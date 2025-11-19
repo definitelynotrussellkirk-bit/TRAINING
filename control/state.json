@@ -1,0 +1,7 @@
+{
+  "status": "training",
+  "last_update": "2025-11-18T17:27:50.390012",
+  "current_file": "syllo_training_new_20k_batch05.jsonl",
+  "paused_at": "2025-11-18T06:23:40.247440",
+  "reason": "Recovered from crash"
+}

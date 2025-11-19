@@ -1,0 +1,448 @@
+#!/usr/bin/env python3
+"""
+Pre-Training Data Validator
+
+THE CRITICAL COMPONENT - Catches mistakes BEFORE training starts!
+
+This would have caught the composition data issue in 30 seconds
+instead of after 9 hours of training.
+"""
+
+import json
+import random
+import hashlib
+from pathlib import Path
+from typing import List, Dict, Optional, Tuple
+from dataclasses import dataclass
+from collections import Counter
+
+
+@dataclass
+class TokenStats:
+    """Token statistics for dataset."""
+    min_input: int
+    max_input: int
+    avg_input: float
+    median_input: int
+    total_input: int
+
+    min_output: int
+    max_output: int
+    avg_output: float
+    median_output: int
+    total_output: int
+
+    total_tokens: int
+    examples_count: int
+
+
+@dataclass
+class ValidationIssue:
+    """A validation issue found in the data."""
+    severity: str  # 'error', 'warning', 'info'
+    category: str  # 'format', 'leakage', 'quality', etc.
+    message: str
+    example_index: Optional[int] = None
+    example_snippet: Optional[str] = None
+
+
+class DatasetValidator:
+    """Validates training datasets before training."""
+
+    def __init__(self, dataset_path: Path, tokenizer=None):
+        self.dataset_path = dataset_path
+        self.tokenizer = tokenizer
+        self.examples = []
+        self.issues = []
+
+    def load_dataset(self) -> bool:
+        """Load and parse dataset file."""
+        print(f"📂 Loading dataset: {self.dataset_path}")
+
+        if not self.dataset_path.exists():
+            self.issues.append(ValidationIssue(
+                severity='error',
+                category='file',
+                message=f"Dataset file not found: {self.dataset_path}"
+            ))
+            return False
+
+        try:
+            with open(self.dataset_path, 'r') as f:
+                for line_num, line in enumerate(f, 1):
+                    if not line.strip():
+                        continue
+                    try:
+                        example = json.loads(line)
+                        self.examples.append(example)
+                    except json.JSONDecodeError as e:
+                        self.issues.append(ValidationIssue(
+                            severity='error',
+                            category='format',
+                            message=f"Invalid JSON at line {line_num}: {e}"
+                        ))
+                        if len(self.issues) > 10:  # Stop after 10 errors
+                            break
+
+            if not self.examples:
+                self.issues.append(ValidationIssue(
+                    severity='error',
+                    category='format',
+                    message="No valid examples found in dataset"
+                ))
+                return False
+
+            print(f"✅ Loaded {len(self.examples):,} examples")
+            return True
+
+        except Exception as e:
+            self.issues.append(ValidationIssue(
+                severity='error',
+                category='file',
+                message=f"Failed to read dataset: {e}"
+            ))
+            return False
+
+    def validate_format(self) -> bool:
+        """Validate example format."""
+        print("\n🔍 Validating format...")
+
+        format_ok = True
+        for i, example in enumerate(self.examples[:1000]):  # Check first 1000
+            # Check required keys
+            if 'messages' not in example:
+                self.issues.append(ValidationIssue(
+                    severity='error',
+                    category='format',
+                    message=f"Example {i} missing 'messages' key"
+                ))
+                format_ok = False
+                continue
+
+            messages = example['messages']
+            if not isinstance(messages, list) or len(messages) != 2:
+                self.issues.append(ValidationIssue(
+                    severity='error',
+                    category='format',
+                    message=f"Example {i}: 'messages' must be list of 2 items"
+                ))
+                format_ok = False
+                continue
+
+            # Check message format
+            user_msg = messages[0]
+            assistant_msg = messages[1]
+
+            if user_msg.get('role') != 'user':
+                self.issues.append(ValidationIssue(
+                    severity='error',
+                    category='format',
+                    message=f"Example {i}: First message must have role='user'"
+                ))
+                format_ok = False
+
+            if assistant_msg.get('role') != 'assistant':
+                self.issues.append(ValidationIssue(
+                    severity='error',
+                    category='format',
+                    message=f"Example {i}: Second message must have role='assistant'"
+                ))
+                format_ok = False
+
+            if 'content' not in user_msg or not isinstance(user_msg['content'], str):
+                self.issues.append(ValidationIssue(
+                    severity='error',
+                    category='format',
+                    message=f"Example {i}: User message missing valid 'content'"
+                ))
+                format_ok = False
+
+            if 'content' not in assistant_msg or not isinstance(assistant_msg['content'], str):
+                self.issues.append(ValidationIssue(
+                    severity='error',
+                    category='format',
+                    message=f"Example {i}: Assistant message missing valid 'content'"
+                ))
+                format_ok = False
+
+        if format_ok:
+            print("✅ Format validation passed")
+        else:
+            print(f"❌ Found {len([i for i in self.issues if i.category == 'format'])} format issues")
+
+        return format_ok
+
+    def check_duplicates(self) -> int:
+        """Check for duplicate examples."""
+        print("\n🔍 Checking for duplicates...")
+
+        hashes = []
+        for example in self.examples:
+            # Hash the user+assistant content
+            content = example['messages'][0]['content'] + example['messages'][1]['content']
+            hash_val = hashlib.md5(content.encode()).hexdigest()
+            hashes.append(hash_val)
+
+        hash_counts = Counter(hashes)
+        duplicates = sum(count - 1 for count in hash_counts.values() if count > 1)
+
+        if duplicates > 0:
+            self.issues.append(ValidationIssue(
+                severity='warning',
+                category='quality',
+                message=f"Found {duplicates:,} duplicate examples ({duplicates/len(self.examples)*100:.1f}%)"
+            ))
+            print(f"⚠️  {duplicates:,} duplicates found")
+        else:
+            print("✅ No duplicates found")
+
+        return duplicates
+
+    def compute_token_stats(self) -> Optional[TokenStats]:
+        """Compute token statistics."""
+        print("\n📊 Computing token statistics...")
+
+        if self.tokenizer is None:
+            # Simple estimation: ~4 chars per token
+            def estimate_tokens(text):
+                return len(text) // 4
+            tokenize = estimate_tokens
+            print("   (Using estimation: ~4 chars/token)")
+        else:
+            def tokenize(text):
+                return len(self.tokenizer.encode(text))
+
+        input_tokens = []
+        output_tokens = []
+
+        # Sample for speed if dataset is large
+        sample_size = min(10000, len(self.examples))
+        samples = random.sample(self.examples, sample_size)
+
+        for example in samples:
+            input_tokens.append(tokenize(example['messages'][0]['content']))
+            output_tokens.append(tokenize(example['messages'][1]['content']))
+
+        # Scale up totals
+        scale_factor = len(self.examples) / sample_size
+
+        stats = TokenStats(
+            min_input=min(input_tokens),
+            max_input=max(input_tokens),
+            avg_input=sum(input_tokens) / len(input_tokens),
+            median_input=sorted(input_tokens)[len(input_tokens)//2],
+            total_input=int(sum(input_tokens) * scale_factor),
+
+            min_output=min(output_tokens),
+            max_output=max(output_tokens),
+            avg_output=sum(output_tokens) / len(output_tokens),
+            median_output=sorted(output_tokens)[len(output_tokens)//2],
+            total_output=int(sum(output_tokens) * scale_factor),
+
+            total_tokens=int((sum(input_tokens) + sum(output_tokens)) * scale_factor),
+            examples_count=len(self.examples)
+        )
+
+        print(f"   Input:  {stats.min_input}-{stats.max_input} tokens (avg: {stats.avg_input:.0f})")
+        print(f"   Output: {stats.min_output}-{stats.max_output} tokens (avg: {stats.avg_output:.0f})")
+        print(f"   Total:  {stats.total_tokens:,} tokens")
+
+        # Check for issues
+        if stats.max_input > 4096:
+            self.issues.append(ValidationIssue(
+                severity='warning',
+                category='quality',
+                message=f"Some inputs exceed 4096 tokens (max: {stats.max_input})"
+            ))
+
+        if stats.avg_output < 5:
+            self.issues.append(ValidationIssue(
+                severity='warning',
+                category='quality',
+                message=f"Very short outputs (avg: {stats.avg_output:.0f} tokens)"
+            ))
+
+        return stats
+
+    def check_answer_leakage(self, num_samples: int = 10) -> List[Dict]:
+        """
+        THE CRITICAL CHECK!
+
+        Detect if answers appear in inputs.
+        This would have caught the composition data issue!
+        """
+        print("\n🚨 CHECKING FOR ANSWER LEAKAGE (CRITICAL!)")
+        print("=" * 70)
+
+        # Sample random examples
+        samples = random.sample(self.examples, min(num_samples, len(self.examples)))
+        leakage_samples = []
+
+        for i, example in enumerate(samples):
+            user_content = example['messages'][0]['content']
+            assistant_content = example['messages'][1]['content']
+
+            # Extract key phrases from assistant response (first 50 chars or first line)
+            answer_preview = assistant_content.strip().split('\n')[0][:50]
+
+            # Check for exact substring matches
+            leakage_found = []
+
+            # Check if full answer appears in input
+            if assistant_content.strip() in user_content:
+                leakage_found.append("Full answer in input!")
+
+            # Check for answer preview
+            if answer_preview in user_content:
+                leakage_found.append(f"Answer preview '{answer_preview}' in input!")
+
+            # Check for composition pattern like "(1 6)"
+            import re
+            comp_pattern = r'\([0-9\s]+\)'
+            user_comps = re.findall(comp_pattern, user_content)
+            assistant_comps = re.findall(comp_pattern, assistant_content)
+
+            if user_comps and assistant_comps:
+                common = set(user_comps) & set(assistant_comps)
+                if common:
+                    leakage_found.append(f"Composition {common} in both input and output!")
+
+            leakage_samples.append({
+                'index': i,
+                'user': user_content[:300],
+                'assistant': assistant_content[:300],
+                'leakage': leakage_found,
+                'has_leakage': len(leakage_found) > 0
+            })
+
+        # Report
+        leakage_count = sum(1 for s in leakage_samples if s['has_leakage'])
+        if leakage_count > 0:
+            self.issues.append(ValidationIssue(
+                severity='error',
+                category='leakage',
+                message=f"⚠️  ANSWER LEAKAGE DETECTED in {leakage_count}/{num_samples} samples!"
+            ))
+
+        return leakage_samples
+
+    def display_samples(self, leakage_samples: List[Dict]):
+        """Display sample examples for user review."""
+        print("\n" + "=" * 70)
+        print("SAMPLE EXAMPLES FOR REVIEW")
+        print("=" * 70)
+
+        for sample in leakage_samples:
+            status = "❌ LEAKAGE" if sample['has_leakage'] else "✅ OK"
+            print(f"\n{status} Example {sample['index'] + 1}/{len(leakage_samples)}:")
+            print("┌" + "─" * 68 + "┐")
+            print("│ INPUT (what model sees):                                          │")
+            print("├" + "─" * 68 + "┤")
+            for line in sample['user'].split('\n')[:5]:  # Show first 5 lines
+                print(f"│ {line[:66]:<66} │")
+            print("│ ...                                                                │")
+            print("└" + "─" * 68 + "┘")
+
+            print("┌" + "─" * 68 + "┐")
+            print("│ EXPECTED OUTPUT (what model should say):                          │")
+            print("├" + "─" * 68 + "┤")
+            for line in sample['assistant'].split('\n')[:3]:  # Show first 3 lines
+                print(f"│ {line[:66]:<66} │")
+            print("└" + "─" * 68 + "┘")
+
+            if sample['has_leakage']:
+                print("\n⚠️  LEAKAGE DETECTED:")
+                for leak in sample['leakage']:
+                    print(f"    • {leak}")
+
+        print("\n" + "=" * 70)
+
+    def run_full_validation(self) -> bool:
+        """Run complete validation pipeline."""
+        print("\n" + "=" * 70)
+        print("PRE-TRAINING VALIDATION")
+        print("=" * 70)
+
+        # 1. Load dataset
+        if not self.load_dataset():
+            return False
+
+        # 2. Validate format
+        if not self.validate_format():
+            return False
+
+        # 3. Check duplicates
+        self.check_duplicates()
+
+        # 4. Token statistics
+        stats = self.compute_token_stats()
+
+        # 5. THE CRITICAL CHECK - Answer leakage!
+        leakage_samples = self.check_answer_leakage(num_samples=10)
+
+        # 6. Display samples for manual review
+        self.display_samples(leakage_samples)
+
+        # 7. Summary
+        print("\n" + "=" * 70)
+        print("VALIDATION SUMMARY")
+        print("=" * 70)
+
+        errors = [i for i in self.issues if i.severity == 'error']
+        warnings = [i for i in self.issues if i.severity == 'warning']
+
+        if errors:
+            print(f"\n❌ {len(errors)} ERRORS found:")
+            for issue in errors:
+                print(f"   • {issue.message}")
+
+        if warnings:
+            print(f"\n⚠️  {len(warnings)} WARNINGS:")
+            for issue in warnings:
+                print(f"   • {issue.message}")
+
+        if not errors and not warnings:
+            print("\n✅ All validation checks passed!")
+
+        print("\n" + "=" * 70)
+        print("CRITICAL QUESTIONS:")
+        print("=" * 70)
+        print("1. Does ANY input reveal the answer? [Check above samples]")
+        print("2. Are output formats consistent? [Review samples]")
+        print("3. Are tasks clearly specified? [Review inputs]")
+        print("4. Can you determine correct answer from input alone? [Try it!]")
+        print("=" * 70)
+
+        # Return True only if no errors
+        return len(errors) == 0
+
+
+def main():
+    """Test validator."""
+    import sys
+
+    if len(sys.argv) < 2:
+        print("Usage: python validator.py <dataset.jsonl>")
+        sys.exit(1)
+
+    dataset_path = Path(sys.argv[1])
+    validator = DatasetValidator(dataset_path)
+
+    if validator.run_full_validation():
+        print("\n✅ Dataset passed validation!")
+
+        # Ask user to confirm
+        print("\n" + "=" * 70)
+        response = input("Continue with this dataset? [yes/no]: ").strip().lower()
+        if response != 'yes':
+            print("❌ Validation cancelled by user")
+            sys.exit(1)
+        print("✅ User confirmed - proceeding with training")
+    else:
+        print("\n❌ Dataset failed validation!")
+        print("Please fix the issues above before training.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

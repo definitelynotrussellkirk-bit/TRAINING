@@ -1,0 +1,31 @@
+# Large model directories (not tracked in git)
+models/
+current_model/
+current_model_small/
+consolidated_models/
+consolidated_backups/
+DIO_20251114/
+snapshots/
+
+# Training outputs and queue
+test_minimal_output/
+queue/
+inbox/
+
+# Logs and status (generated files)
+logs/
+*.log
+status/
+flagged_examples/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# System files
+.DS_Store
+*.swp
+*.swo
+*~

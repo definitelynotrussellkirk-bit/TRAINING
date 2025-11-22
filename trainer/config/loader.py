@@ -44,7 +44,8 @@ class ConfigLoader:
     @staticmethod
     def from_args_and_json(
         args: argparse.Namespace,
-        base_config_path: Optional[Path] = None
+        base_config_path: Optional[Path] = None,
+        validate_lock: bool = True
     ) -> TrainerConfig:
         """
         Create configuration from CLI args and config.json
@@ -57,6 +58,7 @@ class ConfigLoader:
         Args:
             args: Parsed CLI arguments
             base_config_path: Path to config.json (default: config.json)
+            validate_lock: If True, validate against .config_lock.json
 
         Returns:
             TrainerConfig instance
@@ -73,7 +75,13 @@ class ConfigLoader:
         config_dict = ConfigLoader._merge_config(base_config, args)
 
         # Create TrainerConfig
-        return TrainerConfig.from_dict(config_dict)
+        config = TrainerConfig.from_dict(config_dict)
+
+        # Validate locked config
+        if validate_lock:
+            ConfigLoader.validate_locked_config(config, strict=True)
+
+        return config
 
     @staticmethod
     def _merge_config(base: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:
@@ -164,6 +172,7 @@ class ConfigLoader:
     def from_file_and_defaults(
         dataset_path: str,
         base_config: str = "config.json",
+        validate_lock: bool = True,
         **overrides
     ) -> TrainerConfig:
         """
@@ -174,6 +183,7 @@ class ConfigLoader:
         Args:
             dataset_path: Path to training dataset
             base_config: Path to base config.json
+            validate_lock: If True, validate against .config_lock.json
             **overrides: Additional overrides (e.g., output_dir="outputs/run_001")
 
         Returns:
@@ -195,25 +205,104 @@ class ConfigLoader:
                 d = d.setdefault(k, {})
             d[keys[-1]] = value
 
-        return TrainerConfig.from_dict(base)
+        # Create config
+        config = TrainerConfig.from_dict(base)
+
+        # Validate locked config
+        if validate_lock:
+            ConfigLoader.validate_locked_config(config, strict=True)
+
+        return config
 
     @staticmethod
-    def validate_locked_config(config: TrainerConfig, strict: bool = True):
+    def validate_locked_config(
+        config: TrainerConfig,
+        strict: bool = True,
+        lock_file: Path = Path(".config_lock.json")
+    ):
         """
-        Validate locked configuration hasn't been changed.
+        Validate locked configuration hasn't been changed across training runs.
 
-        Raises ValueError if locked fields have been modified (in strict mode).
+        On first run: Creates lock file from current config.locked
+        On subsequent runs: Compares current config against lock file
+
+        Args:
+            config: TrainerConfig to validate
+            strict: If True, raise on mismatch. If False, just warn.
+            lock_file: Path to lock file (default: .config_lock.json in cwd)
+
+        Raises:
+            ValueError: If locked fields changed and strict=True
         """
-        # In strict mode, we'd check against a reference
-        # For now, just ensure locked fields are present
-        if not config.locked.base_model:
-            raise ValueError("Locked config missing: base_model")
+        # Build current locked snapshot
+        current = {
+            "base_model": config.locked.base_model,
+            "model_architecture": config.locked.model_architecture,
+            "max_context_length": config.locked.max_context_length,
+            "vocab_size": config.locked.vocab_size,
+            "model_version": config.locked.model_version,
+        }
 
-        if not config.locked.model_architecture:
-            raise ValueError("Locked config missing: model_architecture")
+        # Validate fields are present
+        for key, value in current.items():
+            if not value or (isinstance(value, int) and value <= 0):
+                raise ValueError(f"Locked config invalid: {key}={value}")
 
-        if config.locked.max_context_length <= 0:
-            raise ValueError(f"Invalid max_context_length: {config.locked.max_context_length}")
+        # If lock file doesn't exist, create it (first run)
+        if not lock_file.exists():
+            lock_data = {
+                **current,
+                "locked_at": datetime.now().isoformat(),
+                "note": "DO NOT MODIFY - This file locks critical model architecture parameters"
+            }
+            lock_file.write_text(json.dumps(lock_data, indent=2))
+            print(f"✓ Created lock file: {lock_file}")
+            print(f"  Locked: base_model={current['base_model']}, "
+                  f"max_length={current['max_context_length']}")
+            return
+
+        # Load existing lock
+        try:
+            with open(lock_file, 'r') as f:
+                locked = json.load(f)
+        except Exception as e:
+            raise ValueError(f"Failed to read lock file {lock_file}: {e}")
+
+        # Compare current vs locked
+        diffs = []
+        for key in current.keys():
+            if key in locked and locked[key] != current[key]:
+                diffs.append(
+                    f"{key}: locked={locked[key]}, current={current[key]}"
+                )
+
+        # Handle mismatches
+        if diffs:
+            msg = (
+                f"❌ Locked configuration changed!\n"
+                f"   Lock file: {lock_file}\n"
+                f"   Changes:\n"
+            )
+            for diff in diffs:
+                msg += f"     - {diff}\n"
+            msg += "\n"
+            msg += "   These parameters CANNOT be changed during training:\n"
+            msg += "     - base_model (changing breaks checkpoint compatibility)\n"
+            msg += "     - max_context_length (requires model re-initialization)\n"
+            msg += "     - vocab_size (incompatible tokenizer)\n"
+            msg += "\n"
+            msg += "   To proceed:\n"
+            msg += f"     1. Delete {lock_file} to start fresh (loses checkpoint compatibility)\n"
+            msg += "     2. Revert config.json to match lock file\n"
+
+            if strict:
+                raise ValueError(msg)
+            else:
+                print(f"⚠️  WARNING: {msg}")
+
+        # Success - config matches lock
+        print(f"✓ Locked config validated: {lock_file}")
+        return True
 
 
 def parse_args() -> argparse.Namespace:

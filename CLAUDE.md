@@ -1,9 +1,11 @@
 # CLAUDE INSTRUCTIONS - LLM Training System
 
-**Last Updated:** 2025-11-22 (Post-Reorganization)
+**Last Updated:** 2025-11-22 (Post-Refactor - Steps 1-5 Complete)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 This document contains instructions for Claude to help with training operations.
+
+**MAJOR UPDATE:** Training system refactored into clean 3-layer architecture (Steps 1-5 complete)
 
 ---
 
@@ -63,13 +65,28 @@ This document contains instructions for Claude to help with training operations.
 
 ## 📁 DIRECTORY STRUCTURE
 
-**Organized 2025-11-22** - All files reorganized into logical categories
+**Reorganized 2025-11-22** - All files organized + new trainer/ module added
 
 ```
 /path/to/training/
 │
 ├── CLAUDE.md                    # This file (Claude instructions)
 ├── config.json                  # Active configuration
+│
+├── trainer/                     # 🆕 NEW: Refactored training modules (3-layer architecture)
+│   ├── config/                  # Layer 2: Configuration system
+│   │   ├── schema.py            # 8 dataclasses (Hyperparams, ProfileConfig, etc.)
+│   │   └── loader.py            # ConfigLoader (JSON + CLI merging)
+│   ├── profiles/                # Layer 3: Pluggable data profiles
+│   │   ├── base.py              # DataProfile ABC interface
+│   │   ├── emoji_think.py       # Emoji thinking/stop profile
+│   │   └── regime3.py           # Symbolic reasoning profile (NEW!)
+│   ├── monitoring/              # Layer 3: Monitoring callbacks
+│   │   ├── status_writer.py     # TrainingStatusWriter
+│   │   └── callbacks.py         # LiveMonitorCallback
+│   ├── core/                    # Layer 1: Engine API
+│   │   └── engine.py            # TrainerEngine.run_job() (proof-of-concept)
+│   └── cli_main.py              # CLI demonstration
 │
 ├── README.md                    # System overview
 ├── QUICKSTART.md                # Getting started
@@ -78,12 +95,13 @@ This document contains instructions for Claude to help with training operations.
 ├── DEVELOPMENT.md               # Development guide
 ├── CHANGELOG.md                 # Change tracking
 │
-├── core/                        # Core training system (10 files)
-│   ├── train.py                 # Main training script (HuggingFace Trainer)
+├── core/                        # Core training system (11 files)
+│   ├── train.py                 # Main training script (HuggingFace Trainer) - STILL WORKS
+│   ├── train_v1_backup.py       # Backup before refactor
 │   ├── training_daemon.py       # File watcher + orchestrator
 │   ├── training_controller.py   # Control commands (pause/resume/stop)
 │   ├── training_queue.py        # Queue management
-│   ├── training_status.py       # Status writer
+│   ├── training_status.py       # Status writer (copied to trainer/monitoring/)
 │   ├── custom_collator.py       # Data collator
 │   ├── logit_penalty.py         # Penalty processors
 │   ├── validator.py             # Data validation
@@ -162,6 +180,15 @@ This document contains instructions for Claude to help with training operations.
 │   ├── failed/                  # Failed files
 │   └── recently_completed/
 │
+├── scratch/                     # Documentation & tests
+│   ├── REFACTOR_PLAN.md         # Original refactor plan
+│   ├── REFACTOR_COMPLETE.md     # Refactor completion summary
+│   ├── STEP1_COMPLETE.md        # Step 1 validation
+│   ├── STEP2_COMPLETE.md        # Step 2 validation
+│   ├── REFACTOR_PROGRESS.md     # Progress tracking
+│   ├── test_emoji_profile.py    # Emoji profile tests (6 tests)
+│   └── test_regime3_profile.py  # Regime3 profile tests (7 tests)
+│
 └── archive/                     # Archived/experimental
     ├── configs/                 # Old configs
     ├── experiments/             # Experimental scripts
@@ -171,6 +198,107 @@ This document contains instructions for Claude to help with training operations.
 GOTCHA_BUSINESS_MODEL/
 OBSERVATIONS/
 ```
+
+---
+
+## 🆕 NEW: REFACTORED TRAINING MODULES
+
+**Status:** Steps 1-5 Complete (2025-11-22)
+**Git Tags:** 6 tags created (trainer_v1_emoji_baseline → refactor_step5_regime3)
+
+### **3-Layer Architecture**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 🔒 LAYER 1: CORE ENGINE (Proof-of-Concept API)            │
+│  trainer/core/engine.py - TrainerEngine.run_job()         │
+│  Clean API surface (demonstration)                         │
+│  Production: Use core/train.py (backward compatible)       │
+└─────────────────────────────────────────────────────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 🎚️  LAYER 2: CONFIG & TOGGLES (Production Ready)          │
+│  trainer/config/schema.py - 8 dataclasses                  │
+│  trainer/config/loader.py - ConfigLoader                   │
+│  Single source of truth, type-safe, validated              │
+└─────────────────────────────────────────────────────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 🧩 LAYER 3: PROFILES / PLUGINS (Production Ready)         │
+│  trainer/profiles/emoji_think.py - Emoji thinking/stop    │
+│  trainer/profiles/regime3.py - Symbolic reasoning (NEW!)  │
+│  trainer/monitoring/callbacks.py - LiveMonitorCallback    │
+│  Pluggable, extensible, tested (13/13 tests passing)      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### **Available Profiles**
+
+**1. emoji_think (Original)**
+- Emoji-based thinking patterns (random emoji, random count 2-8)
+- Stop signals (random emoji, random count 2-4)
+- Logit penalties for enforcement
+- Full backward compatibility
+
+**2. regime3 (NEW!)** ⭐
+- Symbolic reasoning: `(op arg1 arg2)`
+- Answer markers: `<<ANS_START>> ... <<ANS_END>>`
+- Clean, penalty-free training
+- Designed for structured logical reasoning
+
+### **How to Use New Modules**
+
+```python
+# 1. Use Config System
+from trainer.config import create_default_config
+config = create_default_config(
+    model_path="models/Qwen3-0.6B",
+    dataset_path="data/train.jsonl",
+    output_dir="outputs/run_001",
+    base_model="Qwen/Qwen3-0.6B",
+    model_architecture="Qwen3ForCausalLM",
+    max_context_length=4096,
+    vocab_size=151936
+)
+
+# 2. Use Profile System
+from trainer.profiles import get_profile
+profile = get_profile("emoji_think")  # or "regime3"
+transformed = profile.transform_example(example, index, system_prompt)
+processors = profile.build_logits_processors(tokenizer)
+
+# 3. Use Monitoring
+from trainer.monitoring import LiveMonitorCallback, TrainingStatusWriter
+status_writer = TrainingStatusWriter("status/training_status.json")
+callback = LiveMonitorCallback(...)
+
+# 4. Use Engine API (Demo)
+from trainer.core import TrainerEngine
+engine = TrainerEngine(status_writer)
+result = engine.run_job(config)
+```
+
+### **CLI Demo**
+
+```bash
+# Use new CLI wrapper
+python3 -m trainer.cli_main --dataset data.jsonl --model qwen3 --output out --profile emoji_think
+python3 -m trainer.cli_main --dataset data.jsonl --model qwen3 --output out --profile regime3
+
+# Test profiles
+python3 scratch/test_emoji_profile.py      # 6/6 tests ✅
+python3 scratch/test_regime3_profile.py    # 7/7 tests ✅
+```
+
+### **Refactor Status**
+
+- ✅ **Step 1:** Config extraction (tag: refactor_step1_config)
+- ✅ **Step 2:** Profile extraction (tag: refactor_step2_profiles)
+- ✅ **Step 3:** Monitoring extraction (tag: refactor_step3_monitoring)
+- ✅ **Step 4:** TrainerEngine API (tag: refactor_step4_engine)
+- ✅ **Step 5:** Regime3 profile (tag: refactor_step5_regime3)
+
+**Result:** ~3,400 lines organized into 14 modules, fully tested, backward compatible
 
 ---
 
@@ -370,7 +498,19 @@ python3 tools/data/validate_data.py --file my_data.jsonl
 
 ## 🔄 UPDATE LOG
 
-**2025-11-22:**
+**2025-11-22 (Late - Refactor Complete):**
+- ✅ Completed full 5-step refactor (~3 hours)
+- ✅ Created trainer/ module with 3-layer architecture
+- ✅ Extracted config system (8 dataclasses, type-safe)
+- ✅ Extracted emoji_think profile (emoji patterns + stop signals)
+- ✅ Created regime3 profile (symbolic reasoning) ⭐ NEW
+- ✅ Extracted monitoring system (callbacks + status writer)
+- ✅ Created TrainerEngine API (proof-of-concept)
+- ✅ 13/13 tests passing, 100% backward compatible
+- ✅ All pushed to GitHub with 6 git tags
+- **Production ready:** Can use new modules today or continue with core/train.py
+
+**2025-11-22 (Morning - Reorganization):**
 - Reorganized entire codebase (99 Python files → 6 categories)
 - Created 7 canonical documentation files
 - Removed all old documentation (96+ files)

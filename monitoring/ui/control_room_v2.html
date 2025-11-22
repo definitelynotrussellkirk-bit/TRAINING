@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Control Room V2</title>
+    <link rel="stylesheet" href="/css/control_room_v2.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- Top: Run Summary Bar -->
+    <header class="run-summary-bar">
+        <div class="status-badge-container">
+            <div id="statusBadge" class="status-badge status-idle">IDLE</div>
+            <div class="model-info">
+                <span id="modelName">-</span>
+                <span class="checkpoint-id" id="checkpointId">-</span>
+            </div>
+        </div>
+
+        <div class="progress-container">
+            <div class="progress-text">
+                <span id="progressText">Step 0 / 0 (0%)</span>
+                <span id="epochText">Epoch 0.0</span>
+            </div>
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+            </div>
+        </div>
+
+        <div class="health-indicators">
+            <div id="healthLoss" class="health-indicator">
+                <span class="health-icon">●</span>
+                <span>Loss</span>
+            </div>
+            <div id="healthThroughput" class="health-indicator">
+                <span class="health-icon">●</span>
+                <span>Throughput</span>
+            </div>
+            <div id="healthGPU" class="health-indicator">
+                <span class="health-icon">●</span>
+                <span>GPU</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <div class="main-grid">
+        <!-- Left Column: Training & Hardware -->
+        <div class="left-column">
+            <!-- Training Progress Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Training Progress</h2>
+                    <span class="update-indicator" id="trainingUpdate">●</span>
+                </div>
+                <div class="card-content">
+                    <div class="metric-row">
+                        <span class="metric-label">Step</span>
+                        <span class="metric-value" id="stepValue">0 / 0</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Epoch</span>
+                        <span class="metric-value" id="epochValue">0.0</span>
+                    </div>
+
+                    <div class="metric-section">
+                        <div class="metric-row large">
+                            <span class="metric-label">Loss</span>
+                            <span class="metric-value" id="lossValue">0.000</span>
+                            <span class="trend-indicator" id="lossTrend">–</span>
+                        </div>
+                        <div class="metric-subrow">
+                            <span>Streaming CE:</span>
+                            <span id="streamingCE">–</span>
+                        </div>
+                        <div class="metric-subrow">
+                            <span>Variance:</span>
+                            <span id="lossVariance">–</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-section">
+                        <div class="metric-row">
+                            <span class="metric-label">Val/Train Gap</span>
+                            <span class="metric-value gap-good" id="valTrainGap">–</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-section">
+                        <div class="metric-row large">
+                            <span class="metric-label">Tokens/sec</span>
+                            <span class="metric-value" id="tokensPerSec">0</span>
+                        </div>
+                        <div class="metric-subrow">
+                            <span>EMA:</span>
+                            <span id="tokensPerSecAvg">0</span>
+                        </div>
+                        <div class="metric-subrow">
+                            <span>Baseline:</span>
+                            <span id="tokensPerSecBaseline">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Loss Sparkline -->
+                    <div class="chart-container">
+                        <canvas id="lossSparkline"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Queue & Data Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Current Training</h2>
+                </div>
+                <div class="card-content">
+                    <div class="metric-row">
+                        <span class="metric-label">File</span>
+                        <span class="metric-value filename" id="currentFile">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Batch</span>
+                        <span class="metric-value" id="batchProgress">0 / 0</span>
+                    </div>
+                    <div class="mini-progress">
+                        <div id="batchProgressFill" class="mini-progress-fill"></div>
+                    </div>
+
+                    <div class="metric-section">
+                        <div class="queue-header">Queue</div>
+                        <div class="metric-subrow">
+                            <span>High:</span>
+                            <span id="queueHigh">0 files</span>
+                        </div>
+                        <div class="metric-subrow">
+                            <span>Normal:</span>
+                            <span id="queueNormal">0 files</span>
+                        </div>
+                        <div class="metric-subrow">
+                            <span>Low:</span>
+                            <span id="queueLow">0 files</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-section">
+                        <div class="metric-row">
+                            <span class="metric-label">ETA (file)</span>
+                            <span class="metric-value" id="etaFile">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">ETA (all)</span>
+                            <span class="metric-value" id="etaAll">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hardware Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Hardware</h2>
+                </div>
+                <div class="card-content">
+                    <div class="hardware-grid">
+                        <!-- 4090 (Training) -->
+                        <div class="hardware-section">
+                            <div class="hardware-title">RTX 4090 (Training)</div>
+                            <div class="metric-row">
+                                <span>Temp</span>
+                                <span id="gpu4090Temp" class="temp-value">0°C</span>
+                            </div>
+                            <div class="metric-row">
+                                <span>VRAM</span>
+                                <span id="gpu4090VRAM">0 / 24 GB</span>
+                            </div>
+                            <div class="vram-bar">
+                                <div id="gpu4090VRAMFill" class="vram-bar-fill"></div>
+                            </div>
+                            <div class="metric-row">
+                                <span>Util</span>
+                                <span id="gpu4090Util">0%</span>
+                            </div>
+                            <div class="metric-row">
+                                <span>Power</span>
+                                <span id="gpu4090Power">0 / 450 W</span>
+                            </div>
+                        </div>
+
+                        <!-- 3090 (Inference) -->
+                        <div class="hardware-section">
+                            <div class="hardware-title">
+                                RTX 3090 (Inference)
+                                <span id="gpu3090Status" class="status-dot offline">●</span>
+                            </div>
+                            <div class="metric-row">
+                                <span>Temp</span>
+                                <span id="gpu3090Temp" class="temp-value">0°C</span>
+                            </div>
+                            <div class="metric-row">
+                                <span>VRAM</span>
+                                <span id="gpu3090VRAM">0 / 24 GB</span>
+                            </div>
+                            <div class="vram-bar">
+                                <div id="gpu3090VRAMFill" class="vram-bar-fill"></div>
+                            </div>
+                            <div class="metric-row">
+                                <span>Profile</span>
+                                <span id="gpu3090Profile">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Resources -->
+                    <div class="metric-section">
+                        <div class="metric-row">
+                            <span>RAM</span>
+                            <span id="ramUsage">0 / 64 GB</span>
+                        </div>
+                        <div class="metric-row">
+                            <span>Disk</span>
+                            <span id="diskUsage">0 / 1.8 TB</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Preview & Eval -->
+        <div class="right-column">
+            <!-- Live Preview Card -->
+            <div class="card preview-card">
+                <div class="card-header">
+                    <h2>Live Preview</h2>
+                    <span class="update-indicator" id="previewUpdate">●</span>
+                </div>
+                <div class="card-content" id="previewContent">
+                    <div class="preview-empty">
+                        No preview data available
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview Stats Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Preview Statistics</h2>
+                </div>
+                <div class="card-content">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-label">Last 20</div>
+                            <div class="stat-value" id="emLast20">-</div>
+                            <div class="stat-bar">
+                                <div id="emLast20Fill" class="stat-bar-fill"></div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Last 50</div>
+                            <div class="stat-value" id="emLast50">-</div>
+                            <div class="stat-bar">
+                                <div id="emLast50Fill" class="stat-bar-fill"></div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Last 100</div>
+                            <div class="stat-value" id="emLast100">-</div>
+                            <div class="stat-bar">
+                                <div id="emLast100Fill" class="stat-bar-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-section">
+                        <div class="section-title">By Regime</div>
+                        <div id="regimeStats" class="regime-stats">
+                            <div class="empty-state">No data</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-section">
+                        <div class="section-title">By Source</div>
+                        <div id="sourceStats" class="source-stats">
+                            <div class="empty-state">No data</div>
+                        </div>
+                    </div>
+
+                    <!-- EM Trend Chart -->
+                    <div class="chart-container">
+                        <canvas id="emTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Eval Summary Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Evaluation Metrics</h2>
+                </div>
+                <div class="card-content">
+                    <div class="metric-section">
+                        <div class="section-title">Fixed Eval</div>
+                        <div class="metric-row">
+                            <span>EM</span>
+                            <span id="fixedEvalEM">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span>CE</span>
+                            <span id="fixedEvalCE">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span>ECE</span>
+                            <span id="fixedEvalECE">-</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-section">
+                        <div class="section-title">Snapshots</div>
+                        <div id="snapshotsList" class="snapshots-list">
+                            <div class="empty-state">No snapshots</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom: Advanced Analytics -->
+    <div class="bottom-section">
+        <div class="tabs">
+            <button class="tab active" data-tab="history">Preview History</button>
+            <button class="tab" data-tab="throughput">Throughput Analysis</button>
+        </div>
+
+        <div class="tab-content active" id="historyTab">
+            <!-- Filter Controls -->
+            <div class="filter-controls">
+                <select id="regimeFilter" class="filter-select">
+                    <option value="">All Regimes</option>
+                    <option value="emoji_think">Emoji Think</option>
+                    <option value="regime3">Regime 3</option>
+                    <option value="plain_sft">Plain SFT</option>
+                </select>
+                <select id="sourceFilter" class="filter-select">
+                    <option value="">All Sources</option>
+                    <option value="fixed_eval">Fixed Eval</option>
+                    <option value="train">Train</option>
+                    <option value="failures">Failures</option>
+                </select>
+                <select id="matchFilter" class="filter-select">
+                    <option value="">All Results</option>
+                    <option value="true">Matches Only</option>
+                    <option value="false">Failures Only</option>
+                </select>
+                <button id="refreshHistory" class="btn-secondary">Refresh</button>
+            </div>
+
+            <!-- Preview History Table -->
+            <div class="table-container">
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Step</th>
+                            <th>Example</th>
+                            <th>Regime</th>
+                            <th>Source</th>
+                            <th>EM</th>
+                            <th>CE</th>
+                            <th>Failure</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <tr>
+                            <td colspan="8" class="empty-state">No preview history available</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <button id="prevPage" class="btn-secondary" disabled>← Previous</button>
+                <span id="pageInfo">Page 1</span>
+                <button id="nextPage" class="btn-secondary" disabled>Next →</button>
+            </div>
+        </div>
+
+        <div class="tab-content" id="throughputTab">
+            <div class="chart-container-large">
+                <canvas id="throughputChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Detail Modal -->
+    <div id="previewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Preview Detail</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div id="modalBody" class="modal-body">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/control_room_v2.js"></script>
+</body>
+</html>

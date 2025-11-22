@@ -90,6 +90,21 @@ class MonitoringConfig:
     max_output_samples: int = 5              # Max examples to store
     prompt_snapshot_interval: int = 20       # Snapshot prompts every N steps
 
+    # Generation limits
+    max_output_tokens: int = 2048            # Max tokens for status writer output
+    max_eval_tokens: int = 2048              # Max tokens for evaluation/preview
+
+    # Preview backend configuration
+    preview_backend: str = "local"           # "local" or "remote_3090"
+    preview_max_tokens: int = 256            # Max tokens for live preview
+    preview_temperature: float = 0.7         # Sampling temperature for preview
+
+    # Remote 3090 backend settings (used if preview_backend == "remote_3090")
+    remote_3090_host: str = "192.168.x.x"
+    remote_3090_port: int = 8765
+    remote_3090_timeout: int = 30            # Request timeout (seconds)
+    remote_3090_model_id: Optional[str] = None  # Model ID on 3090 (None = use active)
+
 
 @dataclass
 class LockedConfig:

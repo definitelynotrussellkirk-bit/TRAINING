@@ -198,11 +198,19 @@ class UltimateTrainer:
         self.evolution_tracker = None  # Will be initialized with dataset name
         self.avg_seq_len = 0  # Rolling estimate from tokenized train set
         self.model_label = self._load_model_label()
-        # Pass config values to status writer (hardcoded max_new_tokens=getattr(self.args, "eval_max_tokens", 512) from train.py:482)
+
+        # Create status writer with config values (or fallback to defaults)
+        max_output_tokens = 2048  # Default
+        context_window = getattr(args, 'max_length', 2048)  # Default
+
+        if self.config and self.config.monitoring:
+            max_output_tokens = self.config.monitoring.max_output_tokens
+            context_window = self.config.hyperparams.max_length
+
         self.status_writer = TrainingStatusWriter(
             DEFAULT_STATUS_FILE,
-            max_output_tokens=2048,  # From train.py line 482
-            context_window=getattr(args, 'max_length', 2048),
+            max_output_tokens=max_output_tokens,
+            context_window=context_window,
             model_name=self.model_label
         )
         self.notifier = DesktopNotifier()
@@ -906,19 +914,33 @@ class UltimateTrainer:
 
     def setup_live_monitor(self):
         """Setup live inference monitoring."""
-        # Load config for self-correction settings
-        config_path = Path("config.json")
-        self_correction_config = {}
+        # Get monitoring settings from config
+        # Use config if available, otherwise load from config.json (legacy)
         max_eval_tokens = 2048  # Default
+        self_correction_config = {}
 
-        if config_path.exists():
-            try:
-                with open(config_path) as f:
-                    cfg = json.load(f)
-                    self_correction_config = cfg.get("self_correction", {})
-                    max_eval_tokens = cfg.get("eval_max_tokens", 2048)
-            except Exception as e:
-                print(f"⚠️  Could not load self-correction config: {e}")
+        if self.config and self.config.monitoring:
+            max_eval_tokens = self.config.monitoring.max_eval_tokens
+            # Still need to get self_correction_config from config.json for now
+            config_path = Path("config.json")
+            if config_path.exists():
+                try:
+                    with open(config_path) as f:
+                        cfg = json.load(f)
+                        self_correction_config = cfg.get("self_correction", {})
+                except Exception as e:
+                    print(f"⚠️  Could not load self-correction config: {e}")
+        else:
+            # Fallback to reading config.json directly (legacy)
+            config_path = Path("config.json")
+            if config_path.exists():
+                try:
+                    with open(config_path) as f:
+                        cfg = json.load(f)
+                        self_correction_config = cfg.get("self_correction", {})
+                        max_eval_tokens = cfg.get("eval_max_tokens", 2048)
+                except Exception as e:
+                    print(f"⚠️  Could not load self-correction config: {e}")
 
         # Create self-correction generator if enabled
         self_correction_gen = None

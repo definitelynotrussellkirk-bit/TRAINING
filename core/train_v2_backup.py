@@ -69,18 +69,7 @@ from logit_penalty import (
     collect_penalty_stats,
 )
 from layer_monitor import LayerMonitor
-# Optional: auto self-correction (may not be available)
-try:
-    from auto_self_correction import create_self_correction_monitor
-    SELF_CORRECTION_AVAILABLE = True
-except ImportError:
-    SELF_CORRECTION_AVAILABLE = False
-    create_self_correction_monitor = None
-
-# Import new trainer modules (refactored architecture)
-from trainer.config import ConfigLoader, TrainerConfig, create_default_config
-from trainer.profiles import get_profile
-# NOTE: trainer.monitoring.TrainingStatusWriter exists but we use core/training_status.py for now (backward compat)
+from auto_self_correction import create_self_correction_monitor
 
 # Thinking emoji pool - each example gets a RANDOM emoji and count
 THINKING_EMOJIS = [
@@ -155,17 +144,7 @@ try:
     DETAILED_MONITORING_AVAILABLE = True
 except ImportError:
     DETAILED_MONITORING_AVAILABLE = False
-
-# Try to import desktop notifier (optional)
-try:
-    from desktop_notifier import DesktopNotifier
-except ImportError:
-    # Create stub class if not available
-    class DesktopNotifier:
-        def __init__(self): pass
-        def notify(self, *args, **kwargs): pass
-        def notify_success(self, *args, **kwargs): pass
-        def notify_error(self, *args, **kwargs): pass
+from desktop_notifier import DesktopNotifier
 
 
 class UltimateTrainer:
@@ -174,17 +153,6 @@ class UltimateTrainer:
     def __init__(self, args, controller=None):
         self.args = args
         self.controller = controller  # Training control system (pause/stop)
-
-        # Create TrainerConfig from args (new config system)
-        # This provides single source of truth for all config values
-        try:
-            self.config = ConfigLoader.from_args_and_json(args)
-            print(f"✓ TrainerConfig created (profile: {self.config.profile.name}, precision: {self.config.hyperparams.fp_precision})")
-        except Exception as e:
-            print(f"⚠️  Could not create TrainerConfig: {e}")
-            print(f"   Falling back to args-only mode")
-            self.config = None
-
         self.model_db = ModelDatabase()
         self.validator = None
         self.model = None
@@ -519,29 +487,11 @@ class UltimateTrainer:
                 "attn_implementation": "sdpa"
             }
 
-            # Add quantization config if using QLoRA, otherwise set precision
+            # Add quantization config if using QLoRA, otherwise use bfloat16
             if quantization_config:
                 model_kwargs["quantization_config"] = quantization_config
             else:
-                # Use precision from config if available, otherwise default to bfloat16
-                if self.config and self.config.hyperparams.fp_precision:
-                    precision = self.config.hyperparams.fp_precision
-                    if precision == "bf16":
-                        model_kwargs["torch_dtype"] = torch.bfloat16
-                        print(f"   Using BF16 precision (from config)")
-                    elif precision == "fp16":
-                        model_kwargs["torch_dtype"] = torch.float16
-                        print(f"   Using FP16 precision (from config)")
-                    elif precision == "fp32":
-                        model_kwargs["torch_dtype"] = torch.float32
-                        print(f"   Using FP32 precision (from config)")
-                    else:
-                        model_kwargs["torch_dtype"] = torch.bfloat16
-                        print(f"   ⚠️  Unknown precision '{precision}', defaulting to BF16")
-                else:
-                    # Fallback to original behavior
-                    model_kwargs["torch_dtype"] = torch.bfloat16
-                    print(f"   Using BF16 precision (default)")
+                model_kwargs["torch_dtype"] = torch.bfloat16
 
             # Try loading as Qwen3VL (for VL models)
             self.is_vision_model = False  # Track model type for formatting
@@ -587,54 +537,52 @@ class UltimateTrainer:
             # Full model training (no LoRA)
             print("   ✓ Full model fine-tuning enabled (all weights trainable)")
 
-            # Load profile for logit processors
-            # If config available, use profile from config; otherwise use legacy emoji_think
-            if self.config and self.config.profile.name:
-                profile_name = self.config.profile.name
-                try:
-                    self.profile = get_profile(profile_name)
-                    print(f"   ✓ Loaded profile: {profile_name}")
+            # Penalize <think> tags and EOS tokens during generation previews
+            combined_processors = LogitsProcessorList()
 
-                    # Use profile's logit processors
-                    combined_processors = self.profile.build_logits_processors(self.tokenizer)
-                    print(f"   ✓ Built logit processors from profile ({len(combined_processors)} processors)")
-                except Exception as e:
-                    print(f"   ⚠️  Failed to load profile '{profile_name}': {e}")
-                    print(f"      Falling back to legacy emoji_think logic")
-                    self.profile = None
-                    combined_processors = None
-            else:
-                self.profile = None
-                combined_processors = None
+            think_processors = build_think_penalty_processor(
+                self.tokenizer,
+                penalty=80.0,
+                schedule=DEFAULT_PENALTY_SCHEDULE,
+            )
+            if len(think_processors) > 0:
+                combined_processors.extend(think_processors)
+                print("   ✓ Enabled logit penalty for <think> tags")
 
-            # Fallback to legacy logit processors if profile not available
-            if combined_processors is None:
-                print("   Building legacy emoji_think logit processors...")
-                combined_processors = LogitsProcessorList()
+            # DISABLED: Global EOS penalty conflicts with post-stop EOT reward
+            # The post-stop penalty already handles EOS correctly:
+            # - Rewards EOS after complete stop sequence (+50)
+            # - Penalizes everything else (escalating 100 → 1000 → 10000)
+            # Global EOS penalty was causing model to stop mid-sequence because
+            # penalty decreased over time (640 → 160 → 120 → 80) making early
+            # EOS "cheaper" than completing the stop sequence then outputting EOS
+            #
+            # eos_processors = build_eos_penalty_processor(
+            #     self.tokenizer,
+            #     penalty=80.0,
+            #     schedule=DEFAULT_PENALTY_SCHEDULE,
+            # )
+            # if len(eos_processors) > 0:
+            #     combined_processors.extend(eos_processors)
+            #     print("   ✓ Enabled logit penalty for EOS tokens")
 
-                think_processors = build_think_penalty_processor(
-                    self.tokenizer,
-                    penalty=80.0,
-                    schedule=DEFAULT_PENALTY_SCHEDULE,
-                )
-                if len(think_processors) > 0:
-                    combined_processors.extend(think_processors)
-                    print("   ✓ Enabled logit penalty for <think> tags")
-
-                # Penalize tokens after stop emoji sequences with escalating penalties
-                post_stop_processors = build_post_stop_penalty_processor(
-                    self.tokenizer,
-                    stop_emoji_pool=STOP_EMOJI_POOL,
-                    stop_count_min=STOP_COUNT_MIN,
-                    stop_count_max=STOP_COUNT_MAX,
-                    base_penalty=100.0,
-                    escalation_rate=10.0,
-                    eot_reward=50.0,
-                    eot_sequence=None,
-                )
-                if len(post_stop_processors) > 0:
-                    combined_processors.extend(post_stop_processors)
-                    print("   ✓ Enabled escalating penalty for tokens after stop signal")
+            # Penalize tokens after stop emoji sequences with escalating penalties
+            # Supports variable emojis and counts (2-4 repetitions)
+            # Also reward EOT tokens to encourage proper termination
+            post_stop_processors = build_post_stop_penalty_processor(
+                self.tokenizer,
+                stop_emoji_pool=STOP_EMOJI_POOL,  # Pool of 10 stop emojis
+                stop_count_min=STOP_COUNT_MIN,    # Minimum 2 repetitions
+                stop_count_max=STOP_COUNT_MAX,    # Maximum 4 repetitions
+                base_penalty=100.0,  # MASSIVE penalty - nuclear option
+                escalation_rate=10.0,  # Extreme escalation
+                eot_reward=50.0,  # HUGE reward for EOT
+                eot_sequence=None,  # None = use tokenizer.eos_token_id (default)
+                # Future: eot_sequence="<|end|>" or "<|end|><|end|>" for custom sequences
+            )
+            if len(post_stop_processors) > 0:
+                combined_processors.extend(post_stop_processors)
+                print("   ✓ Enabled escalating penalty for tokens after stop signal")
 
             self.logits_processor = combined_processors if len(combined_processors) > 0 else None
 
@@ -675,40 +623,23 @@ class UltimateTrainer:
             val_examples = examples[:val_size]
             train_examples = examples[val_size:]
 
-            # Use profile loaded in load_model() if available
-            # (profile is loaded early for logit processors)
-            profile = self.profile if hasattr(self, 'profile') else None
+            # Inject enforced system prompt into copies of examples
+            def inject_system(ex, idx):
+                """Inject system prompt and apply random thinking pattern based on index."""
+                msgs = ex.get('messages', [])
+                if not msgs or msgs[0].get('role') != 'system':
+                    msgs = [{"role": "system", "content": self.enforced_system_prompt}] + msgs
+                else:
+                    msgs[0]["content"] = self.enforced_system_prompt
+                new_ex = dict(ex)
+                # Pass index to get RANDOM thinking pattern for this example
+                new_ex['messages'] = self.enforce_thinking_requirement(msgs, example_index=idx)
+                new_ex['messages'] = self.enforce_stop_requirement(new_ex['messages'])
+                return new_ex
 
-            # Transform examples using profile (new) or legacy logic (fallback)
-            if profile:
-                profile_name = self.config.profile.name if self.config else "unknown"
-                # NEW: Use profile.transform_example()
-                def transform_example(ex, idx):
-                    """Transform example using loaded profile."""
-                    transformed = profile.transform_example(ex, idx, self.enforced_system_prompt)
-                    return self.sanitize_example(transformed)
-
-                print(f"   Using profile transformation: {profile_name}")
-            else:
-                # LEGACY: Use hard-coded emoji/stop logic
-                def transform_example(ex, idx):
-                    """Inject system prompt and apply random thinking pattern based on index."""
-                    msgs = ex.get('messages', [])
-                    if not msgs or msgs[0].get('role') != 'system':
-                        msgs = [{"role": "system", "content": self.enforced_system_prompt}] + msgs
-                    else:
-                        msgs[0]["content"] = self.enforced_system_prompt
-                    new_ex = dict(ex)
-                    # Pass index to get RANDOM thinking pattern for this example
-                    new_ex['messages'] = self.enforce_thinking_requirement(msgs, example_index=idx)
-                    new_ex['messages'] = self.enforce_stop_requirement(new_ex['messages'])
-                    return self.sanitize_example(new_ex)
-
-                print(f"   Using legacy transformation (hard-coded emoji_think)")
-
-            # Apply transformation to train/val examples
-            train_examples = [transform_example(ex, idx) for idx, ex in enumerate(train_examples)]
-            val_examples = [transform_example(ex, idx) for idx, ex in enumerate(val_examples)]
+            # Use enumerate to pass example index for random pattern generation
+            train_examples = [self.sanitize_example(inject_system(ex, idx)) for idx, ex in enumerate(train_examples)]
+            val_examples = [self.sanitize_example(inject_system(ex, idx)) for idx, ex in enumerate(val_examples)]
 
             # Keep raw examples for eval display (with enforced system prompt)
             self.raw_train_examples = train_examples
@@ -922,7 +853,7 @@ class UltimateTrainer:
 
         # Create self-correction generator if enabled
         self_correction_gen = None
-        if self_correction_config.get("enabled", False) and SELF_CORRECTION_AVAILABLE:
+        if self_correction_config.get("enabled", False):
             try:
                 max_examples = self_correction_config.get("max_examples", 200)
                 generation_interval = self_correction_config.get("generation_interval")
@@ -1052,21 +983,6 @@ class UltimateTrainer:
 
             print(f"📈 Total steps after this batch: {current_global_step} + {steps_for_this_file} = {max_steps}")
 
-            # Determine precision flags from config
-            # Use config precision if available, otherwise default to fp16
-            use_fp16 = False
-            use_bf16 = False
-            if self.config and self.config.hyperparams.fp_precision:
-                precision = self.config.hyperparams.fp_precision
-                if precision == "bf16":
-                    use_bf16 = True
-                elif precision == "fp16":
-                    use_fp16 = True
-                # fp32: both False
-            else:
-                # Fallback to original behavior (fp16)
-                use_fp16 = True
-
             # Training arguments
             # Use max_steps for continuous training instead of num_train_epochs
             training_args = TrainingArguments(
@@ -1081,8 +997,7 @@ class UltimateTrainer:
                 eval_steps=self.args.eval_steps,
                 eval_strategy="steps" if self.args.eval_steps else "no",  # Enable eval loss calculation
                 save_total_limit=None,  # Keep all checkpoints - manually clean by date later
-                fp16=use_fp16,   # Set from config precision
-                bf16=use_bf16,   # Set from config precision
+                fp16=True,
                 report_to="none",
                 remove_unused_columns=False,
             )

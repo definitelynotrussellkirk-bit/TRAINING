@@ -34,5 +34,19 @@
     "seed": 93001,
     "cooldown_sec": 180,
     "payload": {}
+  },
+
+  "_comment_refactor": "New fields for refactored architecture (2025-11-22)",
+  "profile": {
+    "name": "emoji_think"
+  },
+  "hyperparams": {
+    "fp_precision": "bf16"
+  },
+  "locked": {
+    "base_model": "Qwen/Qwen3-0.6B",
+    "model_architecture": "Qwen3ForCausalLM",
+    "max_context_length": 4096,
+    "vocab_size": 151936
   }
 }

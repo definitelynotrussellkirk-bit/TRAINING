@@ -6,6 +6,7 @@ consolidated_models/
 consolidated_backups/
 DIO_20251114/
 snapshots/
+archive/
 
 # Training outputs and queue
 test_minimal_output/

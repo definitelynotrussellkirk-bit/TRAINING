@@ -143,8 +143,8 @@ python3 config_validator.py
 
 ## 🎯 CURRENT CONFIGURATION
 
-**Model:** Qwen2.5-0.5B (fresh download)
-**Path:** `/path/to/training/models/Qwen3-0.6B-fresh`
+**Model:** Qwen3-0.6B (fresh download)
+**Path:** `/path/to/training/models/Qwen3-0.6B`
 **Method:** Full model training (all weights updated directly)
 
 **Key Settings (`config.json`):**

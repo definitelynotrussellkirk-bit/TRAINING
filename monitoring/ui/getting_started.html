@@ -291,10 +291,10 @@ python3 -c "import transformers; print(f'Transformers: {transformers.__version__
             <div class="code-block"><code>cd /path/to/training
 
 # Start the server
-python3 monitoring/api/monitor_server_v2.py --port 8080
+python3 monitoring/api/monitor_server.py --port 8080
 
 # Or run in background
-nohup python3 monitoring/api/monitor_server_v2.py --port 8080 > logs/monitor.log 2>&1 &</code></div>
+nohup python3 monitoring/api/monitor_server.py --port 8080 > logs/monitor.log 2>&1 &</code></div>
 
             <div class="note success">
                 <div class="note-title">✓ Server Started</div>
@@ -493,7 +493,7 @@ ps aux | grep monitor_server | grep -v grep
 netstat -tulpn | grep 8080
 
 # Restart with different port
-python3 monitoring/api/monitor_server_v2.py --port 8081</code></div>
+python3 monitoring/api/monitor_server.py --port 8081</code></div>
         </div>
 
         <!-- Next Steps -->

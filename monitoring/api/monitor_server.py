@@ -25,7 +25,12 @@ import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, request, send_from_directory
-from flask_cors import CORS
+
+try:
+    from flask_cors import CORS
+    CORS_AVAILABLE = True
+except ImportError:
+    CORS_AVAILABLE = False
 
 # Add paths
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "core"))
@@ -41,7 +46,8 @@ from preview_history import get_preview_logger
 
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for development
+if CORS_AVAILABLE:
+    CORS(app)  # Enable CORS for development
 
 # Global config
 BASE_DIR = Path("/path/to/training")

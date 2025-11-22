@@ -14,9 +14,13 @@ This creates a communication bridge between the training process and the UI.
 import json
 import time
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, asdict
 from datetime import datetime
+
+THINKING_EMOJI = "🤔"
+THINKING_PREFIX = THINKING_EMOJI * 4 + "\n"
+THINKING_INSTRUCTION = f"For this task, think with {THINKING_EMOJI} /four/ times."
 
 
 @dataclass
@@ -29,6 +33,9 @@ class TrainingStatus:
     loss: float
     learning_rate: float
     timestamp: str
+
+    # Display label for UI
+    model_name: Optional[str] = None
 
     # Model configuration
     max_output_tokens: int = 2048  # Max tokens model can generate
@@ -73,6 +80,13 @@ class TrainingStatus:
 
     # NEW: Pattern analysis
     pattern_heatmap: Optional[Dict] = None         # Pattern×length heatmap data
+    pattern_loss_trend: Optional[Dict] = None      # Avg/recent loss per pattern
+    pattern_layer_correlation: Optional[Dict] = None  # Layer influence counts per pattern
+    length_bin_staleness: Optional[Dict] = None    # Seconds since each length bucket observed
+
+    # NEW: Layer activity tracking
+    layer_activity_summary: Optional[Dict] = None
+    layer_stability_summary: Optional[Dict] = None  # Derived stability ranking
 
     # NEW: LoRA layer monitoring
     lora_stats: Optional[Dict] = None              # Per-layer gradient norms and updates
@@ -93,6 +107,8 @@ class TrainingStatus:
     tokens_per_sec_avg: Optional[float] = None     # Average throughput
     tokens_per_sec_baseline: Optional[float] = None  # Baseline throughput after warmup
     throughput_trend: Optional[str] = None         # "improving", "stable", "degrading"
+    throughput_vram_samples: Optional[List[Dict]] = None  # Recent throughput+VRAM samples
+    queue_velocity: Optional[Dict] = None          # Estimated samples/sec/hour
 
     # NEW: Validation loss (PHASE 4 - 2025-11-16)
     validation_loss: Optional[float] = None        # Loss on fixed validation set
@@ -101,6 +117,8 @@ class TrainingStatus:
     # NEW: Think tag tracking (PHASE 4 - 2025-11-16)
     think_tag_count: int = 0                       # Count of outputs with <think> tags
     think_tag_percent: float = 0.0                 # Percentage of outputs with <think>
+    logit_penalty_stats: Optional[List[Dict]] = None  # Penalty hit counters
+    penalty_heatmap: Optional[Dict] = None            # Aggregated penalty distribution
 
     # NEW: Output length tracking
     max_golden_output_length: Optional[int] = None  # Max golden output length seen (tokens)
@@ -123,7 +141,13 @@ class TrainingStatus:
 class TrainingStatusWriter:
     """Writes training status to disk for UI consumption."""
 
-    def __init__(self, status_file: Path, max_output_tokens: int = 2048, context_window: int = 2048):
+    def __init__(
+        self,
+        status_file: Path,
+        max_output_tokens: int = 2048,
+        context_window: int = 2048,
+        model_name: Optional[str] = None
+    ):
         self.status_file = Path(status_file)
         self.status_file.parent.mkdir(parents=True, exist_ok=True)
         self.last_inference_data = {}  # Cache last inference data
@@ -133,12 +157,51 @@ class TrainingStatusWriter:
         self.think_tag_count = 0  # NEW: Track <think> tags
         self.max_output_tokens = max_output_tokens
         self.context_window = context_window
+        self.model_name = model_name
         # NEW: Track max output lengths seen during training
         self.max_golden_output_length = 0
         self.max_model_output_length = 0
+        # Pattern heatmap cache
+        self.pattern_heatmap = None
+        self.penalty_heatmap = None
+        self.pattern_layer_correlation = {}
+        self.length_bin_last_seen = {}
+        self.pattern_loss_history = {}
+        self.pattern_loss_summary = {}
+        self.queue_velocity_snapshot = None
+        self.vram_samples = []
+        self.penalty_stats_snapshot = None
+        self.layer_stability_summary = None
         # Append-only log for inference previews
         self.inference_log_dir = self.status_file.parent / "logs"
         self.inference_log_dir.mkdir(parents=True, exist_ok=True)
+        self.pattern_layer_log = self.inference_log_dir / "pattern_layer_history.jsonl"
+    def _ensure_thinking_instruction(self, content: Optional[str]) -> Optional[str]:
+        """Append the four-emoji instruction if it's missing."""
+        if content is None:
+            return None
+        if not isinstance(content, str):
+            content = str(content)
+        if not content.strip():
+            return content
+        # Check for ANY "think with" instruction (any emoji variant), not just our specific one
+        if "think with" in content.lower():
+            return content
+        return content.rstrip() + "\n\n" + THINKING_INSTRUCTION
+
+    def _ensure_thinking_prefix(self, content: Optional[str]) -> Optional[str]:
+        """Ensure assistant outputs start with thinking emoji prefix."""
+        if content is None:
+            return None
+        if not isinstance(content, str):
+            content = str(content)
+        stripped = content.lstrip()
+        # Check if starts with ANY thinking emoji (not just our specific one)
+        THINKING_EMOJIS = ["🤔", "💭", "🧠", "💡", "🎯", "🔍", "🤨", "🧐", "⚡", "✨"]
+        if any(stripped.startswith(e) for e in THINKING_EMOJIS):
+            return stripped
+        # If no thinking emoji found, add our default prefix
+        return THINKING_PREFIX + stripped
 
     def write(self, status: TrainingStatus):
         """Write status to file (atomic write)."""
@@ -166,6 +229,71 @@ class TrainingStatusWriter:
             deduped.append(ex)
         return deduped[-max_items:]
 
+    def _compute_length_staleness(self) -> Optional[Dict[str, float]]:
+        if not self.length_bin_last_seen:
+            return None
+        now = time.time()
+        return {
+            bin_name: max(0.0, now - timestamp)
+            for bin_name, timestamp in self.length_bin_last_seen.items()
+        }
+
+    def _update_length_bin(self, metadata: Dict[str, Any]):
+        bin_name = metadata.get("length_bin")
+        if not bin_name:
+            return
+        self.length_bin_last_seen[bin_name] = time.time()
+
+    def _update_pattern_loss(self, metadata: Dict[str, Any]):
+        pattern_id = metadata.get("pattern_id")
+        loss = metadata.get("loss")
+        if pattern_id is None or loss is None:
+            return
+        history = self.pattern_loss_history.setdefault(pattern_id, [])
+        history.append(float(loss))
+        if len(history) > 50:
+            history.pop(0)
+        avg_loss = sum(history) / len(history)
+        recent_window = history[-5:] if len(history) >= 5 else history
+        recent_avg = sum(recent_window) / len(recent_window)
+        self.pattern_loss_summary[pattern_id] = {
+            "avg_loss": avg_loss,
+            "recent_loss": recent_avg,
+            "samples": len(history),
+        }
+
+    def _update_pattern_layer_correlation(self, metadata: Dict[str, Any], layer_summary: Optional[Dict]):
+        if not layer_summary or not layer_summary.get("top_changes"):
+            return
+        pattern_id = metadata.get("pattern_id") or "unknown"
+        bucket = self.pattern_layer_correlation.setdefault(pattern_id, {})
+        for entry in layer_summary["top_changes"][:3]:
+            name = entry.get("name")
+            if not name:
+                continue
+                stats = bucket.setdefault(name, {"count": 0, "cumulative_delta": 0.0})
+                stats["count"] += 1
+                delta = entry.get("delta")
+                if isinstance(delta, (int, float)):
+                    stats["cumulative_delta"] += abs(delta)
+        self._append_pattern_layer_history(pattern_id, layer_summary)
+
+    def _append_pattern_layer_history(self, pattern_id: str, layer_summary: Dict):
+        if not layer_summary:
+            return
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "pattern": pattern_id,
+            "file": self.last_inference_data.get('current_file'),
+            "top_layers": layer_summary.get("top_changes", [])[:5],
+        }
+        try:
+            with open(self.pattern_layer_log, 'a') as f:
+                json.dump(entry, f)
+                f.write("\n")
+        except Exception:
+            pass
+
     def update_progress(
         self,
         step: int,
@@ -185,7 +313,11 @@ class TrainingStatusWriter:
         loss_variance: Optional[float] = None,
         loss_trend: Optional[str] = None,
         active_alerts: Optional[List[Dict]] = None,
-        alert_summary: Optional[Dict] = None
+        alert_summary: Optional[Dict] = None,
+        throughput_vram_samples: Optional[List[Dict]] = None,
+        queue_velocity: Optional[Dict] = None,
+        logit_penalty_stats: Optional[List[Dict]] = None,
+        penalty_heatmap: Optional[Dict] = None,
     ):
         """Update basic training progress (preserves last inference data)."""
         accuracy_pct = (self.total_correct / self.total_evals * 100) if self.total_evals > 0 else 0.0
@@ -196,6 +328,15 @@ class TrainingStatusWriter:
         if val_loss is not None:
             val_train_gap = val_loss - loss
 
+        if throughput_vram_samples is not None:
+            self.vram_samples = list(throughput_vram_samples)[-60:]
+        if queue_velocity is not None:
+            self.queue_velocity_snapshot = queue_velocity
+        if logit_penalty_stats is not None:
+            self.penalty_stats_snapshot = logit_penalty_stats
+        if penalty_heatmap is not None:
+            self.penalty_heatmap = penalty_heatmap
+
         status = TrainingStatus(
             status="training",
             current_step=step,
@@ -204,6 +345,7 @@ class TrainingStatusWriter:
             loss=loss,
             learning_rate=lr,
             timestamp=datetime.now().isoformat(),
+            model_name=self.model_name,
             max_output_tokens=self.max_output_tokens,
             context_window=self.context_window,
             # Batch/file progress (NEW)
@@ -235,7 +377,17 @@ class TrainingStatusWriter:
             loss_variance=loss_variance,
             loss_trend=loss_trend,
             active_alerts=active_alerts,
-            alert_summary=alert_summary
+            alert_summary=alert_summary,
+            pattern_heatmap=self.pattern_heatmap,
+            penalty_heatmap=self.penalty_heatmap,
+            pattern_loss_trend=self.pattern_loss_summary or None,
+            pattern_layer_correlation=self.pattern_layer_correlation or None,
+            length_bin_staleness=self._compute_length_staleness(),
+            layer_activity_summary=self.last_inference_data.get('layer_activity_summary'),
+            layer_stability_summary=self.layer_stability_summary,
+            throughput_vram_samples=self.vram_samples or None,
+            queue_velocity=self.queue_velocity_snapshot,
+            logit_penalty_stats=self.penalty_stats_snapshot,
         )
         self.write(status)
 
@@ -246,10 +398,14 @@ class TrainingStatusWriter:
         system_prompt: Optional[str] = None
     ):
         """Snapshot prompt/golden without inference; does not change model output."""
+        prompt = self._ensure_thinking_instruction(prompt)
+        golden = self._ensure_thinking_prefix(golden)
         self.last_inference_data.update({
             'system_prompt': system_prompt,
             'prompt': prompt,
-            'golden': golden
+            'golden': golden,
+            'model_output': None,
+            'matches': None
         })
 
     def update_inference(
@@ -270,9 +426,16 @@ class TrainingStatusWriter:
         batch_queue_size: Optional[int] = None,
         current_file: Optional[str] = None,
         golden_output_length: Optional[int] = None,
-        model_output_length: Optional[int] = None
+        model_output_length: Optional[int] = None,
+        pattern_heatmap: Optional[Dict] = None,
+        layer_activity_summary: Optional[Dict] = None,
+        pattern_metadata: Optional[Dict] = None
     ):
         """Update with latest inference results."""
+        prompt = self._ensure_thinking_instruction(prompt) if prompt else prompt
+        golden = self._ensure_thinking_prefix(golden) if golden else golden
+        model_output = self._ensure_thinking_prefix(model_output) if model_output else model_output
+
         # Update running accuracy
         self.total_evals += 1
         if matches:
@@ -299,8 +462,20 @@ class TrainingStatusWriter:
             'golden': golden,
             'model_output': model_output,
             'matches': matches,
-            'current_file': cf
+            'current_file': cf,
+            'layer_activity_summary': layer_activity_summary
         }
+
+        if pattern_heatmap is not None:
+            self.pattern_heatmap = pattern_heatmap
+        if pattern_metadata:
+            self._update_length_bin(pattern_metadata)
+            self._update_pattern_loss(pattern_metadata)
+            self._update_pattern_layer_correlation(pattern_metadata, layer_activity_summary)
+
+        snapshot_layer_summary = layer_activity_summary or self.last_inference_data.get('layer_activity_summary')
+        if layer_activity_summary and layer_activity_summary.get("stability"):
+            self.layer_stability_summary = layer_activity_summary.get("stability")
 
         # Keep last 5 recent examples, dedup by step+file, keep latest
         entry = {
@@ -327,6 +502,7 @@ class TrainingStatusWriter:
             loss=loss,
             learning_rate=lr,
             timestamp=datetime.now().isoformat(),
+            model_name=self.model_name,
             max_output_tokens=self.max_output_tokens,
             context_window=self.context_window,
             # Batch/file progress (NEW)
@@ -351,7 +527,16 @@ class TrainingStatusWriter:
             max_golden_output_length=self.max_golden_output_length,
             max_model_output_length=self.max_model_output_length,
             current_golden_output_length=golden_output_length,
-            current_model_output_length=model_output_length
+            current_model_output_length=model_output_length,
+            pattern_heatmap=self.pattern_heatmap,
+            pattern_loss_trend=self.pattern_loss_summary or None,
+            pattern_layer_correlation=self.pattern_layer_correlation or None,
+            length_bin_staleness=self._compute_length_staleness(),
+            layer_activity_summary=snapshot_layer_summary,
+            layer_stability_summary=self.layer_stability_summary,
+            throughput_vram_samples=self.vram_samples or None,
+            queue_velocity=self.queue_velocity_snapshot,
+            logit_penalty_stats=self.penalty_stats_snapshot,
         )
         self.write(status)
 
@@ -377,7 +562,8 @@ class TrainingStatusWriter:
                     "model_output": model_output,
                     "matches": matches,
                     "golden_output_length": golden_output_length,
-                    "model_output_length": model_output_length
+                    "model_output_length": model_output_length,
+                    "layer_activity_summary": snapshot_layer_summary
                 }) + "\n")
         except Exception:
             pass  # Logging errors should not break training
@@ -392,6 +578,7 @@ class TrainingStatusWriter:
             loss=0.0,
             learning_rate=0.0,
             timestamp=datetime.now().isoformat(),
+            model_name=self.model_name,
             error_message=error,
             error_type=error_type
         )
@@ -439,6 +626,8 @@ class TrainingStatusWriter:
     ):
         """Update status with advanced metrics from all collectors."""
         accuracy_pct = (self.total_correct / self.total_evals * 100) if self.total_evals > 0 else 0.0
+        if pattern_heatmap is None:
+            pattern_heatmap = self.pattern_heatmap
 
         status = TrainingStatus(
             status="training",
@@ -504,7 +693,8 @@ class TrainingStatusWriter:
             epoch=0,
             loss=0.0,
             learning_rate=0.0,
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
+            model_name=self.model_name
         )
         self.write(status)
 
@@ -545,7 +735,7 @@ DEFAULT_STATUS_FILE = Path("/path/to/training/status/training_status.json")
 
 def example_usage():
     """Example of how to use the status tracker."""
-    writer = TrainingStatusWriter(DEFAULT_STATUS_FILE)
+    writer = TrainingStatusWriter(DEFAULT_STATUS_FILE, model_name="demo-model")
 
     # During training loop
     for step in range(100):

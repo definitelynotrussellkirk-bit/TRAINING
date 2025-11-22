@@ -224,7 +224,7 @@ def configure_training_settings():
     # Model
     config["model"] = ask_string(
         "Model name or path",
-        default="qwen3_8b"
+        default="qwen3_0.6b"
     )
 
     # Output directory

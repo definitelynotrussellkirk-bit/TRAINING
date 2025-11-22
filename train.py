@@ -12,19 +12,22 @@ Brings together all components:
 Usage:
     python3 train.py \
         --dataset path/to/data.jsonl \
-        --model qwen3_8b \
+        --model qwen3_0.6b \
         --output-dir ~/my_adapter \
         --epochs 2 \
         --batch-size 4
 """
 
 import argparse
+import os
 import json
+import math
 import random
 import sys
 import time
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
+from collections import OrderedDict
 from datetime import datetime
 
 # Fix CUDA multiprocessing issue - MUST be before torch import
@@ -44,9 +47,9 @@ from transformers import (
     TrainingArguments,
     Trainer,
     DataCollatorForLanguageModeling,
-    BitsAndBytesConfig
+    BitsAndBytesConfig,
+    LogitsProcessorList,
 )
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from datasets import Dataset
 
 # Import our components
@@ -57,6 +60,83 @@ from live_monitor import LiveInferenceMonitor
 from training_status import TrainingStatusWriter, DEFAULT_STATUS_FILE
 from evolution_tracker import EvolutionTracker
 from custom_collator import DataCollatorForCompletionOnly
+from logit_penalty import (
+    build_think_penalty_processor,
+    build_eos_penalty_processor,
+    build_post_stop_penalty_processor,
+    reset_processor_states,
+    DEFAULT_PENALTY_SCHEDULE,
+    collect_penalty_stats,
+)
+from layer_monitor import LayerMonitor
+from auto_self_correction import create_self_correction_monitor
+
+# Thinking emoji pool - each example gets a RANDOM emoji and count
+THINKING_EMOJIS = [
+    "🤔",  # Classic thinking
+    "💭",  # Thought bubble
+    "🧠",  # Brain
+    "💡",  # Lightbulb (idea)
+    "🎯",  # Target (focus)
+    "🔍",  # Magnifying glass (analyze)
+    "🤨",  # Raised eyebrow (skeptical)
+    "🧐",  # Monocle (scrutinize)
+    "⚡",  # Lightning (quick thought)
+    "✨",  # Sparkles (insight)
+]
+
+# Stop emoji (stays consistent)
+# Stop emoji pool - randomly select from these
+STOP_EMOJI_POOL = ["🛑", "⛔", "🚫", "❌", "🔴", "⏹️", "🔚", "✋", "🚦", "🛡️"]
+STOP_COUNT_MIN = 2
+STOP_COUNT_MAX = 4
+
+# Helper functions for variable stop sequences
+def get_random_stop_emoji():
+    """Select a random stop emoji from the pool."""
+    import random
+    return random.choice(STOP_EMOJI_POOL)
+
+def get_random_stop_count():
+    """Select a random stop count (2-4)."""
+    import random
+    return random.randint(STOP_COUNT_MIN, STOP_COUNT_MAX)
+
+def get_stop_instruction(emoji: str, count: int) -> str:
+    """Generate stop instruction for a specific emoji and count."""
+    count_words = {2: "twice", 3: "three times", 4: "four times"}
+    count_text = count_words.get(count, f"{count} times")
+    return f"When finished, emit {emoji} /{count_text}/ to signal completion."
+
+def get_stop_suffix(emoji: str, count: int) -> str:
+    """Generate stop suffix for a specific emoji and count."""
+    return "\n" + emoji * count
+
+def get_thinking_pattern(example_index):
+    """
+    Get RANDOM thinking emoji and count for this example.
+
+    Each example gets:
+    - Random emoji from THINKING_EMOJIS pool
+    - Random count between 2-8
+
+    Uses example_index as seed for reproducibility.
+    """
+    import random
+    random.seed(example_index)  # Reproducible randomness
+
+    emoji = random.choice(THINKING_EMOJIS)
+    count = random.randint(2, 8)
+
+    count_words = ["two", "three", "four", "five", "six", "seven", "eight"]
+    count_word = count_words[count - 2]  # count 2 -> index 0
+
+    prefix = emoji * count + "\n"
+    instruction = f"For this task, think with {emoji} /{count_word}/ times."
+
+    return emoji, count, count_word, prefix, instruction
+
+from pattern_tracker import PatternTracker, get_default_patterns
 
 # Try to import detailed monitoring (optional)
 try:
@@ -85,14 +165,128 @@ class UltimateTrainer:
         self.live_monitor = None
         self.evolution_tracker = None  # Will be initialized with dataset name
         self.avg_seq_len = 0  # Rolling estimate from tokenized train set
+        self.model_label = self._load_model_label()
         # Pass config values to status writer (hardcoded max_new_tokens=getattr(self.args, "eval_max_tokens", 512) from train.py:482)
         self.status_writer = TrainingStatusWriter(
             DEFAULT_STATUS_FILE,
             max_output_tokens=2048,  # From train.py line 482
-            context_window=getattr(args, 'max_length', 2048)
+            context_window=getattr(args, 'max_length', 2048),
+            model_name=self.model_label
         )
         self.notifier = DesktopNotifier()
         self.training_start_time = None
+        self.logits_processor = None  # Optional logit penalties for generation
+        self.training_summary: Dict[str, Any] | None = None
+        self.layer_monitor: LayerMonitor | None = None
+
+    def sanitize_example(self, example: dict) -> dict:
+        """Strip disallowed tags like <think> from conversation content."""
+        cleaned_messages = []
+        for msg in example.get('messages', []):
+            content = msg.get('content')
+            if msg.get('role') == 'assistant' and isinstance(content, str):
+                content = content.replace("<think>", "").replace("</think>", "")
+            cleaned_messages.append({**msg, "content": content})
+        new_ex = dict(example)
+        new_ex['messages'] = cleaned_messages
+        return new_ex
+
+    def enforce_thinking_requirement(self, messages: List[Dict[str, Any]], example_index: int = 0) -> List[Dict[str, Any]]:
+        """
+        Apply thinking pattern to messages with RANDOM emoji and count.
+
+        Args:
+            messages: List of message dicts
+            example_index: Position in dataset (determines random pattern)
+
+        Each example gets a random thinking emoji and repetition count (2-8).
+        """
+        # Get RANDOM pattern for this specific example
+        emoji, count, count_word, prefix, instruction = get_thinking_pattern(example_index)
+
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content", "")
+            if not isinstance(content, str):
+                content = json.dumps(content, ensure_ascii=False)
+
+            if role == "user":
+                # Check if ANY thinking instruction is already present (any emoji variant)
+                has_instruction = any(f"think with {e}" in content.lower() for e in THINKING_EMOJIS) or "think with" in content.lower()
+                if not has_instruction:
+                    content = content.rstrip() + "\n\n" + instruction
+
+            elif role == "assistant":
+                # Check if starts with ANY thinking emoji
+                has_prefix = any(content.startswith(e) for e in THINKING_EMOJIS)
+                if not has_prefix:
+                    content = prefix + content.lstrip()
+
+            msg["content"] = content
+
+        return messages
+
+    def enforce_stop_requirement(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Enforce stop emoji pattern in conversations.
+
+        Adds:
+        - Stop instruction to user messages (after think instruction)
+        - Stop suffix to assistant responses (at end, before EOT)
+
+        Uses random stop emoji and count (2-4) for each conversation.
+        """
+        # Pick ONE random stop emoji and count for this entire conversation
+        stop_emoji = get_random_stop_emoji()
+        stop_count = get_random_stop_count()
+        stop_instruction = get_stop_instruction(stop_emoji, stop_count)
+        stop_suffix = get_stop_suffix(stop_emoji, stop_count)
+
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content", "")
+            if not isinstance(content, str):
+                content = json.dumps(content, ensure_ascii=False)
+            if role == "user":
+                # Add stop instruction to USER messages
+                # Check if ANY stop instruction already present
+                has_stop_instruction = any(
+                    emoji in content and "When finished" in content
+                    for emoji in STOP_EMOJI_POOL
+                )
+                if not has_stop_instruction:
+                    content = content.rstrip() + "\n\n" + stop_instruction
+            elif role == "assistant":
+                # Append stop suffix to ASSISTANT responses (at END)
+                # Check if ANY stop emoji sequence already present at end
+                has_stop_suffix = any(
+                    content.rstrip().endswith(emoji * count)
+                    for emoji in STOP_EMOJI_POOL
+                    for count in range(STOP_COUNT_MIN, STOP_COUNT_MAX + 1)
+                )
+                if not has_stop_suffix:
+                    content = content.rstrip() + stop_suffix
+            msg["content"] = content
+        return messages
+
+    def _load_model_label(self) -> str:
+        """Derive a human-readable model label for status reporting."""
+        config_path = Path("config.json")
+        label = None
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    cfg = json.load(f)
+                label = cfg.get("model_display_name") or cfg.get("model_name")
+                if not label:
+                    base_model = cfg.get("base_model") or cfg.get("model_path")
+                    if base_model:
+                        label = Path(base_model).name
+            except Exception:
+                label = None
+        if not label:
+            label = str(getattr(self.args, "model", "unknown-model"))
+        return label
 
     def enforce_locked_config(self):
         """Hard guard: abort if locked config values are violated."""
@@ -160,6 +354,14 @@ class UltimateTrainer:
 
         # Step 0: Enforce locked config values to prevent bad runs
         self.enforce_locked_config()
+
+        # Reset CUDA peak memory stats to capture per-run metrics
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
+        except Exception:
+            pass
 
         # Step 1: Validate dataset
         if not self.args.skip_validation:
@@ -280,7 +482,7 @@ class UltimateTrainer:
             # Load model (try Qwen3VL first, then AutoModel, fallback to AutoModelForCausalLM)
             print("   Loading model...")
             model_kwargs = {
-                "device_map": "auto",
+                # "device_map": "auto",  # DISABLED - was causing OOM by pre-allocating 90% of GPU
                 "trust_remote_code": True,
                 "attn_implementation": "sdpa"
             }
@@ -328,21 +530,61 @@ class UltimateTrainer:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
                 print("   ✓ Set pad_token = eos_token")
 
-            # Prepare for LoRA
-            self.model = prepare_model_for_kbit_training(self.model)
+            # Disable KV cache for training (saves memory)
+            self.model.config.use_cache = False
+            print("   ✓ Disabled KV cache (use_cache=False)")
 
-            # Add LoRA
-            lora_config = LoraConfig(
-                r=self.args.lora_r,
-                lora_alpha=self.args.lora_alpha,
-                target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-                lora_dropout=0.05,
-                bias="none",
-                task_type="CAUSAL_LM"
+            # Full model training (no LoRA)
+            print("   ✓ Full model fine-tuning enabled (all weights trainable)")
+
+            # Penalize <think> tags and EOS tokens during generation previews
+            combined_processors = LogitsProcessorList()
+
+            think_processors = build_think_penalty_processor(
+                self.tokenizer,
+                penalty=80.0,
+                schedule=DEFAULT_PENALTY_SCHEDULE,
             )
+            if len(think_processors) > 0:
+                combined_processors.extend(think_processors)
+                print("   ✓ Enabled logit penalty for <think> tags")
 
-            self.model = get_peft_model(self.model, lora_config)
-            self.model.print_trainable_parameters()
+            # DISABLED: Global EOS penalty conflicts with post-stop EOT reward
+            # The post-stop penalty already handles EOS correctly:
+            # - Rewards EOS after complete stop sequence (+50)
+            # - Penalizes everything else (escalating 100 → 1000 → 10000)
+            # Global EOS penalty was causing model to stop mid-sequence because
+            # penalty decreased over time (640 → 160 → 120 → 80) making early
+            # EOS "cheaper" than completing the stop sequence then outputting EOS
+            #
+            # eos_processors = build_eos_penalty_processor(
+            #     self.tokenizer,
+            #     penalty=80.0,
+            #     schedule=DEFAULT_PENALTY_SCHEDULE,
+            # )
+            # if len(eos_processors) > 0:
+            #     combined_processors.extend(eos_processors)
+            #     print("   ✓ Enabled logit penalty for EOS tokens")
+
+            # Penalize tokens after stop emoji sequences with escalating penalties
+            # Supports variable emojis and counts (2-4 repetitions)
+            # Also reward EOT tokens to encourage proper termination
+            post_stop_processors = build_post_stop_penalty_processor(
+                self.tokenizer,
+                stop_emoji_pool=STOP_EMOJI_POOL,  # Pool of 10 stop emojis
+                stop_count_min=STOP_COUNT_MIN,    # Minimum 2 repetitions
+                stop_count_max=STOP_COUNT_MAX,    # Maximum 4 repetitions
+                base_penalty=100.0,  # MASSIVE penalty - nuclear option
+                escalation_rate=10.0,  # Extreme escalation
+                eot_reward=50.0,  # HUGE reward for EOT
+                eot_sequence=None,  # None = use tokenizer.eos_token_id (default)
+                # Future: eot_sequence="<|end|>" or "<|end|><|end|>" for custom sequences
+            )
+            if len(post_stop_processors) > 0:
+                combined_processors.extend(post_stop_processors)
+                print("   ✓ Enabled escalating penalty for tokens after stop signal")
+
+            self.logits_processor = combined_processors if len(combined_processors) > 0 else None
 
             return True
 
@@ -360,10 +602,7 @@ class UltimateTrainer:
             enforced_system_prompt = (
                 f"Today is {datetime.now().strftime('%Y-%m-%d')}. "
                 "You are happy. You enjoy being helpful. "
-                "Do your best to follow the directions given. "
-                "If you are asked to think with a given token, you will emit that token "
-                "the specified number of times before beginning your response. "
-                "You no longer use <think>"
+                "Do your best to follow the directions given."
             )
             self.enforced_system_prompt = enforced_system_prompt
 
@@ -383,18 +622,22 @@ class UltimateTrainer:
             train_examples = examples[val_size:]
 
             # Inject enforced system prompt into copies of examples
-            def inject_system(ex):
+            def inject_system(ex, idx):
+                """Inject system prompt and apply random thinking pattern based on index."""
                 msgs = ex.get('messages', [])
                 if not msgs or msgs[0].get('role') != 'system':
                     msgs = [{"role": "system", "content": self.enforced_system_prompt}] + msgs
                 else:
                     msgs[0]["content"] = self.enforced_system_prompt
                 new_ex = dict(ex)
-                new_ex['messages'] = msgs
+                # Pass index to get RANDOM thinking pattern for this example
+                new_ex['messages'] = self.enforce_thinking_requirement(msgs, example_index=idx)
+                new_ex['messages'] = self.enforce_stop_requirement(new_ex['messages'])
                 return new_ex
 
-            train_examples = [inject_system(ex) for ex in train_examples]
-            val_examples = [inject_system(ex) for ex in val_examples]
+            # Use enumerate to pass example index for random pattern generation
+            train_examples = [self.sanitize_example(inject_system(ex, idx)) for idx, ex in enumerate(train_examples)]
+            val_examples = [self.sanitize_example(inject_system(ex, idx)) for idx, ex in enumerate(val_examples)]
 
             # Keep raw examples for eval display (with enforced system prompt)
             self.raw_train_examples = train_examples
@@ -437,12 +680,17 @@ class UltimateTrainer:
             train_data = [format_example(ex) for ex in train_examples]
             self.train_dataset = Dataset.from_list(train_data)
 
+            # Format validation data for eval_dataset
+            val_data = [format_example(ex) for ex in val_examples]
+            self.val_dataset_formatted = Dataset.from_list(val_data)
+
             # Keep val examples in original format for live monitoring
             self.val_dataset = val_examples
 
             # MEMORY FIX: Free intermediate data structures
             del examples
             del train_data
+            del val_data
             import gc
             gc.collect()
 
@@ -488,15 +736,26 @@ class UltimateTrainer:
                 random.seed(42)  # Reproducible sampling
                 val_examples = random.sample(val_examples, 100)
 
+            # Apply same transformations as training data (thinking/stop patterns)
+            def inject_system_val(ex, idx):
+                """Apply same transformations as training data for consistency."""
+                msgs = ex.get('messages', [])
+                if not msgs or msgs[0].get('role') != 'system':
+                    msgs = [{"role": "system", "content": self.enforced_system_prompt}] + msgs
+                else:
+                    msgs[0]["content"] = self.enforced_system_prompt
+                new_ex = dict(ex)
+                # Apply thinking and stop patterns (same as training data)
+                new_ex['messages'] = self.enforce_thinking_requirement(msgs, example_index=idx)
+                new_ex['messages'] = self.enforce_stop_requirement(new_ex['messages'])
+                return new_ex
+
+            # Process examples with same pipeline as training data
+            val_examples = [self.sanitize_example(inject_system_val(ex, idx)) for idx, ex in enumerate(val_examples)]
+
             # Format validation examples same as training data
             def format_example(ex):
                 messages = ex['messages']
-
-                # Insert system prompt if not already present
-                if not messages or messages[0].get('role') != 'system':
-                    messages = [{"role": "system", "content": self.enforced_system_prompt}] + messages
-                else:
-                    messages[0]["content"] = self.enforced_system_prompt
 
                 # Format messages based on model type
                 formatted_messages = []
@@ -531,19 +790,24 @@ class UltimateTrainer:
             print(f"   ✅ Loaded {len(self.fixed_val_dataset)} fixed validation examples")
             print(f"   📊 This set is separate from training data for true generalization metrics")
 
-            # Build tiny, tokenized subset for fast micro-evals (keep overhead low)
-            mini_count = min(16, len(self.fixed_val_dataset))
-            if mini_count > 0:
-                mini_subset = self.fixed_val_dataset.select(range(mini_count))
-                tokenized = self.tokenizer(
-                    mini_subset["text"],
+            # Tokenize validation dataset (same approach as training data)
+            def tokenize_function(examples):
+                return self.tokenizer(
+                    examples["text"],
                     truncation=True,
-                    max_length=512,
-                    padding=True,
-                    return_tensors="pt"
+                    max_length=self.args.max_length,
+                    padding=False
                 )
-                self.tokenized_fixed_val_small = tokenized
-                print(f"   🔎 Prepared {mini_count} mini eval samples for quick checks")
+
+            # Tokenize the validation dataset
+            self.tokenized_fixed_val_small = self.fixed_val_dataset.map(
+                tokenize_function,
+                batched=True,
+                batch_size=10,
+                remove_columns=["text"],
+                num_proc=None  # Disable multiprocessing
+            )
+            print(f"   🔎 Tokenized {len(self.tokenized_fixed_val_small)} validation examples")
 
         except Exception as e:
             print(f"   ⚠️  Failed to load fixed validation set: {e}")
@@ -571,22 +835,62 @@ class UltimateTrainer:
 
     def setup_live_monitor(self):
         """Setup live inference monitoring."""
+        # Load config for self-correction settings
+        config_path = Path("config.json")
+        self_correction_config = {}
+        max_eval_tokens = 2048  # Default
+
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    cfg = json.load(f)
+                    self_correction_config = cfg.get("self_correction", {})
+                    max_eval_tokens = cfg.get("eval_max_tokens", 2048)
+            except Exception as e:
+                print(f"⚠️  Could not load self-correction config: {e}")
+
+        # Create self-correction generator if enabled
+        self_correction_gen = None
+        if self_correction_config.get("enabled", False):
+            try:
+                max_examples = self_correction_config.get("max_examples", 200)
+                generation_interval = self_correction_config.get("generation_interval")
+
+                self_correction_gen = create_self_correction_monitor(
+                    enable=True,
+                    auto_queue=self_correction_config.get("auto_queue", True),
+                    max_examples=max_examples,
+                    generation_interval=generation_interval
+                )
+
+                if generation_interval:
+                    print(f"✅ Auto self-correction enabled (every {max_examples} examples OR {generation_interval} steps)")
+                else:
+                    print(f"✅ Auto self-correction enabled (auto-drop every {max_examples} examples)")
+            except Exception as e:
+                print(f"⚠️  Could not enable self-correction: {e}")
+
         self.live_monitor = LiveInferenceMonitor(
             model=self.model,
             tokenizer=self.tokenizer,
             val_examples=self.val_dataset,
-            num_samples=self.args.num_eval_samples
+            num_samples=self.args.num_eval_samples,
+            max_new_tokens=max_eval_tokens,
+            logits_processor=self.logits_processor,
+            self_correction_generator=self_correction_gen
         )
 
     def train(self) -> bool:
         """Run actual training."""
         try:
             # Tokenize dataset
+            max_length = getattr(self.args, 'max_length', 2048)
+
             def tokenize_function(examples):
                 return self.tokenizer(
                     examples["text"],
                     truncation=True,
-                    max_length=2048,
+                    max_length=max_length,
                     padding=False
                 )
 
@@ -602,6 +906,19 @@ class UltimateTrainer:
                 writer_batch_size=10,  # Write in smaller batches
                 desc="Tokenizing dataset"
             )
+
+            # Tokenize validation dataset for eval_loss
+            tokenized_val_dataset = self.val_dataset_formatted.map(
+                tokenize_function,
+                batched=True,
+                batch_size=10,
+                remove_columns=["text"],
+                num_proc=None,
+                load_from_cache_file=False,
+                writer_batch_size=10,
+                desc="Tokenizing validation dataset"
+            )
+            print(f"   ✅ Tokenized {len(tokenized_val_dataset)} validation examples for eval_loss")
 
             # Estimate average sequence length from a small sample for throughput metrics
             sample_count = min(100, len(tokenized_dataset))
@@ -630,9 +947,19 @@ class UltimateTrainer:
             if Path(self.args.output_dir).exists():
                 checkpoints = list(Path(self.args.output_dir).glob("checkpoint-*"))
                 print(f"🔍 Found {len(checkpoints)} checkpoints")
-                if checkpoints:
-                    # Use the latest checkpoint based on step number
-                    latest_checkpoint = max(checkpoints, key=lambda p: int(p.name.split("-")[1]))
+                checkpoint_candidates = []
+                for cp in checkpoints:
+                    parts = cp.name.split("-", 1)
+                    if len(parts) != 2:
+                        continue
+                    try:
+                        step = int(parts[1])
+                    except ValueError:
+                        continue
+                    checkpoint_candidates.append((step, cp))
+
+                if checkpoint_candidates:
+                    latest_checkpoint = max(checkpoint_candidates, key=lambda item: item[0])[1]
                     print(f"🔍 Latest checkpoint: {latest_checkpoint}")
                     trainer_state_file = latest_checkpoint / "trainer_state.json"
                     print(f"🔍 State file exists: {trainer_state_file.exists()}")
@@ -641,6 +968,8 @@ class UltimateTrainer:
                             trainer_state = json.load(f)
                             current_global_step = trainer_state.get('global_step', 0)
                             print(f"📊 Current training progress: {current_global_step} steps completed")
+                    else:
+                        print("⚠️  Latest checkpoint missing trainer_state.json; treating as fresh start.")
                 else:
                     print("🔍 No checkpoints found - starting from step 0")
             else:
@@ -664,6 +993,7 @@ class UltimateTrainer:
                 logging_steps=10,
                 save_steps=self.args.save_steps,
                 eval_steps=self.args.eval_steps,
+                eval_strategy="steps" if self.args.eval_steps else "no",  # Enable eval loss calculation
                 save_total_limit=None,  # Keep all checkpoints - manually clean by date later
                 fp16=True,
                 report_to="none",
@@ -709,7 +1039,8 @@ class UltimateTrainer:
             class LiveMonitorCallback(TrainerCallback):
                 def __init__(self, monitor, status_writer, eval_steps, total_steps, raw_train_examples, tokenizer, model,
                              batch_total_steps, current_global_step, evolution_tracker=None, current_file=None, batch_number=None, batch_queue_size=None, controller=None, fixed_val_dataset=None,
-                             avg_seq_len: float = 0.0, effective_batch: int = 1, micro_eval_inputs=None, micro_eval_interval: int = 500):
+                             avg_seq_len: float = 0.0, effective_batch: int = 1, micro_eval_inputs=None, micro_eval_interval: int = 500,
+                             logits_processor=None, layer_monitor: LayerMonitor | None = None):
                     self.monitor = monitor
                     self.status_writer = status_writer
                     self.eval_steps = eval_steps
@@ -752,6 +1083,30 @@ class UltimateTrainer:
                     self.current_file = current_file
                     self.batch_number = batch_number
                     self.batch_queue_size = batch_queue_size
+                    self.logits_processor = logits_processor
+                    self.pattern_tracker = PatternTracker(get_default_patterns())
+                    self.layer_monitor = layer_monitor
+                    self.total_vram = None
+                    self.low_vram_counter = 0
+                    self.last_vram_ratio = None
+                    if torch.cuda.is_available():
+                        try:
+                            props = torch.cuda.get_device_properties(torch.cuda.current_device())
+                            self.total_vram = props.total_memory / (1024 ** 3)
+                        except Exception:
+                            self.total_vram = None
+                    self.penalty_last_hits: Dict[str, int] = {}
+                    self.penalty_totals: Dict[str, int] = {}
+                    self.penalty_files: "OrderedDict[str, Dict[str, int]]" = OrderedDict()
+                    self.latest_penalty_delta: Dict[str, int] = {}
+                    self.vram_samples = []
+                    self.queue_velocity = None
+                    self.enable_penalty_metrics = os.environ.get("ENABLE_PENALTY_MONITORING", "0").lower() in (
+                        "1",
+                        "true",
+                        "yes",
+                        "on",
+                    )
 
                 def on_step_end(self, args, state, control, **kwargs):
                     current_time = time.time()
@@ -818,6 +1173,7 @@ class UltimateTrainer:
                     # Throughput tracking (steps/sec and rough tokens/sec)
                     step_time = current_time - self.prev_step_time if self.prev_step_time else None
                     tokens_per_sec = None
+                    steps_per_sec = None
                     if step_time and step_time > 0:
                         steps_per_sec = 1.0 / step_time
                         tokens_per_step = self.avg_seq_len * self.effective_batch if self.avg_seq_len else None
@@ -827,6 +1183,40 @@ class UltimateTrainer:
                             self.tokens_per_sec_ema = tokens_per_sec if self.tokens_per_sec_ema is None else 0.1 * tokens_per_sec + 0.9 * self.tokens_per_sec_ema
                             if self.throughput_baseline is None and state.global_step > 20:
                                 self.throughput_baseline = self.tokens_per_sec_ema
+
+                    current_vram = None
+                    if torch.cuda.is_available():
+                        try:
+                            current_vram = max(torch.cuda.memory_allocated(), torch.cuda.memory_reserved()) / (1024 ** 3)
+                        except Exception:
+                            current_vram = None
+                    ratio = None
+                    if current_vram is not None and self.total_vram:
+                        ratio = current_vram / self.total_vram
+                        self.last_vram_ratio = ratio
+                        if ratio < 0.6:
+                            self.low_vram_counter += 1
+                        else:
+                            self.low_vram_counter = 0
+                    else:
+                        self.low_vram_counter = 0
+                    if steps_per_sec:
+                        samples_per_sec = steps_per_sec * self.effective_batch
+                        self.queue_velocity = {
+                            "samples_per_sec": samples_per_sec,
+                            "samples_per_hour": samples_per_sec * 3600,
+                            "effective_batch": self.effective_batch,
+                        }
+                    if tokens_per_sec is not None and current_vram is not None:
+                        self.vram_samples.append({
+                            "step": state.global_step,
+                            "tokens_per_sec": tokens_per_sec,
+                            "vram_gb": round(current_vram, 3),
+                            "penalty": None,
+                        })
+                        if len(self.vram_samples) > 120:
+                            self.vram_samples.pop(0)
+
                     self.prev_step_time = current_time
 
                     # Lightweight micro-eval on tiny fixed set
@@ -864,6 +1254,10 @@ class UltimateTrainer:
                         mean_loss = sum(self.loss_window) / len(self.loss_window)
                         if mean_loss > 0 and loss_variance > (mean_loss ** 2) * 0.25:
                             alerts.append({"severity": "info", "type": "loss_variance", "detail": "High loss variance"})
+                    if self.last_vram_ratio is not None and self.low_vram_counter >= 15:
+                        severity = "warn" if self.last_vram_ratio < 0.5 else "info"
+                        detail = f"VRAM usage at {self.last_vram_ratio*100:.1f}% capacity"
+                        alerts.append({"severity": severity, "type": "low_vram_utilization", "detail": detail})
                     if alerts:
                         summary = {}
                         for a in alerts:
@@ -872,13 +1266,50 @@ class UltimateTrainer:
 
                     # Time-based status updates (every ~2 seconds)
                     if current_time - self.last_update_time >= self.update_interval:
+                        penalty_stats = None
+                        penalty_heatmap_payload = None
+                        penalty_deltas: Dict[str, int] = {}
+                        if self.enable_penalty_metrics and self.logits_processor:
+                            penalty_stats = collect_penalty_stats(self.logits_processor)
+                            if penalty_stats:
+                                for stat in penalty_stats:
+                                    label = stat.get("label", "penalty")
+                                    hits = stat.get("hits", 0)
+                                    previous = self.penalty_last_hits.get(label, 0)
+                                    delta = max(0, hits - previous)
+                                    self.penalty_last_hits[label] = hits
+                                    if delta > 0:
+                                        penalty_deltas[label] = delta
+                                        self.penalty_totals[label] = self.penalty_totals.get(label, 0) + delta
+                                        file_key = self.current_file or "unknown"
+                                        file_stats = self.penalty_files.setdefault(file_key, {})
+                                        file_stats[label] = file_stats.get(label, 0) + delta
+                                        while len(self.penalty_files) > 8:
+                                            self.penalty_files.popitem(last=False)
+                                if self.penalty_files:
+                                    penalty_heatmap_payload = {
+                                        "totals": dict(self.penalty_totals),
+                                        "per_file": {k: dict(v) for k, v in self.penalty_files.items()}
+                                    }
+
+                        if self.vram_samples:
+                            if penalty_deltas:
+                                self.vram_samples[-1]["penalty"] = penalty_deltas
+                            else:
+                                self.vram_samples[-1]["penalty"] = None
+
+                        serialized_samples = []
+                        for sample in self.vram_samples:
+                            serialized_samples.append(sample)
+                        penalty_stats_payload = penalty_stats
+
                         self.status_writer.update_progress(
                             step=state.global_step,
                             total_steps=self.total_steps,
                             epoch=int(current_epoch),
                             loss=current_loss,
                             lr=current_lr,
-                            val_loss=val_loss,
+                            val_loss=self.last_val_loss,  # Use validation loss from on_evaluate callback
                             batch_step=batch_step,
                             batch_total_steps=self.batch_total_steps,
                             batch_number=self.batch_number,
@@ -890,33 +1321,13 @@ class UltimateTrainer:
                             loss_variance=loss_variance,
                             loss_trend=self.loss_trend,
                             active_alerts=alerts if alerts else None,
-                            alert_summary=alert_summary
+                            alert_summary=alert_summary,
+                            throughput_vram_samples=serialized_samples,
+                            queue_velocity=self.queue_velocity,
+                            logit_penalty_stats=penalty_stats_payload,
+                            penalty_heatmap=penalty_heatmap_payload,
                         )
                         self.last_update_time = current_time
-
-                    # Prompt/golden snapshots (no generation) to keep UI populated
-                    if (
-                        self.raw_train_examples
-                        and (current_time - self.last_prompt_snapshot_time) >= self.prompt_snapshot_interval
-                    ):
-                        try:
-                            dataset_idx = state.global_step % len(self.raw_train_examples)
-                            current_example = self.raw_train_examples[dataset_idx]
-                            if 'messages' in current_example:
-                                messages = current_example['messages']
-                                system_msg = next((m['content'] for m in messages if m['role'] == 'system'), None)
-                                user_msg = next((m['content'] for m in messages if m['role'] == 'user'), None)
-                                golden_msg = next((m['content'] for m in messages if m['role'] == 'assistant'), None)
-                                if user_msg and golden_msg:
-                                    # Truncate to avoid bloating status JSON
-                                    self.status_writer.update_prompt_snapshot(
-                                        prompt=user_msg[:1000],
-                                        golden=golden_msg[:1000],
-                                        system_prompt=system_msg[:500] if system_msg else None
-                                    )
-                                    self.last_prompt_snapshot_time = current_time
-                        except Exception as e:
-                            print(f"Warning: Could not record prompt snapshot at step {state.global_step}: {e}")
 
                     # Inference updates (periodic) - show a live example with golden/model output
                     if (
@@ -955,13 +1366,16 @@ class UltimateTrainer:
 
                                             # Generate
                                             inputs = self.tokenizer(text, return_tensors="pt").to(self.model_ref.device)
+                                            reset_processor_states(self.logits_processor)
                                             outputs = self.model_ref.generate(
                                                 **inputs,
-                                                max_new_tokens=512,  # Longer preview output
+                                                max_new_tokens=2048,  # Full output for reasoning tasks
                                                 temperature=0.1,
                                                 do_sample=False,
                                                 pad_token_id=self.tokenizer.eos_token_id,
-                                                eos_token_id=self.tokenizer.eos_token_id
+                                                eos_token_id=self.tokenizer.eos_token_id,
+                                                logits_processor=self.logits_processor,
+                                                min_new_tokens=1
                                             )
 
                                             # Decode model output
@@ -996,8 +1410,55 @@ class UltimateTrainer:
 
                                         self.model_ref.train()
 
+                                        # Clear GPU cache after inference to prevent OOM
+                                        if torch.cuda.is_available():
+                                            torch.cuda.empty_cache()
+
+                                        # Estimate token lengths for metadata/analysis
+                                        golden_token_len = None
+                                        model_token_len = None
+                                        try:
+                                            golden_token_len = len(self.tokenizer.encode(golden_msg, add_special_tokens=False))
+                                        except Exception:
+                                            pass
+                                        try:
+                                            model_token_len = len(self.tokenizer.encode(model_output, add_special_tokens=False))
+                                        except Exception:
+                                            pass
+
                                         # Check if match
                                         matches = golden_msg.strip() == model_output.strip()
+
+                                        # Update pattern tracker for heatmap coverage
+                                        pattern_matrix = None
+                                        pattern_id = None
+                                        bin_name = None
+                                        if self.pattern_tracker:
+                                            try:
+                                                response_tokens = model_token_len if model_token_len is not None else 0
+                                                pattern_id, bin_name = self.pattern_tracker.classify(
+                                                    user_msg or "",
+                                                    response_tokens
+                                                )
+                                                self.pattern_tracker.record(pattern_id, bin_name, matches)
+                                                pattern_matrix = self.pattern_tracker.get_matrix()
+                                            except Exception as e:
+                                                print(f"Warning: Pattern tracker update failed: {e}")
+                                        pattern_metadata = None
+                                        if pattern_id:
+                                            pattern_metadata = {
+                                                "pattern_id": pattern_id,
+                                                "length_bin": bin_name,
+                                                "timestamp": datetime.now().isoformat(),
+                                                "loss": example_loss,
+                                            }
+
+                                        layer_summary = None
+                                        if self.layer_monitor:
+                                            try:
+                                                layer_summary = self.layer_monitor.snapshot()
+                                            except Exception as e:
+                                                print(f"Warning: Layer monitor snapshot failed: {e}")
 
                                         # Display in terminal
                                         print("\n" + "=" * 80)
@@ -1032,7 +1493,12 @@ class UltimateTrainer:
                                             batch_total_steps=self.batch_total_steps,
                                             batch_number=self.batch_number,
                                             batch_queue_size=self.batch_queue_size,
-                                            current_file=self.current_file
+                                            current_file=self.current_file,
+                                            golden_output_length=golden_token_len,
+                                            model_output_length=model_token_len,
+                                            pattern_heatmap=pattern_matrix,
+                                            layer_activity_summary=layer_summary,
+                                            pattern_metadata=pattern_metadata
                                         )
                                         self.last_update_time = current_time
                                         self.last_inference_step = state.global_step
@@ -1058,6 +1524,22 @@ class UltimateTrainer:
                         except Exception as e:
                             print(f"Warning: Evolution snapshot failed at step {state.global_step}: {e}")
 
+                def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+                    """Capture validation loss after evaluation runs."""
+                    if metrics and 'eval_loss' in metrics:
+                        self.last_val_loss = metrics['eval_loss']
+                        print(f"\n📊 Validation Loss: {self.last_val_loss:.4f}")
+
+                        # Calculate train/val gap if we have recent training loss
+                        if state.log_history:
+                            recent_train_loss = state.log_history[-1].get('loss', None)
+                            if recent_train_loss:
+                                gap = self.last_val_loss - recent_train_loss
+                                print(f"   Train Loss: {recent_train_loss:.4f}")
+                                print(f"   Val-Train Gap: {gap:+.4f}")
+                                if gap > 0.5:
+                                    print(f"   ⚠️  Large gap detected - possible overfitting!")
+
             # Use the calculated values from earlier:
             # - current_global_step (from checkpoint)
             # - steps_for_this_file (for this dataset)
@@ -1068,11 +1550,19 @@ class UltimateTrainer:
             batch_number = getattr(self.args, 'batch_number', None)
             batch_queue_size = getattr(self.args, 'batch_queue_size', None)
 
+            if self.layer_monitor is None:
+                try:
+                    self.layer_monitor = LayerMonitor(self.model)
+                except Exception as exc:
+                    print(f"⚠️ Layer monitor disabled: {exc}")
+                    self.layer_monitor = None
+
             # Trainer
             trainer = Trainer(
                 model=self.model,
                 args=training_args,
                 train_dataset=tokenized_dataset,
+                eval_dataset=tokenized_val_dataset,  # Use validation split from current batch
                 data_collator=data_collator,
                 callbacks=[LiveMonitorCallback(
                     self.live_monitor,
@@ -1093,7 +1583,9 @@ class UltimateTrainer:
                     avg_seq_len=self.avg_seq_len,
                     effective_batch=effective_batch,
                     micro_eval_inputs=self.tokenized_fixed_val_small,
-                    micro_eval_interval=max(500, self.args.eval_steps)
+                    micro_eval_interval=max(500, self.args.eval_steps),
+                    logits_processor=self.logits_processor,
+                    layer_monitor=self.layer_monitor,
                 )]
             )
 
@@ -1123,13 +1615,31 @@ class UltimateTrainer:
             # Check for existing checkpoint to resume from (preserves optimizer state)
             resume_from_checkpoint = None
             if Path(self.args.output_dir).exists():
-                checkpoints = list(Path(self.args.output_dir).glob("checkpoint-*"))
-                if checkpoints:
+                checkpoint_dir = Path(self.args.output_dir)
+                checkpoint_candidates = []
+                for cp in checkpoint_dir.glob("checkpoint-*"):
+                    parts = cp.name.split("-", 1)
+                    if len(parts) != 2:
+                        continue
+                    try:
+                        step = int(parts[1])
+                    except ValueError:
+                        continue
+                    checkpoint_candidates.append((step, cp))
+
+                if checkpoint_candidates:
                     # Use the latest checkpoint based on step number
-                    latest_checkpoint = max(checkpoints, key=lambda p: int(p.name.split("-")[1]))
-                    resume_from_checkpoint = str(latest_checkpoint)
-                    print(f"📦 Resuming from checkpoint: {resume_from_checkpoint}")
-                    print(f"   (This preserves optimizer state for smooth continuation)")
+                    latest_checkpoint = max(checkpoint_candidates, key=lambda item: item[0])[1]
+                    trainer_state_path = latest_checkpoint / "trainer_state.json"
+                    if trainer_state_path.exists():
+                        resume_from_checkpoint = str(latest_checkpoint)
+                        print(f"📦 Resuming from checkpoint: {resume_from_checkpoint}")
+                        print(f"   (This preserves optimizer state for smooth continuation)")
+                    else:
+                        print(
+                            f"⚠️  Skipping checkpoint resume: {trainer_state_path} is missing "
+                            "trainer_state.json (optimizer state will be reinitialized)."
+                        )
 
             # Train with checkpoint resumption if available
             trainer.train(resume_from_checkpoint=resume_from_checkpoint)
@@ -1163,6 +1673,8 @@ class UltimateTrainer:
             duration_str = f"{elapsed/60:.1f} minutes"
             self.notifier.training_complete(duration_str)
 
+            self._record_training_summary(success=True, runtime_sec=elapsed)
+
             return True
 
         except Exception as e:
@@ -1174,13 +1686,61 @@ class UltimateTrainer:
             # Mark as crashed
             self.status_writer.mark_crashed(error_msg, type(e).__name__)
 
+            runtime = None
+            if self.training_start_time:
+                runtime = time.time() - self.training_start_time
+
             # Send crash notification
             if "out of memory" in error_msg.lower() or "OOM" in error_msg:
                 self.notifier.oom_error()
             else:
                 self.notifier.training_crashed(error_msg)
 
+            self._record_training_summary(success=False, runtime_sec=runtime)
+
             return False
+
+    def _record_training_summary(self, success: bool, runtime_sec: Optional[float]):
+        try:
+            dataset_name = Path(self.args.dataset).name if getattr(self.args, 'dataset', None) else None
+            sample_count = len(self.train_dataset) if self.train_dataset is not None else None
+            max_golden = getattr(self.status_writer, 'max_golden_output_length', None)
+            max_model = getattr(self.status_writer, 'max_model_output_length', None)
+            max_length_cfg = getattr(self.args, 'max_length', None)
+            headroom_tokens = None
+            if max_golden:
+                headroom_tokens = math.ceil(min(max_length_cfg or max_golden, max_golden * 1.1))
+
+            gpu_peak_gb = None
+            try:
+                if torch.cuda.is_available():
+                    peak_bytes = torch.cuda.max_memory_allocated()
+                    if peak_bytes:
+                        gpu_peak_gb = peak_bytes / (1024 ** 3)
+            except Exception:
+                pass
+
+            summary = {
+                "timestamp": datetime.now().isoformat(),
+                "dataset": dataset_name,
+                "samples": sample_count,
+                "success": success,
+                "runtime_sec": runtime_sec,
+                "batch_size": getattr(self.args, 'batch_size', None),
+                "gradient_accumulation": getattr(self.args, 'gradient_accumulation', None),
+                "effective_batch": (self.args.batch_size * self.args.gradient_accumulation)
+                if getattr(self.args, 'batch_size', None) and getattr(self.args, 'gradient_accumulation', None) else None,
+                "max_length_config": max_length_cfg,
+                "observed_max_tokens": max_golden,
+                "observed_max_tokens_headroom": headroom_tokens,
+                "observed_max_model_tokens": max_model,
+                "tokens_per_sec_avg": self.tokens_per_sec_ema,
+                "gpu_peak_alloc_gb": gpu_peak_gb
+            }
+            self.training_summary = summary
+        except Exception:
+            # Do not let summary collection crash training flow
+            self.training_summary = None
 
     def run_initial_preview(self, current_global_step: int, total_steps: int):
         """Run a lightweight preview on the first example to seed status/logs."""
@@ -1205,20 +1765,34 @@ class UltimateTrainer:
                     add_generation_prompt=True
                 )
                 inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+                reset_processor_states(self.logits_processor)
                 outputs = self.model.generate(
                     **inputs,
-                    max_new_tokens=64,
+                    max_new_tokens=2048,
                     temperature=0.1,
                     do_sample=False,
                     pad_token_id=self.tokenizer.eos_token_id,
-                    eos_token_id=self.tokenizer.eos_token_id
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    logits_processor=self.logits_processor,
+                    min_new_tokens=1
                 )
                 model_output = self.tokenizer.decode(
                     outputs[0][inputs['input_ids'].shape[1]:],
                     skip_special_tokens=True
                 ).strip()
             self.model.train()
+
+            # Clear GPU cache after initial inference to prevent OOM
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
             batch_step = 0
+            layer_summary = None
+            if self.layer_monitor:
+                try:
+                    layer_summary = self.layer_monitor.snapshot()
+                except Exception as exc:
+                    print(f"Warning: Layer monitor snapshot failed (initial preview): {exc}")
             self.status_writer.update_inference(
                 step=current_global_step,
                 total_steps=total_steps,
@@ -1236,7 +1810,8 @@ class UltimateTrainer:
                 batch_queue_size=getattr(self.args, 'batch_queue_size', None),
                 current_file=getattr(self.args, 'current_file', None),
                 golden_output_length=len(golden_msg),
-                model_output_length=len(model_output)
+                model_output_length=len(model_output),
+                layer_activity_summary=layer_summary
             )
             self.last_inference_step = current_global_step
             print("[InitialPreview] Completed initial inference preview.")
@@ -1258,11 +1833,6 @@ def parse_args():
     parser.add_argument("--gradient-accumulation", type=int, default=4, help="Gradient accumulation steps")
     parser.add_argument("--learning-rate", type=float, default=2e-4, help="Learning rate")
     parser.add_argument("--warmup-steps", type=int, default=100, help="Warmup steps")
-
-    # LoRA params
-    parser.add_argument("--lora-r", type=int, default=64, help="LoRA rank")
-    parser.add_argument("--lora-alpha", type=int, default=32, help="LoRA alpha")
-    parser.add_argument("--use-qlora", action="store_true", help="Use QLoRA (4-bit quantization) to reduce VRAM usage")
 
     # Monitoring
     parser.add_argument("--eval-steps", type=int, default=100, help="Run live inference every N steps")

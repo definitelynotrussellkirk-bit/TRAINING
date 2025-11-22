@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Status Bar Test</title>
+    <style>
+        body { background: #0a0f1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .status-bar { background: rgba(15, 23, 42, 0.95); padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 20px; align-items: center; }
+        .summary-metric { display: flex; flex-direction: column; }
+        .summary-label { font-size: 0.75em; color: #888; }
+        .summary-value { font-size: 1.2em; font-weight: bold; color: #00d9ff; }
+        #output { white-space: pre; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Status Bar Data Flow Test</h1>
+    
+    <div class="status-bar">
+        <div class="summary-metric">
+            <span class="summary-label">STATUS</span>
+            <span class="summary-value" id="summaryStatus">-</span>
+        </div>
+        <div class="summary-metric">
+            <span class="summary-label">LOSS</span>
+            <span class="summary-value" id="lossValue">-</span>
+        </div>
+        <div class="summary-metric">
+            <span class="summary-label">GPU TEMP</span>
+            <span class="summary-value" id="gpuValue">-</span>
+        </div>
+        <div class="summary-metric">
+            <span class="summary-label">VRAM</span>
+            <span class="summary-value" id="vramValue">-</span>
+        </div>
+        <div class="summary-metric">
+            <span class="summary-label">RAM</span>
+            <span class="summary-value" id="ramValue">-</span>
+        </div>
+    </div>
+
+    <div id="output">Loading...</div>
+
+    <script type="module">
+        import { api } from './js/services/api.js';
+        
+        const output = document.getElementById('output');
+        
+        async function test() {
+            try {
+                output.textContent = 'Fetching data...\n';
+                
+                const { status, gpu, memory } = await api.fetchAll();
+                
+                output.textContent = 'RAW DATA:\n\n';
+                output.textContent += 'Status:\n' + JSON.stringify(status, null, 2).substring(0, 500) + '\n\n';
+                output.textContent += 'GPU:\n' + JSON.stringify(gpu, null, 2) + '\n\n';
+                output.textContent += 'Memory:\n' + JSON.stringify(memory, null, 2) + '\n\n';
+                
+                // Update elements
+                if (status) {
+                    document.getElementById('summaryStatus').textContent = status.status?.toUpperCase() || '-';
+                    document.getElementById('lossValue').textContent = status.loss?.toFixed(4) || '-';
+                }
+                
+                if (gpu) {
+                    document.getElementById('gpuValue').textContent = Math.round(gpu.temperature) + '°C';
+                    const vramGB = (gpu.memory_used_mb / 1024).toFixed(1);
+                    document.getElementById('vramValue').textContent = vramGB + ' GB';
+                }
+                
+                if (memory) {
+                    document.getElementById('ramValue').textContent = memory.used_gb.toFixed(1) + ' GB';
+                }
+                
+                output.textContent += '\n✅ Elements updated successfully!';
+                
+            } catch (err) {
+                output.textContent = '❌ ERROR:\n' + err.message + '\n\n' + err.stack;
+            }
+        }
+        
+        test();
+        setInterval(test, 3000);
+    </script>
+</body>
+</html>

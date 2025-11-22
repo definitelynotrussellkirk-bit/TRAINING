@@ -26,7 +26,7 @@ Usage:
     trainer = StreamingTrainer(
         generator=my_generator,
         num_samples=1000,
-        model="qwen3_8b",
+        model="qwen3_0.6b",
         output_dir="~/adapter"
     )
 
@@ -279,7 +279,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Stream training from generator")
     parser.add_argument("--samples", type=int, default=1000, help="Number of samples to generate")
-    parser.add_argument("--model", type=str, default="qwen3_8b", help="Model name or path")
+    parser.add_argument("--model", type=str, default="qwen3_0.6b", help="Model name or path")
     parser.add_argument("--output-dir", type=str, default="~/streaming_adapter", help="Output directory")
     parser.add_argument("--skip-validation", action="store_true", help="Skip validation")
     parser.add_argument("-y", "--yes", action="store_true", help="Skip confirmations")

@@ -21,6 +21,31 @@ const MetricsUpdater = {
         return num.toLocaleString();
     },
 
+    formatMaybeJson(text) {
+        if (!text) return '';
+        let trimmed = text.trim();
+        if (!trimmed) return '';
+        const firstBrace = trimmed.indexOf('{');
+        const firstBracket = trimmed.indexOf('[');
+        const firstJsonIdx = Math.min(
+            firstBrace >= 0 ? firstBrace : Number.MAX_VALUE,
+            firstBracket >= 0 ? firstBracket : Number.MAX_VALUE
+        );
+        if (firstJsonIdx > 0 && firstJsonIdx !== Number.MAX_VALUE) {
+            trimmed = trimmed.slice(firstJsonIdx);
+        }
+        const looksJson = (trimmed.startsWith('{')) || (trimmed.startsWith('['));
+        if (looksJson) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                return JSON.stringify(parsed, null, 2);
+            } catch (err) {
+                // Fall through to raw text
+            }
+        }
+        return text;
+    },
+
     setElementText(id, text) {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
@@ -86,9 +111,25 @@ const MetricsUpdater = {
         }
 
         // Config display
-        this.setElementText('loraRank', data.lora_r || '-');
-        this.setElementText('loraAlpha', data.lora_alpha || '-');
-        this.setElementText('trainableParams', data.trainable_params || '-');
+        const layerSummary = data.layer_activity_summary;
+        if (layerSummary && layerSummary.overall) {
+            const totalLayers = layerSummary.overall.total_layers ?? (layerSummary.top_changes ? layerSummary.top_changes.length : null);
+            const avgDelta = layerSummary.overall.avg_delta ?? null;
+            this.setElementText('loraRank', totalLayers != null ? this.formatLargeNumber(totalLayers) : '-');
+            this.setElementText('loraAlpha', avgDelta != null ? this.formatNumber(avgDelta, 4) : '-');
+        } else {
+            this.setElementText('loraRank', data.lora_r || '-');
+            this.setElementText('loraAlpha', data.lora_alpha || '-');
+        }
+        const batch = data.batch_size || this.configBatchSize || '-';
+        const accum = data.gradient_accumulation || this.configGradAccum || '-';
+        let effective = '-';
+        if (!isNaN(batch) && !isNaN(accum)) {
+            effective = this.formatLargeNumber(Math.round(batch * accum));
+        }
+        this.setElementText('batchSize', batch);
+        this.setElementText('gradAccum', accum);
+        this.setElementText('effectiveBatch', effective);
         this.setElementText('modelName', data.model_name || '-');
         this.setElementText('maxOutputTokens', data.max_output_tokens || '-');
         this.setElementText('contextWindow', data.context_window || '-');
@@ -130,7 +171,11 @@ const MetricsUpdater = {
         this.setElementText('stepsPerSec', this.formatNumber(stepsPerSec, 2));
 
         // Examples/sec (steps/sec × effective batch size)
-        const effectiveBatchSize = 8; // TODO: Get from config
+        const effectiveBatchSize = (data.batch_size && data.gradient_accumulation)
+            ? data.batch_size * data.gradient_accumulation
+            : this.configBatchSize && this.configGradAccum
+                ? this.configBatchSize * this.configGradAccum
+                : 8;
         const examplesPerSec = stepsPerSec * effectiveBatchSize;
         this.setElementText('examplesPerSec', this.formatNumber(examplesPerSec, 2));
 
@@ -230,7 +275,8 @@ const MetricsUpdater = {
         // Model output
         const modelEl = document.getElementById('modelAnswer');
         if (modelEl) {
-            modelEl.textContent = example.model_output || 'Waiting for validation step...';
+            const formatted = this.formatMaybeJson(example.model_output || '');
+            modelEl.textContent = formatted || 'Waiting for validation step...';
         }
 
         // Match badge
@@ -256,6 +302,7 @@ const MetricsUpdater = {
             const matchIcon = ex.correct ? '✓' : '✗';
             const matchClass = ex.correct ? 'success' : 'error';
             const lossDisplay = ex.loss ? `Loss: ${ex.loss.toFixed(3)}` : '';
+            const formattedOutput = this.formatMaybeJson(ex.model_output || '');
 
             return `
                 <div style="margin-bottom: 10px; padding: 8px; background: rgba(42, 63, 95, 0.3); border-radius: 5px;">
@@ -266,6 +313,7 @@ const MetricsUpdater = {
                     <div style="font-size: 0.85em; color: #888;">
                         ${lossDisplay}
                     </div>
+                    ${formattedOutput ? `<pre style="white-space: pre-wrap; margin-top: 5px; font-size: 0.8em; max-height: 120px; overflow-y: auto;">${formattedOutput.substring(0, 600)}${formattedOutput.length > 600 ? '...' : ''}</pre>` : ''}
                 </div>
             `;
         }).join('');
@@ -495,44 +543,44 @@ const MetricsUpdater = {
         }
     },
 
-    // ========== LORA MONITORING (NEW) ==========
+    // ========== LAYER ACTIVITY ==========
 
-    updateLoRAStats(data) {
-        if (!data || !data.lora_summary) return;
+    updateLayerActivity(data) {
+        const summary = data && data.layer_activity_summary;
+        const summaryEl = document.getElementById('layerActivitySummary');
+        const listEl = document.getElementById('layerActivityTop');
+        if (!summaryEl || !listEl) return;
 
-        const summary = data.lora_summary;
-
-        // Update summary stats
-        if (summary.total_layers != null) {
-            this.setElementText('loraLayers', summary.total_layers);
+        if (!summary || !summary.top_changes) {
+            summaryEl.textContent = 'Waiting for first snapshot...';
+            listEl.innerHTML = '';
+            return;
         }
-        if (summary.active_layers != null) {
-            this.setElementText('loraActiveLayers', summary.active_layers);
+
+        const overall = summary.overall || {};
+        const totalLayers = overall.total_layers || summary.top_changes.length;
+        const avgDelta = overall.avg_delta || 0;
+        summaryEl.innerHTML = `Layers tracked: <strong>${totalLayers}</strong> · Avg Δ: <strong>${this.formatNumber(avgDelta, 4)}</strong>`;
+
+        if (summary.top_changes.length === 0) {
+            listEl.innerHTML = '<p style="color: #888;">No layer movement detected yet.</p>';
+            return;
         }
 
-        // Top layers (could render a mini chart or list)
-        if (summary.top_layers && summary.top_layers.length > 0) {
-            const container = document.getElementById('loraTopLayers');
-            if (container) {
-                const html = summary.top_layers.slice(0, 5).map((layer, idx) => `
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9em;">
-                        <span style="color: #00d9ff;">${layer.name.split('.').pop()}</span>
-                        <span style="color: #00ff88;">${layer.grad_norm.toExponential(2)}</span>
+        const rows = summary.top_changes.map((entry, idx) => {
+            const rel = entry.relative_delta ? (entry.relative_delta * 100) : 0;
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div>
+                        <span style="color: #00d9ff; font-weight: bold;">${idx + 1}. ${entry.name}</span>
+                        <span style="color: #888; margin-left: 6px;">Δ=${this.formatNumber(entry.delta, 4)}</span>
                     </div>
-                `).join('');
-                container.innerHTML = html || '<div style="color: #888;">No data yet</div>';
-            }
-        }
+                    <span style="color: #ffaa00; font-size: 0.85em;">rel ${rel.toFixed(3)}%</span>
+                </div>
+            `;
+        }).join('');
 
-        // Dead layers warning
-        if (summary.dead_layers && summary.dead_layers.length > 0) {
-            const warningEl = document.getElementById('loraDeadLayersWarning');
-            if (warningEl) {
-                warningEl.textContent = `⚠️ ${summary.dead_layers.length} dead layers detected`;
-                warningEl.style.display = 'block';
-                warningEl.style.color = '#ffaa00';
-            }
-        }
+        listEl.innerHTML = rows;
     },
 
     // ========== SMART ALERTS (NEW) ==========

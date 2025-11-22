@@ -28,7 +28,39 @@ from model_versioner import ModelVersioner
 from backup_manager import BackupManager
 
 
-def consolidate_model(base_dir: Path, description: str, training_data: list = None):
+def resolve_adapter_dir(base_dir: Path, config: dict, override: Path | None = None) -> Path:
+    """
+    Determine which current_model directory should be consolidated.
+    Preference order:
+      1. --current-dir CLI override
+      2. config['current_model_dir'] (absolute or relative)
+      3. <base_dir>/current_model
+      4. <base_dir>/current_model_small
+    Returns the first directory that exists and contains adapter_model.safetensors.
+    """
+
+    def normalize(path_value):
+        if path_value is None:
+            return None
+        path = Path(path_value)
+        if not path.is_absolute():
+            path = (base_dir / path).resolve()
+        return path
+
+    candidates = []
+    for candidate in [override, config.get('current_model_dir'), base_dir / 'current_model', base_dir / 'current_model_small']:
+        path = normalize(candidate)
+        if path and path not in candidates:
+            candidates.append(path)
+
+    for path in candidates:
+        if path.exists() and (path / 'adapter_model.safetensors').exists():
+            return path
+
+    return normalize(override) or normalize(config.get('current_model_dir')) or (base_dir / 'current_model').resolve()
+
+
+def consolidate_model(base_dir: Path, description: str, training_data: list = None, current_dir: Path | None = None):
     """
     Safely merge current adapter into base model with versioning.
 
@@ -45,8 +77,8 @@ def consolidate_model(base_dir: Path, description: str, training_data: list = No
     with open(config_file) as f:
         config = json.load(f)
 
-    base_model_path = Path(config.get('base_model', config.get('model_path')))
-    current_model_path = base_dir / 'current_model'
+    base_model_path = Path(config.get('base_model', config.get('model_path'))).resolve()
+    current_model_path = resolve_adapter_dir(base_dir, config, current_dir)
 
     # Initialize versioning and backup systems
     versioner = ModelVersioner(str(base_dir))
@@ -228,6 +260,7 @@ def main():
         epilog='Example: python3 consolidate_model.py --base-dir /path/to/training --description "Math training 10k examples"'
     )
     parser.add_argument('--base-dir', type=Path, required=True, help='Base directory (e.g., /path/to/training)')
+    parser.add_argument('--current-dir', type=Path, help='Override current adapter directory (default: <base>/current_model)')
     parser.add_argument('--description', required=True, help='Description of this version (e.g., "Math training 10k")')
     parser.add_argument('--training-data', nargs='+', help='Training data files used (optional)')
 
@@ -241,7 +274,8 @@ def main():
         success = consolidate_model(
             base_dir=args.base_dir,
             description=args.description,
-            training_data=args.training_data
+            training_data=args.training_data,
+            current_dir=args.current_dir
         )
         return 0 if success else 1
     except Exception as e:

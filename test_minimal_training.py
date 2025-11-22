@@ -41,13 +41,13 @@ bnb_config = BitsAndBytesConfig(
 )
 
 model = AutoModelForCausalLM.from_pretrained(
-    "/path/to/training/DIO_20251114",
+    "/path/to/training/consolidated_models/20251119_152444",
     quantization_config=bnb_config,
     device_map="auto",
     trust_remote_code=True
 )
 
-tokenizer = AutoTokenizer.from_pretrained("/path/to/training/DIO_20251114")
+tokenizer = AutoTokenizer.from_pretrained("/path/to/training/consolidated_models/20251119_152444")
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 

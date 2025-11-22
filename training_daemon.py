@@ -34,6 +34,7 @@ import traceback
 from pathlib import Path
 from datetime import datetime, timedelta
 import logging
+from urllib import request, error
 
 # Checkpoint retention
 from checkpoint_retention import enforce_retention
@@ -45,6 +46,26 @@ from train import UltimateTrainer
 from training_queue import TrainingQueue
 from training_controller import TrainingController
 from atomic_ops import write_json_atomic, safe_file_operation
+
+# Add format variety support
+import random
+REPO_ROOT = Path(__file__).parent.parent / "singleSKILL"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+try:
+    from skill_syllo_variant.scripts.export_training_data import (
+        DEFAULT_OUTPUT_VARIANT_DISTRIBUTION,
+        OUTPUT_VARIANTS,
+        choose_output_variant
+    )
+    FORMAT_VARIETY_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Format variety not available: {e}")
+    FORMAT_VARIETY_AVAILABLE = False
+    DEFAULT_OUTPUT_VARIANT_DISTRIBUTION = {"standard": 1.0}
+    OUTPUT_VARIANTS = {"standard": {"prompt_note": "", "transform": lambda p: p}}
+    choose_output_variant = lambda rng, dist: "standard"
 
 
 class TrainingDaemon:
@@ -75,6 +96,12 @@ class TrainingDaemon:
         # Track last consolidation date
         self.last_consolidation_date = None
         self.consolidation_marker = self.base_dir / ".last_consolidation"
+
+        # Track API autogen cooldown
+        self.last_autogen_time = 0.0
+
+        # RNG for format variety
+        self.format_rng = random.Random()
 
         # Initialize queue and control systems
         self.queue = TrainingQueue(str(self.base_dir))
@@ -114,7 +141,7 @@ class TrainingDaemon:
         if not self.config_file.exists():
             # Create default config
             default_config = {
-                "model_name": "qwen3_8b",
+                "model_name": "qwen3_0.6b",
                 "model_path": None,  # Set this to your base model path
                 "batch_size": 4,
                 "gradient_accumulation": 4,
@@ -127,7 +154,18 @@ class TrainingDaemon:
                 "num_eval_samples": 5,
                 "save_steps": 500,
                 "poll_interval": 60,  # Check inbox every 60 seconds
-                "snapshot_time": "02:00"  # Daily snapshot at 2 AM
+                "snapshot_time": "02:00",  # Daily snapshot at 2 AM
+                "auto_generate": {
+                    "enabled": False,
+                    "host": "127.0.0.1",
+                    "port": 8091,
+                    "count": 20000,
+                    "priority": "normal",
+                    "threshold": 0,
+                    "seed": None,
+                    "cooldown_sec": 120,
+                    "payload": {}
+                }
             }
 
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -141,6 +179,18 @@ class TrainingDaemon:
 
         with open(self.config_file) as f:
             config = json.load(f)
+
+        config.setdefault("auto_generate", {
+            "enabled": False,
+            "host": "127.0.0.1",
+            "port": 8091,
+            "count": 20000,
+            "priority": "normal",
+            "threshold": 0,
+            "seed": None,
+            "cooldown_sec": 120,
+            "payload": {}
+        })
 
         self.logger.info(f"Loaded config from {self.config_file}")
 
@@ -192,6 +242,21 @@ class TrainingDaemon:
             lora_r = config['lora_r']
             if not (lora_r > 0 and lora_r <= 1024):
                 errors.append(f"LoRA rank out of range (1-1024): {lora_r}")
+
+        auto_cfg = config.get("auto_generate", {}) or {}
+        if auto_cfg.get("enabled"):
+            host = auto_cfg.get("host")
+            port = auto_cfg.get("port")
+            count = auto_cfg.get("count")
+            if not host:
+                errors.append("auto_generate.host is required when enabled")
+            if not isinstance(port, int) or port <= 0:
+                errors.append(f"auto_generate.port invalid: {port}")
+            if not isinstance(count, int) or count <= 0:
+                errors.append(f"auto_generate.count invalid: {count}")
+            priority = auto_cfg.get("priority", "normal")
+            if priority not in {"high", "normal", "low"}:
+                errors.append(f"auto_generate.priority invalid: {priority}")
 
         if errors:
             self.logger.error("❌ CONFIG VALIDATION FAILED!")
@@ -726,6 +791,7 @@ class TrainingDaemon:
         args.num_eval_samples = self.config["num_eval_samples"]
         args.save_steps = self.config["save_steps"]
         args.use_qlora = self.config.get("use_qlora", False)
+        args.max_length = self.config.get("max_length")
 
         # Skip validation (assume data is pre-validated)
         args.skip_validation = True
@@ -762,6 +828,10 @@ class TrainingDaemon:
 
             self.logger.info("Running training...")
             success = trainer.run()
+            summary = getattr(trainer, 'training_summary', None)
+            if summary:
+                summary.setdefault('dataset', data_file.name)
+                self.log_run_summary(summary)
 
             elapsed = time.time() - start_time
             self.logger.info(f"Training completed in {elapsed/60:.1f} minutes")
@@ -786,6 +856,50 @@ class TrainingDaemon:
             error_details = traceback.format_exc()
             self.logger.error(f"Full traceback:\n{error_details}")
             return False
+
+    def log_run_summary(self, summary: dict):
+        try:
+            history_path = self.logs_dir / "run_history.jsonl"
+            history_path.parent.mkdir(parents=True, exist_ok=True)
+            with history_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(summary) + "\n")
+            self.logger.info(f"📈 Logged run summary (dataset={summary.get('dataset')})")
+
+            suggestion = self.compute_batch_suggestion(summary)
+            if suggestion:
+                self.logger.info(
+                    "⚙️ Throughput advisor: observed %.2f GB at batch %s -> suggested batch %s (target %.1f GB)",
+                    suggestion['observed_mem_gb'],
+                    summary.get('batch_size'),
+                    suggestion['recommended_batch_size'],
+                    suggestion['target_mem_gb']
+                )
+        except Exception as e:
+            self.logger.error(f"Failed to log run summary: {e}")
+
+    def compute_batch_suggestion(self, summary: dict):
+        peak = summary.get('gpu_peak_alloc_gb')
+        batch = summary.get('batch_size')
+        if not peak or not batch:
+            return None
+        try:
+            peak = float(peak)
+            batch = int(batch)
+        except (TypeError, ValueError):
+            return None
+        if peak <= 0 or batch <= 0:
+            return None
+
+        target_mem = 21.0  # Aim for 19–22 GB usage
+        ratio = target_mem / peak
+        suggested = max(1, min(int(round(batch * ratio)), batch * 4))
+        if suggested == batch:
+            return None
+        return {
+            'observed_mem_gb': peak,
+            'target_mem_gb': target_mem,
+            'recommended_batch_size': suggested
+        }
 
     def cleanup_data_file(self, data_file: Path):
         """Delete training data after use"""
@@ -962,6 +1076,11 @@ class TrainingDaemon:
         self.logger.info(f"  Learning rate: {self.config['learning_rate']}")
         self.logger.info(f"  Poll interval: {self.config['poll_interval']}s")
         self.logger.info(f"  Daily snapshot: {self.config['snapshot_time']}")
+        if FORMAT_VARIETY_AVAILABLE:
+            variant_count = len(OUTPUT_VARIANTS)
+            self.logger.info(f"  Format variety: {variant_count} variants enabled")
+        else:
+            self.logger.info("  Format variety: NOT AVAILABLE (using standard format only)")
         self.logger.info("")
         self.logger.info("Daemon is running...")
         self.logger.info(f"  Drop JSONL files in: {self.inbox_dir}")
@@ -1066,6 +1185,7 @@ class TrainingDaemon:
                     # No files, just log periodically
                     if iteration % 10 == 0:  # Every 10 iterations
                         self.logger.info(f"Queue empty. Waiting... (iteration {iteration})")
+                    self.maybe_auto_generate(queue_status)
 
                 # Sleep until next check
                 time.sleep(self.config["poll_interval"])
@@ -1079,6 +1199,233 @@ class TrainingDaemon:
         finally:
             self.logger.info("Shutting down daemon...")
             self.release_lock()
+
+    def maybe_auto_generate(self, queue_status: dict):
+        auto_cfg = self.config.get("auto_generate", {}) or {}
+        if not auto_cfg.get("enabled"):
+            return
+
+        threshold = auto_cfg.get("threshold", 0)
+        if queue_status.get("total_queued", 0) > threshold:
+            return
+        if queue_status.get("processing", 0) > 0:
+            return
+        if self.get_inbox_files():
+            return
+
+        cooldown = auto_cfg.get("cooldown_sec", 120)
+        now = time.time()
+        if now - self.last_autogen_time < cooldown:
+            return
+
+        try:
+            puzzles = self.fetch_autogen_puzzles(auto_cfg)
+            entries = self.convert_puzzles_to_training(puzzles)
+            if not entries:
+                self.logger.warning("Auto-generate: API returned no puzzles")
+                return
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"syllo_autogen_{timestamp}_count{len(entries)}.jsonl"
+            inbox_path = self.inbox_dir / filename
+            self.write_training_file(inbox_path, entries)
+
+            priority = auto_cfg.get("priority", "normal")
+            self.queue.add_to_queue(inbox_path, priority)
+            self.logger.info(f"🤖 Auto-generated {len(entries)} puzzles via API and queued {filename}")
+        except Exception as e:
+            self.logger.error(f"Auto-generation failed: {e}")
+        finally:
+            self.last_autogen_time = now
+
+    def fetch_autogen_puzzles(self, auto_cfg: dict):
+        host = auto_cfg.get("host", "127.0.0.1")
+        port = auto_cfg.get("port", 8080)
+        url = f"http://{host}:{port}/generate"
+
+        payload = {
+            "count": auto_cfg.get("count", 1000)
+        }
+        if auto_cfg.get("seed") is not None:
+            payload["seed"] = auto_cfg["seed"]
+        extra = auto_cfg.get("payload") or {}
+        payload.update(extra)
+
+        data = json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        req = request.Request(url, data=data, headers=headers, method="POST")
+
+        try:
+            with request.urlopen(req, timeout=300) as resp:
+                body = resp.read().decode("utf-8")
+        except error.URLError as exc:
+            raise RuntimeError(f"API request failed: {exc}") from exc
+
+        parsed = json.loads(body)
+        if isinstance(parsed, dict):
+            if "puzzles" in parsed:
+                puzzles = parsed["puzzles"]
+            elif "examples" in parsed:
+                puzzles = parsed["examples"]
+            else:
+                puzzles = parsed.get("data", [])
+        else:
+            puzzles = parsed
+
+        if not puzzles:
+            raise RuntimeError("API response contained no puzzles")
+        return puzzles
+
+    def convert_puzzles_to_training(self, puzzles):
+        entries = []
+        for puzzle in puzzles:
+            # Choose format variant
+            variant_key = choose_output_variant(self.format_rng, DEFAULT_OUTPUT_VARIANT_DISTRIBUTION)
+
+            # Build base payload
+            base_payload = self.build_assistant_payload(puzzle)
+
+            # Apply format transformation
+            transform = OUTPUT_VARIANTS[variant_key]["transform"]
+            assistant_payload = transform(base_payload)
+
+            # Convert to JSON string
+            assistant_text = json.dumps(assistant_payload, ensure_ascii=False)
+
+            # Build user prompt with variant note
+            user_prompt = self.build_user_prompt(puzzle, variant_key)
+
+            entry = {
+                "messages": [
+                    {"role": "user", "content": user_prompt},
+                    {"role": "assistant", "content": assistant_text}
+                ],
+                "metadata": {
+                    "dataset": "syllo_api_autogen",
+                    "puzzle_id": puzzle.get("puzzle_id"),
+                    "word_count": len(puzzle.get("words", [])),
+                    "syllable_bank_size": len(puzzle.get("syllable_bank", [])),
+                    "rules": puzzle.get("rules", {}),
+                    "output_variant": variant_key
+                }
+            }
+            entries.append(entry)
+        return entries
+
+    def build_user_prompt(self, puzzle: dict, variant_key: str = "standard") -> str:
+        puzzle_id = puzzle.get("puzzle_id", "syllo_autogen")
+        rules = puzzle.get("rules", {})
+        difficulty = rules.get("difficulty", "Unknown")
+        word_count = rules.get("word_count", len(puzzle.get("words", [])))
+        syllable_bank = puzzle.get("syllable_bank", [])
+        total_tiles = len(syllable_bank)
+        total_needed = sum(len(word.get("syllables", [])) for word in puzzle.get("words", []))
+        red_herring_count = max(0, total_tiles - total_needed)
+        notes = rules.get("notes", "")
+
+        lines = [
+            f"SYLLO Puzzle {puzzle_id}",
+            "You must recover every hidden word by assigning syllable tiles to definitions.",
+            f"Difficulty: {difficulty}",
+            "Rules:",
+            f"- {word_count} target words (always between 4 and 8).",
+            "- Each word lists its syllable count via blank slots.",
+            "- Syllable tiles may repeat across clues when the bank includes duplicates.",
+            "- Return your answers as JSON with keys `solutions` and `inventory_check`.",
+            "",
+            "Word slots:"
+        ]
+
+        for idx, word in enumerate(puzzle.get("words", []), 1):
+            blanks = " ".join(["___"] * word.get("syllable_count", len(word.get("syllables", []))))
+            clue = word.get("definition") or ", ".join(word.get("available_hints", [])[:1]) or word.get("label", "Unknown clue")
+            lines.append(f"{idx}. {blanks} — {clue}")
+
+        note_line = "Note: "
+        if red_herring_count > 0:
+            note_line += f"{red_herring_count} tile(s) in the bank are red herrings and do not belong to any answer."
+        else:
+            note_line += "All tiles belong to some answer."
+        if notes:
+            note_line += f" {notes}"
+        lines.extend(["", note_line, "", "Syllable bank (shuffled):", " | ".join(syllable_bank), ""])
+        # Get variant-specific format note
+        variant = OUTPUT_VARIANTS.get(variant_key, OUTPUT_VARIANTS.get("standard", {}))
+        variant_note = variant.get("prompt_note", "")
+
+        lines.extend([
+            "Output contract:",
+            "- Return a single JSON object.",
+            "- Top-level keys: `solutions` (array) and `inventory_check` (object).",
+            "- Each `solutions` entry contains `ans_num` (1-indexed clue number),",
+            "  the ordered `syllables` you used, and the final UPPERCASE `answer`.",
+            "- `inventory_check` must include `total_tiles`, a `usage` map of tile→count,",
+            "  the `used` counts per tile, and a short `status` string.",
+            "- If red herrings exist, include them under `inventory_check.unused_tiles`.",
+            "Do not include literal JSON examples or commentary outside the payload."
+        ])
+
+        # Add variant-specific format instruction
+        if variant_note:
+            lines.append(variant_note)
+
+        return "\n".join(lines)
+
+    def build_assistant_payload(self, puzzle: dict) -> dict:
+        from collections import Counter
+
+        words = puzzle.get("words", [])
+        syllable_bank = puzzle.get("syllable_bank", [])
+        solutions = []
+        used_counter = Counter()
+        for idx, word in enumerate(words, 1):
+            syllables = word.get("syllables", [])
+            used_counter.update(syllables)
+            solutions.append({
+                "ans_num": idx,
+                "syllables": syllables,
+                "answer": word.get("label", "").upper()
+            })
+
+        bank_counter = Counter(syllable_bank)
+        unused_tiles = []
+        for tile, count in bank_counter.items():
+            unused = count - used_counter.get(tile, 0)
+            if unused > 0:
+                unused_tiles.extend([tile] * unused)
+
+        usage_map = dict(bank_counter)
+        used_map = {tile: used_counter.get(tile, 0) for tile in bank_counter if used_counter.get(tile, 0)}
+        if unused_tiles:
+            status = "All target words completed; red herrings unused: " + ", ".join(sorted(set(unused_tiles))) + "."
+        else:
+            status = "All target words completed; no unused tiles."
+
+        analysis = {
+            "word_count": len(words),
+            "unused_tile_count": len(set(unused_tiles)),
+            "unused_tiles": sorted(set(unused_tiles)),
+            "tile_usage_span": [[tile, used_counter.get(tile, 0)] for tile in sorted(bank_counter.keys())]
+        }
+
+        return {
+            "solutions": solutions,
+            "inventory_check": {
+                "total_tiles": len(syllable_bank),
+                "usage": usage_map,
+                "used": used_map,
+                "unused_tiles": sorted(set(unused_tiles)),
+                "status": status
+            },
+            "analysis": analysis
+        }
+
+    def write_training_file(self, path: Path, entries):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as fh:
+            for entry in entries:
+                fh.write(json.dumps(entry, ensure_ascii=False))
+                fh.write("\n")
 
 
 def main():

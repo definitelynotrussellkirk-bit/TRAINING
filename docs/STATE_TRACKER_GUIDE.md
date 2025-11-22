@@ -68,8 +68,8 @@ That's it! You now know:
 **Example:**
 ```
 ⚙️  CONFIG:
-   Model: qwen3_8b
-   Base: /path/to/training/DIO_20251114
+   Model: qwen3_0.6b
+   Base: /path/to/training/consolidated_models/20251119_152444
    Max Length: 2048
    Locked Params: max_length, base_model, model_name
 ```
@@ -216,8 +216,8 @@ cat current_state.json | jq '.current_model.training_steps'
   ],
   "config": {
     "exists": true,
-    "model_name": "qwen3_8b",
-    "base_model": "/path/to/training/DIO_20251114",
+    "model_name": "qwen3_0.6b",
+    "base_model": "/path/to/training/consolidated_models/20251119_152444",
     "max_length": 2048,
     "locked_params": ["max_length", "base_model", "model_name"],
     "warning": null

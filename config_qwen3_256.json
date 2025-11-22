@@ -1,6 +1,7 @@
 {
-  "model_name": "qwen3_8b_instruct",
-  "model_path": "/path/to/training/model_qwen3_8b",
+  "model_name": "qwen3_0.6b_instruct",
+  "model_display_name": "MERGED-2025-11-19 • Qwen3 0.6B",
+  "model_path": "/path/to/training/consolidated_models/20251119_152444",
   "batch_size": 1,
   "gradient_accumulation": 8,
   "learning_rate": 2e-4,

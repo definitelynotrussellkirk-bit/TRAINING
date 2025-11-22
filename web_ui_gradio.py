@@ -348,8 +348,8 @@ Set your training configuration and get a time estimate.
                     with gr.Column():
                         model_name = gr.Textbox(
                             label="Model Name",
-                            placeholder="e.g., qwen3_8b",
-                            value="qwen3_8b"
+                            placeholder="e.g., qwen3_0.6b",
+                            value="qwen3_0.6b"
                         )
 
                         num_examples = gr.Number(
@@ -404,7 +404,7 @@ For now, use the CLI:
 ```bash
 python3 train.py \\
     --dataset /path/to/data.jsonl \\
-    --model qwen3_8b \\
+    --model qwen3_0.6b \\
     --output-dir ~/my_adapter \\
     --epochs 2 \\
     --batch-size 4

@@ -136,6 +136,13 @@
                 <span class="delta-indicator" id="ramDelta"></span>
             </span>
         </div>
+
+        <div class="summary-metric">
+            <span class="summary-label">QUEUE</span>
+            <span class="summary-value medium" id="summaryQueue">
+                <span id="queueValue">-</span>
+            </span>
+        </div>
     </div>
 
     <div class="container">
@@ -243,6 +250,43 @@
             </div>
         </div>
 
+        <div class="panel" id="advancedAnalyticsPanel" style="margin-bottom: 15px;">
+            <h2>🧠 Advanced Analytics</h2>
+            <div class="analytics-grid">
+                <div class="analytics-card">
+                    <h3>Penalty Hits</h3>
+                    <div id="penaltyStats" class="analytics-content">Collecting…</div>
+                </div>
+                <div class="analytics-card">
+                    <h3>Queue Velocity</h3>
+                    <div id="queueVelocityStats" class="analytics-content">--</div>
+                </div>
+                <div class="analytics-card">
+                    <h3>Length Coverage</h3>
+                    <div id="lengthCoverageList" class="analytics-content">--</div>
+                </div>
+                <div class="analytics-card">
+                    <h3>Pattern Loss</h3>
+                    <div id="patternLossList" class="analytics-content">--</div>
+                </div>
+                <div class="analytics-card">
+                    <h3>Pattern ⇄ Layer</h3>
+                    <div id="patternLayerList" class="analytics-content">--</div>
+                </div>
+                <div class="analytics-card">
+                    <h3>Layer Stability</h3>
+                    <div id="layerStabilityList" class="analytics-content">--</div>
+                </div>
+            </div>
+            <div class="analytics-subpanel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <h3 style="margin:0;">Throughput vs VRAM</h3>
+                    <span id="vramScatterStatus" class="muted small-text">Waiting for samples…</span>
+                </div>
+                <canvas id="vramScatter" width="640" height="240" style="width: 100%; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(5,10,20,0.6);"></canvas>
+            </div>
+        </div>
+
         <!-- ========================================
              OVERALL PROGRESS BAR SECTION
              ======================================== -->
@@ -305,68 +349,56 @@
              ======================================== -->
         <div class="section-divider">⚙️ MODEL CONFIGURATION</div>
         <div class="grid-4 compactable" style="margin-bottom: 15px;">
-            <!-- LoRA Rank -->
+            <!-- Layer Monitor: total layers -->
             <div class="panel panel-lora">
-                <h2>🔢 LoRA Rank
+                <h2>🔢 Layers Tracked
                     <div class="tooltip-icon">ℹ️
                         <span class="tooltiptext">
-                            <div class="tooltip-header">LoRA Rank (r)</div>
-                            The dimensionality of low-rank matrices. Higher values = more capacity to learn complex patterns but slower training.
-                            <br><br>
-                            <strong>Typical values:</strong><br>
-                            • r=8-16: Lightweight fine-tuning<br>
-                            • r=32-64: Standard fine-tuning<br>
-                            • r=128+: Heavy fine-tuning for complex tasks
-                            <br><br>
-                            <strong>Effects:</strong><br>
-                            Higher r = More parameters, more VRAM, slower training, better quality
+                            <div class="tooltip-header">Layer Groups</div>
+                            Shows how many transformer blocks the layer monitor is tracking in the current run. During full-model training every block is tracked; during adapter-only runs this matches the number of trainable layers.
                         </span>
                     </div>
                 </h2>
                 <div class="value-big" id="loraRank" style="font-size: 2em;">-</div>
             </div>
 
-            <!-- LoRA Alpha -->
+            <!-- Layer Monitor: avg delta -->
             <div class="panel panel-lora">
-                <h2>⚖️ LoRA Alpha
+                <h2>⚖️ Avg Δ (Weight Norm)
                     <div class="tooltip-icon">ℹ️
                         <span class="tooltiptext">
-                            <div class="tooltip-header">LoRA Alpha (α)</div>
-                            Scaling factor for LoRA updates. Controls how much the adapter influences the base model.
-                            <br><br>
-                            <strong>Common practice:</strong><br>
-                            • α = r (scaling factor = 1x)<br>
-                            • α = 2×r (scaling factor = 2x)<br>
-                            Ratio: α/r determines update strength
-                            <br><br>
-                            <strong>Effects:</strong><br>
-                            Higher α = Stronger adapter influence on base model
+                            <div class="tooltip-header">Average Layer Delta</div>
+                            Displays the mean change in weight norm between snapshots across all monitored layers. Larger values mean the model is adapting more aggressively.
                         </span>
                     </div>
                 </h2>
                 <div class="value-big" id="loraAlpha" style="font-size: 2em;">-</div>
             </div>
 
-            <!-- Trainable Parameters -->
+            <!-- Batch size / accumulation -->
             <div class="panel panel-config">
-                <h2>🎯 Trainable Params
+                <h2>🎯 Batch & Accumulation
                     <div class="tooltip-icon">ℹ️
                         <span class="tooltiptext">
-                            <div class="tooltip-header">Trainable Parameters</div>
-                            Number of parameters being updated during training.
-                            <br><br>
-                            <strong>LoRA advantage:</strong><br>
-                            Only ~0.1-5% of full model params!<br>
-                            Example: 7B model with r=128 trains only ~320M params
-                            <br><br>
-                            <strong>Influences:</strong><br>
-                            • Training speed (fewer params = faster)<br>
-                            • VRAM usage (fewer params = less memory)<br>
-                            • Disk space (smaller adapter files)
+                            <div class="tooltip-header">Effective Batch Size</div>
+                            Shows the per-device batch size and gradient accumulation steps flowing through the trainer. Effective batch = batch × accumulation.
                         </span>
                     </div>
                 </h2>
-                <div class="value-big" id="trainableParams" style="font-size: 1.5em; color: #ffaa00;">-</div>
+                <div style="display:flex; justify-content:space-around; font-size:1.2em; margin-top:10px;">
+                    <div>
+                        <div class="muted small-text">Batch</div>
+                        <div id="batchSize">-</div>
+                    </div>
+                    <div>
+                        <div class="muted small-text">Acc</div>
+                        <div id="gradAccum">-</div>
+                    </div>
+                    <div>
+                        <div class="muted small-text">Effective</div>
+                        <div id="effectiveBatch">-</div>
+                    </div>
+                </div>
             </div>
 
             <!-- Model Name -->
@@ -596,7 +628,7 @@
                                 <br><br>
                                 <strong>Why this matters:</strong> MB/hr varies with file size. Tokens/sec is consistent.
                                 <br><br>
-                                <strong>Typical for 7-8B models:</strong><br>
+                                <strong>Typical for sub-1B models:</strong><br>
                                 • 4000-8000 tok/s: Good<br>
                                 • 8000-15000 tok/s: Excellent<br>
                                 • < 4000 tok/s: Check GPU utilization
@@ -1084,58 +1116,22 @@
 
         <div class="section-divider">🔬 ANALYSIS & INSIGHTS</div>
 
-        <!-- Pattern×Length Heatmap (NEW) -->
         <div class="panel compactable">
-            <h2>🧩 Pattern Coverage & Accuracy
+            <h2>🧠 Layer Adaptation Monitor
                 <div class="tooltip-icon">ℹ️
                     <span class="tooltiptext">
-                        <div class="tooltip-header">Pattern×Length Matrix</div>
-                        Shows which types of examples you're training on and how well the model learns them.
-                        <br><br>
-                        <strong>Rows:</strong> Pattern types (factual, reasoning, creative, etc.)<br>
-                        <strong>Columns:</strong> Response length buckets<br>
-                        <strong>Numbers:</strong> Sample count<br>
-                        <strong>Green gradient:</strong> Exact Match % (darker = lower accuracy)
-                        <br><br>
-                        <strong>What to look for:</strong><br>
-                        • Empty cells = gaps in training data<br>
-                        • Dark cells = patterns that need more work<br>
-                        • Imbalanced rows = biased dataset
+                        <div class="tooltip-header">Per-Layer Weight Changes</div>
+                        Tracks how much each transformer block's weight norm changes between snapshots.
+                        Useful for spotting dead layers or bursts of learning.
                     </span>
                 </div>
             </h2>
-            <div id="bucketHeatmap" style="overflow: auto; max-height: 300px; font-size: 0.85em;">
-                <p style="color: #888; text-align: center; padding: 20px;">Waiting for pattern data...</p>
+            <div id="layerActivitySummary" style="color: #888; margin-bottom: 10px;">
+                Waiting for first snapshot...
             </div>
+            <div id="layerActivityTop" style="font-family: monospace; font-size: 0.85em; line-height: 1.6;"></div>
         </div>
 
-        <!-- LoRA Layer Adaptation (NEW) -->
-        <div class="panel compactable">
-            <h2>🧠 LoRA Adaptation by Layer (Top-5 by Δ‖A/B‖)
-                <div class="tooltip-icon">ℹ️
-                    <span class="tooltiptext">
-                        <div class="tooltip-header">Layer-Wise Learning</div>
-                        Shows which layers are changing most during training.
-                        <br><br>
-                        <strong>Δ (delta):</strong> Magnitude of weight changes<br>
-                        <strong>QKV:</strong> Attention layers (pattern matching)<br>
-                        <strong>MLP:</strong> Feed-forward layers (knowledge storage)
-                        <br><br>
-                        <strong>What's normal:</strong><br>
-                        • Mid-layers (12-24) adapt most = good abstraction<br>
-                        • Early layers adapt = low-level feature learning<br>
-                        • Late layers adapt = output head specialization
-                        <br><br>
-                        <strong>What's concerning:</strong><br>
-                        • Only first/last layers = shallow learning<br>
-                        • No adaptation = LoRA rank too low or LR too low
-                    </span>
-                </div>
-            </h2>
-            <div id="loraTopLayers" style="font-family: monospace; font-size: 0.85em; line-height: 1.8;">
-                <p style="color: #888;">Waiting for first measurement...</p>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -1174,6 +1170,7 @@
         let isPaused = false;
         let trainingStartTime = null;
         let hasCompletedBefore = false;
+        let lastStatusForNotification = null;
         let stepsPerSecEMA = null;
         let errorCount = 0;
         let currentBackoff = 0;
@@ -1477,6 +1474,24 @@
                 ramValueEl.style.color = '#ffaa00';
             } else {
                 ramValueEl.style.color = '#00ff88';
+            }
+
+            // Queue
+            const queueValueEl = document.getElementById('queueValue');
+            const queueSize = data.batch_queue_size;
+            if (queueSize !== null && queueSize !== undefined) {
+                queueValueEl.textContent = queueSize + ' files';
+                // Color code based on queue size
+                if (queueSize === 0) {
+                    queueValueEl.style.color = '#ff4444';
+                } else if (queueSize < 5) {
+                    queueValueEl.style.color = '#ffaa00';
+                } else {
+                    queueValueEl.style.color = '#00ff88';
+                }
+            } else {
+                queueValueEl.textContent = '-';
+                queueValueEl.style.color = '#888';
             }
 
             // Update system health
@@ -2032,7 +2047,7 @@
                         MetricsUpdater.updateFixedEval(trainingData);
                         MetricsUpdater.updateStreamingMetrics(trainingData);
                         MetricsUpdater.updateThroughput(trainingData);
-                        MetricsUpdater.updateLoRAStats(trainingData);
+                        MetricsUpdater.updateLayerActivity(trainingData);
                         MetricsUpdater.updateAlerts(trainingData);
                     }
 
@@ -2292,13 +2307,20 @@
 
         // Fetch config on load (only once)
         fetch(CONFIG_API).then(r => r.json()).then(config => {
-            document.getElementById('loraRank').textContent = config.lora_r || 128;
-            document.getElementById('loraAlpha').textContent = config.lora_alpha || 128;
-            document.getElementById('modelName').textContent = config.model_name || 'Qwen 2.5 7B Instruct';
-            // Estimate trainable params (rough calculation)
-            const r = config.lora_r || 128;
-            const estimatedParams = (r * 4096 * 2 * 32) / 1_000_000; // Rough estimate for 7B model
-            document.getElementById('trainableParams').textContent = estimatedParams.toFixed(1) + 'M';
+            const batch = config.batch_size ?? '-';
+            const accum = config.gradient_accumulation ?? '-';
+            let effective = '-';
+            if (!isNaN(batch) && !isNaN(accum)) {
+                effective = (batch * accum).toString();
+            }
+            document.getElementById('batchSize').textContent = batch;
+            document.getElementById('gradAccum').textContent = accum;
+            document.getElementById('effectiveBatch').textContent = effective;
+            document.getElementById('modelName').textContent = config.model_display_name || config.model_name || 'Qwen3 0.6B';
+            if (window.MetricsUpdater) {
+                MetricsUpdater.configBatchSize = config.batch_size || null;
+                MetricsUpdater.configGradAccum = config.gradient_accumulation || null;
+            }
         }).catch(e => console.error('Failed to load config:', e));
 
         // Queue Preview Functionality
@@ -2505,14 +2527,16 @@
 
         // Show notifications for critical events
         function checkForCriticalEvents(data) {
-            // Training completed
-            if (data.status === 'completed' && !hasCompletedBefore) {
+            const previousStatus = lastStatusForNotification;
+
+            // Training completed (only fire on transition)
+            if (data.status === 'completed' && previousStatus !== 'completed') {
                 sendNotification('Training Completed!', 'Training batch has finished successfully.', 'normal');
                 playSound('complete');
             }
 
-            // Training crashed
-            if (data.status === 'crashed') {
+            // Training crashed (only fire on transition)
+            if (data.status === 'crashed' && previousStatus !== 'crashed') {
                 sendNotification('Training Crashed!', 'Training has stopped with an error.', 'urgent');
                 showErrorBanner({ message: data.error || 'Training crashed', file: data.current_file });
                 playSound('error');
@@ -2523,6 +2547,8 @@
                 sendNotification('New Best Model!', `Step ${data.current_step}: Loss ${data.loss.toFixed(4)}`, 'normal');
                 playSound('bestModel');
             }
+
+            lastStatusForNotification = data.status;
         }
 
         // Integrate with existing update function

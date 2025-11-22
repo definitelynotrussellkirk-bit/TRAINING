@@ -7,23 +7,46 @@ class MetricsDisplay {
     }
 
     updatePromptDisplay(data) {
-        const example = this.getActiveExample(data);
+        const example = this.buildDisplayExample(data);
 
         // Step indicator
-        const stepVal = example?.step ?? data.current_step;
-        document.getElementById('exampleStep').textContent = (stepVal || '--').toLocaleString();
+        const stepVal = example?.step;
+        if (stepVal !== null && stepVal !== undefined) {
+            document.getElementById('exampleStep').textContent = stepVal.toLocaleString();
+        } else {
+            document.getElementById('exampleStep').textContent = '--';
+        }
 
-        // System prompt (extract from training data or use default)
-        this.updateSystemPrompt(data, example);
+        // System prompt / user prompt / responses all come from the same example snapshot
+        this.updateSystemPrompt(example);
+        this.updateUserPrompt(example);
+        this.updateResponses(example);
+        this.updateExampleMetrics(example);
+    }
 
-        // User prompt
-        this.updateUserPrompt(data, example);
+    buildDisplayExample(data) {
+        const example = this.getActiveExample(data);
+        if (example) {
+            return {
+                step: example.step ?? data.current_step ?? null,
+                system_prompt: example.system_prompt ?? data.current_system_prompt ?? null,
+                prompt: example.prompt ?? data.current_prompt ?? null,
+                golden: example.golden ?? data.golden_answer ?? null,
+                model_output: example.model_output ?? data.model_answer ?? null,
+                matches: example.matches ?? data.answer_matches ?? null,
+                loss: example.loss ?? data.loss ?? null
+            };
+        }
 
-        // Responses
-        this.updateResponses(data, example);
-
-        // Example metrics
-        this.updateExampleMetrics(data, example);
+        return {
+            step: data.current_step ?? null,
+            system_prompt: data.current_system_prompt ?? null,
+            prompt: data.current_prompt ?? null,
+            golden: data.golden_answer ?? null,
+            model_output: data.model_answer ?? null,
+            matches: data.answer_matches ?? null,
+            loss: data.loss ?? null
+        };
     }
 
     getActiveExample(data) {
@@ -35,16 +58,16 @@ class MetricsDisplay {
         return null;
     }
 
-    updateSystemPrompt(data, example) {
+    updateSystemPrompt(example) {
         const container = document.getElementById('systemPromptText');
 
-        const systemPrompt = example?.system_prompt || data.current_system_prompt || this.systemPrompt;
+        const systemPrompt = example?.system_prompt || this.systemPrompt;
         container.textContent = systemPrompt || 'N/A';
     }
 
-    updateUserPrompt(data, example) {
+    updateUserPrompt(example) {
         const container = document.getElementById('userPromptText');
-        const prompt = example?.prompt || data.current_prompt;
+        const prompt = example?.prompt;
 
         if (prompt) {
             // Truncate very long prompts for display
@@ -59,14 +82,14 @@ class MetricsDisplay {
         }
     }
 
-    updateResponses(data, example) {
+    updateResponses(example) {
         const goldenContainer = document.getElementById('goldenAnswer');
         const modelContainer = document.getElementById('modelAnswer');
         const matchIndicator = document.getElementById('matchIndicator');
 
-        const golden = example?.golden || data.golden_answer;
-        const modelAnswer = example?.model_output || data.model_answer;
-        const matches = example?.matches ?? data.answer_matches;
+        const golden = example?.golden;
+        const modelAnswer = example?.model_output;
+        const matches = example?.matches;
 
         // Golden answer
         if (golden) {
@@ -106,10 +129,10 @@ class MetricsDisplay {
         }
     }
 
-    updateExampleMetrics(data, example) {
+    updateExampleMetrics(example) {
         // Loss
         const lossEl = document.getElementById('exampleLoss');
-        const lossVal = example?.loss ?? data.loss;
+        const lossVal = example?.loss;
         if (lossVal !== null && lossVal !== undefined) {
             lossEl.textContent = lossVal.toString();
         } else {
@@ -118,7 +141,7 @@ class MetricsDisplay {
 
         // Think tags
         const thinkEl = document.getElementById('exampleHasThink');
-        const modelAnswer = example?.model_output || data.model_answer;
+        const modelAnswer = example?.model_output;
         if (modelAnswer) {
             const hasThink = modelAnswer.includes('<think>');
             thinkEl.textContent = hasThink ? '⚠️ Yes' : '✅ No';

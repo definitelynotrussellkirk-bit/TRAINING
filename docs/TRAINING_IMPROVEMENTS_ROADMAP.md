@@ -342,9 +342,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
 # Load model
-base = AutoModelForCausalLM.from_pretrained("DIO_20251114/")
+base = AutoModelForCausalLM.from_pretrained("models/Qwen3-0.6B/")
 model = PeftModel.from_pretrained(base, "current_model/")
-tokenizer = AutoTokenizer.from_pretrained("DIO_20251114/")
+tokenizer = AutoTokenizer.from_pretrained("models/Qwen3-0.6B/")
 
 # Test
 prompt = input("Prompt: ")

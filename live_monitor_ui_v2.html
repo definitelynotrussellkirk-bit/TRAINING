@@ -19,6 +19,10 @@
                 <span class="value" id="currentStep">--</span>
             </div>
             <div class="metric">
+                <span class="label">Model</span>
+                <span class="value" id="currentModelName">--</span>
+            </div>
+            <div class="metric">
                 <span class="label">Loss</span>
                 <span class="value" id="currentLoss">--</span>
             </div>
@@ -37,6 +41,10 @@
             <div class="metric">
                 <span class="label">Accuracy</span>
                 <span class="value" id="accuracy">--</span>
+            </div>
+            <div class="metric">
+                <span class="label">Queue</span>
+                <span class="value" id="queueSize">--</span>
             </div>
         </div>
     </div>
@@ -133,8 +141,12 @@
                         <span id="currentFile">--</span>
                     </div>
                     <div class="info-row">
-                        <span class="label">Progress:</span>
+                        <span class="label">File Progress:</span>
                         <span id="fileProgress">-- / --</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Files in Queue:</span>
+                        <span id="queueCount" style="font-weight: bold;">--</span>
                     </div>
                 </div>
                 <button class="btn-primary" onclick="openDataBrowser()">

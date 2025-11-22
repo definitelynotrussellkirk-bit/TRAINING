@@ -510,7 +510,6 @@ function initializeImprovements() {
     });
 
     console.log('✅ All improvements initialized!');
-    showToast('✨ UI/UX improvements loaded!', 'success');
 }
 
 // Initialize when DOM is ready

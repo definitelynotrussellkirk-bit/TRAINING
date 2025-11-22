@@ -122,7 +122,7 @@ def interactive_mode(model, tokenizer):
 
 def main():
     parser = argparse.ArgumentParser(description="Test a trained model")
-    parser.add_argument("--base-model", default="/path/to/training/DIO_20251114",
+    parser.add_argument("--base-model", default="/path/to/training/consolidated_models/20251119_152444",
                        help="Path to base model")
     parser.add_argument("--adapter", default="/path/to/training/current_model",
                        help="Path to adapter (optional)")

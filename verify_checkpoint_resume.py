@@ -130,15 +130,13 @@ def check_resume_correctness():
         else:
             print("✅ Base model path exists")
 
-            # Check if it's the raw base model or consolidated
-            if "DIO_20251114" in str(base_model):
-                if latest_checkpoint:
-                    print("⚠️ Using raw DIO base model but checkpoints exist")
-                    print("   This is OK if this is first training run")
-                else:
-                    print("✅ Using raw DIO base model (first training)")
+            # Check if it's the approved base model directory
+            expected_base = Path("/path/to/training/consolidated_models/20251119_152444")
+            if base_model.resolve() == expected_base.resolve():
+                print("✅ Using approved merged base (Qwen3-0.6B)")
             else:
-                print("✅ Using consolidated model (has prior training)")
+                print("⚠️ Base model is not the current merged base directory")
+                warnings.append(f"Unexpected base_model path: {base_model}")
     except Exception as e:
         print(f"❌ Error checking config: {e}")
         issues.append("Cannot validate config")

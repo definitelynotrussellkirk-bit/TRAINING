@@ -50,7 +50,7 @@ python3 training_daemon.py --base-dir /path/to/training &
 ### Model Location
 
 **Base Model:** `/path/to/training/model/`
-- Qwen3-VL-8B-Thinking (17GB)
+- Qwen3 0.6B (text-only) + `docs/MERGED_BASE_REFERENCE.md` for current path
 - Vision-language model (8.9B params)
 - Text-only training (174M trainable params)
 
@@ -100,7 +100,7 @@ If training fails:
 
 **Last Verified:** 2025-11-03 14:37 PST
 
-- ✅ Model ready (17GB, Qwen3-VL 8B)
+- ✅ Model ready (1.5GB, Qwen3 0.6B)
 - ✅ Data ready (10k samples)
 - ✅ Config fixed (batch_size=1, QLoRA enabled)
 - ✅ Code fixed (data format handling)

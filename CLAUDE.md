@@ -1,10 +1,60 @@
 # CLAUDE QUICK REFERENCE - Ultimate Trainer System
 
-**Last Updated:** 2025-11-18 (Comprehensive Safety System Added)
+**Last Updated:** 2025-11-22 (OOM During Eval Fix Applied)
 
 This document contains key information for Claude to help with training operations.
 
-## 🆕 LATEST: Comprehensive Safety System (2025-11-18)
+## 🆕 LATEST: OOM During Eval Steps - FIXED (2025-11-22)
+
+**CRITICAL FIX: Eval-triggered OOM crashes resolved:**
+
+- **Root cause:** `model.generate()` during eval steps created KV cache that wasn't cleared
+- **Symptom:** Training stable, crashes ONLY at eval steps (every 50 steps)
+- **Fix:** Added `torch.cuda.empty_cache()` after all inference in train.py
+- **Result:** Can now use batch_size=30+ again (was forced down to 16, then 8, then 1)
+- **Bonus:** Increased max_new_tokens from 512 → 2048 for full reasoning outputs
+
+**Quick access:**
+- Full analysis: `OOM_EVAL_FIX_2025-11-22.md`
+- Modified file: `train.py` (lines 1419-1421, 1791-1793, 1378, 1777)
+
+**Key lesson:** Always clear GPU cache after `model.generate()` during training!
+
+---
+
+## Automatic Disk Space Management (2025-11-21)
+
+**NEW: Auto disk cleanup prevents training crashes:**
+
+- **Monitors disk every 5 minutes** - Checks free space continuously
+- **Auto-cleanup when low** - Deletes old versions/backups when < 50GB free
+- **Keeps latest 2 versions** - Automatic version retention policy
+- **Runs 24/7** - No more waking up to "No space left on device"
+
+**Quick access:**
+- Script: `auto_disk_manager.py`
+- Logs: `logs/disk_manager.log`
+- Auto-starts with `start_all.sh`
+
+---
+
+## Self-Correction Training Fixed (2025-11-21)
+
+**Critical bug fixed in auto self-correction system:**
+
+- **Was teaching mistakes:** Old system created examples like `prompt → wrong_answer`
+- **Now teaches reflection:** Shows wrong answers as CONTEXT only, teaches binary self-evaluation + correction
+- **Auto-enabled:** Runs during eval steps, auto-queues every 200 examples
+- **Tested & verified:** All tests pass, ready for production
+
+**Quick access:**
+- Implementation details: `SELF_CORRECTION_FIX_COMPLETE.md`
+- User guide: `SELF_CORRECTION_GUIDE.md`
+- Test suite: `test_self_correction_fixed.py`
+
+---
+
+## 🛡️ Comprehensive Safety System (2025-11-18)
 
 **After crash at step 2500, built complete auto-recovery and prevention system:**
 
@@ -19,6 +69,43 @@ This document contains key information for Claude to help with training operatio
 
 ---
 
+## 📋 COMMUNICATION STYLE
+
+**Default mode: Factual technical documentation**
+
+- State facts about system behavior, configuration, and current state
+- Do not include recommendations, suggestions, or opinions unless explicitly asked
+- Do not add phrases like "I recommend", "you should", "it's best to", "consider"
+- Present options without bias when multiple approaches exist
+- Omit evaluative language ("excellent", "better", "perfect", "brilliant")
+- When asked "how does X work", describe the mechanism without suggesting changes
+- When asked "what are the options", list them without ranking
+
+**Example:**
+- ❌ "I recommend using batch_size=30 because it's more efficient"
+- ✅ "batch_size=30 uses ~21GB VRAM. batch_size=16 uses ~14GB VRAM"
+
+**Only add recommendations when:**
+- Explicitly asked ("what should I do?", "which is better?")
+- Critical safety issue (data loss, system damage)
+- User makes factual error that needs correction
+
+---
+
+## 👷‍♂️ ROLE & RESPONSIBILITIES (CLAUDE)
+
+➡️ **Training Daemon Manager (per user directive, 2025-11-20):**
+
+- Launch, monitor, and relaunch `training_daemon.py` (via `bin/launch_training_daemon.sh`) whenever it stops or crashes.
+- Verify `status/training_status.json` transitions back to `"training"` after restarts and ensure queued files move out of `queue/processing/`.
+- Handle queue hygiene when crashes occur: move stuck files back to `queue/normal/`, re-run validation if needed, and confirm GPU/VRAM settings (batch size, grad accumulation) stay within `config.json`.
+- Document any daemon intervention (OOM mitigation, config tweaks, restarts) in session notes or summaries so future agents know the state of the training loop.
+- **IMPORTANT:** Do NOT create documentation (.md files) without explicit user permission - ASK FIRST
+
+💡 **Always** follow the critical rules below before touching configs or models. If unsure, pause the daemon (`training_controller.py pause`) and ask for guidance rather than risking data loss.
+
+---
+
 ## 🚨 CRITICAL RULES (READ FIRST!)
 
 ### Deletion Policies (NEVER VIOLATE!)
@@ -26,6 +113,7 @@ This document contains key information for Claude to help with training operatio
 1. **NEVER delete `current_model/` without explicit user permission**
 2. **ALWAYS create backup before risky operations**
 3. **NEVER modify config.json critical parameters (`max_length`, `model_name`, `base_model`) without user approval**
+4. **NEVER create .md files without explicit user permission** - ASK FIRST before writing any markdown documentation
 
 ### Pre-Session Checklist
 
@@ -55,18 +143,24 @@ python3 config_validator.py
 
 ## 🎯 CURRENT CONFIGURATION
 
-**Model:** Qwen3 8B (DIO model)
-**Location:** `/path/to/training/DIO_20251114/` *(base model)*
-**Method:** QLoRA (4-bit quantization)
+**Model:** Qwen3 0.6B merged base
+**Base:** `/path/to/training/consolidated_models/20251121_101953`
+**Method:** Full precision LoRA (NOT QLoRA - use_qlora: false)
 **LoRA:** r=128, alpha=128, dropout=0.02
 
 **Key Settings (`config.json`):**
-- Batch size: 1 (effective: 8 with gradient accumulation)
+- Batch size: 16 (effective: 16 with gradient accumulation: 1)
 - Learning rate: 2e-4
-- Eval steps: 500
-- Save steps: 100 (checkpoint frequency)
-- Max length: 3072 tokens
+- Eval steps: 50 ⚠️ (very frequent inference)
+- Save steps: 1000 (checkpoint frequency)
+- Max length: 4096 tokens
 - Poll interval: 30 seconds
+
+**⚠️ BATCH SIZE RECOMMENDATIONS (Post-OOM Fix):**
+- **Conservative:** 16 (current, ~14 GB VRAM)
+- **Balanced:** 24 (~18 GB VRAM)
+- **Aggressive:** 30 (~21 GB VRAM) ✅ RECOMMENDED
+- **Maximum:** 40 (~23 GB VRAM, very tight)
 
 ---
 
@@ -208,6 +302,29 @@ ps aux | grep training_daemon | grep -v grep
 nohup python3 training_daemon.py --base-dir /path/to/training > /dev/null 2>&1 &
 ```
 
+### OOM (Out of Memory) Crashes ⚠️ NEW
+**Symptom:** Training crashes with "CUDA out of memory" error
+
+**Check for dual processes FIRST:**
+```bash
+ps aux | grep "python3.*training_daemon" | grep -v grep
+# Should show ONLY ONE process. If multiple, kill all and restart:
+ps aux | grep "python3.*training_daemon" | grep -v grep | awk '{print $2}' | xargs kill -9
+sleep 3
+nohup python3 training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+```
+
+**If crashes happen at eval steps (every N steps):**
+- ✅ FIXED in train.py (2025-11-22) - cache clearing added
+- If using old train.py, see `OOM_EVAL_FIX_2025-11-22.md`
+
+**If crashes during normal training:**
+- Check batch_size in config.json (should be ≤30 for 24GB GPU)
+- Monitor GPU memory: `nvidia-smi --query-gpu=memory.used --format=csv`
+- Reduce batch_size if needed: `python3 edit_config.py batch_size 16`
+
+**Key insight:** OOM at eval steps = inference cache not cleared (FIXED)
+
 ### Monitor Not Working
 ```bash
 ./check_health.sh  # Diagnose all systems
@@ -266,12 +383,12 @@ python3 validate_data.py --auto-adjust  # Auto-adjust config if needed
 ├── models/
 │   ├── versions/             # Versioned snapshots (v001, v002, ...)
 │   └── backups/              # Safety backups
-├── consolidated_models/      # Merged base models
+├── consolidated_models/      # Merged base models (current: 20251119_152444)
 ├── data/validation/          # Fixed validation set
 ├── logs/                     # Training logs (daily rotation)
 ├── status/                   # Real-time status JSON
 ├── queue/                    # Training queue (high/normal/low priority)
-├── DIO_20251114/             # Base model (Qwen3 8B)
+├── models/Qwen3-0.6B/        # Base model (Qwen3 0.6B)
 ├── config.json               # Configuration
 ├── train.py                  # Core training script
 ├── training_daemon.py        # Auto-ingestion daemon
@@ -324,6 +441,7 @@ python3 validate_data.py --auto-adjust  # Auto-adjust config if needed
 1. Run `python3 state_tracker.py --check`
 2. Read the warnings it shows
 3. **ASK THE USER** before making changes
+4. **ASK THE USER** before creating any .md documentation files
 
 ---
 

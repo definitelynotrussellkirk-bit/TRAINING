@@ -106,7 +106,7 @@ class IntegratedTrainingDaemon:
         if not self.config_file.exists():
             # Create default config
             default_config = {
-                "model_name": "qwen3_8b",
+                "model_name": "qwen3_0.6b",
                 "model_path": None,  # Set this to your base model path
                 "batch_size": 4,
                 "gradient_accumulation": 4,

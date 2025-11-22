@@ -43,7 +43,7 @@ class TimeEstimator:
             1: 1.0,   # 1B params
             3: 1.8,   # 3B params
             7: 3.2,   # 7B params
-            8: 3.5,   # 8B params
+            8: 3.5,   # legacy value (unused)
             13: 5.5,  # 13B params
         },
         "RTX 3090": {
@@ -270,7 +270,7 @@ def main():
     gpu_type, vram = TimeEstimator.detect_gpu()
     print(f"\n🖥️  Detected: {gpu_type} with {vram:.0f} GB VRAM")
 
-    # Example: 50K examples, 2 epochs, 8B model
+    # Example: 50K examples, 2 epochs, ~1B model
     estimate = TimeEstimator.estimate_training(
         num_examples=50_000,
         batch_size=4,

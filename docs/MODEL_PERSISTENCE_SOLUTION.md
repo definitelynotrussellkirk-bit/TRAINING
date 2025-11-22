@@ -23,7 +23,7 @@
 
 ### Why Wrong Model Used:
 
-1. **Ambiguous naming** - "current_model/" vs "DIO_20251114/" vs what?
+1. **Ambiguous naming** - "current_model/" vs "models/Qwen3-0.6B/" vs what?
 2. **No validation** - System doesn't check if you're using intended model
 3. **Manual intervention** - Human error in selecting base model
 
@@ -42,7 +42,7 @@
 **Every training run creates immutable, tracked lineage:**
 
 ```
-model_v001_baseline (Qwen3 8B base)
+model_v001_baseline (Qwen3 0.6B base)
   └─> + data/syllo_20k.jsonl (hash: abc123...)
        └─> model_v002_syllo_20k
             └─> + data/reasoning_10k.jsonl (hash: def456...)

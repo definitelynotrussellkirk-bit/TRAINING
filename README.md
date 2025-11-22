@@ -9,14 +9,14 @@
 **1. Start the training daemon:**
 ```bash
 cd /path/to/training
-python3 training_daemon.py --base-dir /path/to/training &
+bin/launch_training_daemon.sh
 ```
 
 **2. Monitor training:**
 - Web UI: http://localhost:7860
 - Live stats: http://localhost:8080/live_monitor_ui.html
 
-**3. Done!** The daemon automatically trains on files in `inbox/`
+**3. Done!** The guarded launcher prevents multiple daemons; training auto-pulls from `inbox/`.
 
 ---
 
@@ -27,7 +27,6 @@ python3 training_daemon.py --base-dir /path/to/training &
 
 **Reference:**
 - [FIXES_APPLIED.md](FIXES_APPLIED.md) - Technical fixes (9 debug sessions)
-- [CONFIG_GUIDE.md](CONFIG_GUIDE.md) - Configuration options
 - [WEB_UI_GUIDE.md](WEB_UI_GUIDE.md) - Web interface
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues
 
@@ -35,12 +34,12 @@ python3 training_daemon.py --base-dir /path/to/training &
 
 ## 🎯 What's This?
 
-Trains **Qwen3-VL 8B** on **LEO composition data** using:
+Trains **Qwen3 0.6B** on **LEO composition data** using:
 - QLoRA (4-bit) - fits in 24GB GPU
 - Text-only training - vision layers frozen
 - Automated pipeline - just drop files in `inbox/`
 
-**Model Location:** `/path/to/training/model/` (17GB, Qwen3-VL-8B-Thinking)
+**Model Location:** `/path/to/training/consolidated_models/20251119_152444/` (1.5GB, text-only)
 
 **Training Data:** `inbox/leo_10k_qlora.jsonl` (10k samples, ready to go)
 
@@ -62,7 +61,7 @@ cd /path/to/training && python3 train.py --dataset inbox/leo_10k_qlora.jsonl --m
 /path/to/training/
 ├── README.md              ← You are here
 ├── QUICK_START.md         ← Complete training guide
-├── model/                 ← Qwen3-VL 8B base model (17GB)
+├── models/Qwen3-0.6B/     ← Base model (1.5GB)
 ├── inbox/                 ← Drop training data here
 │   └── leo_10k_qlora.jsonl
 ├── adapters/              ← Trained adapters saved here
@@ -77,7 +76,7 @@ cd /path/to/training && python3 train.py --dataset inbox/leo_10k_qlora.jsonl --m
 
 ## ✅ Current Status
 
-- ✅ Model downloaded (Qwen3-VL 8B, 17GB)
+- ✅ Model downloaded (Qwen3 0.6B, 1.5GB)
 - ✅ Data ready (10k LEO samples)
 - ✅ Config fixed (batch_size=1, QLoRA enabled)
 - ✅ Data format fixed (handles non-string content)
@@ -102,6 +101,23 @@ python3 convert_leo_data.py \
 
 # Daemon will auto-train when file appears
 ```
+
+### On-demand SYLLO batches via API
+If `skill_syllo_variant/api_server.py` is running you can auto-request fresh packs
+whenever the queue is low:
+
+```bash
+# Start the API server (example)
+python skill_syllo_variant/api_server.py --host 127.0.0.1 --port 8080 \
+  --word-db HELPERS/data/word_db.jsonl
+
+# Generate a 20k pack as soon as <=1 files remain in the queue
+python3 generate_syllo_batch.py --count 20000 --seed 93001 --threshold 1
+```
+
+`generate_syllo_batch.py` writes the JSONL to `inbox/` and immediately queues it
+for training. Use `--payload '{...}'` to pass custom parameters (e.g., hard-only
+puzzles) straight through to the API.
 
 ---
 
@@ -159,5 +175,5 @@ python3 training_daemon.py --base-dir /path/to/training &
 
 **Last Updated:** 2025-11-03 14:37 PST
 **System:** Ubuntu 24.04, RTX 4090 24GB
-**Model:** Qwen3-VL-8B-Thinking
+**Model:** Qwen3 0.6B (text-only)
 **Status:** ✅ Fully operational

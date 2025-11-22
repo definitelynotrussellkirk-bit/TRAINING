@@ -29,3 +29,27 @@ __pycache__/
 *.swp
 *.swo
 *~
+
+# Runtime/generated files
+.daemon.pid
+.config_lock.json
+.system_state.json
+.last_consolidation
+.train_now.sh
+training_output.log
+reports/
+tools/
+
+# Backup files
+.gitignore.backup
+*.backup
+
+# Quick reference files (user-specific)
+.QUICK_REFERENCE.txt
+.README_FIRST.txt
+
+# Test data files
+test_stop_emoji.jsonl
+
+# Temp files
+=*

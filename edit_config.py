@@ -19,7 +19,7 @@ CONFIG_SCHEMA = {
     "model_name": {
         "type": str,
         "description": "Friendly name for your model",
-        "example": "qwen3_vl_8b_thinking"
+        "example": "qwen3_vl_0.6b_thinking"
     },
     "model_path": {
         "type": str,
@@ -30,7 +30,7 @@ CONFIG_SCHEMA = {
         "type": int,
         "description": "Samples per training step (higher = more VRAM)",
         "example": "1-8",
-        "tip": "Start with 1 for 8B models. Increase if you have VRAM."
+        "tip": "Start with 1 for 0.6B models. Increase if you have VRAM."
     },
     "gradient_accumulation": {
         "type": int,

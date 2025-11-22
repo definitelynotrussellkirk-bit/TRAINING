@@ -6,6 +6,11 @@ echo ""
 
 cd /path/to/training
 
+# Start disk space manager (CRITICAL - prevents out of space crashes)
+echo "▶️  Starting disk space manager..."
+nohup python3 auto_disk_manager.py > /dev/null 2>&1 &
+sleep 1
+
 # Start training daemon
 echo "▶️  Starting training daemon..."
 nohup python3 training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &

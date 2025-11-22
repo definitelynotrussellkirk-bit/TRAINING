@@ -22,6 +22,8 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
+from transformers import LogitsProcessorList
+from logit_penalty import reset_processor_states
 
 
 @dataclass
@@ -47,7 +49,9 @@ class LiveInferenceMonitor:
         tokenizer,
         val_examples: List[Dict],
         num_samples: int = 5,
-        max_new_tokens: int = 200
+        max_new_tokens: int = 2048,  # Increased to capture full outputs
+        logits_processor=None,
+        self_correction_generator=None  # Optional self-correction training data generator
     ):
         self.model = model
         self.tokenizer = tokenizer
@@ -56,6 +60,8 @@ class LiveInferenceMonitor:
         self.max_new_tokens = max_new_tokens
         self.history: List[InferenceResult] = []
         self.used_indices = set()  # Track which examples we've used
+        self.logits_processor = LogitsProcessorList(logits_processor or [])
+        self.self_correction_generator = self_correction_generator  # Auto-generate correction training data
 
     def run_inference(self, step: int) -> List[InferenceResult]:
         """Run inference on NEW random validation examples (no repeats)."""
@@ -133,13 +139,16 @@ class LiveInferenceMonitor:
                 inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
 
                 # Generate
+                reset_processor_states(self.logits_processor)
                 outputs = self.model.generate(
                     **inputs,
                     max_new_tokens=self.max_new_tokens,
                     temperature=0.1,
                     do_sample=False,
                     pad_token_id=self.tokenizer.eos_token_id,
-                    eos_token_id=self.tokenizer.eos_token_id
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    logits_processor=self.logits_processor,
+                    min_new_tokens=1
                 )
 
                 # Decode
@@ -168,6 +177,13 @@ class LiveInferenceMonitor:
 
         # Switch back to train mode
         self.model.train()
+
+        # Auto-generate self-correction training data if enabled
+        if self.self_correction_generator and results:
+            try:
+                self.self_correction_generator.process_inference_results(results, step)
+            except Exception as e:
+                print(f"⚠️  Self-correction generation error: {e}")
 
         return results
 

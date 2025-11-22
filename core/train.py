@@ -52,6 +52,11 @@ from transformers import (
 )
 from datasets import Dataset
 
+# Add paths for modules in other directories
+sys.path.insert(0, str(Path(__file__).parent.parent))  # For trainer/ module
+sys.path.insert(0, str(Path(__file__).parent.parent / "management"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "monitoring" / "servers"))
+
 # Import our components
 from validator import DatasetValidator
 from model_db import ModelDatabase
@@ -521,10 +526,20 @@ class UltimateTrainer:
 
             # Load model (try Qwen3VL first, then AutoModel, fallback to AutoModelForCausalLM)
             print("   Loading model...")
+
+            # Try flash_attention_2 if available, fallback to sdpa
+            attn_impl = "sdpa"
+            try:
+                import flash_attn
+                attn_impl = "flash_attention_2"
+                print("   ✓ Flash Attention 2 detected, will use optimized attention")
+            except ImportError:
+                print("   Using SDPA attention (flash_attention_2 not installed)")
+
             model_kwargs = {
                 # "device_map": "auto",  # DISABLED - was causing OOM by pre-allocating 90% of GPU
                 "trust_remote_code": True,
-                "attn_implementation": "sdpa"
+                "attn_implementation": attn_impl
             }
 
             # Add quantization config if using QLoRA, otherwise set precision
@@ -1000,6 +1015,21 @@ class UltimateTrainer:
                 desc="Tokenizing dataset"
             )
 
+            # Pack dataset for efficiency (fill 4k blocks completely)
+            try:
+                from trl import pack_dataset
+                print(f"   📦 Packing dataset (max_length={max_length})...")
+                print(f"      Before packing: {len(tokenized_dataset)} examples")
+                tokenized_dataset = pack_dataset(
+                    tokenized_dataset,
+                    seq_length=max_length,
+                    strategy="bfd"  # Best Fit Decreasing - preserves sequence boundaries
+                )
+                print(f"      After packing: {len(tokenized_dataset)} packed sequences")
+                print(f"      ✅ Packing enabled - filling {max_length}-token blocks efficiently")
+            except Exception as e:
+                print(f"      ⚠️  Packing failed ({e}), continuing without packing")
+
             # Tokenize validation dataset for eval_loss
             tokenized_val_dataset = self.val_dataset_formatted.map(
                 tokenize_function,
@@ -1105,6 +1135,11 @@ class UltimateTrainer:
                 save_total_limit=None,  # Keep all checkpoints - manually clean by date later
                 fp16=use_fp16,   # Set from config precision
                 bf16=use_bf16,   # Set from config precision
+                tf32=True,  # Enable TF32 for matrix math speedups
+                gradient_checkpointing=False,  # Keep disabled for speed (only enable if OOM)
+                optim="adamw_torch_fused",  # Faster than default AdamW
+                dataloader_num_workers=8,  # High workers to feed GPU faster
+                dataloader_pin_memory=True,  # Faster CPU->GPU transfer
                 report_to="none",
                 remove_unused_columns=False,
             )

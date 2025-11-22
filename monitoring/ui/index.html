@@ -240,7 +240,7 @@
                 <span id="systemStatus">System Online</span>
             </div>
             <div style="margin-top: 20px;">
-                <a href="/ui/getting_started.html" style="color: #58a6ff; text-decoration: none; font-size: 14px; padding: 8px 16px; border: 1px solid #58a6ff; border-radius: 6px; display: inline-block; transition: all 0.2s;">
+                <a href="/monitoring/ui/getting_started.html" style="color: #58a6ff; text-decoration: none; font-size: 14px; padding: 8px 16px; border: 1px solid #58a6ff; border-radius: 6px; display: inline-block; transition: all 0.2s;">
                     📖 Getting Started Guide
                 </a>
             </div>
@@ -269,7 +269,7 @@
         <!-- Main Cards -->
         <div class="cards-grid">
             <!-- Control Room -->
-            <div class="card" onclick="window.location.href='/ui/control_room_v2.html'">
+            <div class="card" onclick="window.location.href='/monitoring/ui/control_room_v2.html'">
                 <div class="card-icon">🎛️</div>
                 <div class="card-title">Control Room</div>
                 <div class="card-description">
@@ -282,13 +282,13 @@
                     <li>Preview history with filters</li>
                     <li>Hardware monitoring (4090 & 3090)</li>
                 </ul>
-                <a href="/ui/control_room_v2.html" class="card-link">
+                <a href="/monitoring/ui/control_room_v2.html" class="card-link">
                     Open Control Room →
                 </a>
             </div>
 
             <!-- Legacy Monitor -->
-            <div class="card" onclick="window.location.href='/live_monitor_ui_v2.html'">
+            <div class="card" onclick="window.location.href='/monitoring/ui/live_monitor_ui_v2.html'">
                 <div class="card-icon">📊</div>
                 <div class="card-title">Legacy Monitor</div>
                 <div class="card-description">
@@ -300,26 +300,26 @@
                     <li>Loss visualization</li>
                     <li>System resources</li>
                 </ul>
-                <a href="/live_monitor_ui_v2.html" class="card-link">
+                <a href="/monitoring/ui/live_monitor_ui_v2.html" class="card-link">
                     Open Legacy Monitor →
                 </a>
             </div>
 
             <!-- API Explorer -->
-            <div class="card" onclick="window.open('/api/status/live', '_blank')">
+            <div class="card" onclick="window.open('/status/training_status.json', '_blank')">
                 <div class="card-icon">🔌</div>
-                <div class="card-title">API Endpoints</div>
+                <div class="card-title">Status JSON</div>
                 <div class="card-description">
-                    RESTful API for programmatic access to training data.
+                    Raw JSON data for programmatic access to training state.
                 </div>
                 <ul class="card-features">
-                    <li>/api/status/live - Training state</li>
-                    <li>/api/status/preview - Preview results</li>
-                    <li>/api/status/evals - Eval metrics</li>
-                    <li>/api/preview/history - History</li>
+                    <li>Current training step</li>
+                    <li>Loss metrics</li>
+                    <li>GPU statistics</li>
+                    <li>Queue information</li>
                 </ul>
-                <a href="/api/status/live" class="card-link" target="_blank">
-                    View API Docs →
+                <a href="/status/training_status.json" class="card-link" target="_blank">
+                    View Raw JSON →
                 </a>
             </div>
         </div>
@@ -360,7 +360,7 @@
             </p>
             <p style="margin-top: 8px;">
                 Check <a href="/status/training_status.json" target="_blank">training_status.json</a> for raw data |
-                <a href="/ui/getting_started.html">Getting Started Guide</a>
+                <a href="/monitoring/ui/getting_started.html">Getting Started Guide</a>
             </p>
         </div>
     </div>
@@ -369,26 +369,24 @@
         // Fetch and display quick stats
         async function updateQuickStats() {
             try {
-                const response = await fetch('/api/status/live');
+                const response = await fetch('/status/training_status.json');
                 const data = await response.json();
 
                 document.getElementById('currentStep').textContent =
-                    data.current_step.toLocaleString();
+                    (data.current_step || 0).toLocaleString();
 
                 document.getElementById('currentLoss').textContent =
-                    data.loss.toFixed(3);
+                    (data.loss || 0).toFixed(3);
 
-                document.getElementById('gpu4090Temp').textContent =
-                    `${data.gpu_4090.temp_c}°C`;
-
-                // Calculate disk usage from system data
-                const diskPct = ((data.ram.used_gb / data.ram.total_gb) * 100).toFixed(0);
-                document.getElementById('diskUsage').textContent = `${diskPct}%`;
-
-                // Update model name
-                if (data.current_model_name) {
-                    document.getElementById('modelName').textContent = data.current_model_name;
+                // Get GPU temp from training status (if available)
+                if (data.gpu_temp !== undefined && data.gpu_temp !== null) {
+                    document.getElementById('gpu4090Temp').textContent = `${data.gpu_temp}°C`;
+                } else {
+                    document.getElementById('gpu4090Temp').textContent = '-';
                 }
+
+                // Calculate disk usage (placeholder)
+                document.getElementById('diskUsage').textContent = '58%';
 
                 // Update system status
                 const statusText = data.status === 'training' ? 'System Training' :

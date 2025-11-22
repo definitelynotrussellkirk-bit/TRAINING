@@ -307,14 +307,20 @@ def legacy_training_status():
 
 @app.route('/')
 def index():
-    """Serve the new UI"""
-    return send_from_directory(BASE_DIR / "monitoring" / "ui", "control_room_v2.html")
+    """Serve the landing page"""
+    return send_from_directory(BASE_DIR / "monitoring" / "ui", "index.html")
 
 
 @app.route('/ui/<path:path>')
 def serve_ui(path):
     """Serve UI static files"""
     return send_from_directory(BASE_DIR / "monitoring" / "ui", path)
+
+
+@app.route('/live_monitor_ui_v2.html')
+def legacy_monitor():
+    """Serve legacy monitor UI"""
+    return send_from_directory(BASE_DIR / "monitoring" / "ui", "live_monitor_ui_v2.html")
 
 
 @app.route('/js/<path:path>')

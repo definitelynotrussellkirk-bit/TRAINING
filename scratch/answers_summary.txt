@@ -1,0 +1,83 @@
+════════════════════════════════════════════════════════════════
+REGIME 3 QUESTIONNAIRE - QUICK SUMMARY
+════════════════════════════════════════════════════════════════
+
+SECTION A: Trainer Side (4090)
+────────────────────────────────────────────────────────────────
+A1: HuggingFace Trainer (full fine-tuning, no LoRA)
+A2: JSONL with {"messages": [{role, content}, ...]}
+    Tokenized via apply_chat_template()
+    Thinking emojis 🤔🤔🤔🤔, Stop emojis 🛑🛑🛑
+A3: inbox/ → queue/normal|high|low/ → queue/processing/
+    No sequence packing, 1 example per sample, max_length=4096
+
+
+SECTION B: Web Viewer
+────────────────────────────────────────────────────────────────
+B1: JSON file polling (status/training_status.json)
+    Served via Flask/FastAPI on :8080, :8081, :8082
+B2: YES - TrainingStatus dataclass with 40+ fields
+    See full payload in detailed answers file
+B3: Critical live data:
+    - loss, streaming_ce, val_train_gap
+    - current_step/total_steps, tokens/sec, ETA
+    - GPU temp/VRAM, accuracy_percent
+    - fixed_eval_em, train_loss_history
+
+
+SECTION C: Remote Inference (3090)
+────────────────────────────────────────────────────────────────
+C1: ✅ All ready - Python 3.12, CUDA 12.8, PyTorch 2.9.1
+    ✅ FastAPI running at http://192.168.x.x:8765
+    ✅ Qwen3-0.6B loaded, 24GB VRAM, persistence mode on
+C2: SCP/rsync for now, API upload planned
+C3: YES to all - Eval, data gen, inference, telemetry,
+    power management, job queue, model management
+
+
+SECTION D: Regime 3 Encoding
+────────────────────────────────────────────────────────────────
+D1: ❌ NOT IMPLEMENTED YET
+    Need user to specify canonical format
+D2: ❓ UNKNOWN - Pure regime-3 or mixed with English?
+D3: ❓ UNKNOWN - Depends on D2, would need decoder if yes
+
+
+SECTION E: Goals / Constraints
+────────────────────────────────────────────────────────────────
+E1: INFERRED - Self-improving reasoning system with
+    continuous training loop, auto data generation,
+    self-correction, evolution tracking
+E2: INFERRED - Long-running (days/weeks)
+    Daily snapshots, daemon-based, 24/7 operation
+E3: YES - Power management matters
+    3090 has quiet/normal/max modes (220W/280W/350W)
+
+
+════════════════════════════════════════════════════════════════
+KEY UNKNOWNS (NEED USER INPUT)
+════════════════════════════════════════════════════════════════
+1. Canonical representation format (S-expr? JSON? DSL?)
+2. Pure regime-3 or mixed with English?
+3. Regime-3 domains (math, logic, code, all?)
+4. Encoding approach (token vocab? encoder module? embeddings?)
+
+
+════════════════════════════════════════════════════════════════
+CURRENT SYSTEM STATUS
+════════════════════════════════════════════════════════════════
+4090: Daemon stopped, 3 files stuck (OOM), no checkpoint
+3090: API running, clean, ready for work
+Model: Qwen3-0.6B base (1.5GB)
+Regime-3: Not implemented yet
+
+IMMEDIATE FIXES NEEDED:
+- Resolve OOM on 4090 (reduce batch_size or split large files)
+- Initialize current_model checkpoint
+- Restart training daemon
+- Design regime-3 format
+
+
+════════════════════════════════════════════════════════════════
+See regime3_questionnaire_answers.txt for full details
+════════════════════════════════════════════════════════════════

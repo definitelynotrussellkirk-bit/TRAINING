@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Monitor Test</title>
+</head>
+<body>
+<h1>Monitor Data Test</h1>
+<div id="status"></div>
+<div id="data"></div>
+
+<script>
+console.log('Test page loaded');
+
+async function test() {
+    try {
+        console.log('Fetching status...');
+        const response = await fetch('/status/training_status.json?t=' + Date.now());
+        console.log('Response status:', response.status);
+
+        const data = await response.json();
+        console.log('Got data:', data);
+
+        document.getElementById('status').innerHTML = `
+            <p style="color: green;">✅ Successfully loaded data!</p>
+            <p>Step: ${data.current_step} / ${data.total_steps}</p>
+            <p>Total Evals: ${data.total_evals}</p>
+            <p>Accuracy: ${data.accuracy_percent.toFixed(1)}%</p>
+        `;
+
+        if (data.recent_examples && data.recent_examples.length > 0) {
+            let html = '<h2>Recent Examples:</h2>';
+            data.recent_examples.forEach(ex => {
+                html += `
+                    <div style="border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
+                        <p><strong>Step ${ex.step}</strong> - Match: ${ex.matches ? 'YES ✅' : 'NO ❌'} - Loss: ${ex.loss.toFixed(4)}</p>
+                        <p><strong>Prompt:</strong> ${ex.prompt.substring(0, 200)}...</p>
+                        <p><strong>Expected:</strong> ${ex.golden}</p>
+                        <p><strong>Got:</strong> ${ex.model_output}</p>
+                    </div>
+                `;
+            });
+            document.getElementById('data').innerHTML = html;
+        } else {
+            document.getElementById('data').innerHTML = '<p>No recent examples yet</p>';
+        }
+
+    } catch (e) {
+        console.error('Error:', e);
+        document.getElementById('status').innerHTML = `<p style="color: red;">❌ Error: ${e.message}</p>`;
+    }
+}
+
+test();
+setInterval(test, 2000);
+</script>
+</body>
+</html>

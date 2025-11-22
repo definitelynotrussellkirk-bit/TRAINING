@@ -143,10 +143,9 @@ python3 config_validator.py
 
 ## 🎯 CURRENT CONFIGURATION
 
-**Model:** Qwen3 0.6B merged base
-**Base:** `/path/to/training/consolidated_models/20251121_101953`
-**Method:** Full precision LoRA (NOT QLoRA - use_qlora: false)
-**LoRA:** r=128, alpha=128, dropout=0.02
+**Model:** Qwen2.5-0.5B (fresh download)
+**Path:** `/path/to/training/models/Qwen3-0.6B-fresh`
+**Method:** Full model training (all weights updated directly)
 
 **Key Settings (`config.json`):**
 - Batch size: 16 (effective: 16 with gradient accumulation: 1)
@@ -379,11 +378,11 @@ python3 validate_data.py --auto-adjust  # Auto-adjust config if needed
 ```
 /path/to/training/
 ├── inbox/                    # Drop .jsonl files here
-├── current_model/            # Active training (LoRA adapter)
+├── current_model/            # Active training model
 ├── models/
 │   ├── versions/             # Versioned snapshots (v001, v002, ...)
 │   └── backups/              # Safety backups
-├── consolidated_models/      # Merged base models (current: 20251119_152444)
+├── consolidated_models/      # Model snapshots at various training checkpoints
 ├── data/validation/          # Fixed validation set
 ├── logs/                     # Training logs (daily rotation)
 ├── status/                   # Real-time status JSON

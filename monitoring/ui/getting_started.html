@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started - LLM Training System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: #0f1419;
+            color: #e6edf3;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        h1 {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #58a6ff 0%, #a371f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #8b949e;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #58a6ff;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .section {
+            background: #1e2530;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 32px;
+        }
+
+        h2 {
+            font-size: 28px;
+            margin-bottom: 20px;
+            color: #e6edf3;
+        }
+
+        h3 {
+            font-size: 20px;
+            margin-top: 24px;
+            margin-bottom: 12px;
+            color: #58a6ff;
+        }
+
+        p {
+            margin-bottom: 16px;
+            color: #8b949e;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 16px 0;
+            overflow-x: auto;
+        }
+
+        code {
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            color: #e6edf3;
+        }
+
+        .code-block code {
+            display: block;
+            white-space: pre;
+        }
+
+        .inline-code {
+            background: #1e2530;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            color: #58a6ff;
+        }
+
+        .step {
+            margin-bottom: 32px;
+        }
+
+        .step-number {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            background: #58a6ff;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 32px;
+            font-weight: 700;
+            margin-right: 12px;
+        }
+
+        .step-title {
+            display: inline;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .note {
+            background: #1a1f29;
+            border-left: 4px solid #58a6ff;
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+        }
+
+        .note-title {
+            font-weight: 600;
+            color: #58a6ff;
+            margin-bottom: 8px;
+        }
+
+        .warning {
+            border-left-color: #d29922;
+        }
+
+        .warning .note-title {
+            color: #d29922;
+        }
+
+        .success {
+            border-left-color: #3fb950;
+        }
+
+        .success .note-title {
+            color: #3fb950;
+        }
+
+        ul, ol {
+            margin-left: 24px;
+            margin-bottom: 16px;
+        }
+
+        li {
+            margin-bottom: 8px;
+            color: #8b949e;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 16px;
+            margin-top: 32px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #58a6ff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4a93e8;
+        }
+
+        .btn-secondary {
+            background: #1e2530;
+            color: #e6edf3;
+            border: 1px solid #30363d;
+        }
+
+        .btn-secondary:hover {
+            background: #252d3a;
+        }
+
+        .checklist {
+            list-style: none;
+            margin-left: 0;
+        }
+
+        .checklist li:before {
+            content: "☐ ";
+            color: #8b949e;
+            margin-right: 8px;
+        }
+
+        .checklist li.done:before {
+            content: "✓ ";
+            color: #3fb950;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #30363d;
+        }
+
+        th {
+            background: #0d1117;
+            color: #8b949e;
+            font-weight: 600;
+        }
+
+        td {
+            color: #e6edf3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Home</a>
+
+        <header>
+            <h1>🚀 Quick Start Guide</h1>
+            <div class="subtitle">Get your training system up and running in 5 minutes</div>
+        </header>
+
+        <!-- Prerequisites -->
+        <div class="section">
+            <h2>📋 Prerequisites</h2>
+            <ul class="checklist" id="prereqList">
+                <li>Python 3.8+ installed</li>
+                <li>PyTorch with CUDA support</li>
+                <li>transformers library</li>
+                <li>Flask (for monitoring)</li>
+                <li>Base model downloaded (Qwen3-0.6B)</li>
+                <li>Training data in JSONL format</li>
+            </ul>
+
+            <div class="note">
+                <div class="note-title">💡 Check Installation</div>
+                <div class="code-block"><code># Verify Python and packages
+python3 --version
+python3 -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
+python3 -c "import transformers; print(f'Transformers: {transformers.__version__}')"</code></div>
+            </div>
+        </div>
+
+        <!-- Step 1: Start Monitoring -->
+        <div class="section">
+            <div class="step">
+                <span class="step-number">1</span>
+                <h2 class="step-title">Start the Monitoring Server</h2>
+            </div>
+
+            <p>The monitoring server provides real-time training insights and controls.</p>
+
+            <div class="code-block"><code>cd /path/to/training
+
+# Start the server
+python3 monitoring/api/monitor_server_v2.py --port 8080
+
+# Or run in background
+nohup python3 monitoring/api/monitor_server_v2.py --port 8080 > logs/monitor.log 2>&1 &</code></div>
+
+            <div class="note success">
+                <div class="note-title">✓ Server Started</div>
+                Open your browser to <strong>http://localhost:8080/</strong>
+            </div>
+
+            <h3>What You'll See</h3>
+            <ul>
+                <li><strong>Landing Page</strong> - System overview with quick stats</li>
+                <li><strong>Control Room</strong> - Real-time training monitoring</li>
+                <li><strong>API Endpoints</strong> - RESTful access to all data</li>
+            </ul>
+        </div>
+
+        <!-- Step 2: Start Training -->
+        <div class="section">
+            <div class="step">
+                <span class="step-number">2</span>
+                <h2 class="step-title">Start Training</h2>
+            </div>
+
+            <p>Launch the training daemon to process your data.</p>
+
+            <div class="code-block"><code># Start training daemon
+python3 core/training_daemon.py --base-dir /path/to/training
+
+# Or run in background
+nohup python3 core/training_daemon.py --base-dir /path/to/training > logs/training.log 2>&1 &</code></div>
+
+            <h3>Or: Run a Single Training Job</h3>
+            <div class="code-block"><code># Direct training without daemon
+python3 core/train.py \
+    --dataset data/my_training_data.jsonl \
+    --model qwen3 \
+    --output models/current_model \
+    --batch-size 16 \
+    --learning-rate 0.0002</code></div>
+
+            <div class="note warning">
+                <div class="note-title">⚠️ Important</div>
+                Make sure you have training data in <span class="inline-code">inbox/</span> or <span class="inline-code">queue/normal/</span>
+            </div>
+        </div>
+
+        <!-- Step 3: Add Training Data -->
+        <div class="section">
+            <div class="step">
+                <span class="step-number">3</span>
+                <h2 class="step-title">Add Training Data</h2>
+            </div>
+
+            <p>Drop JSONL files into the queue for automatic processing.</p>
+
+            <div class="code-block"><code># Copy data to queue
+cp my_data.jsonl queue/normal/
+
+# Or use the queue manager
+python3 core/training_queue.py add my_data.jsonl --priority high
+
+# Check queue status
+python3 core/training_queue.py status</code></div>
+
+            <h3>Data Format</h3>
+            <p>Your JSONL file should contain one JSON object per line:</p>
+            <div class="code-block"><code>{"messages": [{"role": "user", "content": "What is 2+2?"}, {"role": "assistant", "content": "4"}]}
+{"messages": [{"role": "user", "content": "What is 3+3?"}, {"role": "assistant", "content": "6"}]}</code></div>
+        </div>
+
+        <!-- Step 4: Monitor Training -->
+        <div class="section">
+            <div class="step">
+                <span class="step-number">4</span>
+                <h2 class="step-title">Monitor Training</h2>
+            </div>
+
+            <p>Use the monitoring UI to track progress in real-time.</p>
+
+            <h3>Monitoring URLs</h3>
+            <table>
+                <tr>
+                    <th>Page</th>
+                    <th>URL</th>
+                    <th>Purpose</th>
+                </tr>
+                <tr>
+                    <td>Landing Page</td>
+                    <td><code>http://localhost:8080/</code></td>
+                    <td>System overview</td>
+                </tr>
+                <tr>
+                    <td>Control Room</td>
+                    <td><code>http://localhost:8080/ui/control_room_v2.html</code></td>
+                    <td>Real-time monitoring</td>
+                </tr>
+                <tr>
+                    <td>Live API</td>
+                    <td><code>http://localhost:8080/api/status/live</code></td>
+                    <td>JSON training state</td>
+                </tr>
+            </table>
+
+            <h3>What to Watch</h3>
+            <ul>
+                <li><strong>Loss</strong> - Should decrease over time (trending ↓)</li>
+                <li><strong>Val/Train Gap</strong> - Should be < 0.3 (green)</li>
+                <li><strong>GPU Temp</strong> - Should stay below 80°C</li>
+                <li><strong>Tokens/sec</strong> - Monitor for performance issues</li>
+            </ul>
+        </div>
+
+        <!-- Step 5: Control Training -->
+        <div class="section">
+            <div class="step">
+                <span class="step-number">5</span>
+                <h2 class="step-title">Control Training</h2>
+            </div>
+
+            <p>Pause, resume, or stop training as needed.</p>
+
+            <div class="code-block"><code># Check status
+python3 core/training_controller.py status
+
+# Pause training
+python3 core/training_controller.py pause
+
+# Resume training
+python3 core/training_controller.py resume
+
+# Stop training (graceful)
+python3 core/training_controller.py stop</code></div>
+
+            <div class="note">
+                <div class="note-title">💡 Tip</div>
+                Training can be paused/resumed without losing progress. The system saves checkpoints regularly.
+            </div>
+        </div>
+
+        <!-- Common Tasks -->
+        <div class="section">
+            <h2>🔧 Common Tasks</h2>
+
+            <h3>Check System Health</h3>
+            <div class="code-block"><code>python3 safety/comprehensive_health_check.py
+python3 tools/analysis/state_tracker.py --check</code></div>
+
+            <h3>Manage Checkpoints (Retention)</h3>
+            <div class="code-block"><code># Check retention status
+python3 management/retention_manager.py \
+    --output-dir models/current_model \
+    --status
+
+# Create daily snapshot
+python3 management/retention_manager.py \
+    --output-dir models/current_model \
+    --snapshot
+
+# Enforce retention policy (cleanup old checkpoints)
+python3 management/retention_manager.py \
+    --output-dir models/current_model \
+    --enforce</code></div>
+
+            <h3>Set Up Automated Maintenance</h3>
+            <div class="code-block"><code># Add to crontab
+crontab -e
+
+# Daily retention at 3 AM
+0 3 * * * /path/to/training/scripts/daily_retention.sh >> logs/retention.log 2>&1</code></div>
+        </div>
+
+        <!-- Troubleshooting -->
+        <div class="section">
+            <h2>🔍 Troubleshooting</h2>
+
+            <h3>Training Daemon Not Running</h3>
+            <div class="code-block"><code># Check if running
+ps aux | grep training_daemon | grep -v grep
+
+# Kill if stuck
+pkill -f training_daemon
+
+# Restart
+python3 core/training_daemon.py --base-dir /path/to/training</code></div>
+
+            <h3>Out of Memory (OOM)</h3>
+            <div class="code-block"><code># Reduce batch size
+python3 tools/config/edit_config.py batch_size 8
+
+# Check GPU memory
+nvidia-smi</code></div>
+
+            <h3>Monitoring Server Not Accessible</h3>
+            <div class="code-block"><code># Check if running
+ps aux | grep monitor_server | grep -v grep
+
+# Check port
+netstat -tulpn | grep 8080
+
+# Restart with different port
+python3 monitoring/api/monitor_server_v2.py --port 8081</code></div>
+        </div>
+
+        <!-- Next Steps -->
+        <div class="section">
+            <h2>🎯 Next Steps</h2>
+
+            <ul>
+                <li>Read <strong>ARCHITECTURE.md</strong> to understand the system</li>
+                <li>See <strong>TROUBLESHOOTING.md</strong> for common issues</li>
+                <li>Check <strong>RETENTION_POLICY_DESIGN.md</strong> for checkpoint management</li>
+                <li>Review <strong>MONITORING_V2_DESIGN.md</strong> for monitoring details</li>
+            </ul>
+
+            <div class="action-buttons">
+                <a href="/" class="btn btn-primary">Back to Dashboard</a>
+                <a href="/ui/control_room_v2.html" class="btn btn-secondary">Open Control Room</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Make checklist interactive
+        document.querySelectorAll('.checklist li').forEach(item => {
+            item.addEventListener('click', function() {
+                this.classList.toggle('done');
+            });
+        });
+    </script>
+</body>
+</html>

@@ -13,11 +13,12 @@ Each profile encapsulates:
 
 from trainer.profiles.base import DataProfile
 from trainer.profiles.emoji_think import EmojiThinkProfile
+from trainer.profiles.regime3 import Regime3Profile
 
 # Profile registry
 PROFILE_REGISTRY = {
     "emoji_think": EmojiThinkProfile,
-    # Future: "regime3": Regime3Profile,
+    "regime3": Regime3Profile,
     # Future: "plain_sft": PlainSFTProfile,
 }
 
@@ -46,6 +47,7 @@ def get_profile(name: str) -> DataProfile:
 __all__ = [
     "DataProfile",
     "EmojiThinkProfile",
+    "Regime3Profile",
     "get_profile",
     "PROFILE_REGISTRY",
 ]

@@ -182,18 +182,20 @@ This document contains instructions for Claude to help with training operations.
 │   ├── failed/                  # Failed files
 │   └── recently_completed/
 │
-├── scratch/                     # Documentation & tests
-│   ├── REFACTOR_PLAN.md         # Original refactor plan
-│   ├── REFACTOR_COMPLETE.md     # Refactor completion summary
-│   ├── STEP1_COMPLETE.md        # Step 1 validation
-│   ├── STEP2_COMPLETE.md        # Step 2 validation
-│   ├── REFACTOR_PROGRESS.md     # Progress tracking
-│   ├── test_emoji_profile.py    # Emoji profile tests (6 tests)
-│   └── test_regime3_profile.py  # Regime3 profile tests (7 tests)
+├── scratch/                     # Working space for design docs & experiments
+│   ├── DAEMON_REFACTOR_PLAN.md  # Current work: daemon refactor planning
+│   ├── IMPLEMENTATION_PLAN_TASKS.md  # Task breakdowns
+│   ├── MONITORING_V2_DESIGN.md  # Monitoring system designs
+│   ├── RETENTION_POLICY_DESIGN.md   # Policy documents
+│   └── *.md                     # Other design/planning docs
 │
-└── archive/                     # Archived/experimental
-    ├── configs/                 # Old configs
-    ├── experiments/             # Experimental scripts
+└── archive/                     # Archived code & completed work
+    ├── refactor_2025_11_22/     # Nov 22 trainer/ refactor
+    │   ├── code/                # Backup train.py versions
+    │   ├── docs/                # Refactor documentation
+    │   └── tests/               # Profile & engine tests
+    ├── configs/                 # Old config files
+    ├── experiments/             # Old experiments
     └── PERMANENT_ERROR_TRAINING/
 
 # IGNORED (user data/notes):

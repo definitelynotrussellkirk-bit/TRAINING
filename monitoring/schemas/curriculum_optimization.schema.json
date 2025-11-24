@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Curriculum Optimization Schema",
+  "description": "3090 RTX Intelligence Machine - Curriculum optimization results",
+  "type": "object",
+  "required": ["evaluations"],
+  "properties": {
+    "evaluations": {
+      "type": "array",
+      "description": "List of curriculum strategy evaluations",
+      "items": {
+        "type": "object",
+        "required": ["step", "checkpoint", "timestamp", "difficulties"],
+        "properties": {
+          "step": {"type": "integer"},
+          "checkpoint": {"type": "string"},
+          "timestamp": {"type": "string", "format": "date-time"},
+          "difficulties": {
+            "type": "object",
+            "properties": {
+              "easy": {
+                "type": "object",
+                "properties": {
+                  "avg_loss": {"type": "number"},
+                  "std_loss": {"type": "number"},
+                  "perplexity": {"type": "number"},
+                  "accuracy": {"type": "number"},
+                  "num_examples": {"type": "integer"},
+                  "difficulty": {"type": "string"}
+                }
+              },
+              "medium": {
+                "type": "object",
+                "properties": {
+                  "avg_loss": {"type": "number"},
+                  "std_loss": {"type": "number"},
+                  "perplexity": {"type": "number"},
+                  "accuracy": {"type": "number"},
+                  "num_examples": {"type": "integer"},
+                  "difficulty": {"type": "string"}
+                }
+              },
+              "hard": {
+                "type": "object",
+                "properties": {
+                  "avg_loss": {"type": "number"},
+                  "std_loss": {"type": "number"},
+                  "perplexity": {"type": "number"},
+                  "accuracy": {"type": "number"},
+                  "num_examples": {"type": "integer"},
+                  "difficulty": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

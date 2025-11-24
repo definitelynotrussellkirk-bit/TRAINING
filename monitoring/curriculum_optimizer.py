@@ -277,9 +277,22 @@ class CurriculumOptimizer:
         with torch.no_grad():
             for example in examples:
                 try:
-                    # Get input/output
+                    # Get input/output - handle both text and messages format
                     text = example.get("text", "")
+                    if not text and "messages" in example:
+                        # Convert messages format to text using chat template
+                        try:
+                            text = tokenizer.apply_chat_template(
+                                example["messages"],
+                                tokenize=False,
+                                add_generation_prompt=False
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to apply chat template: {e}")
+                            continue
+
                     if not text:
+                        logger.warning(f"Skipping example with no text or messages")
                         continue
 
                     # Tokenize

@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Training Status Schema",
+  "description": "4090 RTX Training Machine - Real-time training status",
+  "type": "object",
+  "required": ["status", "current_step", "total_steps", "loss", "timestamp"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["training", "paused", "stopped", "error"],
+      "description": "Current training state"
+    },
+    "current_step": {"type": "integer", "minimum": 0},
+    "total_steps": {"type": "integer", "minimum": 0},
+    "epoch": {"type": "integer", "minimum": 0},
+    "loss": {"type": "number"},
+    "validation_loss": {"type": "number"},
+    "val_train_gap": {"type": "number"},
+    "learning_rate": {"type": "number"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "model_name": {"type": "string"},
+    "max_output_tokens": {"type": "integer"},
+    "context_window": {"type": "integer"},
+    "batch_step": {"type": "integer"},
+    "batch_total_steps": {"type": "integer"},
+    "batch_queue_size": {"type": "integer"},
+    "current_file": {"type": "string"},
+    "current_system_prompt": {"type": "string"},
+    "total_evals": {"type": "integer"},
+    "total_correct": {"type": "integer"},
+    "accuracy_percent": {"type": "number"},
+    "tokens_per_sec": {"type": "number"},
+    "tokens_per_sec_avg": {"type": "number"},
+    "loss_trend": {
+      "type": "string",
+      "enum": ["rising", "falling", "stable"]
+    },
+    "recent_examples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "step": {"type": "integer"},
+          "current_file": {"type": "string"},
+          "matches": {"type": "boolean"},
+          "loss": {"type": "number"}
+        }
+      }
+    }
+  }
+}

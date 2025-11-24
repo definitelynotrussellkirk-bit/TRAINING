@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous Systems Dashboard</title>
+    <link rel="stylesheet" href="/monitoring/css/systems_dashboard.css">
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <header class="dashboard-header">
+            <h1>Autonomous Intelligence Systems</h1>
+            <div class="header-stats">
+                <div class="stat">
+                    <span class="label">Systems Running</span>
+                    <span class="value" id="systemsRunning">--</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Last Update</span>
+                    <span class="value" id="lastUpdate">--</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Queue Files</span>
+                    <span class="value" id="queueTotal">--</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- CURRICULUM INTELLIGENCE HERO SECTION -->
+        <section class="curriculum-hero">
+            <div class="hero-title">
+                <h2>Curriculum Intelligence</h2>
+                <span class="hero-subtitle">The Brain of the System</span>
+            </div>
+            <div class="hero-content">
+                <div class="accuracy-grid">
+                    <div class="accuracy-card easy">
+                        <div class="difficulty-label">Easy</div>
+                        <div class="accuracy-value" id="curriculumEasy">--</div>
+                        <div class="accuracy-bar"><div class="accuracy-fill" id="curriculumEasyBar"></div></div>
+                    </div>
+                    <div class="accuracy-card medium">
+                        <div class="difficulty-label">Medium</div>
+                        <div class="accuracy-value" id="curriculumMedium">--</div>
+                        <div class="accuracy-bar"><div class="accuracy-fill" id="curriculumMediumBar"></div></div>
+                    </div>
+                    <div class="accuracy-card hard">
+                        <div class="difficulty-label">Hard</div>
+                        <div class="accuracy-value" id="curriculumHard">--</div>
+                        <div class="accuracy-bar"><div class="accuracy-fill" id="curriculumHardBar"></div></div>
+                    </div>
+                </div>
+                <div class="hero-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Last Checkpoint</span>
+                        <span class="detail-value" id="curriculumCheckpoint">--</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Status</span>
+                        <span class="status-badge" id="curriculumStatus">--</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MONITORING SYSTEMS GRID -->
+        <section class="systems-grid">
+            <h2 class="section-title">Monitoring Systems</h2>
+
+            <!-- Checkpoint Sync -->
+            <div class="system-card" id="checkpointSync">
+                <div class="card-header">
+                    <h3>Checkpoint Sync</h3>
+                    <span class="status-indicator"></span>
+                </div>
+                <div class="card-body">
+                    <div class="metric">
+                        <span class="metric-label">Last Synced</span>
+                        <span class="metric-value" id="syncLastStep">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Local/Remote</span>
+                        <span class="metric-value" id="syncCheckpoints">--</span>
+                    </div>
+                    <div class="card-timestamp" id="syncTimestamp">--</div>
+                </div>
+            </div>
+
+            <!-- Adversarial Miner -->
+            <div class="system-card" id="adversarialMiner">
+                <div class="card-header">
+                    <h3>Adversarial Miner</h3>
+                    <span class="status-indicator"></span>
+                </div>
+                <div class="card-body">
+                    <div class="metric">
+                        <span class="metric-label">Examples Found</span>
+                        <span class="metric-value" id="adversarialFound">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Total Tested</span>
+                        <span class="metric-value" id="adversarialTested">--</span>
+                    </div>
+                    <div class="card-timestamp" id="adversarialTimestamp">--</div>
+                </div>
+            </div>
+
+            <!-- Regression Monitor -->
+            <div class="system-card" id="regressionMonitor">
+                <div class="card-header">
+                    <h3>Regression Monitor</h3>
+                    <span class="status-indicator"></span>
+                </div>
+                <div class="card-body">
+                    <div class="metric">
+                        <span class="metric-label">Regressions Detected</span>
+                        <span class="metric-value" id="regressionsDetected">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Checkpoints Tested</span>
+                        <span class="metric-value" id="regressionsTested">--</span>
+                    </div>
+                    <div class="card-timestamp" id="regressionTimestamp">--</div>
+                </div>
+            </div>
+
+            <!-- Model Comparison -->
+            <div class="system-card" id="modelComparison">
+                <div class="card-header">
+                    <h3>Model Comparison</h3>
+                    <span class="status-indicator"></span>
+                </div>
+                <div class="card-body">
+                    <div class="metric">
+                        <span class="metric-label">Engine Status</span>
+                        <span class="metric-value" id="comparisonStatus">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Data Available</span>
+                        <span class="metric-value" id="comparisonData">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confidence Calibrator -->
+            <div class="system-card" id="confidenceCalibrator">
+                <div class="card-header">
+                    <h3>Confidence Calibrator</h3>
+                    <span class="status-indicator"></span>
+                </div>
+                <div class="card-body">
+                    <div class="metric">
+                        <span class="metric-label">Confidence Bins</span>
+                        <span class="metric-value" id="confidenceBins">--</span>
+                    </div>
+                    <div class="card-timestamp" id="confidenceTimestamp">--</div>
+                </div>
+            </div>
+
+            <!-- Automated Testing -->
+            <div class="system-card" id="automatedTesting">
+                <div class="card-header">
+                    <h3>Automated Testing</h3>
+                    <span class="status-indicator"></span>
+                </div>
+                <div class="card-body">
+                    <div class="metric">
+                        <span class="metric-label">Daemon Status</span>
+                        <span class="metric-value" id="testingStatus">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Data Available</span>
+                        <span class="metric-value" id="testingData">--</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SKILLS SECTION -->
+        <section class="skills-section">
+            <h2 class="section-title">Available Skills</h2>
+            <div class="skills-grid">
+                <div class="skill-card" id="sylloSkill">
+                    <div class="skill-header">
+                        <h3>Syllogistic Reasoning</h3>
+                        <span class="skill-health">?</span>
+                    </div>
+                    <div class="skill-body">
+                        <div class="skill-info">
+                            <span class="info-label">Difficulty Levels</span>
+                            <span class="info-value">5</span>
+                        </div>
+                        <div class="skill-info">
+                            <span class="info-label">API Endpoint</span>
+                            <span class="info-value api-url">localhost:8080</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="skill-card" id="binarySkill">
+                    <div class="skill-header">
+                        <h3>Binary Arithmetic</h3>
+                        <span class="skill-health">?</span>
+                    </div>
+                    <div class="skill-body">
+                        <div class="skill-info">
+                            <span class="info-label">Difficulty Levels</span>
+                            <span class="info-value">7</span>
+                        </div>
+                        <div class="skill-info">
+                            <span class="info-label">API Endpoint</span>
+                            <span class="info-value api-url">localhost:8090</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- QUEUE PIPELINE -->
+        <section class="queue-section">
+            <h2 class="section-title">Data Pipeline</h2>
+            <div class="queue-grid">
+                <div class="queue-card high">
+                    <div class="queue-priority">High</div>
+                    <div class="queue-count" id="queueHigh">--</div>
+                </div>
+                <div class="queue-card normal">
+                    <div class="queue-priority">Normal</div>
+                    <div class="queue-count" id="queueNormal">--</div>
+                </div>
+                <div class="queue-card low">
+                    <div class="queue-priority">Low</div>
+                    <div class="queue-count" id="queueLow">--</div>
+                </div>
+                <div class="queue-card processing">
+                    <div class="queue-priority">Processing</div>
+                    <div class="queue-count" id="queueProcessing">--</div>
+                </div>
+                <div class="queue-card failed">
+                    <div class="queue-priority">Failed</div>
+                    <div class="queue-count" id="queueFailed">--</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="dashboard-footer">
+            <a href="/monitoring/ui/live_monitor_ui_v2.html" class="footer-link">← Back to Main Monitor</a>
+            <span class="footer-version">Systems Dashboard v1.0</span>
+        </footer>
+    </div>
+
+    <script src="/monitoring/js/systems_dashboard.js"></script>
+</body>
+</html>

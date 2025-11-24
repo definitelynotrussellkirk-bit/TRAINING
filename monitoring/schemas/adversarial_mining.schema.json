@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Adversarial Mining Schema",
+  "description": "3090 RTX Intelligence Machine - Adversarial example mining results",
+  "type": "object",
+  "required": ["mining_runs"],
+  "properties": {
+    "mining_runs": {
+      "type": "array",
+      "description": "List of adversarial mining runs",
+      "items": {
+        "type": "object",
+        "required": ["step", "checkpoint", "timestamp", "stats"],
+        "properties": {
+          "step": {"type": "integer"},
+          "checkpoint": {"type": "string"},
+          "timestamp": {"type": "string", "format": "date-time"},
+          "stats": {
+            "type": "object",
+            "properties": {
+              "total_tested": {"type": "integer"},
+              "low_confidence": {"type": "integer"},
+              "incorrect_predictions": {"type": "integer"},
+              "avg_confidence": {"type": "number"}
+            }
+          },
+          "adversarial_count": {"type": "integer"},
+          "output_file": {
+            "type": ["string", "null"],
+            "description": "Path to generated adversarial examples JSONL"
+          }
+        }
+      }
+    }
+  }
+}

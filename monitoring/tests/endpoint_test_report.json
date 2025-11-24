@@ -1,0 +1,163 @@
+{
+  "timestamp": "2025-11-23T23:27:08.812302",
+  "summary": {
+    "total": 21,
+    "passed": 20,
+    "failed": 0,
+    "warnings": 1
+  },
+  "results": {
+    "passed": [
+      [
+        "training_status.json",
+        {
+          "status": "pass",
+          "data": "65 keys, 44684 bytes"
+        }
+      ],
+      [
+        "curriculum_state.json",
+        {
+          "status": "pass",
+          "data": "4 keys, 767 bytes"
+        }
+      ],
+      [
+        "3090_watchdog_status.json",
+        {
+          "status": "pass",
+          "data": "3 keys, 613 bytes"
+        }
+      ],
+      [
+        "curriculum_optimization.json (3090)",
+        {
+          "status": "pass",
+          "data": "4 keys, 25175 bytes"
+        }
+      ],
+      [
+        "model_comparisons.json (3090)",
+        {
+          "status": "pass",
+          "data": "4 keys, 6386 bytes"
+        }
+      ],
+      [
+        "regression_monitoring.json (3090)",
+        {
+          "status": "pass",
+          "data": "4 keys, 4862 bytes"
+        }
+      ],
+      [
+        "confidence_calibration.json (3090)",
+        {
+          "status": "pass",
+          "data": "2 keys, 1828 bytes"
+        }
+      ],
+      [
+        "adversarial_mining.json (3090)",
+        {
+          "status": "pass",
+          "data": "4 keys, 1616 bytes"
+        }
+      ],
+      [
+        "checkpoint_sync.json (3090)",
+        {
+          "status": "pass",
+          "data": "6 keys, 437 bytes"
+        }
+      ],
+      [
+        "/api/status/live",
+        {
+          "status": "pass",
+          "data": "26 keys"
+        }
+      ],
+      [
+        "/api/status/system",
+        {
+          "status": "pass",
+          "data": "1 keys"
+        }
+      ],
+      [
+        "/api/status/preview",
+        {
+          "status": "pass",
+          "data": "4 keys"
+        }
+      ],
+      [
+        "/api/status/evals",
+        {
+          "status": "pass",
+          "data": "4 keys"
+        }
+      ],
+      [
+        "/api/config",
+        {
+          "status": "pass",
+          "data": "3 keys"
+        }
+      ],
+      [
+        "nvidia-smi (4090)",
+        {
+          "status": "pass",
+          "data": "NVIDIA GeForce RTX 4090, 24564 MiB"
+        }
+      ],
+      [
+        "nvidia-smi (3090)",
+        {
+          "status": "pass",
+          "data": "NVIDIA GeForce RTX 3090, 24576 MiB"
+        }
+      ],
+      [
+        "Local monitoring processes (4090)",
+        {
+          "status": "pass",
+          "data": "10 processes running"
+        }
+      ],
+      [
+        "Remote monitoring processes (3090)",
+        {
+          "status": "pass",
+          "data": "7 processes running"
+        }
+      ],
+      [
+        "Queue directories accessible",
+        {
+          "status": "pass",
+          "data": "9 dirs, 8 files"
+        }
+      ],
+      [
+        "Skill folder access",
+        {
+          "status": "pass",
+          "data": "27 skills found"
+        }
+      ]
+    ],
+    "failed": [],
+    "warnings": [
+      [
+        "latest_preview.json",
+        {
+          "status": "warn",
+          "message": "Missing fields: ['step']"
+        }
+      ]
+    ]
+  }
+}

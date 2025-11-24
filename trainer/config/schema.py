@@ -15,8 +15,8 @@ class Hyperparams:
     """Core hyperparameters for training"""
 
     # Batch configuration
-    batch_size: int = 19
-    gradient_accumulation: int = 1
+    batch_size: int = 1              # Safe default for 24GB GPU
+    gradient_accumulation: int = 16  # Effective batch = 16
     effective_batch_size: int = field(init=False)
 
     # Learning rate
@@ -28,11 +28,11 @@ class Hyperparams:
     max_steps: Optional[int] = None  # If set, overrides epochs
 
     # Context & generation
-    max_length: int = 4096           # Training context window
+    max_length: int = 2048           # Safe training context for 24GB
     max_new_tokens: int = 2048       # Max tokens for generation
 
     # Precision
-    fp_precision: Literal["fp16", "bf16", "fp32"] = "fp16"
+    fp_precision: Literal["fp16", "bf16", "fp32"] = "bf16"  # bf16 for stability
 
     # Checkpointing
     save_steps: int = 1000
@@ -43,7 +43,7 @@ class Hyperparams:
     eval_strategy: Literal["steps", "epoch", "no"] = "steps"
 
     # Memory optimization
-    use_gradient_checkpointing: bool = False  # Trade compute for memory
+    use_gradient_checkpointing: bool = True  # Essential for 24GB GPU
 
     def __post_init__(self):
         """Calculate derived values"""

@@ -1292,7 +1292,7 @@ class UltimateTrainer:
             print(f"📈 Total steps after this batch: {current_global_step} + {steps_for_this_file} = {max_steps}")
 
             # Determine precision flags from config
-            # Use config precision if available, otherwise default to fp16
+            # Use config precision if available, otherwise default to bf16 (matches model loading)
             use_fp16 = False
             use_bf16 = False
             if self.config and self.config.hyperparams.fp_precision:
@@ -1303,8 +1303,8 @@ class UltimateTrainer:
                     use_fp16 = True
                 # fp32: both False
             else:
-                # Fallback to original behavior (fp16)
-                use_fp16 = True
+                # Fallback to match model loading default (bf16) - avoids BF16/FP16 mismatch
+                use_bf16 = True
 
             # Training arguments
             # Use max_steps for continuous training instead of num_train_epochs

@@ -275,13 +275,11 @@ class TrainingDaemon:
             default_config = {
                 "model_name": "qwen3_0.6b",
                 "model_path": None,  # Set this to your base model path
-                "batch_size": 4,
-                "gradient_accumulation": 4,
+                "batch_size": 1,
+                "gradient_accumulation": 16,
                 "learning_rate": 2e-4,
                 "warmup_steps": 100,
-                "lora_r": 64,
-                "lora_alpha": 32,
-                "use_qlora": True,  # Use QLoRA to reduce VRAM usage
+                "load_in_4bit": False,  # 4-bit quantization (reduces VRAM but lower quality)
                 "eval_steps": 100,
                 "num_eval_samples": 5,
                 "save_steps": 500,
@@ -441,8 +439,9 @@ class TrainingDaemon:
 
     def initialize_model(self):
         """Initialize current model from base or latest snapshot"""
-        # Check if current_model exists
-        if (self.current_model_dir / "adapter_config.json").exists():
+        # Check if current_model exists (HF checkpoint files for full model training)
+        config_file = self.current_model_dir / "config.json"
+        if config_file.exists():
             self.logger.info(f"Current model already exists: {self.current_model_dir}")
             return
 
@@ -483,18 +482,28 @@ class TrainingDaemon:
         """
         CRITICAL FIX #7: Verify snapshot integrity before trusting it
 
-        Checks that essential files exist and are readable
+        Checks that essential HuggingFace checkpoint files exist and are readable
+        (For full model fine-tuning, not LoRA adapters)
         """
         try:
-            adapter_file = snapshot_dir / "adapter_model.safetensors"
-            config_file = snapshot_dir / "adapter_config.json"
+            # Check for HuggingFace checkpoint files (full model training)
+            config_file = snapshot_dir / "config.json"
 
-            if not adapter_file.exists() or not config_file.exists():
+            # Check for model weights (either safetensors or pytorch)
+            model_file = snapshot_dir / "model.safetensors"
+            if not model_file.exists():
+                model_file = snapshot_dir / "pytorch_model.bin"
+
+            # Check for tokenizer
+            tokenizer_file = snapshot_dir / "tokenizer.json"
+
+            # At minimum, need config and model weights
+            if not config_file.exists() or not model_file.exists():
                 return False
 
-            # Verify files are readable
-            adapter_size = adapter_file.stat().st_size
-            if adapter_size == 0:
+            # Verify model file is not empty
+            model_size = model_file.stat().st_size
+            if model_size == 0:
                 return False
 
             # Try to read config as JSON
@@ -607,10 +616,11 @@ class TrainingDaemon:
             except:
                 pass  # Invalid marker file, proceed with consolidation
 
-        # Check if there's an adapter to consolidate
-        adapter_file = self.current_model_dir / 'adapter_model.safetensors'
-        if not self.current_model_dir.exists() or not adapter_file.exists():
-            self.logger.info("No adapter to consolidate - skipping")
+        # Check if there's a trained model to consolidate
+        # For full model training, check for checkpoints
+        checkpoints = list(self.current_model_dir.glob("checkpoint-*"))
+        if not self.current_model_dir.exists() or not checkpoints:
+            self.logger.info("No checkpoints to consolidate - skipping")
             return
 
         self.logger.info("=" * 80)
@@ -1002,8 +1012,9 @@ class TrainingDaemon:
             return all((path / f).exists() for f in required)
 
         # Determine which model to use
-        if (self.current_model_dir / "adapter_config.json").exists():
-            # Continue training existing adapter
+        config_file = self.current_model_dir / "config.json"
+        if config_file.exists():
+            # Continue training existing model
             args.model = str(self.current_model_dir)
             self.logger.info(f"Continuing training on: {self.current_model_dir}")
         else:
@@ -1036,9 +1047,7 @@ class TrainingDaemon:
         args.eval_steps = self.config.get("eval_steps", 500)
         args.save_steps = self.config.get("save_steps", 1000)
         args.num_eval_samples = self.config.get("num_eval_samples", 2)
-        args.lora_r = self.config.get("lora_r", 0)
-        args.lora_alpha = self.config.get("lora_alpha", 0)
-        args.use_qlora = self.config.get("use_qlora", False)
+        args.load_in_4bit = self.config.get("load_in_4bit", False)
 
         # Batch context for progress tracking
         args.current_file = data_file.name

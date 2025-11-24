@@ -4,6 +4,7 @@ Self-Correction Loop Plugin
 Phase 4: Self-correction loop results from 3090 intelligence machine
 """
 
+from typing import Dict, Any, Optional
 from .base import RemoteFilePlugin
 
 
@@ -16,7 +17,7 @@ class SelfCorrectionPlugin(RemoteFilePlugin):
     Critical: No
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
         ssh_host = (config or {}).get('ssh_host', '192.168.x.x')
         remote_path = (config or {}).get(
             'remote_path',
@@ -29,10 +30,10 @@ class SelfCorrectionPlugin(RemoteFilePlugin):
 
         super().__init__(ssh_host, remote_path, config)
 
-    def get_name(self):
+    def get_name(self) -> str:
         return 'self_correction'
 
-    def get_metadata(self):
+    def get_metadata(self) -> Dict[str, Any]:
         return {
             'description': '3090 Intelligence Machine - Self-correction loop',
             'refresh_interval': 300,
@@ -46,7 +47,7 @@ class SelfCorrectionPlugin(RemoteFilePlugin):
             ]
         }
 
-    def fetch(self):
+    def fetch(self) -> Dict[str, Any]:
         """Fetch and extract key self-correction metrics"""
         data = super().fetch()
 

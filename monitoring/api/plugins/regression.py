@@ -4,6 +4,7 @@ Regression Monitoring Plugin
 Phase 4: Regression detection from 3090 intelligence machine
 """
 
+from typing import Dict, Any, Optional
 from .base import RemoteFilePlugin
 
 
@@ -16,7 +17,7 @@ class RegressionPlugin(RemoteFilePlugin):
     Critical: Yes (regressions must be caught immediately)
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
         ssh_host = (config or {}).get('ssh_host', '192.168.x.x')
         remote_path = (config or {}).get(
             'remote_path',
@@ -29,10 +30,10 @@ class RegressionPlugin(RemoteFilePlugin):
 
         super().__init__(ssh_host, remote_path, config)
 
-    def get_name(self):
+    def get_name(self) -> str:
         return 'regression_monitoring'
 
-    def get_metadata(self):
+    def get_metadata(self) -> Dict[str, Any]:
         return {
             'description': '3090 Intelligence Machine - Regression detection',
             'refresh_interval': 300,
@@ -46,7 +47,7 @@ class RegressionPlugin(RemoteFilePlugin):
             ]
         }
 
-    def fetch(self):
+    def fetch(self) -> Dict[str, Any]:
         """Fetch and extract key regression monitoring metrics"""
         data = super().fetch()
 

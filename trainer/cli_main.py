@@ -25,7 +25,7 @@ from trainer.core.engine import TrainerEngine
 from trainer.monitoring.status_writer import TrainingStatusWriter
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="API-driven training with TrainerEngine (DEMO)"
@@ -46,7 +46,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main() -> int:
     """Main entry point."""
     args = parse_args()
 

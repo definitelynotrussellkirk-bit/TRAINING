@@ -4,6 +4,7 @@ Training Status Plugin
 Phase 2, Task 2.2: Real-time training status from 4090 machine
 """
 
+from typing import Dict, Any, Optional
 from .base import LocalFilePlugin
 
 
@@ -16,7 +17,7 @@ class TrainingStatusPlugin(LocalFilePlugin):
     Critical: Yes
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
         # Default path, can be overridden in config
         file_path = (config or {}).get(
             'file_path',
@@ -29,10 +30,10 @@ class TrainingStatusPlugin(LocalFilePlugin):
 
         super().__init__(file_path, config)
 
-    def get_name(self):
+    def get_name(self) -> str:
         return 'training_status'
 
-    def get_metadata(self):
+    def get_metadata(self) -> Dict[str, Any]:
         return {
             'description': '4090 Training Machine - Real-time training progress',
             'refresh_interval': 5,
@@ -47,7 +48,7 @@ class TrainingStatusPlugin(LocalFilePlugin):
             ]
         }
 
-    def fetch(self):
+    def fetch(self) -> Dict[str, Any]:
         """Fetch and optionally transform training status data"""
         data = super().fetch()
 

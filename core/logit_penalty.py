@@ -1,57 +1,171 @@
 #!/usr/bin/env python3
 """
-Logit Penalty System - Control token generation during inference.
+Logit Penalty System - Inference-time control over token generation probabilities.
 
-Provides LogitsProcessor implementations that modify generation probabilities
-to discourage unwanted tokens (<think> tags, premature EOS) and enforce
-stop signal behavior.
+Modifies logits during generation to discourage unwanted behaviors (<think> tags, premature EOS,
+post-stop text) using HuggingFace LogitsProcessor interface. Critical for enforcing output
+formatting and stopping conditions during model inference.
 
-Key Components:
-    - TokenLogitPenalty: Penalize specific tokens with optional schedules
-    - PostStopPenalty: Penalize all tokens after stop emoji sequences
-    - build_think_penalty_processor(): Factory for <think> tag penalties
-    - build_eos_penalty_processor(): Factory for EOS token penalties
-    - build_post_stop_penalty_processor(): Factory for post-stop penalties
+=== CORE RESPONSIBILITY ===
+Answer: "Which tokens should be discouraged during generation?"
 
-Penalty Schedule Format:
-    Schedules control how penalties change over generation steps.
+Provides penalty processors that modify logits (pre-softmax scores) to:
+- Prevent <think> tag generation during final answers
+- Delay EOS tokens until answer is complete
+- Force stop after emoji stop signals (🛑🛑, ✓✓✓)
 
-    Format: List of dicts with "steps" and "multiplier" keys:
-        [
-            {"steps": 4, "multiplier": 8.0},   # First 4 steps: penalty * 8.0
-            {"steps": 4, "multiplier": 2.0},   # Next 4 steps: penalty * 2.0
-            {"steps": 4, "multiplier": 1.5},   # Next 4 steps: penalty * 1.5
-            # After step 12: penalty * 1.0 (no multiplier)
-        ]
+Penalties are subtractive: logits[token_id] -= penalty_value (makes token less likely).
 
-    - "steps": int, number of generation steps for this window
-    - "multiplier": float >= 1.0, penalty multiplier for this window
-    - Windows apply sequentially (cumulative step counting)
-    - After all windows complete, multiplier defaults to 1.0
+=== KEY COMPONENTS ===
 
-Usage:
-    from core.logit_penalty import build_think_penalty_processor
+**3 LogitsProcessor Classes:**
+1. **TokenLogitPenalty** - Penalize specific token IDs with optional schedule
+2. **PostStopPenalty** - Escalating penalties after stop emoji sequences detected
+3. **TokenLogitReward** - Reward specific tokens (boost logits, inverse of penalty)
 
-    # Basic penalty
-    processors = build_think_penalty_processor(tokenizer, penalty=80.0)
+**5 Factory Functions:**
+1. build_think_penalty_processor() - Penalize <think>...</think> opening tags
+2. build_eos_penalty_processor() - Delay EOS until sufficient text generated
+3. build_post_stop_penalty_processor() - Force stop after emoji sequences
+4. build_think_reward_processor() - Reward <think> tags (for training data generation)
+5. build_emoji_stop_reward_processor() - Reward stop emojis (encourage stop signal use)
 
-    # With schedule (strong early, taper off)
-    schedule = [
-        {"steps": 4, "multiplier": 8.0},
-        {"steps": 4, "multiplier": 2.0},
-    ]
-    processors = build_think_penalty_processor(
-        tokenizer,
-        penalty=80.0,
-        schedule=schedule
-    )
+=== PENALTY SCHEDULE SYSTEM ===
 
-    # Use with generation
-    outputs = model.generate(
-        input_ids,
-        logits_processor=processors,
-        max_new_tokens=100
-    )
+Schedules allow penalties to change over generation steps. Strong early, taper off.
+
+**Format:**
+```python
+[
+    {"steps": 4, "multiplier": 8.0},   # Steps 0-3: penalty × 8.0
+    {"steps": 4, "multiplier": 2.0},   # Steps 4-7: penalty × 2.0
+    {"steps": 4, "multiplier": 1.5},   # Steps 8-11: penalty × 1.5
+]
+# After step 12: penalty × 1.0 (baseline)
+```
+
+**Semantics:**
+- "steps": Number of consecutive generation steps for this window
+- "multiplier": Penalty multiplier (≥ 1.0) for this window
+- Windows apply sequentially (cumulative counting)
+- After last window: multiplier = 1.0 (baseline penalty)
+
+**Example:**
+```python
+schedule = [{"steps": 4, "multiplier": 8.0}, {"steps": 4, "multiplier": 2.0}]
+penalty = 10.0
+
+Step 0: applied_penalty = 10.0 × 8.0 = 80.0  (very strong)
+Step 3: applied_penalty = 10.0 × 8.0 = 80.0  (still in first window)
+Step 4: applied_penalty = 10.0 × 2.0 = 20.0  (second window starts)
+Step 7: applied_penalty = 10.0 × 2.0 = 20.0  (second window ends)
+Step 8+: applied_penalty = 10.0 × 1.0 = 10.0  (baseline, all windows complete)
+```
+
+=== STOP SIGNAL SYSTEM ===
+
+PostStopPenalty enforces clean endings after emoji stop sequences.
+
+**Detected Stop Patterns:**
+- "🛑🛑" (2 stop signs)
+- "✓✓✓" (3 checkmarks)
+- Custom patterns (configurable)
+
+**Escalating Penalty Formula:**
+```
+penalty = base_penalty × (escalation_rate ^ tokens_after_stop)
+
+Example (base=5.0, rate=2.0):
+  Token 1 after stop: 5.0 × 2¹ = 10.0
+  Token 2 after stop: 5.0 × 2² = 20.0
+  Token 3 after stop: 5.0 × 2³ = 40.0
+  ... exponentially growing to force EOS
+```
+
+**EOT Exemption:**
+End-of-turn tokens (EOS) are exempted from penalties (optionally rewarded) to
+encourage clean stopping.
+
+=== USAGE EXAMPLES ===
+
+**Prevent <think> tags during final answer:**
+```python
+from core.logit_penalty import build_think_penalty_processor
+
+processors = build_think_penalty_processor(
+    tokenizer,
+    penalty=80.0,
+    schedule=[{"steps": 4, "multiplier": 8.0}]  # Very strong for first 4 tokens
+)
+
+# Use in generation
+outputs = model.generate(
+    input_ids,
+    logits_processor=processors,
+    max_new_tokens=100
+)
+```
+
+**Delay EOS until answer complete:**
+```python
+processors = build_eos_penalty_processor(
+    tokenizer,
+    penalty=50.0,
+    schedule=[{"steps": 10, "multiplier": 5.0}]  # Strong for first 10 tokens
+)
+```
+
+**Force stop after emoji signals:**
+```python
+processors = build_post_stop_penalty_processor(
+    tokenizer,
+    stop_sequences=["🛑🛑", "✓✓✓"],
+    base_penalty=5.0,
+    escalation_rate=2.0
+)
+```
+
+**Combine multiple processors:**
+```python
+all_processors = (
+    build_think_penalty_processor(tokenizer, penalty=80.0) +
+    build_eos_penalty_processor(tokenizer, penalty=50.0) +
+    build_post_stop_penalty_processor(tokenizer)
+)
+
+outputs = model.generate(
+    input_ids,
+    logits_processor=all_processors,
+    max_new_tokens=200
+)
+```
+
+=== INTEGRATION POINTS ===
+- Used by: Inference servers, evaluation scripts, data generation
+- NOT used during training (training uses raw model outputs)
+- Works with: HuggingFace model.generate()
+- Format: LogitsProcessorList (compatible with Transformers library)
+
+=== WHEN TO USE ===
+
+**Use penalties for:**
+- Production inference (enforce output format)
+- Evaluation (prevent invalid outputs)
+- Data generation (control synthetic examples)
+
+**Don't use penalties for:**
+- Training (want model to learn naturally)
+- Benchmarking model capabilities (would be cheating)
+- Exploration/debugging (penalties hide model behavior)
+
+=== STATISTICS & MONITORING ===
+
+All processors track statistics:
+- hits: Number of times penalty was applied
+- total_steps: Total generation steps processed
+- detected_patterns: Which stop sequences were detected (PostStopPenalty)
+
+Access via processor.get_stats() for debugging and analysis.
 """
 
 from collections.abc import Iterable

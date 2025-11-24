@@ -505,7 +505,7 @@ class UltimateTrainer:
             key_map = {
                 "batch_size": "batch_size",
                 "gradient_accumulation": "gradient_accumulation",
-                "use_qlora": "use_qlora",
+                "load_in_4bit": "load_in_4bit",
                 "max_length": "max_length"
             }
             for cfg_key, arg_key in key_map.items():
@@ -667,17 +667,17 @@ class UltimateTrainer:
                 model_path = self.args.model
                 print(f"   Loading: {model_path}")
 
-            # Setup quantization config if using QLoRA
+            # Setup quantization config if using 4-bit quantization
             quantization_config = None
-            if getattr(self.args, 'use_qlora', False):
-                print("   🔧 Enabling QLoRA (4-bit quantization)")
+            if getattr(self.args, 'load_in_4bit', False):
+                print("   🔧 Enabling 4-bit quantization")
                 quantization_config = BitsAndBytesConfig(
                     load_in_4bit=True,
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_compute_dtype=torch.bfloat16,
                     bnb_4bit_use_double_quant=True,
                 )
-                print("   ✓ QLoRA config created (4-bit NF4, bfloat16 compute)")
+                print("   ✓ 4-bit quantization config created (NF4, bfloat16 compute)")
 
             # Load model (try Qwen3VL first, then AutoModel, fallback to AutoModelForCausalLM)
             print("   Loading model...")

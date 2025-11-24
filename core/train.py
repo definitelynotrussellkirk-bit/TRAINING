@@ -1326,7 +1326,7 @@ class UltimateTrainer:
                 tf32=True,  # Enable TF32 for matrix math speedups
                 gradient_checkpointing=True,  # MEMORY FIX: Enable to save ~40-50% activation memory
                 optim="adamw_torch_fused",  # Faster than default AdamW
-                dataloader_num_workers=8,  # High workers to feed GPU faster
+                dataloader_num_workers=16,  # INCREASED: Leverage 7950X (32 threads) + DDR5
                 dataloader_pin_memory=True,  # Faster CPU->GPU transfer
                 report_to="none",
                 remove_unused_columns=False,

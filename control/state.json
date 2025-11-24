@@ -1,6 +1,6 @@
 {
   "status": "training",
-  "last_update": "2025-11-24T04:09:43.625340",
+  "last_update": "2025-11-24T05:16:18.979405",
   "current_file": "auto_gen_20251123_192609_count50000.jsonl",
   "paused_at": "2025-11-21T05:13:38.792400",
   "reason": "Recovered from crash"

@@ -1,86 +1,309 @@
 #!/usr/bin/env python3
 """
-Training Control System - Graceful Training Management
+═══════════════════════════════════════════════════════════════════════════════
+MODULE: core/training_controller.py
+═══════════════════════════════════════════════════════════════════════════════
 
-Provides a file-based signaling system for controlling training without killing processes.
-All control operations are graceful - training completes the current batch before acting.
+File-based signaling system for graceful training control without killing processes.
 
-Key Features:
-    - Pause/Resume: Pause after current batch, resume when ready
-    - Stop: Finish current batch, then stop cleanly
-    - Skip: Skip current training file, move to next in queue
-    - Status: Query current training state and active signals
+OVERVIEW
+--------
+Provides a safe way to control training via signal files in control/ directory.
+All control operations are graceful - training completes current batch before acting.
+No process signals (SIGINT/SIGTERM), no race conditions, fully atomic operations.
 
-Usage:
-    # From command line
-    python3 training_controller.py pause --reason "Maintenance"
+FEATURES
+--------
+✓ Pause/Resume - Pause training after current batch, resume when ready
+✓ Stop - Finish current batch, then stop cleanly
+✓ Skip - Skip current file, move to queue/failed/, continue with next
+✓ Status - Query current training state and active signals
+✓ State Tracking - Persistent state in control/state.json
+
+ARCHITECTURE
+------------
+
+    User CLI                 Signal Files              Training Daemon
+    ========                 ============              ===============
+
+    pause                → control/.pause      →     check after batch
+                                                      ↓
+    resume               → control/.resume     →     wait_for_resume()
+                                                      ↓
+    stop                 → control/.stop       →     clean shutdown
+
+    status               ← control/state.json  ←     update_state()
+
+File-Based Communication:
+    - Signal files: .pause, .stop, .skip, .resume (atomic existence checks)
+    - State file: state.json (training daemon writes, CLI reads)
+    - No shared memory, no locks, no race conditions
+
+SIGNAL FILES (control/*.signal)
+-------------------------------
+All signals are files in control/ directory. File existence = signal active.
+
+1. .pause - Pause after current batch completes
+   - Training daemon checks after each batch
+   - When detected, training finishes batch then pauses
+   - File contains: reason + timestamp
+   - Training calls wait_for_resume() to block
+
+2. .stop - Stop after current batch completes
+   - Training finishes current batch then exits cleanly
+   - File contains: reason + timestamp
+   - Training saves checkpoint, cleans up, exits 0
+
+3. .skip - Skip current training file
+   - Moves current file to queue/failed/
+   - Continues with next file in queue
+   - File contains: reason + timestamp
+   - Useful for stuck files or bad data
+
+4. .resume - Resume from paused state
+   - Clears .pause signal
+   - Training continues from where it paused
+   - File is empty (just marker)
+   - Unblocks wait_for_resume()
+
+STATE FILE (control/state.json)
+-------------------------------
+Persistent state written by training daemon, read by CLI:
+
+{
+    "status": "training",              // Current state
+    "last_update": "2025-11-24T10:30:00",  // ISO timestamp
+    "current_file": "data.jsonl",      // File being trained (str or null)
+    "paused_at": "2025-11-24T10:25:00", // When paused (ISO timestamp or null)
+    "reason": "User requested"         // Reason for current state (str or null)
+}
+
+Status Values:
+    - idle: Not training, waiting for files in queue
+    - training: Currently training on a file
+    - paused: Paused by user, waiting for resume
+    - stopping: Finishing current batch, will exit
+    - skipping: Skipping current file, moving to next
+
+State Transitions:
+    idle → training → paused → training (pause/resume cycle)
+    training → stopping → idle (graceful stop)
+    training → skipping → training (skip file)
+
+THREAD SAFETY
+-------------
+✓ Signal file checks are atomic (file.exists() is atomic syscall)
+✓ State file writes are NOT atomic (JSON serialization + write)
+✓ Design assumption: Single training daemon writes, CLI reads
+✓ Multiple CLI processes can safely read state concurrently
+
+Race Condition Prevention:
+    - Signal files: Atomic filesystem operations (touch, unlink)
+    - State file: Single-writer (training daemon only)
+    - No locks needed, no shared memory
+
+EXAMPLE WORKFLOW
+----------------
+
+Pause/Resume Cycle:
+    1. Training is running (status="training")
+    2. User runs: training_controller.py pause --reason "Check logs"
+    3. .pause signal file created with reason + timestamp
+    4. Training completes current batch (e.g., batch 5/100)
+    5. Training checks should_pause_after_batch() → True
+    6. Training calls wait_for_resume()
+       - Writes status="paused" to state.json
+       - Logs: "⏸️ PAUSED - Waiting for resume signal..."
+       - Blocks in 5-second polling loop
+    7. User checks logs, fixes issue
+    8. User runs: training_controller.py resume
+    9. .resume signal created, .pause removed
+    10. wait_for_resume() detects .resume, clears it
+    11. Status becomes "training" again
+    12. Training continues from batch 6/100
+
+Stop Workflow:
+    1. User runs: training_controller.py stop
+    2. .stop signal created
+    3. Training completes current batch
+    4. Training checks should_stop_after_batch() → True
+    5. Training saves checkpoint, cleans up
+    6. Status becomes "idle"
+    7. Process exits with code 0
+
+Skip Workflow:
+    1. File "bad_data.jsonl" causing issues
+    2. User runs: training_controller.py skip --reason "Corrupt data"
+    3. .skip signal created
+    4. Training checks should_skip_current_file() → True
+    5. File moved to queue/failed/bad_data.jsonl
+    6. Training continues with next file in queue
+    7. .skip signal cleared
+
+COMMAND-LINE INTERFACE
+----------------------
+
+Control Commands:
+    python3 training_controller.py pause [--reason "text"]
+        Create pause signal. Training will pause after current batch.
+
     python3 training_controller.py resume
+        Create resume signal. Training will continue from pause.
+
+    python3 training_controller.py stop [--reason "text"]
+        Create stop signal. Training will exit after current batch.
+
+    python3 training_controller.py skip [--reason "text"]
+        Create skip signal. Current file will move to failed/.
+
     python3 training_controller.py status
+        Show current status, signals, and state.
 
-    # From code
-    controller = TrainingController("/path/to/TRAINING")
+    python3 training_controller.py clear
+        Clear all control signals. Emergency reset.
+
+Status Output:
+    ================================================================================
+    TRAINING CONTROL STATUS
+    ================================================================================
+
+    Status: training
+    Last Update: 2025-11-24T10:30:15
+    Current File: data.jsonl
+
+    Active Signals:
+      🔴 pause
+
+    ================================================================================
+
+INTEGRATION WITH TRAINING DAEMON
+---------------------------------
+
+In training loop (core/training_daemon.py):
+
+    controller = TrainingController()
+
+    while True:
+        # Get next file from queue
+        training_file = queue.get_next()
+        controller.set_status("training", current_file=training_file.name)
+
+        # Train for N batches
+        for batch in batches:
+            train_batch(batch)
+
+            # Check signals after each batch
+            if controller.should_stop_after_batch():
+                logger.info("Stop signal received - exiting")
+                controller.clear_stop()
+                return 0  # Clean exit
+
+            if controller.should_pause_after_batch():
+                logger.info("Pause signal received - pausing")
+                controller.wait_for_resume()  # Blocks until resume
+                logger.info("Resumed - continuing training")
+
+            if controller.should_skip_current_file():
+                logger.info(f"Skip signal received - skipping {training_file.name}")
+                move_to_failed(training_file)
+                controller.clear_skip()
+                break  # Move to next file
+
+        controller.set_status("idle")
+
+Key Points:
+    - Check signals AFTER batch completes (graceful)
+    - wait_for_resume() blocks until user resumes
+    - Clear signals after handling them
+    - Update state to inform CLI
+
+PROGRAMMATIC USAGE
+------------------
+
+From Python code:
+
+    from training_controller import TrainingController
+
+    # Initialize
+    controller = TrainingController("/path/to/training")
+
+    # Send signals
     controller.signal_pause("Need to check something")
+    controller.signal_stop("Emergency stop")
+    controller.signal_skip("File is corrupted")
+    controller.signal_resume()
 
-    # In training loop
+    # Check signals (in training loop)
     if controller.should_pause_after_batch():
         controller.wait_for_resume()
 
-Signal Files (control/*.signal)
--------------------------------
-All signals are empty files in control/ directory:
+    # Update state (in training daemon)
+    controller.set_status("training", current_file="data.jsonl")
 
-- .pause: Pause after current batch completes
-  - Training daemon checks this after each batch
-  - When detected, training finishes batch then pauses
-  - File contains: reason + timestamp
+    # Query status (in monitoring)
+    status = controller.get_status()
+    print(f"Status: {status['status']}")
+    print(f"Signals: {status['signals']}")
 
-- .stop: Stop after current batch completes
-  - Training finishes current batch then exits cleanly
-  - File contains: reason + timestamp
+ERROR HANDLING
+--------------
 
-- .skip: Skip current training file
-  - Moves current file to queue/failed/
-  - Continues with next file in queue
-  - File contains: reason + timestamp
+Missing control/ Directory:
+    - Created automatically on TrainingController init
+    - No error if already exists (mkdir_p=True)
 
-- .resume: Resume from paused state
-  - Clears .pause signal
-  - Training continues from where it paused
-  - File is empty (just marker)
+Corrupt state.json:
+    - get_status() returns empty dict on JSON parse error
+    - State file recreated on next set_status() call
 
-State File (control/state.json)
--------------------------------
-Current controller state:
+Stale Signal Files:
+    - No automatic cleanup (by design)
+    - User can run: training_controller.py clear
+    - Or manually: rm control/.pause control/.stop
 
-{
-    "status": "training",  // "idle" | "training" | "paused" | "stopping" | "skipping"
-    "last_update": "2025-11-24T10:30:00",  // ISO timestamp
-    "current_file": "data.jsonl",  // File being trained (str or null)
-    "paused_at": "2025-11-24T10:25:00",  // When paused (ISO timestamp or null)
-    "reason": "User requested"  // Reason for current state (str or null)
-}
+Multiple Resume Signals:
+    - wait_for_resume() clears .resume after detecting it
+    - Additional .resume files ignored (already resumed)
 
-State Transitions:
-    idle → training → paused → training
-    training → stopping → idle
-    training → skipping → training
+GOTCHAS & EDGE CASES
+--------------------
 
-Thread Safety:
-    - Signal files are atomic (file exists or doesn't)
-    - State file writes are NOT atomic (use from single thread)
-    - Safe for training process to read, controller to write
+1. Multiple .pause Signals:
+   - Only one needed (file existence check)
+   - Additional pauses do nothing (already paused)
+   - Resume once to clear pause state
 
-Example Workflow:
-    1. Training is running (status="training")
-    2. User runs: training_controller.py pause
-    3. .pause signal file created
-    4. Training completes current batch
-    5. Training checks should_pause_after_batch() → True
-    6. Training calls wait_for_resume()
-    7. Status becomes "paused"
-    8. User runs: training_controller.py resume
-    9. .resume signal created, .pause removed
-    10. Training continues
+2. Pause During Pause:
+   - No-op (already in paused state)
+   - wait_for_resume() still blocking
+
+3. Stop During Pause:
+   - Stop takes precedence
+   - Training exits immediately (no resume needed)
+
+4. Signal File Permissions:
+   - Must be writable by both CLI and daemon
+   - Usually same user, no issue
+   - If different users, check group permissions
+
+5. State File Lag:
+   - State file written by daemon (periodic updates)
+   - CLI status may show stale data (1-5 second lag)
+   - Not a bug, expected behavior
+
+HISTORY
+-------
+Created: 2025-11-10 - Initial implementation
+Updated: 2025-11-15 - Added skip command
+Updated: 2025-11-20 - Enhanced status display
+
+RELATED MODULES
+---------------
+- core/training_daemon.py - Main training loop (checks signals)
+- core/training_queue.py - Queue management (skip moves files)
+- core/training_status.py - Training progress (different from control state)
+
+═══════════════════════════════════════════════════════════════════════════════
 """
 
 import json

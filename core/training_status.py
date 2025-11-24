@@ -1,29 +1,90 @@
 #!/usr/bin/env python3
 """
-Training Status Tracker - Communication Bridge Between Training and UI
+═══════════════════════════════════════════════════════════════════════════════
+MODULE: core/training_status.py
+═══════════════════════════════════════════════════════════════════════════════
 
-Provides a structured way to write and read training status as JSON files.
-The training process writes status updates, and the UI/monitoring systems
-read these files to display real-time progress.
+Communication bridge between training process and monitoring UI via JSON status files.
 
-Key Components:
-    - TrainingStatus: Dataclass representing complete training state
-    - TrainingStatusWriter: Writes status updates to disk (atomic writes)
-    - TrainingStatusReader: Reads status from disk
+OVERVIEW
+--------
+Provides structured read/write of training progress to status/training_status.json.
+Training daemon writes status updates, web UI/monitoring tools read for real-time display.
+All writes are atomic (temp file + rename) to prevent corruption during concurrent reads.
 
-Usage:
-    writer = TrainingStatusWriter(Path("status/training_status.json"))
+KEY COMPONENTS
+--------------
+1. TrainingStatus - Dataclass representing complete training state (~50 fields)
+2. TrainingStatusWriter - Writes status updates to disk (atomic writes + caching)
+3. TrainingStatusReader - Reads status from disk with error handling
 
-    # During training
-    writer.update_progress(step=100, total_steps=1000, loss=0.45, lr=2e-4)
+ARCHITECTURE
+------------
 
-    # After inference
-    writer.update_inference(step=100, prompt="What is 2+2?",
-                          golden="4", model_output="4", matches=True)
+    Training Process          JSON File                Monitoring UI
+    ================          =========                =============
 
-    # On crash
-    writer.mark_crashed(error="CUDA OOM", error_type="OOM")
+    update_progress()    →    training_status.json  →  Read + display
+    update_inference()   →    (atomic write)        →  Charts/metrics
+    mark_crashed()       →                          →  Alerts
 
+Atomic Writes:
+    1. Write to training_status.tmp
+    2. Rename to training_status.json (atomic operation)
+    3. No partial reads, no corruption
+
+DATA FLOW
+---------
+
+Training Loop → StatusWriter → JSON File → StatusReader → Web UI
+
+1. Training loop calls update_progress() every step:
+   - step, loss, learning_rate, epoch
+   - Preserves last inference data (cached)
+
+2. Periodic inference calls update_inference():
+   - prompt, golden answer, model output, matches
+   - Appends to recent_examples (last 5)
+   - Updates running accuracy stats
+
+3. Advanced collectors call update_advanced_metrics():
+   - Pattern heatmaps, layer activity, LoRA stats
+   - Throughput tracking, alerts, penalties
+   - Validation metrics, confidence calibration
+
+4. Status written atomically to training_status.json
+
+5. Inference details appended to logs/inference_YYYYMMDD.log (daily rotation)
+
+CACHING STRATEGY
+----------------
+Writer maintains internal state between updates to avoid data loss:
+
+1. last_inference_data: Most recent inference result
+   - Preserved across update_progress() calls
+   - Prevents loss of inference data during frequent progress updates
+
+2. recent_examples: Last 5 inference examples
+   - Deduped by (step, current_file, model_output)
+   - Ordered by recency (newest last)
+
+3. pattern_heatmap: Aggregated pattern×length distribution
+   - Updated incrementally as new patterns observed
+   - Persisted across all updates
+
+4. penalty_heatmap: Aggregated logit penalty hits
+   - Tracks penalty system effectiveness
+   - Updated from logit_penalty_stats
+
+5. vram_samples: Last 60 throughput+VRAM measurements
+   - Rolling window for trend analysis
+   - Used by throughput charts
+
+6. pattern_loss_history: Per-pattern loss tracking
+   - Last 50 losses per pattern_id
+   - Enables pattern-specific analysis
+
+TRAINING_STATUS.JSON SCHEMA
 training_status.json Format
 ---------------------------
 Complete JSON schema for the status file:
@@ -147,6 +208,351 @@ Notes:
     - Null values indicate the metric is not currently tracked
     - Timestamps are ISO 8601 format (YYYY-MM-DDTHH:MM:SS)
     - Dict/list fields have variable structure (see specific collectors)
+
+USAGE EXAMPLES
+--------------
+
+Basic Training Loop:
+
+    from pathlib import Path
+    from training_status import TrainingStatusWriter
+
+    writer = TrainingStatusWriter(
+        status_file=Path("status/training_status.json"),
+        max_output_tokens=2048,
+        context_window=4096,
+        model_name="Qwen3-0.6B"
+    )
+
+    # During training
+    for step in range(total_steps):
+        # Update progress every step
+        writer.update_progress(
+            step=step,
+            total_steps=total_steps,
+            epoch=epoch,
+            loss=loss,
+            lr=learning_rate
+        )
+
+        # Periodic inference (every 50 steps)
+        if step % 50 == 0:
+            prompt = validation_set[step % len(validation_set)]
+            model_output = model.generate(prompt)
+
+            writer.update_inference(
+                step=step,
+                total_steps=total_steps,
+                epoch=epoch,
+                loss=loss,
+                lr=learning_rate,
+                prompt=prompt['input'],
+                golden=prompt['expected'],
+                model_output=model_output,
+                matches=(model_output.strip() == prompt['expected'].strip())
+            )
+
+    # On completion
+    writer.mark_completed(final_step=total_steps, total_steps=total_steps)
+
+With Advanced Metrics:
+
+    # Training loop with advanced monitoring
+    for step in range(total_steps):
+        writer.update_progress(
+            step=step,
+            total_steps=total_steps,
+            epoch=epoch,
+            loss=loss,
+            lr=learning_rate,
+            # NEW: Validation metrics
+            val_loss=validation_loss,
+            # NEW: Throughput tracking
+            tokens_per_sec=throughput_tracker.current(),
+            tokens_per_sec_avg=throughput_tracker.average(),
+            tokens_per_sec_baseline=throughput_tracker.baseline,
+            # NEW: Loss stability
+            loss_variance=loss_tracker.variance(),
+            loss_trend=loss_tracker.trend(),  # "improving" | "stable" | "degrading"
+            # NEW: Alerts
+            active_alerts=alert_system.get_active(),
+            alert_summary=alert_system.summary(),
+            # NEW: Logit penalties
+            logit_penalty_stats=penalty_tracker.stats(),
+            penalty_heatmap=penalty_tracker.heatmap()
+        )
+
+Error Handling:
+
+    try:
+        # Training loop
+        train_model()
+    except torch.cuda.OutOfMemoryError as e:
+        writer.mark_crashed(
+            error="CUDA out of memory",
+            error_type="OOM"
+        )
+        raise
+    except Exception as e:
+        writer.mark_crashed(
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise
+
+Reading Status:
+
+    from training_status import TrainingStatusReader
+
+    reader = TrainingStatusReader(Path("status/training_status.json"))
+
+    # Check if training is active
+    if reader.is_training():
+        print("Training in progress")
+
+    # Check for crashes
+    if reader.has_crashed():
+        status = reader.read()
+        print(f"Training crashed: {status.error_message}")
+
+    # Get full status
+    status = reader.read()
+    if status:
+        print(f"Step {status.current_step}/{status.total_steps}")
+        print(f"Loss: {status.loss:.4f}")
+        print(f"Accuracy: {status.accuracy_percent:.1f}%")
+
+KEY METHODS
+-----------
+
+TrainingStatusWriter Methods:
+
+1. update_progress(step, total_steps, epoch, loss, lr, ...)
+   - Called every training step
+   - Updates basic progress metrics
+   - Preserves last inference data (cached)
+   - Fast (~1ms write time)
+
+2. update_inference(step, ..., prompt, golden, model_output, matches)
+   - Called during periodic inference (every N steps)
+   - Updates inference results and accuracy
+   - Appends to recent_examples (last 5)
+   - Appends to daily inference log
+   - Slower (~5ms due to log append)
+
+3. update_advanced_metrics(step, ..., pattern_heatmap, lora_stats, ...)
+   - Called by advanced monitoring collectors
+   - Updates detailed analytics (patterns, LoRA, alerts, etc.)
+   - Optional (training works without this)
+
+4. mark_crashed(error, error_type)
+   - Call on exception to mark training as crashed
+   - Sets status="crashed" with error details
+   - UI displays crash alert
+
+5. mark_completed(final_step, total_steps)
+   - Call when training finishes successfully
+   - Sets status="completed"
+   - UI shows completion message
+
+TrainingStatusReader Methods:
+
+1. read() -> TrainingStatus | None
+   - Read current status from file
+   - Returns None if file doesn't exist
+   - Returns None on JSON parse error
+
+2. is_training() -> bool
+   - Check if training is currently active
+   - Returns status.status == "training"
+
+3. has_crashed() -> bool
+   - Check if last training crashed
+   - Returns status.status == "crashed"
+
+INTEGRATION WITH TRAINING DAEMON
+---------------------------------
+
+In core/train.py (main training script):
+
+    # Initialize status writer
+    status_writer = TrainingStatusWriter(
+        status_file=Path(base_dir) / "status" / "training_status.json",
+        max_output_tokens=2048,
+        context_window=config.max_length,
+        model_name=model_config.name_or_path
+    )
+
+    # Training loop with HuggingFace Trainer
+    class StatusCallback(TrainerCallback):
+        def on_log(self, args, state, control, logs=None, **kwargs):
+            # Called every logging step
+            status_writer.update_progress(
+                step=state.global_step,
+                total_steps=state.max_steps,
+                epoch=state.epoch,
+                loss=logs.get('loss', 0),
+                lr=logs.get('learning_rate', 0)
+            )
+
+        def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+            # Called after validation
+            status_writer.update_progress(
+                step=state.global_step,
+                total_steps=state.max_steps,
+                epoch=state.epoch,
+                loss=logs.get('loss', 0),
+                lr=logs.get('learning_rate', 0),
+                val_loss=metrics.get('eval_loss')
+            )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        callbacks=[StatusCallback()]
+    )
+
+    try:
+        trainer.train()
+        status_writer.mark_completed(
+            final_step=trainer.state.global_step,
+            total_steps=trainer.state.max_steps
+        )
+    except Exception as e:
+        status_writer.mark_crashed(
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise
+
+SIDE EFFECTS & FILE OUTPUTS
+----------------------------
+
+1. status/training_status.json
+   - Main status file (atomic writes)
+   - Updated every training step (~1-5 seconds)
+   - Read by web UI for real-time display
+   - Size: ~10-50KB depending on metrics
+
+2. logs/inference_YYYYMMDD.log
+   - Daily rotating inference log
+   - One JSON line per inference
+   - Appended by update_inference()
+   - Used for historical analysis
+   - Size: ~1-10MB per day
+
+3. logs/pattern_layer_history.jsonl
+   - Pattern×layer correlation log
+   - One JSON line per inference with layer activity
+   - Appended by update_inference() if pattern_metadata provided
+   - Used for pattern analysis
+   - Size: ~1-5MB per day
+
+Directory Creation:
+    - Creates status/ if missing
+    - Creates logs/ if missing
+    - No error if already exists
+
+File Permissions:
+    - Files created with default umask
+    - Readable by all processes (monitoring, UI)
+    - Writable only by training process
+
+THREAD SAFETY
+-------------
+
+Atomic Writes:
+    ✓ Write to .tmp file, then rename (atomic operation)
+    ✓ No partial reads during concurrent access
+    ✓ Safe for multiple readers
+
+Single Writer Assumption:
+    ✗ NOT safe for multiple writers
+    ✗ Design assumption: Only training daemon writes
+    ✗ Multiple writers would cause race conditions
+
+Caching:
+    ✗ Internal caches (last_inference_data, recent_examples) not thread-safe
+    ✗ Must use from single thread (main training thread)
+
+ERROR HANDLING
+--------------
+
+Missing Directories:
+    - status/ and logs/ created automatically
+    - No error if already exists (mkdir_p=True)
+
+Write Errors:
+    - Atomic write prevents corruption
+    - Temp file left behind on failure
+    - Training continues (logging is non-critical)
+
+Read Errors:
+    - Reader returns None on missing file
+    - Reader returns None on JSON parse error
+    - UI handles None gracefully (shows "No training active")
+
+Disk Full:
+    - Write fails silently (try/except in append logs)
+    - Status file write will fail
+    - Training process should handle (not this module's responsibility)
+
+Corrupt JSON:
+    - Reader catches json.JSONDecodeError
+    - Returns None (UI shows error)
+    - Next write creates fresh file
+
+GOTCHAS & EDGE CASES
+--------------------
+
+1. Thinking Emoji Auto-Injection:
+   - _ensure_thinking_instruction() adds emoji instruction to prompts
+   - _ensure_thinking_prefix() adds emoji prefix to outputs
+   - Only applies if not already present
+   - Can be disabled by removing these calls
+
+2. Recent Examples Deduplication:
+   - Deduped by (step, current_file, model_output)
+   - Prevents duplicate entries in UI
+   - Keeps last 5 unique examples
+
+3. Pattern Loss History Window:
+   - Last 50 losses per pattern_id
+   - Older losses automatically dropped
+   - Prevents unbounded memory growth
+
+4. VRAM Samples Window:
+   - Last 60 samples kept
+   - Rolling window for trend analysis
+   - ~1 minute of data at 1 sample/sec
+
+5. Null vs Empty:
+   - null: Metric not tracked (missing data)
+   - empty list/dict: Tracked but no data yet
+   - UI handles both gracefully
+
+6. Status vs State:
+   - training_status.json: Training progress (this module)
+   - control/state.json: Control signals (training_controller.py)
+   - Different files, different purposes
+
+HISTORY
+-------
+Created: 2025-11-05 - Initial implementation
+Updated: 2025-11-10 - Added atomic writes
+Updated: 2025-11-15 - Added validation metrics
+Updated: 2025-11-16 - Added think tag tracking
+Updated: 2025-11-20 - Added advanced metrics
+
+RELATED MODULES
+---------------
+- core/train.py - Main training script (writes status)
+- core/training_controller.py - Control signals (different from status)
+- monitoring/servers/live_monitor.py - Web UI (reads status)
+- monitoring/servers/memory_stats_api.py - Memory API (reads status)
+
+═══════════════════════════════════════════════════════════════════════════════
 """
 
 import json

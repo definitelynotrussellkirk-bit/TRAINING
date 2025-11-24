@@ -2,13 +2,64 @@
 """
 Training Queue Management System
 
-Manages multiple training files with priorities:
-- High priority queue (process first)
-- Normal priority queue (default)
-- Low priority queue (process last)
-- FIFO within each priority level
+This module implements a priority-based file queue system for managing training data files.
+Files are organized into three priority levels (high/normal/low) and processed in FIFO order
+within each priority level. The system prevents race conditions using filesystem-based locking
+and tracks file lifecycle through metadata.
 
-Prevents race conditions and ensures orderly processing.
+Key Components:
+    - TrainingQueue: Main queue manager with priority handling
+    - Priority Queues: Three directories (high/normal/low) for prioritized processing
+    - Processing State: Files move to processing/ during training
+    - Metadata Tracking: JSON-based history of processed/failed/skipped files
+    - Race Condition Prevention: Atomic file moves prevent concurrent processing
+
+Queue Lifecycle:
+    1. Inbox → Queue: Files dropped in inbox/ are moved to priority queue
+    2. Queue → Processing: get_next_file() moves file to processing/
+    3. Processing → Completed: mark_completed() deletes file (or moves to recently_completed/)
+    4. Processing → Failed: mark_failed() moves file to failed/
+    5. Processing → Skipped: mark_skipped() moves file back to original queue
+
+Directory Structure:
+    base_dir/
+        inbox/                      - Drop zone for new .jsonl files
+        queue/
+            high/                   - High priority files (process first)
+            normal/                 - Normal priority files (default)
+            low/                    - Low priority files (process last)
+            processing/             - Currently training file (only 1 at a time)
+            failed/                 - Failed training files (kept for review)
+            recently_completed/     - Recently completed files (optional retention)
+            queue_metadata.json     - History of all processed files
+
+Priority Processing Order:
+    1. high/ → Process all files in FIFO order
+    2. normal/ → Process all files in FIFO order (if high empty)
+    3. low/ → Process all files in FIFO order (if high + normal empty)
+
+Integration Points:
+    - core/training_daemon.py: Main consumer (process_inbox, get_next_file loop)
+    - CLI tools: Direct queue management (add, list, change priority)
+
+Usage:
+    from core.training_queue import TrainingQueue
+
+    # Initialize queue
+    queue = TrainingQueue("/training")
+
+    # Process inbox files into queue
+    count = queue.process_inbox(default_priority="normal")
+
+    # Get next file to train on (by priority)
+    data_file = queue.get_next_file()
+    if data_file:
+        # Train on file...
+        queue.mark_completed(data_file, delete_file=True)
+
+    # Check queue status
+    status = queue.get_queue_status()
+    print(f"Queue: {status['queued']['high']} high, {status['queued']['normal']} normal")
 """
 
 import json
@@ -23,7 +74,84 @@ logger = logging.getLogger(__name__)
 
 
 class TrainingQueue:
-    """Manages training file queue with priorities"""
+    """
+    Priority-based queue manager for training data files.
+
+    Responsibilities:
+        - Scan inbox for new .jsonl training files
+        - Add files to priority queues (high/normal/low)
+        - Process inbox automatically (batch move to queues)
+        - Get next file by priority (high → normal → low, FIFO within level)
+        - Track file lifecycle (queued → processing → completed/failed/skipped)
+        - Prevent race conditions (atomic file moves)
+        - Maintain metadata (history of all processed files)
+        - Support queue inspection (status, list, change priority)
+
+    Data Flow:
+        1. Scan & Add:
+            → scan_inbox() finds .jsonl files in inbox/
+            → add_to_queue() moves file to priority queue (high/normal/low)
+            → File now visible in queue status
+
+        2. Get Next File:
+            → get_next_file() checks high/, then normal/, then low/ (oldest first)
+            → Moves file to processing/ (atomic, prevents concurrent access)
+            → Returns Path to file or None if queue empty
+
+        3. Mark Result:
+            → mark_completed(): Delete file or move to recently_completed/
+            → mark_failed(): Move to failed/ for review
+            → mark_skipped(): Move back to original priority queue
+
+        4. Metadata Update:
+            → All results recorded in queue_metadata.json
+            → Tracks: filename, timestamp, priority, result (completed/failed/skipped)
+
+    Race Condition Prevention:
+        - Atomic file moves: shutil.move() is atomic on same filesystem
+        - Processing lock: Only one file in processing/ at a time
+        - get_next_file() checks processing/ is empty before moving
+        - If crash occurs: processing/ contains orphaned file (daemon recovers on startup)
+
+    Attributes:
+        base_dir: Root directory for training system
+        inbox: Inbox directory (base_dir/inbox)
+        queue_dir: Queue root directory (base_dir/queue)
+        high_priority: High priority queue directory
+        normal_priority: Normal priority queue directory
+        low_priority: Low priority queue directory
+        processing: Processing directory (currently training file)
+        metadata_file: Queue metadata JSON file (base_dir/queue/queue_metadata.json)
+
+    Example:
+        # Initialize queue
+        queue = TrainingQueue("/training")
+
+        # Process inbox → queue
+        count = queue.process_inbox()  # Move all inbox files to normal queue
+        print(f"Added {count} files to queue")
+
+        # Training loop
+        while True:
+            file = queue.get_next_file()
+            if not file:
+                break  # Queue empty
+
+            # Train on file...
+            success = train(file)
+
+            if success:
+                queue.mark_completed(file, delete_file=True)
+            else:
+                queue.mark_failed(file, error="OOM", keep_file=True)
+
+        # Check queue status
+        status = queue.get_queue_status()
+        print(f"Queue: {status['total_queued']} files")
+        print(f"  High: {status['queued']['high']}")
+        print(f"  Normal: {status['queued']['normal']}")
+        print(f"  Low: {status['queued']['low']}")
+    """
 
     def __init__(self, base_dir: str = "/path/to/training"):
         self.base_dir = Path(base_dir)
@@ -127,12 +255,46 @@ class TrainingQueue:
 
     def get_next_file(self) -> Optional[Path]:
         """
-        Get next file to process (FIFO within priority)
+        Get next file to process from priority queues in FIFO order.
 
-        Priority order: high → normal → low
+        This is the core method for priority-based queue processing. It checks
+        queues in priority order (high → normal → low) and returns the oldest
+        file (by modification time) within the highest non-empty priority level.
+
+        Priority Processing Order:
+            1. Check high/ → if files exist, return oldest
+            2. Check normal/ → if files exist and high/ empty, return oldest
+            3. Check low/ → if files exist and high/ + normal/ empty, return oldest
+            4. Return None if all queues empty
+
+        Race Condition Prevention:
+            - Atomic move: shutil.move() to processing/ prevents concurrent access
+            - Single file in processing/: Only one file can be in processing/ at a time
+            - Daemon checks processing/ is empty before calling get_next_file()
 
         Returns:
-            Path to next file, or None if queue is empty
+            Path to file in processing/ directory if queue not empty, None otherwise.
+            File is moved from priority queue to processing/ before returning.
+
+        Side Effects:
+            - Moves file from priority queue (high/normal/low/) to processing/
+            - Logs which file and priority queue it came from
+
+        Example:
+            queue = TrainingQueue("/training")
+
+            # Get next file (by priority)
+            file = queue.get_next_file()
+            if file:
+                print(f"Training on: {file.name}")
+                # file is now in processing/
+            else:
+                print("Queue empty")
+
+        Crash Recovery:
+            If daemon crashes while processing a file, the file remains in processing/.
+            On restart, daemon should move orphaned files back to their original queue
+            or to failed/ for manual review.
         """
         # Check high priority first
         for priority_dir in [self.high_priority, self.normal_priority, self.low_priority]:

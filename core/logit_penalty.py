@@ -1,9 +1,57 @@
 #!/usr/bin/env python3
 """
-Logit penalties for discouraging unwanted tokens (e.g., <think> tags).
+Logit Penalty System - Control token generation during inference.
 
-Provides utilities to build a logits processor list that subtracts a fixed
-penalty from specified token IDs during generation.
+Provides LogitsProcessor implementations that modify generation probabilities
+to discourage unwanted tokens (<think> tags, premature EOS) and enforce
+stop signal behavior.
+
+Key Components:
+    - TokenLogitPenalty: Penalize specific tokens with optional schedules
+    - PostStopPenalty: Penalize all tokens after stop emoji sequences
+    - build_think_penalty_processor(): Factory for <think> tag penalties
+    - build_eos_penalty_processor(): Factory for EOS token penalties
+    - build_post_stop_penalty_processor(): Factory for post-stop penalties
+
+Penalty Schedule Format:
+    Schedules control how penalties change over generation steps.
+
+    Format: List of dicts with "steps" and "multiplier" keys:
+        [
+            {"steps": 4, "multiplier": 8.0},   # First 4 steps: penalty * 8.0
+            {"steps": 4, "multiplier": 2.0},   # Next 4 steps: penalty * 2.0
+            {"steps": 4, "multiplier": 1.5},   # Next 4 steps: penalty * 1.5
+            # After step 12: penalty * 1.0 (no multiplier)
+        ]
+
+    - "steps": int, number of generation steps for this window
+    - "multiplier": float >= 1.0, penalty multiplier for this window
+    - Windows apply sequentially (cumulative step counting)
+    - After all windows complete, multiplier defaults to 1.0
+
+Usage:
+    from core.logit_penalty import build_think_penalty_processor
+
+    # Basic penalty
+    processors = build_think_penalty_processor(tokenizer, penalty=80.0)
+
+    # With schedule (strong early, taper off)
+    schedule = [
+        {"steps": 4, "multiplier": 8.0},
+        {"steps": 4, "multiplier": 2.0},
+    ]
+    processors = build_think_penalty_processor(
+        tokenizer,
+        penalty=80.0,
+        schedule=schedule
+    )
+
+    # Use with generation
+    outputs = model.generate(
+        input_ids,
+        logits_processor=processors,
+        max_new_tokens=100
+    )
 """
 
 from collections.abc import Iterable
@@ -13,6 +61,11 @@ import torch
 from transformers import LogitsProcessor, LogitsProcessorList
 
 
+# Default penalty schedule: Strong early penalties that taper off
+# Steps 0-3:   penalty * 8.0 (very strong)
+# Steps 4-7:   penalty * 2.0 (moderate)
+# Steps 8-11:  penalty * 1.5 (mild)
+# Steps 12+:   penalty * 1.0 (baseline)
 DEFAULT_PENALTY_SCHEDULE = [
     {"steps": 4, "multiplier": 8.0},
     {"steps": 4, "multiplier": 2.0},
@@ -21,11 +74,54 @@ DEFAULT_PENALTY_SCHEDULE = [
 
 
 class PostStopPenalty(LogitsProcessor):
-    """Penalize tokens after stop emoji sequences with escalating penalties.
+    """
+    Penalize all tokens after stop emoji sequences with exponentially escalating penalties.
 
-    Supports variable stop emojis and counts (2-4 repetitions).
-    Optionally rewards EOT tokens to encourage proper response termination.
-    Supports configurable EOT sequences for forward compatibility.
+    Detects stop emoji sequences (e.g., "🛑🛑", "✓✓✓") and applies growing penalties
+    to all subsequent tokens except EOT (end-of-turn). Forces model to end generation
+    cleanly after stop signals rather than continuing to produce text.
+
+    Responsibilities:
+        - Detect stop emoji sequences in generated tokens
+        - Apply exponentially increasing penalties after stop detected
+        - Exempt EOT tokens from penalties (+ optional reward boost)
+        - Track statistics (hits, steps, detected patterns)
+
+    Penalty Formula:
+        penalty = base_penalty * (escalation_rate ^ tokens_after_stop)
+
+        Example (base=5.0, rate=2.0):
+            Token 1 after stop: 5.0 * (2.0^1) = 10.0
+            Token 2 after stop: 5.0 * (2.0^2) = 20.0
+            Token 3 after stop: 5.0 * (2.0^3) = 40.0
+            ...exponentially growing
+
+    Attributes:
+        base_penalty: Starting penalty value
+        escalation_rate: Exponential growth rate (e.g., 2.0 = double each step)
+        eot_reward: Extra reward for EOT tokens (on top of penalty exemption)
+        stop_count_min: Minimum emoji repetitions to detect (default: 2)
+        stop_count_max: Maximum emoji repetitions to detect (default: 4)
+        stop_emoji_pool: List of stop emojis (default: ["🛑"])
+        stop_sequences: Dict mapping (emoji, count) → token IDs
+        eot_ids: Set of EOT token IDs to exempt
+        stop_seen: bool, whether stop sequence detected yet
+        tokens_after_stop: int, count of tokens generated after stop
+        detected_emoji: str, which emoji was detected (or None)
+        detected_count: int, how many repetitions detected (or None)
+
+    Example:
+        >>> penalty = PostStopPenalty(
+        ...     tokenizer,
+        ...     stop_emoji_pool=["🛑", "✓"],
+        ...     stop_count_min=2,
+        ...     stop_count_max=3,
+        ...     base_penalty=5.0,
+        ...     escalation_rate=2.0,
+        ...     eot_reward=5.0
+        ... )
+        >>> processors = LogitsProcessorList([penalty])
+        >>> outputs = model.generate(inputs, logits_processor=processors)
     """
 
     def __init__(
@@ -40,6 +136,24 @@ class PostStopPenalty(LogitsProcessor):
         eot_sequence: Optional[str] = None,
         label: Optional[str] = None,
     ):
+        """
+        Initialize post-stop penalty processor.
+
+        Args:
+            tokenizer: HuggingFace tokenizer for encoding stop sequences
+            stop_emoji_pool: List of stop emojis to detect (default: ["🛑"])
+            stop_count_min: Minimum repetitions to detect (default: 2)
+            stop_count_max: Maximum repetitions to detect (default: 4)
+            base_penalty: Starting penalty value (default: 5.0)
+            escalation_rate: Exponential growth rate (default: 2.0)
+            eot_reward: Extra reward for EOT tokens (default: 0.0)
+            eot_sequence: Custom EOT sequence (e.g., "<|end|>"). If None, uses tokenizer.eos_token_id
+            label: Optional label for stats tracking (default: "post_stop")
+
+        Side Effects:
+            - Tokenizes all (emoji, count) combinations to build stop_sequences dict
+            - Validates EOT token IDs are within vocab bounds
+        """
         self.base_penalty = float(base_penalty)
         self.escalation_rate = float(escalation_rate)
         self.eot_reward = float(eot_reward)
@@ -152,7 +266,60 @@ class PostStopPenalty(LogitsProcessor):
 
 
 class TokenLogitPenalty(LogitsProcessor):
-    """Penalty processor with optional boosted prefix windows."""
+    """
+    Penalize specific token IDs with optional time-varying schedules.
+
+    Subtracts a fixed penalty from specified token logits during generation.
+    Supports two modes for time-varying penalties:
+    1. Prefix window: Higher penalty for first N steps, then baseline
+    2. Schedule: Multiple windows with different multipliers (more flexible)
+
+    Use this for discouraging specific tokens like <think>, </s>, or any
+    unwanted tokens throughout generation.
+
+    Responsibilities:
+        - Apply constant or time-varying penalties to specified tokens
+        - Track generation steps and adjust multiplier based on schedule
+        - Collect statistics (hit count, steps, penalties applied)
+
+    Attributes:
+        token_ids: Tuple of token IDs to penalize (sorted, deduplicated)
+        penalty: Base penalty value to subtract from logits
+        prefix_steps: Number of initial steps for prefix mode
+        prefix_multiplier: Multiplier for prefix window (≥1.0)
+        schedule: Optional list of {"steps": int, "multiplier": float} dicts
+        generated_steps: Counter for generation steps
+        hit_count: Counter for how many times penalty was applied
+        label: Optional label for stats tracking
+
+    Example (prefix mode):
+        >>> # Strong penalty for first 10 steps, then baseline
+        >>> penalty = TokenLogitPenalty(
+        ...     token_ids=[think_token_id],
+        ...     penalty=80.0,
+        ...     prefix_steps=10,
+        ...     prefix_multiplier=4.0
+        ... )
+        >>> # Steps 0-9:  penalty * 4.0 = 320.0
+        >>> # Steps 10+:  penalty * 1.0 = 80.0
+
+    Example (schedule mode):
+        >>> # Tapering penalty: strong → moderate → mild
+        >>> schedule = [
+        ...     {"steps": 4, "multiplier": 8.0},
+        ...     {"steps": 4, "multiplier": 2.0},
+        ...     {"steps": 4, "multiplier": 1.5},
+        ... ]
+        >>> penalty = TokenLogitPenalty(
+        ...     token_ids=[eos_id],
+        ...     penalty=80.0,
+        ...     schedule=schedule
+        ... )
+        >>> # Steps 0-3:   penalty * 8.0 = 640.0
+        >>> # Steps 4-7:   penalty * 2.0 = 160.0
+        >>> # Steps 8-11:  penalty * 1.5 = 120.0
+        >>> # Steps 12+:   penalty * 1.0 = 80.0
+    """
 
     def __init__(
         self,
@@ -163,6 +330,25 @@ class TokenLogitPenalty(LogitsProcessor):
         schedule: Sequence[dict] | None = None,
         label: Optional[str] = None,
     ):
+        """
+        Initialize token penalty processor.
+
+        Args:
+            token_ids: Sequence of token IDs to penalize
+            penalty: Base penalty value (default: 5.0). Must be non-negative.
+            prefix_steps: Number of steps for prefix mode (default: 0, disabled)
+            prefix_multiplier: Multiplier for prefix window (default: 1.0). Must be ≥1.0.
+            schedule: Optional penalty schedule (overrides prefix mode if provided).
+                Format: [{"steps": int, "multiplier": float >= 1.0}, ...]
+            label: Optional label for stats tracking (default: "penalty")
+
+        Raises:
+            ValueError: If penalty < 0
+
+        Side Effects:
+            - Normalizes schedule (validates steps > 0, multiplier ≥ 1.0)
+            - Deduplicates and sorts token_ids
+        """
         if penalty < 0:
             raise ValueError("penalty must be non-negative")
 

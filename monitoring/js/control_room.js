@@ -117,26 +117,32 @@ function startPolling() {
  * Render live training status
  */
 function renderLiveStatus(data) {
-    // Status badge
-    const statusBadge = document.getElementById('statusBadge');
-    statusBadge.textContent = data.status.toUpperCase();
-    statusBadge.className = `status-badge status-${data.status}`;
+    try {
+        // Status badge
+        const statusBadge = document.getElementById('statusBadge');
+        statusBadge.textContent = data.status.toUpperCase();
+        statusBadge.className = `status-badge status-${data.status}`;
 
-    // Model info
-    document.getElementById('modelName').textContent = data.current_model_name || '-';
-    document.getElementById('checkpointId').textContent = data.current_checkpoint_id || '-';
+        // Model info
+        document.getElementById('modelName').textContent = data.current_model_name || '-';
+        document.getElementById('checkpointId').textContent = data.current_checkpoint_id || '-';
 
-    // Progress bar
-    const progress = data.total_steps > 0 ? (data.current_step / data.total_steps) * 100 : 0;
-    document.getElementById('progressFill').style.width = `${progress}%`;
-    document.getElementById('progressText').textContent =
-        `Step ${data.current_step.toLocaleString()} / ${data.total_steps.toLocaleString()} (${progress.toFixed(1)}%)`;
-    document.getElementById('epochText').textContent = `Epoch ${data.epoch.toFixed(1)}`;
+        // Progress bar
+        const progress = data.total_steps > 0 ? (data.current_step / data.total_steps) * 100 : 0;
+        document.getElementById('progressFill').style.width = `${progress}%`;
+        document.getElementById('progressText').textContent =
+            `Step ${data.current_step.toLocaleString()} / ${data.total_steps.toLocaleString()} (${progress.toFixed(1)}%)`;
+        document.getElementById('epochText').textContent = `Epoch ${data.epoch.toFixed(1)}`;
 
-    // Health indicators
-    updateHealthIndicator('healthLoss', data.loss_trend);
-    updateHealthIndicator('healthThroughput', data.throughput_trend);
-    updateHealthIndicator('healthGPU', data.gpu_4090.temp_c > 80 ? 'critical' : 'good');
+        // Health indicators
+        updateHealthIndicator('healthLoss', data.loss_trend);
+        updateHealthIndicator('healthThroughput', data.throughput_trend);
+        updateHealthIndicator('healthGPU', data.gpu_4090.temp_c > 80 ? 'critical' : 'good');
+    } catch (error) {
+        console.error('Error in status/progress section:', error);
+    }
+
+    try {
 
     // Training progress card
     document.getElementById('stepValue').textContent =
@@ -170,7 +176,11 @@ function renderLiveStatus(data) {
     document.getElementById('tokensPerSec').textContent = data.tokens_per_sec.toLocaleString();
     document.getElementById('tokensPerSecAvg').textContent = data.tokens_per_sec_avg.toLocaleString();
     document.getElementById('tokensPerSecBaseline').textContent = data.tokens_per_sec_baseline.toLocaleString();
+    } catch (error) {
+        console.error('Error in loss/throughput section:', error);
+    }
 
+    try {
     // Queue & current file
     document.getElementById('currentFile').textContent = data.current_file || '-';
     document.getElementById('batchProgress').textContent = `${data.batch_step} / ${data.batch_total_steps}`;
@@ -183,7 +193,11 @@ function renderLiveStatus(data) {
 
     document.getElementById('etaFile').textContent = data.eta_current_file || '-';
     document.getElementById('etaAll').textContent = data.eta_overall || '-';
+    } catch (error) {
+        console.error('Error in queue section:', error);
+    }
 
+    try {
     // Hardware - 4090
     const gpu4090 = data.gpu_4090;
     const temp4090 = document.getElementById('gpu4090Temp');
@@ -230,6 +244,9 @@ function renderLiveStatus(data) {
 
     // Update loss chart
     updateLossChart(data.loss);
+    } catch (error) {
+        console.error('Error in hardware/chart section:', error);
+    }
 }
 
 /**
@@ -269,21 +286,29 @@ function renderPreviewStatus(data) {
  * Render latest preview
  */
 function renderLatestPreview(preview) {
+    // Get first result from results array
+    if (!preview.results || preview.results.length === 0) {
+        document.getElementById('previewContent').innerHTML =
+            '<div class="preview-empty">No preview results available</div>';
+        return;
+    }
+
+    const result = preview.results[0];
+    const em_rate = preview.metrics.exact_match_rate;
+
     const html = `
         <div class="preview-meta">
-            <div class="preview-tag">Step ${preview.step}</div>
-            <div class="preview-tag">${preview.checkpoint_id}</div>
-            <div class="preview-tag">${preview.example_id}</div>
-            <div class="preview-tag regime">${preview.regime}</div>
-            <div class="preview-tag source">${preview.source_pool}</div>
+            <div class="preview-tag">Step ${preview.training_step}</div>
+            <div class="preview-tag">${preview.checkpoint_id || 'Training'}</div>
+            <div class="preview-tag">${result.puzzle_id}</div>
+            <div class="preview-tag regime">${result.difficulty}</div>
+            <div class="preview-tag">EM: ${(em_rate * 100).toFixed(0)}%</div>
         </div>
 
         <div class="preview-outcome">
-            <div class="outcome-badge ${preview.exact_match ? 'outcome-match' : 'outcome-no-match'}">
-                ${preview.exact_match ? '✓ Exact Match' : '✗ No Match'}
+            <div class="outcome-badge ${result.exact_match ? 'outcome-match' : 'outcome-no-match'}">
+                ${result.exact_match ? '✓ Exact Match' : '✗ No Match'}
             </div>
-            ${preview.failure_mode ?
-                `<div class="outcome-badge outcome-contract">Failure: ${preview.failure_mode}</div>` : ''}
         </div>
 
         <div class="preview-section">
@@ -291,15 +316,15 @@ function renderLatestPreview(preview) {
                 <div class="preview-section-title">Prompt</div>
                 <div>▼</div>
             </div>
-            <div class="preview-section-content">${escapeHtml(preview.prompt)}</div>
+            <div class="preview-section-content">${escapeHtml(result.prompt)}</div>
         </div>
 
         <div class="preview-section">
             <div class="preview-section-header" onclick="togglePreviewSection(this)">
-                <div class="preview-section-title">Golden Answer</div>
+                <div class="preview-section-title">Expected Answer</div>
                 <div>▼</div>
             </div>
-            <div class="preview-section-content">${escapeHtml(preview.golden)}</div>
+            <div class="preview-section-content">${escapeHtml(result.expected)}</div>
         </div>
 
         <div class="preview-section">
@@ -307,21 +332,21 @@ function renderLatestPreview(preview) {
                 <div class="preview-section-title">Model Answer</div>
                 <div>▼</div>
             </div>
-            <div class="preview-section-content ${preview.exact_match ? '' : 'outcome-no-match'}">${escapeHtml(preview.model_answer)}</div>
+            <div class="preview-section-content ${result.exact_match ? '' : 'outcome-no-match'}">${escapeHtml(result.generated)}</div>
         </div>
 
         <div class="preview-metrics">
             <div class="preview-metric">
-                <div class="preview-metric-label">Cross-Entropy</div>
-                <div class="preview-metric-value">${preview.ce !== null ? preview.ce.toFixed(3) : '-'}</div>
+                <div class="preview-metric-label">Samples Tested</div>
+                <div class="preview-metric-value">${preview.metrics.samples_tested}</div>
             </div>
             <div class="preview-metric">
-                <div class="preview-metric-label">Tokens</div>
-                <div class="preview-metric-value">${preview.prompt_tokens} → ${preview.model_tokens}</div>
+                <div class="preview-metric-label">EM Rate</div>
+                <div class="preview-metric-value">${(em_rate * 100).toFixed(1)}%</div>
             </div>
             <div class="preview-metric">
-                <div class="preview-metric-label">Gen Time</div>
-                <div class="preview-metric-value">${preview.generation_time_ms}ms</div>
+                <div class="preview-metric-label">Avg Time</div>
+                <div class="preview-metric-value">${preview.metrics.avg_inference_time_ms.toFixed(0)}ms</div>
             </div>
         </div>
     `;
@@ -441,7 +466,7 @@ async function loadPreviewHistory() {
             if (!value) params.delete(key);
         }
 
-        const response = await fetch(`/api/preview/history?${params}`);
+        const response = await fetch(`/api/status/preview?${params}`);
         const data = await response.json();
 
         renderPreviewHistoryTable(data.previews);

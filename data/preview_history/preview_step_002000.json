@@ -1,0 +1,21 @@
+{
+  "training_step": 2000,
+  "checkpoint_id": null,
+  "timestamp": "2025-11-23T15:28:35.105180",
+  "metrics": {
+    "exact_match_rate": 0.0,
+    "avg_inference_time_ms": 30.596494674682617,
+    "samples_tested": 1
+  },
+  "results": [
+    {
+      "puzzle_id": "syllo_train_00017",
+      "difficulty": "hard",
+      "prompt": "SYLLO Puzzle syllo_train_00017\nYou must recover every hidden word by assigning syllable tiles to definitions.\nDifficulty: Hard (see notes for overlap/red herrings).\nRules:\n- 8 target words (always bet...",
+      "expected": "{\"solutions\": [{\"ans_num\": 1, \"syllables\": [\"au\", \"thor\", \"i\", \"ty\"], \"answer\": \"AUTHORITY\"}, {\"ans_num\": 2, \"syllables\": [\"uni\", \"ver\", \"si\", \"ty\"], \"answer\": \"UNIVERSITY\"}, {\"ans_num\": 3, \"syllables\": [\"in\", \"ves\", \"ti\", \"ga\", \"tion\"], \"answer\": \"INVESTIGATION\"}, {\"ans_num\": 4, \"syllables\": [\"com\", \"mu\", \"ni\", \"ca\", \"tion\"], \"answer\": \"COMMUNICATION\"}, {\"ans_num\": 5, \"syllables\": [\"ab\", \"so\", \"lute\", \"ly\"], \"answer\": \"ABSOLUTELY\"}, {\"ans_num\": 6, \"syllables\": [\"im\", \"me\", \"di\", \"ate\", \"ly\"], \"answer\": \"IMMEDIATELY\"}, {\"ans_num\": 7, \"syllables\": [\"in\", \"ter\", \"est\", \"ed\"], \"answer\": \"INTERESTED\"}, {\"ans_num\": 8, \"syllables\": [\"ac\", \"tu\", \"al\", \"ly\"], \"answer\": \"ACTUALLY\"}], \"inventory_check\": {\"total_tiles\": 38, \"usage\": {\"tion\": 2, \"ver\": 1, \"ly\": 3, \"ty\": 2, \"si\": 1, \"ga\": 1, \"ves\": 1, \"ni\": 1, \"ti\": 1, \"cludes\": 1, \"lute\": 1, \"ab\": 1, \"au\": 1, \"in\": 2, \"com\": 1, \"ed\": 1, \"est\": 1, \"ate\": 1, \"me\": 1, \"ern\": 1, \"thor\": 1, \"al\": 1, \"so\": 1, \"tu\": 1, \"uni\": 1, \"ter\": 1, \"di\": 1, \"i\": 1, \"im\": 1, \"ca\": 1, \"ac\": 1, \"mu\": 1, \"reg\": 1}, \"used\": {\"au\": 1, \"thor\": 1, \"i\": 1, \"ty\": 2, \"uni\": 1, \"ver\": 1, \"si\": 1, \"in\": 2, \"ves\": 1, \"ti\": 1, \"ga\": 1, \"tion\": 2, \"com\": 1, \"mu\": 1, \"ni\": 1, \"ca\": 1, \"ab\": 1, \"so\": 1, \"lute\": 1, \"ly\": 3, \"im\": 1, \"me\": 1, \"di\": 1, \"ate\": 1, \"ter\": 1, \"est\": 1, \"ed\": 1, \"ac\": 1, \"tu\": 1, \"al\": 1}, \"unused_tiles\": [\"cludes\", \"ern\", \"reg\"], \"status\": \"All target words completed; red herrings unused: cludes, ern, reg.\"}}",
+      "generated": "[Job queued - implement GPU worker to get actual response]",
+      "exact_match": false,
+      "inference_time_ms": 30.596494674682617
+    }
+  ]
+}

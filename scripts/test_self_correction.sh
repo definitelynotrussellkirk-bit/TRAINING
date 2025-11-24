@@ -1,61 +1,46 @@
 #!/bin/bash
-# Quick test of the self-correction pipeline
+#
+# Test Self-Correction Loop with sample data
+# Creates test examples and runs through the pipeline
+#
 
 set -e
 
-echo "==================================="
-echo "Self-Correction Pipeline Test"
-echo "==================================="
-echo
+TRAINING_DIR="/path/to/training"
+cd "$TRAINING_DIR"
 
-# Create test dataset
-cat > /tmp/test_qa.jsonl <<EOF
-{"prompt": "What is 5 × 7?", "response": "5 × 7 = 35. This is calculated by multiplying 5 by 7."}
-{"prompt": "Name the four cardinal directions.", "response": "The four cardinal directions are:\n1. North\n2. South\n3. East\n4. West"}
-{"prompt": "What is the boiling point of water?", "response": "The boiling point of water is 100°C (212°F) at standard atmospheric pressure."}
-EOF
+echo "================================================================================"
+echo "🧪 TESTING SELF-CORRECTION LOOP"
+echo "================================================================================"
+echo ""
 
-echo "✓ Created test dataset (3 Q&A pairs)"
-echo
+# Create test data
+echo "1️⃣  Creating test data..."
+cat > /tmp/test_corrections.jsonl << 'TESTEOF'
+{"input": "All cats are mammals. Fluffy is a cat. Therefore, Fluffy is a mammal.", "output": "valid"}
+{"input": "All cats are mammals. Fluffy is not a cat. Therefore, Fluffy is not a mammal.", "output": "invalid"}
+{"input": "If it rains, the ground is wet. The ground is wet. Therefore, it rained.", "output": "invalid"}
+{"input": "All dogs bark. Rex is a dog. Therefore, Rex barks.", "output": "valid"}
+{"input": "Some birds can fly. Penguins are birds. Therefore, penguins can fly.", "output": "invalid"}
+TESTEOF
 
-# Option 1: Demo mode (no model required)
-echo "Running demo mode (no model inference)..."
-echo
-python3 demo_self_correction.py | head -100
-echo
-echo "... (output truncated)"
-echo
+echo "   ✅ Created 5 test examples"
+echo ""
 
-# Option 2: Test error codes
-echo "==================================="
-echo "Testing Error Code Generation"
-echo "==================================="
-echo
-python3 self_correction_trainer.py --test-error-codes
+# Run test
+echo "2️⃣  Running self-correction pipeline..."
+python3 monitoring/self_correction_loop.py \
+    --file /tmp/test_corrections.jsonl \
+    2>&1 | head -100
 
-echo
-echo "==================================="
-echo "Test Complete!"
-echo "==================================="
-echo
-echo "To use on real data:"
-echo "  1. Generate initial answers:"
-echo "     python3 generate_initial_answers.py \\"
-echo "       --input your_qa.jsonl \\"
-echo "       --output initial_answers.jsonl \\"
-echo "       --model current_model/"
-echo
-echo "  2. Generate training data:"
-echo "     python3 self_correction_trainer.py \\"
-echo "       --input your_qa.jsonl \\"
-echo "       --output training_data.jsonl \\"
-echo "       --initial-answers initial_answers.jsonl"
-echo
-echo "  3. Train:"
-echo "     cp training_data.jsonl inbox/"
-echo
-
-# Cleanup
-rm -f /tmp/test_qa.jsonl
-
-echo "See SELF_CORRECTION_GUIDE.md for full documentation."
+echo ""
+echo "================================================================================"
+echo "✅ TEST COMPLETE"
+echo "================================================================================"
+echo ""
+echo "Check outputs:"
+echo "   - Corrections: queue/corrections/"
+echo "   - Error patterns: logs/error_patterns/"
+echo "   - Validated: queue/normal/"
+echo ""
+echo "================================================================================"

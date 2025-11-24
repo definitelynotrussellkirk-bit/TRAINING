@@ -1,9 +1,9 @@
 {
-  "model_name": "qwen2.5_0.5b",
-  "model_display_name": "PURE BASE - Qwen2.5-0.5B (2025-11-22)",
+  "model_name": "qwen3_0.6b",
+  "model_display_name": "PURE BASE - Qwen3-0.6B (2025-11-22)",
   "model_path": "/path/to/training/models/Qwen3-0.6B",
   "current_model_dir": "/path/to/training/current_model",
-  "batch_size": 4,
+  "batch_size": 1,
   "gradient_accumulation": 1,
   "learning_rate": 0.0004,
   "warmup_steps": 100,
@@ -12,12 +12,12 @@
   "lora_alpha": 0,
   "use_qlora": false,
   "log_steps": 200,
-  "eval_steps": 50,
-  "num_eval_samples": 4,
+  "eval_steps": 500,
+  "num_eval_samples": 2,
   "save_steps": 1000,
   "poll_interval": 30,
   "snapshot_time": "03:00",
-  "max_length": 4096,
+  "max_length": 2048,
   "base_model": "/path/to/training/models/Qwen3-0.6B",
   "eval_max_tokens": 4096,
   "eval_timeout_seconds": 120,
@@ -29,7 +29,7 @@
   },
   "auto_generate": {
     "enabled": true,
-    "host": "127.0.0.1",
+    "host": "192.168.x.x",
     "port": 8765,
     "count": 100000,
     "priority": "normal",
@@ -38,13 +38,34 @@
     "cooldown_sec": 180,
     "payload": {}
   },
+  "remote_eval": {
+    "enabled": true,
+    "host": "192.168.x.x",
+    "port": 8765,
+    "remote_user": "user",
+    "remote_models_dir": "/path/to/models",
+    "eval_dataset": "data/validation/eval_dataset.jsonl",
+    "eval_interval_steps": 5000,
+    "sync_checkpoints": true,
+    "metrics": ["accuracy", "loss"]
+  },
+  "curriculum": {
+    "enabled": true,
+    "target_accuracy": 0.75,
+    "current_skill": "syllo",
+    "progression_mode": "automatic"
+  },
 
   "_comment_refactor": "New fields for refactored architecture (2025-11-22)",
   "profile": {
     "name": "emoji_think"
   },
   "hyperparams": {
-    "fp_precision": "bf16"
+    "fp_precision": "bf16",
+    "max_length": 2048,
+    "batch_size": 1,
+    "gradient_accumulation": 1,
+    "learning_rate": 0.0004
   },
   "locked": {
     "base_model": "Qwen/Qwen3-0.6B",

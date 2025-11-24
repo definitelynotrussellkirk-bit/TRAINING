@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Render</title>
+    <style>
+        body { font-family: monospace; background: #111; color: #0f0; padding: 20px; }
+        pre { background: #000; padding: 10px; border: 1px solid #0f0; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        #gpu4090Temp, #gpu4090VRAM, #gpu4090Util, #gpu4090Power { color: #ff0; }
+    </style>
+</head>
+<body>
+    <h1>Test JavaScript Rendering</h1>
+    <h2>GPU Data (from JavaScript):</h2>
+    <div>Temp: <span id="gpu4090Temp">-</span></div>
+    <div>VRAM: <span id="gpu4090VRAM">-</span></div>
+    <div>Util: <span id="gpu4090Util">-</span></div>
+    <div>Power: <span id="gpu4090Power">-</span></div>
+
+    <h2>Debug Log:</h2>
+    <pre id="debugLog">Loading...</pre>
+
+    <script>
+    async function testRender() {
+        const log = document.getElementById('debugLog');
+        try {
+            log.textContent = '1. Fetching /api/status/live...\n';
+
+            const response = await fetch('/api/status/live');
+            log.textContent += `2. Response: ${response.status}\n`;
+
+            const data = await response.json();
+            log.textContent += `3. Data received\n`;
+            log.textContent += `4. tokens_per_sec: ${data.tokens_per_sec} (${typeof data.tokens_per_sec})\n`;
+            log.textContent += `5. loss_trend: ${data.loss_trend} (${typeof data.loss_trend})\n`;
+            log.textContent += `6. gpu_4090: ${JSON.stringify(data.gpu_4090)}\n`;
+
+            // Simulate the exact code from control_room.js line 170-172
+            log.textContent += '7. Calling toLocaleString()...\n';
+            const tps = data.tokens_per_sec.toLocaleString();
+            log.textContent += `8. tokens_per_sec.toLocaleString() = ${tps} ✓\n`;
+
+            // Simulate line 188-200
+            log.textContent += '9. Rendering GPU section...\n';
+            const gpu4090 = data.gpu_4090;
+
+            document.getElementById('gpu4090Temp').textContent = `${gpu4090.temp_c}°C`;
+            document.getElementById('gpu4090VRAM').textContent =
+                `${gpu4090.vram_used_gb.toFixed(1)} / ${gpu4090.vram_total_gb.toFixed(0)} GB`;
+            document.getElementById('gpu4090Util').textContent = `${gpu4090.util_pct}%`;
+            document.getElementById('gpu4090Power').textContent =
+                `${gpu4090.power_w} / ${gpu4090.power_limit_w} W`;
+
+            log.textContent += '10. GPU rendering complete ✓\n';
+            log.textContent += '11. SUCCESS - All rendering worked!\n';
+
+        } catch (error) {
+            log.textContent += `\nERROR: ${error.message}\n${error.stack}`;
+            log.className = 'error';
+        }
+    }
+
+    testRender();
+    setInterval(testRender, 5000);
+    </script>
+</body>
+</html>

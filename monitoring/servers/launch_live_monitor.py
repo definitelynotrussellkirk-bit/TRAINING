@@ -11,9 +11,72 @@ import socketserver
 from pathlib import Path
 import subprocess
 import json
+import threading
+import time
+from urllib import request, error as urllib_error
 
 PORT = 8080
-DIRECTORY = Path(__file__).parent
+DIRECTORY = Path(__file__).parent.parent.parent  # Serve from project root
+
+# Global cache for 3090 data
+GPU_3090_CACHE = {
+    'online': False,
+    'temp_c': 0,
+    'vram_used_gb': 0.0,
+    'vram_total_gb': 24.0,
+    'vram_pct': 0,
+    'power_profile': None,
+    'last_update': None,
+    'utilization_gpu': 0,
+    'power_draw_w': 0,
+    'power_limit_w': 350
+}
+
+def poll_3090_gpu():
+    """Background thread to poll 3090 API every 10 seconds"""
+    REMOTE_API = "http://192.168.x.x:8765"
+
+    print("  ✓ 3090 GPU polling thread started")
+
+    while True:
+        try:
+            # Health check
+            health_req = request.Request(f"{REMOTE_API}/health", method='GET')
+            with request.urlopen(health_req, timeout=5) as resp:
+                health = json.loads(resp.read().decode())
+
+            # GPU stats
+            gpu_req = request.Request(f"{REMOTE_API}/gpu", method='GET')
+            with request.urlopen(gpu_req, timeout=5) as resp:
+                gpu = json.loads(resp.read().decode())
+
+            # Power profile
+            power_req = request.Request(f"{REMOTE_API}/settings/power_profile", method='GET')
+            with request.urlopen(power_req, timeout=5) as resp:
+                power = json.loads(resp.read().decode())
+
+            # Update cache
+            GPU_3090_CACHE.update({
+                'online': health.get('status') == 'ok',
+                'temp_c': gpu.get('temperature_gpu', 0),
+                'vram_used_gb': gpu.get('memory_used_mb', 0) / 1024,
+                'vram_total_gb': gpu.get('memory_total_mb', 24576) / 1024,
+                'vram_pct': int((gpu.get('memory_used_mb', 0) / gpu.get('memory_total_mb', 24576)) * 100) if gpu.get('memory_total_mb', 24576) > 0 else 0,
+                'power_profile': power.get('current', 'unknown'),
+                'utilization_gpu': gpu.get('utilization_gpu', 0),
+                'power_draw_w': int(gpu.get('power_draw_w', 0)),
+                'power_limit_w': int(gpu.get('power_limit_w', 350)),
+                'last_update': time.time()
+            })
+
+        except Exception as e:
+            # Mark offline on error
+            GPU_3090_CACHE['online'] = False
+            # Don't spam errors, just update once per minute when offline
+            if int(time.time()) % 60 == 0:
+                print(f"  ⚠ 3090 poll error: {e}")
+
+        time.sleep(10)  # Poll every 10 seconds
 
 class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -33,6 +96,179 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         return content_type
 
     def do_GET(self):
+        # Serve live status endpoint
+        if self.path.startswith('/api/status/live'):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            try:
+                status_file = DIRECTORY / 'status' / 'training_status.json'
+
+                # Get GPU stats
+                gpu_result = subprocess.run([
+                    'nvidia-smi',
+                    '--query-gpu=temperature.gpu,utilization.gpu,memory.used,memory.total,power.draw,power.limit',
+                    '--format=csv,noheader,nounits'
+                ], capture_output=True, text=True, timeout=5)
+
+                gpu_stats = {'temp_c': 0, 'util_pct': 0, 'vram_used_gb': 0, 'vram_total_gb': 24, 'vram_pct': 0, 'power_w': 0, 'power_limit_w': 450}
+                if gpu_result.returncode == 0:
+                    parts = [p.strip() for p in gpu_result.stdout.split(',')]
+                    gpu_stats = {
+                        'temp_c': int(float(parts[0])),
+                        'util_pct': int(float(parts[1])),
+                        'vram_used_gb': float(parts[2]) / 1024,
+                        'vram_total_gb': float(parts[3]) / 1024,
+                        'vram_pct': int((float(parts[2]) / float(parts[3])) * 100),
+                        'power_w': int(float(parts[4])),
+                        'power_limit_w': int(float(parts[5]))
+                    }
+
+                # Get RAM stats
+                import psutil
+                mem = psutil.virtual_memory()
+                ram_stats = {
+                    'used_gb': mem.used / (1024**3),
+                    'total_gb': mem.total / (1024**3)
+                }
+
+                # Load training status
+                status_data = {}
+                if status_file.exists():
+                    with open(status_file, 'r') as f:
+                        status_data = json.load(f)
+
+                response = {
+                    'status': status_data.get('status', 'idle'),
+                    'current_step': status_data.get('current_step', 0),
+                    'total_steps': status_data.get('total_steps', 0),
+                    'epoch': status_data.get('epoch', 0.0),
+                    'loss': status_data.get('loss', 0.0),
+                    'streaming_ce': status_data.get('streaming_ce'),
+                    'loss_variance': status_data.get('loss_variance', 0.0),
+                    'val_train_gap': status_data.get('val_train_gap'),
+                    'val_loss': status_data.get('val_loss'),
+                    'train_loss': status_data.get('train_loss'),
+                    'loss_trend': status_data.get('loss_trend', 'stable'),
+                    'throughput_trend': status_data.get('throughput_trend', 'stable'),
+                    'tokens_per_sec': status_data.get('tokens_per_sec', 0),
+                    'tokens_per_sec_avg': status_data.get('tokens_per_sec_avg', 0),
+                    'tokens_per_sec_baseline': status_data.get('tokens_per_sec_baseline', 0),
+                    'current_model_name': status_data.get('model_name', '-'),
+                    'current_checkpoint_id': status_data.get('checkpoint_id', '-'),
+                    'current_file': status_data.get('current_file', '-'),
+                    'batch_step': status_data.get('batch_idx', 0),
+                    'batch_total_steps': status_data.get('total_batches', 0),
+                    'batch_queue_size': status_data.get('queue_size', 0),
+                    'eta_current_file': status_data.get('eta_current_file'),
+                    'eta_overall': status_data.get('eta_overall'),
+                    'gpu_4090': gpu_stats,
+                    'gpu_3090': GPU_3090_CACHE.copy(),
+                    'ram': ram_stats
+                }
+
+                self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                self.wfile.write(json.dumps({"error": str(e)}).encode())
+            return
+
+        # Serve preview status endpoint
+        if self.path.startswith('/api/status/preview'):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            try:
+                # Load latest preview from file
+                latest_preview_file = DIRECTORY / 'status' / 'latest_preview.json'
+                latest_preview = None
+                if latest_preview_file.exists():
+                    with open(latest_preview_file, 'r') as f:
+                        latest_preview = json.load(f)
+
+                # Load preview history for trends
+                preview_history_dir = DIRECTORY / 'data' / 'preview_history'
+                em_trend = []
+                if preview_history_dir.exists():
+                    history_files = sorted(preview_history_dir.glob('preview_step_*.json'))[-20:]
+                    for file in history_files:
+                        with open(file, 'r') as f:
+                            data = json.load(f)
+                            em_trend.append({
+                                'step': data['training_step'],
+                                'em_rate': data['metrics']['exact_match_rate'],
+                                'timestamp': data['timestamp']
+                            })
+
+                # Calculate rolling averages
+                all_em = [p['em_rate'] for p in em_trend]
+                em_last_20 = sum(all_em[-20:]) / len(all_em[-20:]) if len(all_em) >= 1 else 0.0
+                em_last_50 = sum(all_em[-50:]) / len(all_em[-50:]) if len(all_em) >= 1 else 0.0
+
+                response = {
+                    'latest_preview': latest_preview,
+                    'preview_em_last_20': em_last_20,
+                    'preview_em_last_50': em_last_50,
+                    'em_trend': em_trend
+                }
+                self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                self.wfile.write(json.dumps({"error": str(e)}).encode())
+            return
+
+        # Serve evals status endpoint
+        if self.path.startswith('/api/status/evals'):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            try:
+                response = {
+                    'fixed_eval_em': None,
+                    'fixed_eval_ce': None,
+                    'fixed_eval_ece': None,
+                    'snapshots': []
+                }
+                self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                self.wfile.write(json.dumps({"error": str(e)}).encode())
+            return
+
+        # Serve queue health endpoint
+        if self.path.startswith('/api/status/queue_health'):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            try:
+                import sys
+                sys.path.insert(0, str(DIRECTORY / 'monitoring'))
+                from queue_health import QueueHealthMonitor
+
+                monitor = QueueHealthMonitor(base_dir=DIRECTORY)
+                health = monitor.analyze_queue_health()
+                self.wfile.write(json.dumps(health).encode())
+            except Exception as e:
+                self.wfile.write(json.dumps({"error": str(e)}).encode())
+            return
+
+        # Serve system status endpoint
+        if self.path.startswith('/api/status/system'):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            try:
+                import psutil
+                disk = psutil.disk_usage('/')
+
+                response = {
+                    'system_4090': {
+                        'disk_used_gb': disk.used / (1024**3),
+                        'disk_total_gb': disk.total / (1024**3)
+                    }
+                }
+                self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                self.wfile.write(json.dumps({"error": str(e)}).encode())
+            return
+
         # Serve config endpoint
         if self.path.startswith('/api/config'):
             self.send_response(200)
@@ -324,6 +560,12 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
 def main():
+    socketserver.TCPServer.allow_reuse_address = True
+
+    # Start 3090 polling thread before starting server
+    poller_thread = threading.Thread(target=poll_3090_gpu, daemon=True)
+    poller_thread.start()
+
     with socketserver.TCPServer(("", PORT), MyHTTPRequestHandler) as httpd:
         print(f"""
 ╔══════════════════════════════════════════════════════════╗
@@ -331,10 +573,13 @@ def main():
 ╠══════════════════════════════════════════════════════════╣
 ║                                                          ║
 ║  Open in your browser:                                   ║
-║  http://localhost:{PORT}/live_monitor_ui.html               ║
+║  http://localhost:{PORT}/monitoring/ui/control_room_v2.html ║
 ║                                                          ║
 ║  This page will auto-refresh every 2 seconds             ║
 ║  showing current training progress.                      ║
+║                                                          ║
+║  RTX 3090 remote monitoring: ENABLED                     ║
+║  Polling interval: 10 seconds                            ║
 ║                                                          ║
 ║  Press Ctrl+C to stop the server                         ║
 ║                                                          ║

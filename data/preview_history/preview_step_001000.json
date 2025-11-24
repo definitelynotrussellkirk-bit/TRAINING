@@ -1,0 +1,21 @@
+{
+  "training_step": 1000,
+  "checkpoint_id": null,
+  "timestamp": "2025-11-23T15:26:18.664343",
+  "metrics": {
+    "exact_match_rate": 0.0,
+    "avg_inference_time_ms": 27.29487419128418,
+    "samples_tested": 1
+  },
+  "results": [
+    {
+      "puzzle_id": "syllo_train_00002",
+      "difficulty": "easy",
+      "prompt": "SYLLO Puzzle syllo_train_00002\nYou must recover every hidden word by assigning syllable tiles to definitions.\nDifficulty: Easy (see notes for overlap/red herrings).\nRules:\n- 5 target words (always bet...",
+      "expected": "{\"solutions\": [{\"ans_num\": 1, \"syllables\": [\"ac\", \"cept\", \"ed\"], \"answer\": \"ACCEPTED\"}, {\"ans_num\": 2, \"syllables\": [\"ra\", \"dio\"], \"answer\": \"RADIO\"}, {\"ans_num\": 3, \"syllables\": [\"re\", \"view\"], \"answer\": \"REVIEW\"}, {\"ans_num\": 4, \"syllables\": [\"sub\", \"ject\"], \"answer\": \"SUBJECT\"}, {\"ans_num\": 5, \"syllables\": [\"pa\", \"tients\"], \"answer\": \"PATIENTS\"}], \"inventory_check\": {\"total_tiles\": 11, \"usage\": {\"ra\": 1, \"tients\": 1, \"sub\": 1, \"ject\": 1, \"ac\": 1, \"view\": 1, \"re\": 1, \"cept\": 1, \"ed\": 1, \"dio\": 1, \"pa\": 1}, \"used\": {\"ac\": 1, \"cept\": 1, \"ed\": 1, \"ra\": 1, \"dio\": 1, \"re\": 1, \"view\": 1, \"sub\": 1, \"ject\": 1, \"pa\": 1, \"tients\": 1}, \"unused_tiles\": [], \"status\": \"All syllable tiles accounted for exactly once.\"}}",
+      "generated": "[Job queued - implement GPU worker to get actual response]",
+      "exact_match": false,
+      "inference_time_ms": 27.29487419128418
+    }
+  ]
+}

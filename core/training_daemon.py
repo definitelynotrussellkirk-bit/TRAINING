@@ -36,16 +36,22 @@ from datetime import datetime, timedelta
 import logging
 from urllib import request, error
 
+# Add paths
+sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "management"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
+
 # Checkpoint retention
 from checkpoint_retention import enforce_retention
-
-# Add ultimate_trainer to path
-sys.path.insert(0, str(Path(__file__).parent))
 
 from train import UltimateTrainer
 from training_queue import TrainingQueue
 from training_controller import TrainingController
 from atomic_ops import write_json_atomic, safe_file_operation
+
+# Data Manager (for auto-generation with quality testing)
+sys.path.insert(0, str(Path(__file__).parent.parent / "data_manager"))
+from data_manager import DataManager
 
 # Add format variety support
 import random
@@ -106,6 +112,9 @@ class TrainingDaemon:
         # Initialize queue and control systems
         self.queue = TrainingQueue(str(self.base_dir))
         self.controller = TrainingController(str(self.base_dir))
+
+        # Initialize Data Manager (handles auto-generation + quality testing)
+        self.data_manager = DataManager(self.base_dir, self.config)
 
         # Checkpoint retention tracking
         self.last_retention_check = 0
@@ -238,10 +247,11 @@ class TrainingDaemon:
                 errors.append(f"Gradient accumulation out of range (1-128): {ga}")
 
         # Check LoRA rank (if specified)
+        # lora_r=0 means full model training (no LoRA)
         if 'lora_r' in config:
             lora_r = config['lora_r']
-            if not (lora_r > 0 and lora_r <= 1024):
-                errors.append(f"LoRA rank out of range (1-1024): {lora_r}")
+            if not (lora_r >= 0 and lora_r <= 1024):
+                errors.append(f"LoRA rank out of range (0-1024): {lora_r}")
 
         auto_cfg = config.get("auto_generate", {}) or {}
         if auto_cfg.get("enabled"):
@@ -755,12 +765,27 @@ class TrainingDaemon:
             self.logger.error("   Fix config or data, then try again")
             return False
 
-        # Create args for UltimateTrainer
+        # Create minimal args for UltimateTrainer
+        # TrainerConfig will load hyperparams from config.json
         class Args:
             pass
 
         args = Args()
+
+        # Routing info only (where to read/write)
         args.dataset = str(data_file)
+        args.output_dir = str(self.current_model_dir)
+
+        # Point to config.json for TrainerConfig to load hyperparams
+        args.config = str(self.config_file)
+
+        # Validate current_model directory
+        def is_valid_model_dir(path):
+            """Check if directory contains required HF model files."""
+            if not path.exists():
+                return False
+            required = ["config.json", "tokenizer.json"]
+            return all((path / f).exists() for f in required)
 
         # Determine which model to use
         if (self.current_model_dir / "adapter_config.json").exists():
@@ -770,35 +795,38 @@ class TrainingDaemon:
         else:
             # Start fresh from base model
             args.model = self.config.get("model_path") or self.config["model_name"]
-            self.logger.info(f"Starting fresh training from: {args.model}")
-            # Initialize current_model_dir from base if empty
-            if not self.current_model_dir.exists() or not any(self.current_model_dir.iterdir()):
-                self.logger.info("Current model dir empty; copying base model for throughput resume safety")
+
+            # Initialize current_model_dir from base if invalid/empty
+            if not is_valid_model_dir(self.current_model_dir):
+                if self.current_model_dir.exists():
+                    self.logger.warning("Current model dir incomplete/corrupt; will replace with fresh copy")
+                    shutil.rmtree(self.current_model_dir)
+
+                self.logger.info(f"Copying base model from: {args.model}")
                 shutil.copytree(args.model, self.current_model_dir, dirs_exist_ok=True)
+                self.logger.info(f"✅ Model copied to: {self.current_model_dir}")
+            else:
+                self.logger.info(f"Using existing model: {self.current_model_dir}")
 
-        args.output_dir = str(self.current_model_dir)
+            args.model = str(self.current_model_dir)
 
-        # Training params from config
-        args.epochs = 1  # ALWAYS 1 EPOCH
-        args.batch_size = self.config["batch_size"]
-        args.gradient_accumulation = self.config["gradient_accumulation"]
-        args.learning_rate = self.config["learning_rate"]
-        args.warmup_steps = self.config["warmup_steps"]
-        args.lora_r = self.config["lora_r"]
-        args.lora_alpha = self.config["lora_alpha"]
-        args.log_steps = self.config.get("log_steps", 10)  # Default to 10 if not in config
-        args.eval_steps = self.config["eval_steps"]
-        args.num_eval_samples = self.config["num_eval_samples"]
-        args.save_steps = self.config["save_steps"]
-        args.use_qlora = self.config.get("use_qlora", False)
-        args.max_length = self.config.get("max_length")
-
-        # Skip validation (assume data is pre-validated)
-        args.skip_validation = True
+        # These are daemon-specific overrides (not hyperparams)
+        args.epochs = 1  # ALWAYS 1 EPOCH (daemon trains 1 epoch per file)
+        args.skip_validation = True  # Assume data is pre-validated
         args.yes = True  # No prompts
         args.system_prompt = "You are a helpful assistant."
 
-        # Batch context (NEW: for progress tracking)
+        # Control/routing params (not hyperparams, needed by trainer logic)
+        args.warmup_steps = self.config.get("warmup_steps", 100)
+        args.log_steps = self.config.get("log_steps", 10)
+        args.eval_steps = self.config.get("eval_steps", 500)
+        args.save_steps = self.config.get("save_steps", 1000)
+        args.num_eval_samples = self.config.get("num_eval_samples", 2)
+        args.lora_r = self.config.get("lora_r", 0)
+        args.lora_alpha = self.config.get("lora_alpha", 0)
+        args.use_qlora = self.config.get("use_qlora", False)
+
+        # Batch context for progress tracking
         args.current_file = data_file.name
         args.batch_number = batch_number
         args.batch_queue_size = batch_queue_size
@@ -1201,231 +1229,32 @@ class TrainingDaemon:
             self.release_lock()
 
     def maybe_auto_generate(self, queue_status: dict):
-        auto_cfg = self.config.get("auto_generate", {}) or {}
-        if not auto_cfg.get("enabled"):
-            return
+        """
+        Auto-generate training data using Data Manager
 
-        threshold = auto_cfg.get("threshold", 0)
-        if queue_status.get("total_queued", 0) > threshold:
-            return
-        if queue_status.get("processing", 0) > 0:
-            return
-        if self.get_inbox_files():
-            return
-
-        cooldown = auto_cfg.get("cooldown_sec", 120)
-        now = time.time()
-        if now - self.last_autogen_time < cooldown:
-            return
-
+        Data Manager handles:
+        - Remote GPU communication (192.168.x.x:8765)
+        - Quality testing (5 test suites)
+        - Queue management
+        - Cooldown tracking
+        """
         try:
-            puzzles = self.fetch_autogen_puzzles(auto_cfg)
-            entries = self.convert_puzzles_to_training(puzzles)
-            if not entries:
-                self.logger.warning("Auto-generate: API returned no puzzles")
-                return
+            # Data Manager handles all checks internally
+            success = self.data_manager.generate_and_queue(force=False)
 
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"syllo_autogen_{timestamp}_count{len(entries)}.jsonl"
-            inbox_path = self.inbox_dir / filename
-            self.write_training_file(inbox_path, entries)
+            if success:
+                self.logger.info("🤖 Data Manager: Successfully generated, tested, and queued new batch")
 
-            priority = auto_cfg.get("priority", "normal")
-            self.queue.add_to_queue(inbox_path, priority)
-            self.logger.info(f"🤖 Auto-generated {len(entries)} puzzles via API and queued {filename}")
         except Exception as e:
-            self.logger.error(f"Auto-generation failed: {e}")
-        finally:
-            self.last_autogen_time = now
+            self.logger.error(f"Data Manager auto-generation failed: {e}")
+            self.logger.debug(traceback.format_exc())
 
-    def fetch_autogen_puzzles(self, auto_cfg: dict):
-        host = auto_cfg.get("host", "127.0.0.1")
-        port = auto_cfg.get("port", 8080)
-        url = f"http://{host}:{port}/generate"
-
-        payload = {
-            "count": auto_cfg.get("count", 1000)
-        }
-        if auto_cfg.get("seed") is not None:
-            payload["seed"] = auto_cfg["seed"]
-        extra = auto_cfg.get("payload") or {}
-        payload.update(extra)
-
-        data = json.dumps(payload).encode("utf-8")
-        headers = {"Content-Type": "application/json"}
-        req = request.Request(url, data=data, headers=headers, method="POST")
-
-        try:
-            with request.urlopen(req, timeout=300) as resp:
-                body = resp.read().decode("utf-8")
-        except error.URLError as exc:
-            raise RuntimeError(f"API request failed: {exc}") from exc
-
-        parsed = json.loads(body)
-        if isinstance(parsed, dict):
-            if "puzzles" in parsed:
-                puzzles = parsed["puzzles"]
-            elif "examples" in parsed:
-                puzzles = parsed["examples"]
-            else:
-                puzzles = parsed.get("data", [])
-        else:
-            puzzles = parsed
-
-        if not puzzles:
-            raise RuntimeError("API response contained no puzzles")
-        return puzzles
-
-    def convert_puzzles_to_training(self, puzzles):
-        entries = []
-        for puzzle in puzzles:
-            # Choose format variant
-            variant_key = choose_output_variant(self.format_rng, DEFAULT_OUTPUT_VARIANT_DISTRIBUTION)
-
-            # Build base payload
-            base_payload = self.build_assistant_payload(puzzle)
-
-            # Apply format transformation
-            transform = OUTPUT_VARIANTS[variant_key]["transform"]
-            assistant_payload = transform(base_payload)
-
-            # Convert to JSON string
-            assistant_text = json.dumps(assistant_payload, ensure_ascii=False)
-
-            # Build user prompt with variant note
-            user_prompt = self.build_user_prompt(puzzle, variant_key)
-
-            entry = {
-                "messages": [
-                    {"role": "user", "content": user_prompt},
-                    {"role": "assistant", "content": assistant_text}
-                ],
-                "metadata": {
-                    "dataset": "syllo_api_autogen",
-                    "puzzle_id": puzzle.get("puzzle_id"),
-                    "word_count": len(puzzle.get("words", [])),
-                    "syllable_bank_size": len(puzzle.get("syllable_bank", [])),
-                    "rules": puzzle.get("rules", {}),
-                    "output_variant": variant_key
-                }
-            }
-            entries.append(entry)
-        return entries
-
-    def build_user_prompt(self, puzzle: dict, variant_key: str = "standard") -> str:
-        puzzle_id = puzzle.get("puzzle_id", "syllo_autogen")
-        rules = puzzle.get("rules", {})
-        difficulty = rules.get("difficulty", "Unknown")
-        word_count = rules.get("word_count", len(puzzle.get("words", [])))
-        syllable_bank = puzzle.get("syllable_bank", [])
-        total_tiles = len(syllable_bank)
-        total_needed = sum(len(word.get("syllables", [])) for word in puzzle.get("words", []))
-        red_herring_count = max(0, total_tiles - total_needed)
-        notes = rules.get("notes", "")
-
-        lines = [
-            f"SYLLO Puzzle {puzzle_id}",
-            "You must recover every hidden word by assigning syllable tiles to definitions.",
-            f"Difficulty: {difficulty}",
-            "Rules:",
-            f"- {word_count} target words (always between 4 and 8).",
-            "- Each word lists its syllable count via blank slots.",
-            "- Syllable tiles may repeat across clues when the bank includes duplicates.",
-            "- Return your answers as JSON with keys `solutions` and `inventory_check`.",
-            "",
-            "Word slots:"
-        ]
-
-        for idx, word in enumerate(puzzle.get("words", []), 1):
-            blanks = " ".join(["___"] * word.get("syllable_count", len(word.get("syllables", []))))
-            clue = word.get("definition") or ", ".join(word.get("available_hints", [])[:1]) or word.get("label", "Unknown clue")
-            lines.append(f"{idx}. {blanks} — {clue}")
-
-        note_line = "Note: "
-        if red_herring_count > 0:
-            note_line += f"{red_herring_count} tile(s) in the bank are red herrings and do not belong to any answer."
-        else:
-            note_line += "All tiles belong to some answer."
-        if notes:
-            note_line += f" {notes}"
-        lines.extend(["", note_line, "", "Syllable bank (shuffled):", " | ".join(syllable_bank), ""])
-        # Get variant-specific format note
-        variant = OUTPUT_VARIANTS.get(variant_key, OUTPUT_VARIANTS.get("standard", {}))
-        variant_note = variant.get("prompt_note", "")
-
-        lines.extend([
-            "Output contract:",
-            "- Return a single JSON object.",
-            "- Top-level keys: `solutions` (array) and `inventory_check` (object).",
-            "- Each `solutions` entry contains `ans_num` (1-indexed clue number),",
-            "  the ordered `syllables` you used, and the final UPPERCASE `answer`.",
-            "- `inventory_check` must include `total_tiles`, a `usage` map of tile→count,",
-            "  the `used` counts per tile, and a short `status` string.",
-            "- If red herrings exist, include them under `inventory_check.unused_tiles`.",
-            "Do not include literal JSON examples or commentary outside the payload."
-        ])
-
-        # Add variant-specific format instruction
-        if variant_note:
-            lines.append(variant_note)
-
-        return "\n".join(lines)
-
-    def build_assistant_payload(self, puzzle: dict) -> dict:
-        from collections import Counter
-
-        words = puzzle.get("words", [])
-        syllable_bank = puzzle.get("syllable_bank", [])
-        solutions = []
-        used_counter = Counter()
-        for idx, word in enumerate(words, 1):
-            syllables = word.get("syllables", [])
-            used_counter.update(syllables)
-            solutions.append({
-                "ans_num": idx,
-                "syllables": syllables,
-                "answer": word.get("label", "").upper()
-            })
-
-        bank_counter = Counter(syllable_bank)
-        unused_tiles = []
-        for tile, count in bank_counter.items():
-            unused = count - used_counter.get(tile, 0)
-            if unused > 0:
-                unused_tiles.extend([tile] * unused)
-
-        usage_map = dict(bank_counter)
-        used_map = {tile: used_counter.get(tile, 0) for tile in bank_counter if used_counter.get(tile, 0)}
-        if unused_tiles:
-            status = "All target words completed; red herrings unused: " + ", ".join(sorted(set(unused_tiles))) + "."
-        else:
-            status = "All target words completed; no unused tiles."
-
-        analysis = {
-            "word_count": len(words),
-            "unused_tile_count": len(set(unused_tiles)),
-            "unused_tiles": sorted(set(unused_tiles)),
-            "tile_usage_span": [[tile, used_counter.get(tile, 0)] for tile in sorted(bank_counter.keys())]
-        }
-
-        return {
-            "solutions": solutions,
-            "inventory_check": {
-                "total_tiles": len(syllable_bank),
-                "usage": usage_map,
-                "used": used_map,
-                "unused_tiles": sorted(set(unused_tiles)),
-                "status": status
-            },
-            "analysis": analysis
-        }
-
-    def write_training_file(self, path: Path, entries):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w", encoding="utf-8") as fh:
-            for entry in entries:
-                fh.write(json.dumps(entry, ensure_ascii=False))
-                fh.write("\n")
+    # OLD METHODS REMOVED - Now handled by Data Manager
+    # - fetch_autogen_puzzles() → RemoteGPUClient.generate_data()
+    # - convert_puzzles_to_training() → Remote server returns training format
+    # - build_user_prompt() → Remote server generates prompts
+    # - build_assistant_payload() → Remote server generates payloads
+    # - write_training_file() → DataManager.queue_data()
 
 
 def main():

@@ -453,3 +453,90 @@ python3 tools/data/validate_data.py --file my_data.jsonl
 - **Architecture decision:** Pure training module - all inference on remote RTX 3090
 - Added REMOTE_INFERENCE.md for remote server operations
 - System state: Fresh start, daemon not running, 3 files stuck in queue
+
+---
+
+## 🤖 AUTONOMOUS SYSTEMS (NEW - 2025-11-23)
+
+**10 Intelligent Systems Running 24/7**
+
+### RTX 3090 Systems (7 monitoring & intelligence)
+
+1. **Curriculum Optimizer** - `monitoring/curriculum_optimizer.py`
+   - A/B tests curriculum strategies every 5 minutes
+   - Auto-adjusts difficulty progression
+   - Output: `status/curriculum_optimization.json`
+
+2. **Adversarial Miner** - `monitoring/adversarial_miner.py`
+   - Mines hard examples from model failures
+   - Creates targeted training data
+   - Output: `data/adversarial_examples/*.jsonl`
+
+3. **Regression Monitor** - `monitoring/continuous_regression_monitor.py`
+   - Detects bad checkpoints (>15% loss increase)
+   - Runs every 5 minutes
+   - Output: `status/regression_monitoring.json`
+
+4. **Model Comparison Engine** - `monitoring/model_comparison_engine.py`
+   - Ranks checkpoints by composite score
+   - Runs every 10 minutes
+   - Output: `status/model_comparisons.json`
+
+5. **Confidence Calibrator** - `monitoring/confidence_calibrator.py`
+   - Calibrates prediction confidence
+   - 6 confidence bins
+   - Output: `status/confidence_calibration.json`
+
+6. **Self-Correction Loop** - `monitoring/self_correction_loop.py`
+   - Validates data quality
+   - Captures & analyzes errors
+   - Generates correction examples
+   - Output: `queue/corrections/*.jsonl`, `logs/error_patterns/*.json`
+
+7. **Automated Testing Daemon** - `monitoring/automated_testing_daemon.py`
+   - Runs fixed validation suite against checkpoints
+   - Calculates accuracy by difficulty
+   - Detects regressions
+   - Output: `status/automated_testing.json`
+
+### RTX 4090 Systems (2 automation)
+
+8. **Data Generation Automation** - `monitoring/data_generation_automation.py`
+   - Auto-generates when queue < 2 files
+   - Uses curriculum-optimized difficulty
+   - Never runs out of data
+
+9. **Checkpoint Auto-Deployment** - `monitoring/checkpoint_auto_deployment.py`
+   - Auto-deploys best checkpoint to 3090
+   - Based on model comparison rankings
+   - Runs every 10 minutes
+
+### Verify All Systems
+
+```bash
+# Check 3090 systems (should show 7)
+ssh 192.168.x.x "ps aux | grep python3 | grep monitoring | wc -l"
+
+# Check 4090 systems (should show 2)
+ps aux | grep python3 | grep monitoring | wc -l
+
+# View system status
+cat status/*.json | jq .
+
+# Monitor logs
+tail -f logs/curriculum_optimizer.log
+tail -f logs/self_correction.log
+tail -f logs/automated_testing.log
+```
+
+### System Outputs
+
+All systems write to `status/*.json` files:
+- `curriculum_optimization.json` - Best curriculum strategy
+- `adversarial_mining.json` - Hard examples found
+- `regression_monitoring.json` - Regression alerts
+- `model_comparisons.json` - Checkpoint rankings
+- `confidence_calibration.json` - Confidence bins
+- `automated_testing.json` - Validation results
+- `last_deployment.json` - Latest checkpoint deployed
+

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>API Test</h1>
+    <pre id="output">Loading...</pre>
+
+    <script>
+    async function test() {
+        try {
+            const response = await fetch('/api/status/live');
+            const data = await response.json();
+            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        } catch (error) {
+            document.getElementById('output').textContent = 'ERROR: ' + error.message;
+        }
+    }
+    test();
+    </script>
+</body>
+</html>

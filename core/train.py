@@ -87,6 +87,15 @@ from trainer.config import ConfigLoader, TrainerConfig, create_default_config
 from trainer.profiles import get_profile
 # NOTE: trainer.monitoring.TrainingStatusWriter exists but we use core/training_status.py for now (backward compat)
 
+# Import Data Manager for remote eval
+sys.path.insert(0, str(Path(__file__).parent.parent / "data_manager"))
+try:
+    from remote_evaluator import RemoteEvaluator
+    REMOTE_EVAL_AVAILABLE = True
+except ImportError:
+    REMOTE_EVAL_AVAILABLE = False
+    RemoteEvaluator = None
+
 # Thinking emoji pool - each example gets a RANDOM emoji and count
 THINKING_EMOJIS = [
     "🤔",  # Classic thinking
@@ -171,6 +180,10 @@ except ImportError:
         def notify(self, *args, **kwargs): pass
         def notify_success(self, *args, **kwargs): pass
         def notify_error(self, *args, **kwargs): pass
+        # Added no-op handlers to avoid crashes when optional notifier is absent
+        def training_complete(self, *args, **kwargs): pass
+        def training_crashed(self, *args, **kwargs): pass
+        def oom_error(self, *args, **kwargs): pass
 
 
 class UltimateTrainer:
@@ -206,11 +219,16 @@ class UltimateTrainer:
 
         # Create status writer with config values (or fallback to defaults)
         max_output_tokens = 2048  # Default
-        context_window = getattr(args, 'max_length', 2048)  # Default
+        context_window = 2048  # Default
 
-        if self.config and self.config.monitoring:
-            max_output_tokens = self.config.monitoring.max_output_tokens
-            context_window = self.config.hyperparams.max_length
+        if self.config:
+            if self.config.monitoring:
+                max_output_tokens = self.config.monitoring.max_output_tokens
+            if self.config.hyperparams:
+                context_window = self.config.hyperparams.max_length
+        else:
+            # Fallback to args if config unavailable
+            context_window = getattr(args, 'max_length', 2048)
 
         self.status_writer = TrainingStatusWriter(
             DEFAULT_STATUS_FILE,
@@ -223,6 +241,12 @@ class UltimateTrainer:
         self.logits_processor = None  # Optional logit penalties for generation
         self.training_summary: Dict[str, Any] | None = None
         self.layer_monitor: LayerMonitor | None = None
+
+    def _get_hyperparam(self, name: str, default=None):
+        """Get hyperparam from config (preferred) or args (fallback)."""
+        if self.config and hasattr(self.config, 'hyperparams'):
+            return getattr(self.config.hyperparams, name, default)
+        return getattr(self.args, name, default)
 
     def sanitize_example(self, example: dict) -> dict:
         """Strip disallowed tags like <think> from conversation content."""
@@ -889,7 +913,7 @@ class UltimateTrainer:
                 return self.tokenizer(
                     examples["text"],
                     truncation=True,
-                    max_length=self.args.max_length,
+                    max_length=self._get_hyperparam('max_length', 2048),
                     padding=False
                 )
 
@@ -918,7 +942,7 @@ class UltimateTrainer:
         else:
             model_size_b = 8.0  # Default guess
 
-        effective_batch = self.args.batch_size * self.args.gradient_accumulation
+        effective_batch = self._get_hyperparam('batch_size', 1) * self._get_hyperparam('gradient_accumulation', 1)
 
         return TimeEstimator.estimate_training(
             num_examples=len(self.train_dataset),
@@ -991,8 +1015,8 @@ class UltimateTrainer:
     def train(self) -> bool:
         """Run actual training."""
         try:
-            # Tokenize dataset
-            max_length = getattr(self.args, 'max_length', 2048)
+            # Tokenize dataset - get max_length from config
+            max_length = self._get_hyperparam('max_length', 2048)
 
             def tokenize_function(examples):
                 return self.tokenizer(
@@ -1015,20 +1039,30 @@ class UltimateTrainer:
                 desc="Tokenizing dataset"
             )
 
-            # Pack dataset for efficiency (fill 4k blocks completely)
-            try:
-                from trl import pack_dataset
-                print(f"   📦 Packing dataset (max_length={max_length})...")
-                print(f"      Before packing: {len(tokenized_dataset)} examples")
-                tokenized_dataset = pack_dataset(
-                    tokenized_dataset,
-                    seq_length=max_length,
-                    strategy="bfd"  # Best Fit Decreasing - preserves sequence boundaries
-                )
-                print(f"      After packing: {len(tokenized_dataset)} packed sequences")
-                print(f"      ✅ Packing enabled - filling {max_length}-token blocks efficiently")
-            except Exception as e:
-                print(f"      ⚠️  Packing failed ({e}), continuing without packing")
+            # Pack dataset for efficiency (fill context windows more completely)
+            enable_packing = os.environ.get("ENABLE_PACKING", "1").lower() in ("1", "true", "yes", "on")
+            if enable_packing:
+                try:
+                    from trl import pack_dataset
+                    print(f"   📦 Packing dataset (max_length={max_length})...")
+                    print(f"      Before packing: {len(tokenized_dataset)} examples")
+                    tokenized_dataset = pack_dataset(
+                        tokenized_dataset,
+                        seq_length=max_length,
+                        strategy="bfd"  # Best Fit Decreasing - preserves sequence boundaries
+                    )
+                    print(f"      After packing: {len(tokenized_dataset)} packed sequences")
+
+                    # Remove seq_lengths metadata (list of lists) - collator can't handle it
+                    if 'seq_lengths' in tokenized_dataset.column_names:
+                        tokenized_dataset = tokenized_dataset.remove_columns(['seq_lengths'])
+                        print(f"      ✅ Removed seq_lengths metadata (incompatible with collator)")
+
+                    print(f"      ✅ Packing enabled - filling {max_length}-token blocks efficiently")
+                except Exception as e:
+                    print(f"      ⚠️  Packing failed ({e}), continuing without packing")
+            else:
+                print(f"   ⚠️  Packing disabled via ENABLE_PACKING=0")
 
             # Tokenize validation dataset for eval_loss
             tokenized_val_dataset = self.val_dataset_formatted.map(
@@ -1059,7 +1093,7 @@ class UltimateTrainer:
                 torch.cuda.empty_cache()
 
             # Calculate steps for this dataset
-            effective_batch = self.args.batch_size * self.args.gradient_accumulation
+            effective_batch = self._get_hyperparam('batch_size', 1) * self._get_hyperparam('gradient_accumulation', 1)
             steps_for_this_file = len(tokenized_dataset) // effective_batch
             if len(tokenized_dataset) % effective_batch != 0:
                 steps_for_this_file += 1  # Account for partial batch
@@ -1124,9 +1158,10 @@ class UltimateTrainer:
             training_args = TrainingArguments(
                 output_dir=self.args.output_dir,
                 max_steps=max_steps,  # ✅ FIX: Use max_steps for continuous training
-                per_device_train_batch_size=self.args.batch_size,
-                gradient_accumulation_steps=self.args.gradient_accumulation,
-                learning_rate=self.args.learning_rate,
+                per_device_train_batch_size=self._get_hyperparam('batch_size', 1),
+                per_device_eval_batch_size=1,  # MEMORY FIX: Match train batch size to avoid eval spikes
+                gradient_accumulation_steps=self._get_hyperparam('gradient_accumulation', 1),
+                learning_rate=self._get_hyperparam('learning_rate', 2e-4),
                 warmup_steps=self.args.warmup_steps,
                 logging_steps=10,
                 save_steps=self.args.save_steps,
@@ -1136,7 +1171,7 @@ class UltimateTrainer:
                 fp16=use_fp16,   # Set from config precision
                 bf16=use_bf16,   # Set from config precision
                 tf32=True,  # Enable TF32 for matrix math speedups
-                gradient_checkpointing=False,  # Keep disabled for speed (only enable if OOM)
+                gradient_checkpointing=True,  # MEMORY FIX: Enable to save ~40-50% activation memory
                 optim="adamw_torch_fused",  # Faster than default AdamW
                 dataloader_num_workers=8,  # High workers to feed GPU faster
                 dataloader_pin_memory=True,  # Faster CPU->GPU transfer
@@ -1184,7 +1219,7 @@ class UltimateTrainer:
                 def __init__(self, monitor, status_writer, eval_steps, total_steps, raw_train_examples, tokenizer, model,
                              batch_total_steps, current_global_step, evolution_tracker=None, current_file=None, batch_number=None, batch_queue_size=None, controller=None, fixed_val_dataset=None,
                              avg_seq_len: float = 0.0, effective_batch: int = 1, micro_eval_inputs=None, micro_eval_interval: int = 500,
-                             logits_processor=None, layer_monitor: LayerMonitor | None = None):
+                             logits_processor=None, layer_monitor: LayerMonitor | None = None, remote_eval_config=None):
                     self.monitor = monitor
                     self.status_writer = status_writer
                     self.eval_steps = eval_steps
@@ -1195,6 +1230,21 @@ class UltimateTrainer:
                     self.evolution_tracker = evolution_tracker
                     self.controller = controller  # Training control system
                     self.fixed_val_dataset = fixed_val_dataset  # Fixed validation set
+
+                    # Remote evaluation setup
+                    self.remote_eval_config = remote_eval_config or {}
+                    self.remote_evaluator = None
+                    if REMOTE_EVAL_AVAILABLE and self.remote_eval_config.get("enabled", False):
+                        try:
+                            self.remote_evaluator = RemoteEvaluator(
+                                host=self.remote_eval_config.get("host", "192.168.x.x"),
+                                port=self.remote_eval_config.get("port", 8765)
+                            )
+                            print(f"✅ Remote eval enabled: {self.remote_eval_config['host']}:{self.remote_eval_config['port']}")
+                        except Exception as e:
+                            print(f"⚠️  Remote eval setup failed: {e}")
+                            self.remote_evaluator = None
+                    self.last_remote_eval_step = 0
                     self.last_update_time = time.time()
                     self.last_prompt_snapshot_time = time.time()
                     self.update_interval = 2  # Status JSON refresh cadence (seconds)
@@ -1684,6 +1734,103 @@ class UltimateTrainer:
                                 if gap > 0.5:
                                     print(f"   ⚠️  Large gap detected - possible overfitting!")
 
+                def on_save(self, args, state, control, **kwargs):
+                    """Handle checkpoint save - sync to remote and submit eval job."""
+                    if not self.remote_evaluator or not self.remote_eval_config.get("enabled", False):
+                        return
+
+                    eval_interval = self.remote_eval_config.get("eval_interval_steps", 5000)
+
+                    # Check if it's time for remote eval
+                    if state.global_step - self.last_remote_eval_step < eval_interval:
+                        return
+
+                    print(f"\n🌐 Remote Eval: Checkpoint at step {state.global_step}")
+
+                    try:
+                        import subprocess
+                        import threading
+
+                        # Find the checkpoint directory that was just saved
+                        checkpoint_dir = Path(args.output_dir) / f"checkpoint-{state.global_step}"
+
+                        if not checkpoint_dir.exists():
+                            print(f"⚠️  Checkpoint not found: {checkpoint_dir}")
+                            return
+
+                        # Get remote config
+                        remote_user = self.remote_eval_config.get("remote_user", "user")
+                        remote_host = self.remote_eval_config.get("host", "192.168.x.x")
+                        remote_dir = self.remote_eval_config.get("remote_models_dir", "/path/to/models")
+                        model_id = f"qwen3-step-{state.global_step}"
+                        remote_path = f"{remote_dir}/{model_id}"
+
+                        # Async copy function
+                        def async_sync_and_eval():
+                            try:
+                                if self.remote_eval_config.get("sync_checkpoints", True):
+                                    print(f"   📦 Syncing to {remote_host}:{remote_path}...")
+
+                                    # Use rsync for efficient transfer
+                                    rsync_cmd = [
+                                        "rsync", "-az", "--delete",
+                                        str(checkpoint_dir) + "/",
+                                        f"{remote_user}@{remote_host}:{remote_path}/"
+                                    ]
+
+                                    result = subprocess.run(
+                                        rsync_cmd,
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=300
+                                    )
+
+                                    if result.returncode != 0:
+                                        print(f"   ⚠️  Sync failed: {result.stderr}")
+                                        return
+
+                                    print(f"   ✅ Sync complete")
+
+                                # Register checkpoint with remote server
+                                print(f"   📝 Registering model: {model_id}")
+                                success = self.remote_evaluator.register_checkpoint(
+                                    checkpoint_path=remote_path,
+                                    model_id=model_id,
+                                    tags=f"step{state.global_step},training"
+                                )
+
+                                if not success:
+                                    print(f"   ⚠️  Registration failed")
+                                    return
+
+                                # Submit eval job
+                                dataset_ref = self.remote_eval_config.get("eval_dataset", "eval_dataset.jsonl")
+                                metrics = self.remote_eval_config.get("metrics", ["accuracy", "loss"])
+
+                                print(f"   🎯 Submitting eval job...")
+                                job_id = self.remote_evaluator.submit_eval_job(
+                                    model_id=model_id,
+                                    dataset_ref=dataset_ref,
+                                    metrics=metrics
+                                )
+
+                                print(f"   ✅ Eval job submitted: {job_id}")
+                                print(f"      Check status: python3 data_manager/remote_evaluator.py status {job_id}")
+
+                            except subprocess.TimeoutExpired:
+                                print(f"   ⚠️  Sync timed out")
+                            except Exception as e:
+                                print(f"   ⚠️  Remote eval error: {e}")
+
+                        # Start async sync and eval (don't wait)
+                        thread = threading.Thread(target=async_sync_and_eval, daemon=True)
+                        thread.start()
+
+                        self.last_remote_eval_step = state.global_step
+
+                    except Exception as e:
+                        print(f"⚠️  Remote eval setup failed: {e}")
+
             # Use the calculated values from earlier:
             # - current_global_step (from checkpoint)
             # - steps_for_this_file (for this dataset)
@@ -1724,6 +1871,7 @@ class UltimateTrainer:
                     batch_queue_size=batch_queue_size,
                     controller=self.controller,  # Pass controller for pause/stop detection
                     fixed_val_dataset=self.fixed_val_dataset,  # Pass fixed validation set
+                    remote_eval_config=getattr(self.config, "remote_eval", {}) if self.config else {},  # Remote evaluation config
                     avg_seq_len=self.avg_seq_len,
                     effective_batch=effective_batch,
                     micro_eval_inputs=self.tokenized_fixed_val_small,
@@ -1872,7 +2020,7 @@ class UltimateTrainer:
                 "runtime_sec": runtime_sec,
                 "batch_size": getattr(self.args, 'batch_size', None),
                 "gradient_accumulation": getattr(self.args, 'gradient_accumulation', None),
-                "effective_batch": (self.args.batch_size * self.args.gradient_accumulation)
+                "effective_batch": (self._get_hyperparam('batch_size', 1) * self._get_hyperparam('gradient_accumulation', 1))
                 if getattr(self.args, 'batch_size', None) and getattr(self.args, 'gradient_accumulation', None) else None,
                 "max_length_config": max_length_cfg,
                 "observed_max_tokens": max_golden,
@@ -1942,7 +2090,7 @@ class UltimateTrainer:
                 total_steps=total_steps,
                 epoch=0,
                 loss=0.0,
-                lr=self.args.learning_rate,
+                lr=self._get_hyperparam('learning_rate', 2e-4),
                 prompt=user_msg,
                 golden=golden_msg,
                 model_output=model_output,

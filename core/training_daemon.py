@@ -1,26 +1,65 @@
 #!/usr/bin/env python3
 """
-Training Daemon - RTX 3090 Continuous Training System
+Training Daemon - Continuous Training Orchestrator
 
-Simple, focused purpose:
-1. Watch INBOX for new training data
-2. Train on it (1 epoch only)
-3. Delete data after successful training (keep failed files)
-4. Save daily snapshots of model
-5. Always train on newest model
-6. Never touch old snapshots
+This module implements a long-running daemon that continuously monitors for training data,
+orchestrates training jobs, manages model checkpoints, and handles system lifecycle.
+
+Key Components:
+    - TrainingDaemon: Main daemon class with lifecycle management
+    - Queue integration: Uses TrainingQueue for priority-based processing
+    - Control integration: Uses TrainingController for pause/resume/stop signals
+    - Data management: Auto-generation via DataManager when queue is empty
+    - Snapshot management: Daily model snapshots and periodic consolidation
+    - Checkpoint retention: Automatic cleanup of old checkpoints
+
+Directory Structure:
+    base_dir/
+        inbox/             - Drop zone for new JSONL files
+        queue/             - Priority queues (high/normal/low/processing/failed)
+        current_model/     - Active model being trained
+        snapshots/         - Daily snapshots (YYYY-MM-DD/)
+        logs/              - Training and daemon logs
+        status/            - training_status.json and other status files
+        control/           - Control signals (state.json, .stop, .pause, .skip)
+        config.json        - Training configuration
+        .daemon.pid        - PID lock file (prevents multiple daemons)
+        .stop              - Stop signal file (daemon exits cleanly)
+
+Daemon Lifecycle:
+    1. Startup: Setup directories, acquire PID lock, recover from crashes
+    2. Main Loop:
+        a. Check stop signal → exit cleanly
+        b. Run checkpoint retention (cleanup old checkpoints)
+        c. Check snapshot schedule → create daily snapshot
+        d. Check consolidation schedule → consolidate checkpoints when idle
+        e. Process inbox → move files to queue
+        f. Process queue → train on files by priority
+        g. Auto-generate data if queue empty
+        h. Sleep poll_interval seconds → repeat
+    3. Shutdown: Release PID lock, cleanup state
+
+Integration Points:
+    - core/training_queue.py: Priority queue management
+    - core/training_controller.py: Control signals (pause/resume/stop)
+    - core/train.py (UltimateTrainer): Actual training execution
+    - data_manager.py: Auto-generation with quality testing
+    - management/checkpoint_retention.py: Checkpoint cleanup
 
 Usage:
-    python3 training_daemon.py --base-dir /training
+    # Start daemon
+    python3 training_daemon.py --base-dir /path/to/training
 
-Directory structure:
-    /training/
-        inbox/          ← Drop JSONL files here
-        current_model/  ← Active model being trained
-        snapshots/      ← Daily snapshots (YYYY-MM-DD/)
-        logs/           ← Training logs
-        config.json     ← Training configuration
-        .stop           ← Create this file to stop daemon
+    # Drop training data
+    cp my_data.jsonl /path/to/training/inbox/
+
+    # Control daemon
+    python3 core/training_controller.py pause
+    python3 core/training_controller.py resume
+    python3 core/training_controller.py stop
+
+    # Stop daemon
+    touch /path/to/training/.stop
 """
 
 import os
@@ -75,7 +114,91 @@ except ImportError as e:
 
 
 class TrainingDaemon:
-    """Continuous training daemon for RTX 3090"""
+    """
+    Continuous training daemon that orchestrates the complete training lifecycle.
+
+    Responsibilities:
+        - Monitor inbox directory for new training data
+        - Process files through priority queue (high/normal/low)
+        - Execute training jobs via UltimateTrainer
+        - Handle pause/resume/stop control signals
+        - Create daily snapshots of trained models
+        - Consolidate checkpoints when idle (reduce disk usage)
+        - Enforce checkpoint retention policies (cap disk usage)
+        - Auto-generate training data when queue empty
+        - Recover from crashes (orphaned files, stale state)
+        - Prevent multiple daemon instances (PID lock)
+
+    Data Flow:
+        1. Startup:
+            → Setup directories (inbox, queue, logs, etc.)
+            → Load config.json
+            → Validate config (catch errors before training)
+            → Acquire PID lock (.daemon.pid)
+            → Recover from crashes (move processing → failed, cleanup state)
+
+        2. Main Loop (every poll_interval seconds):
+            → Check .stop file → exit cleanly
+            → Run checkpoint retention (cleanup old checkpoints if caps exceeded)
+            → Check snapshot schedule (daily at configured time) → create snapshot
+            → Check consolidation schedule (after 3 AM when idle) → consolidate
+            → Flatten inbox (move .jsonl files from subdirs to root)
+            → Process inbox → move files to queue (high/normal/low)
+            → Get queue status (counts by priority)
+            → While queue not empty:
+                - Check control signals (.stop, .pause, .skip)
+                - Get next file by priority (high → normal → low)
+                - Check disk space (skip if insufficient)
+                - Train on file (via UltimateTrainer)
+                - Mark completed (delete file) or failed (keep file)
+            → If queue empty → maybe auto-generate data
+            → Sleep poll_interval seconds
+
+        3. Shutdown:
+            → Release PID lock (.daemon.pid)
+            → Cleanup state
+
+    Lifecycle States (via TrainingController):
+        - idle: Waiting for files
+        - training: Actively training on a file
+        - paused: Paused (waiting for resume signal)
+        - stopped: Stopped by user (exit after current batch)
+
+    Attributes:
+        base_dir: Root directory for all training operations
+        inbox_dir: Drop zone for new JSONL files (base_dir/inbox)
+        current_model_dir: Active model directory (base_dir/current_model)
+        snapshots_dir: Daily snapshots directory (base_dir/snapshots)
+        logs_dir: Log files directory (base_dir/logs)
+        config_file: Training configuration (base_dir/config.json)
+        stop_file: Stop signal file (base_dir/.stop)
+        pid_file: PID lock file (base_dir/.daemon.pid)
+        config: Loaded configuration dict
+        queue: TrainingQueue instance (priority queue management)
+        controller: TrainingController instance (control signals)
+        data_manager: DataManager instance (auto-generation with quality testing)
+        logger: Python logger instance
+        last_snapshot_date: Date of last snapshot (YYYY-MM-DD)
+        last_consolidation_date: Date of last consolidation
+        last_autogen_time: Timestamp of last auto-generation
+        shutdown_requested: Flag set by signal handlers (SIGTERM, SIGINT)
+
+    Example:
+        # Start daemon
+        daemon = TrainingDaemon(Path("/training"))
+        daemon.run()  # Runs until .stop file created or signal received
+
+        # In another terminal, drop training data
+        $ cp my_data.jsonl /training/inbox/
+
+        # Control daemon
+        $ python3 core/training_controller.py pause
+        $ python3 core/training_controller.py resume
+        $ python3 core/training_controller.py stop
+
+        # Stop daemon cleanly
+        $ touch /training/.stop
+    """
 
     def __init__(self, base_dir: Path):
         self.base_dir = Path(base_dir)
@@ -208,11 +331,37 @@ class TrainingDaemon:
 
         return config
 
-    def validate_config(self, config: dict):
-        """Validate configuration to prevent training failures.
+    def validate_config(self, config: dict) -> None:
+        """
+        Validate configuration to prevent training failures before they occur.
 
-        GUARDRAIL: Catches config errors BEFORE training starts.
-        Part of Phase 1 from CRITICAL_EDGE_CASES_AND_GUARDRAILS.md
+        Checks all critical config parameters for common issues that would cause
+        training to fail. Logs warnings but does not raise exceptions (allows
+        daemon to continue with warnings for non-critical issues).
+
+        Args:
+            config: Configuration dictionary loaded from config.json
+
+        Side Effects:
+            - Logs warnings for invalid parameters
+            - Does NOT raise exceptions (daemon continues)
+
+        Validation Checks:
+            - base_model path exists (if specified)
+            - max_length in range [128, 32768]
+            - learning_rate in range [1e-6, 1e-2]
+            - batch_size in range [1, 128]
+            - gradient_accumulation in range [1, 128]
+            - lora_r in range [1, 256] (if specified)
+            - lora_alpha in range [1, 512] (if specified)
+            - snapshot_time format "HH:MM"
+
+        Example:
+            config = {"batch_size": 256, "learning_rate": 0.1}
+            self.validate_config(config)
+            # Logs: "Batch size out of range (1-128): 256"
+            # Logs: "Learning rate out of range (1e-6 to 1e-2): 0.1"
+            # Daemon continues with warnings
         """
         errors = []
 
@@ -719,8 +868,73 @@ class TrainingDaemon:
             self.logger.warning("   ⚠️  Proceeding anyway (validation is best-effort)")
             return True  # Don't block training on validation errors
 
-    def train_on_file(self, data_file: Path, batch_number: int = None, batch_queue_size: int = None):
-        """Train on a single data file (1 epoch)"""
+    def train_on_file(self, data_file: Path, batch_number: int = None, batch_queue_size: int = None) -> bool:
+        """
+        Execute training on a single JSONL data file for one epoch.
+
+        This is the core training execution method. It validates the data file,
+        sets up the UltimateTrainer, executes training, handles errors, and
+        reports training results.
+
+        Args:
+            data_file: Path to JSONL training data file
+            batch_number: Optional batch number for logging (e.g., "3/10")
+            batch_queue_size: Optional total queue size for logging
+
+        Returns:
+            True if training completed successfully, False if failed
+
+        Data Flow:
+            1. Validate file:
+                - Check file size (max 10GB)
+                - Check JSON line sizes (max 100MB per line)
+                - Count examples (reject if 0)
+                - Validate data against config (prompt/response lengths, etc.)
+            2. Setup UltimateTrainer:
+                - Create Args object with paths (dataset, output_dir, config)
+                - Determine model (continue from current_model or start from base)
+                - Choose format variant (if format variety enabled)
+            3. Execute training:
+                - Call trainer.train() (delegates to core/train.py)
+                - Monitor progress via TrainingStatusWriter
+                - Handle OOM errors → reduce batch size suggestion
+                - Handle control signals (skip, pause, stop)
+            4. Post-training:
+                - Log training summary (examples, loss, time, etc.)
+                - Compute batch size suggestions
+                - Cleanup GPU memory
+            5. Report result:
+                - Return True if successful
+                - Return False if failed (file moved to queue/failed)
+
+        Side Effects:
+            - Trains model (GPU operations)
+            - Writes checkpoints to current_model/
+            - Writes training_status.json
+            - Logs training metrics
+            - Clears GPU memory after training
+
+        Raises:
+            Does not raise exceptions - catches all errors and returns False
+
+        Safety Checks:
+            - File size limits (10GB max, 100MB per JSON line)
+            - Empty file rejection
+            - Prompt/response length validation against config.max_length
+            - Truncation detection (rejects if responses truncated)
+
+        Example:
+            # Train on a single file
+            success = daemon.train_on_file(
+                Path("/training/queue/high/syllo_hard_1000.jsonl"),
+                batch_number=3,
+                batch_queue_size=10
+            )
+            if success:
+                # File deleted, training complete
+            else:
+                # File moved to queue/failed, review logs
+        """
         self.logger.info("=" * 80)
         self.logger.info(f"Training on: {data_file.name}")
         if batch_number and batch_queue_size:
@@ -1079,8 +1293,64 @@ class TrainingDaemon:
         except Exception as e:
             self.logger.warning(f"Checkpoint retention failed: {e}")
 
-    def run(self):
-        """Main daemon loop"""
+    def run(self) -> None:
+        """
+        Main daemon loop that runs continuously until stopped.
+
+        Lifecycle:
+            1. Startup Phase:
+                - Setup directories (inbox, queue, logs, etc.)
+                - Initialize model (if empty current_model)
+                - Acquire PID lock (prevents multiple daemons)
+                - Recover from crashes (orphaned files, stale state)
+                - Log configuration summary
+
+            2. Main Loop (runs every poll_interval seconds):
+                - Check stop signal (.stop file or SIGTERM/SIGINT) → exit cleanly
+                - Run checkpoint retention (cleanup if exceeds disk caps)
+                - Check snapshot schedule → create daily snapshot
+                - Check consolidation schedule → consolidate when idle after 3 AM
+                - Flatten inbox (move .jsonl from subdirs to root)
+                - Process inbox → move files to priority queue
+                - Get queue status (counts by priority)
+                - While queue not empty:
+                    * Check control signals (.stop, .pause, .skip)
+                    * Get next file by priority (high → normal → low)
+                    * Check disk space → skip if insufficient
+                    * Train on file (via UltimateTrainer)
+                    * Mark completed (delete) or failed (keep)
+                    * Update queue status
+                - If queue empty → maybe auto-generate data
+                - Sleep poll_interval seconds
+                - Repeat
+
+            3. Shutdown Phase:
+                - Release PID lock (.daemon.pid)
+                - Log shutdown message
+
+        Side Effects:
+            - Creates/modifies files in base_dir (inbox, queue, logs, checkpoints, etc.)
+            - Writes PID lock file (.daemon.pid)
+            - Trains model (GPU operations)
+            - Writes training_status.json
+            - Deletes completed training files
+            - Creates daily snapshots
+            - Consolidates checkpoints
+            - Auto-generates training data (if enabled)
+
+        Raises:
+            SystemExit: If PID lock acquisition fails (another daemon running)
+            KeyboardInterrupt: Caught and handled gracefully (clean shutdown)
+            Exception: Caught and logged (daemon exits with error message)
+
+        Example:
+            # Start daemon
+            daemon = TrainingDaemon(Path("/training"))
+            daemon.run()  # Blocks until stopped
+
+            # Daemon runs indefinitely, processing files from queue
+            # Stop by creating .stop file or sending SIGTERM/SIGINT
+        """
         self.logger.info("=" * 80)
         self.logger.info("🤖 TRAINING DAEMON STARTING")
         self.logger.info("=" * 80)

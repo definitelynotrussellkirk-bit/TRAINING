@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction Viewer - Training Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid #2a2a3e;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin-bottom: 15px;
+            color: #4fc3f7;
+        }
+
+        .checkpoint-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .info-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2c5f2d 100%);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4fc3f7 0%, #2196f3 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 195, 247, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.generate {
+            background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+        }
+
+        select {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .predictions-list {
+            display: grid;
+            gap: 20px;
+        }
+
+        .prediction-card {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 1px solid #2a2a3e;
+            border-radius: 12px;
+            padding: 25px;
+            transition: all 0.3s;
+        }
+
+        .prediction-card:hover {
+            border-color: #4fc3f7;
+            box-shadow: 0 5px 20px rgba(79, 195, 247, 0.2);
+        }
+
+        .prediction-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .prediction-id {
+            font-size: 14px;
+            color: #888;
+        }
+
+        .badges {
+            display: flex;
+            gap: 8px;
+        }
+
+        .badge {
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge.difficulty-easy { background: #66bb6a; color: #000; }
+        .badge.difficulty-medium { background: #ffa726; color: #000; }
+        .badge.difficulty-hard { background: #ef5350; color: #fff; }
+        .badge.exact-match { background: #4caf50; color: #fff; }
+        .badge.semantic-match { background: #03a9f4; color: #fff; }
+        .badge.no-match { background: #666; color: #fff; }
+        .badge.has-thinking { background: #9c27b0; color: #fff; }
+
+        .content-section {
+            margin: 15px 0;
+        }
+
+        .section-title {
+            font-size: 12px;
+            color: #4fc3f7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .content-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .grading-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .grading-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .grade-btn {
+            flex: 1;
+            padding: 15px;
+            font-size: 16px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .grade-btn.correct {
+            background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+        }
+
+        .grade-btn.incorrect {
+            background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
+        }
+
+        .grade-btn.unsure {
+            background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+        }
+
+        .grade-btn.selected {
+            box-shadow: 0 0 20px rgba(79, 195, 247, 0.6);
+            transform: scale(1.05);
+        }
+
+        textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 12px;
+            color: #e0e0e0;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .graded-indicator {
+            background: rgba(76, 175, 80, 0.2);
+            border: 2px solid #4caf50;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #888;
+        }
+
+        .error {
+            background: rgba(239, 83, 80, 0.2);
+            border: 2px solid #ef5350;
+            padding: 20px;
+            border-radius: 8px;
+            color: #ef5350;
+            margin-bottom: 20px;
+        }
+
+        .no-predictions {
+            text-align: center;
+            padding: 80px 20px;
+            color: #888;
+        }
+
+        .no-predictions h2 {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(79, 195, 247, 0.5);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(79, 195, 247, 0.7);
+        }
+
+        /* Back button */
+        .back-link {
+            display: inline-block;
+            color: #4fc3f7;
+            text-decoration: none;
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background: rgba(79, 195, 247, 0.1);
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(79, 195, 247, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/monitoring/ui/control_room_v2.html" class="back-link">← Back to Dashboard</a>
+
+        <header>
+            <h1>Prediction Viewer</h1>
+            <p>Interactive model prediction inspection with human grading</p>
+
+            <div class="checkpoint-info" id="checkpointInfo">
+                <div class="info-card">
+                    <div class="info-label">Checkpoint</div>
+                    <div class="info-value" id="checkpointPath">Loading...</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Training Step</div>
+                    <div class="info-value" id="checkpointStep">-</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Generated At</div>
+                    <div class="info-value" id="generatedAt">-</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="stats-grid" id="statsGrid">
+            <!-- Stats will be populated by JavaScript -->
+        </div>
+
+        <div class="controls">
+            <button class="generate" onclick="generatePredictions()">Generate New Predictions</button>
+            <select id="filterDifficulty" onchange="applyFilters()">
+                <option value="all">All Difficulties</option>
+                <option value="easy">Easy Only</option>
+                <option value="medium">Medium Only</option>
+                <option value="hard">Hard Only</option>
+            </select>
+            <select id="filterGraded" onchange="applyFilters()">
+                <option value="all">All Predictions</option>
+                <option value="graded">Graded Only</option>
+                <option value="ungraded">Ungraded Only</option>
+            </select>
+            <button onclick="refreshPredictions()">Refresh</button>
+        </div>
+
+        <div id="content">
+            <div class="loading">Loading predictions...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+
+        async function loadPredictions() {
+            try {
+                const response = await fetch('/api/predictions');
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                currentData = data;
+                renderPredictions();
+            } catch (error) {
+                showError('Failed to load predictions: ' + error.message);
+            }
+        }
+
+        function renderPredictions() {
+            if (!currentData || currentData.predictions.length === 0) {
+                showNoPredictions();
+                return;
+            }
+
+            // Update checkpoint info
+            const checkpoint = currentData.checkpoint;
+            document.getElementById('checkpointPath').textContent = checkpoint.path.split('/').pop();
+            document.getElementById('checkpointStep').textContent = checkpoint.step || 'Unknown';
+            document.getElementById('generatedAt').textContent = new Date(checkpoint.generated_at).toLocaleString();
+
+            // Update stats
+            const stats = currentData.stats;
+            const statsHTML = `
+                <div class="stat-card">
+                    <div class="stat-label">Total Predictions</div>
+                    <div class="stat-value">${stats.total}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Accuracy (Auto)</div>
+                    <div class="stat-value">${(stats.accuracy_auto * 100).toFixed(1)}%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Accuracy (Human)</div>
+                    <div class="stat-value">${stats.accuracy_human !== null ? (stats.accuracy_human * 100).toFixed(1) + '%' : 'N/A'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Semantic Match</div>
+                    <div class="stat-value">${(stats.semantic_match_rate * 100).toFixed(1)}%</div>
+                </div>
+            `;
+            document.getElementById('statsGrid').innerHTML = statsHTML;
+
+            // Apply filters and render predictions
+            applyFilters();
+        }
+
+        function applyFilters() {
+            if (!currentData) return;
+
+            const difficultyFilter = document.getElementById('filterDifficulty').value;
+            const gradedFilter = document.getElementById('filterGraded').value;
+
+            let filtered = currentData.predictions.filter(pred => {
+                if (difficultyFilter !== 'all' && pred.difficulty !== difficultyFilter) return false;
+                if (gradedFilter === 'graded' && !pred.human_grade) return false;
+                if (gradedFilter === 'ungraded' && pred.human_grade) return false;
+                return true;
+            });
+
+            renderPredictionsList(filtered);
+        }
+
+        function renderPredictionsList(predictions) {
+            const contentDiv = document.getElementById('content');
+
+            if (predictions.length === 0) {
+                contentDiv.innerHTML = '<div class="no-predictions"><h2>No predictions match your filters</h2></div>';
+                return;
+            }
+
+            const predictionsHTML = predictions.map(pred => `
+                <div class="prediction-card">
+                    <div class="prediction-header">
+                        <div class="prediction-id">${pred.id}</div>
+                        <div class="badges">
+                            <span class="badge difficulty-${pred.difficulty}">${pred.difficulty}</span>
+                            <span class="badge ${pred.exact_match ? 'exact-match' : (pred.semantic_match ? 'semantic-match' : 'no-match')}">
+                                ${pred.exact_match ? 'Exact Match' : (pred.semantic_match ? 'Semantic Match' : 'No Match')}
+                            </span>
+                            ${pred.has_thinking_tags ? '<span class="badge has-thinking">Thinking</span>' : ''}
+                        </div>
+                    </div>
+
+                    <div class="content-section">
+                        <div class="section-title">Prompt</div>
+                        <div class="content-box">${escapeHtml(pred.prompt)}</div>
+                    </div>
+
+                    <div class="content-section">
+                        <div class="section-title">Generated Output</div>
+                        <div class="content-box">${escapeHtml(pred.generated)}</div>
+                    </div>
+
+                    <div class="content-section">
+                        <div class="section-title">Expected Output</div>
+                        <div class="content-box">${escapeHtml(pred.expected)}</div>
+                    </div>
+
+                    ${pred.manual_grade ? renderGradedSection(pred) : renderGradingSection(pred.id)}
+                </div>
+            `).join('');
+
+            contentDiv.innerHTML = `<div class="predictions-list">${predictionsHTML}</div>`;
+        }
+
+        function renderGradingSection(predictionId) {
+            return `
+                <div class="grading-section">
+                    <div class="section-title">Grade This Prediction</div>
+                    <div class="grading-buttons">
+                        <button class="grade-btn correct" onclick="selectGrade('${predictionId}', 'correct', this)">✓ Correct</button>
+                        <button class="grade-btn incorrect" onclick="selectGrade('${predictionId}', 'incorrect', this)">✗ Incorrect</button>
+                        <button class="grade-btn unsure" onclick="selectGrade('${predictionId}', 'unsure', this)">? Unsure</button>
+                    </div>
+                    <textarea id="notes-${predictionId}" placeholder="Optional notes..."></textarea>
+                    <button style="margin-top: 10px; width: 100%;" onclick="submitGrade('${predictionId}')">Save Grading</button>
+                </div>
+            `;
+        }
+
+        function renderGradedSection(pred) {
+            return `
+                <div class="graded-indicator">
+                    ✓ Graded as: ${pred.human_grade.toUpperCase()}
+                    ${pred.human_grade_notes ? '<br><small>' + escapeHtml(pred.human_grade_notes) + '</small>' : ''}
+                </div>
+            `;
+        }
+
+        let selectedGrades = {};
+
+        function selectGrade(predictionId, grade, button) {
+            selectedGrades[predictionId] = grade;
+
+            // Remove selected class from all buttons in this grading section
+            const gradingSection = button.closest('.grading-section');
+            gradingSection.querySelectorAll('.grade-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+
+            // Add selected class to clicked button
+            button.classList.add('selected');
+        }
+
+        async function submitGrade(predictionId) {
+            const grade = selectedGrades[predictionId];
+            const notes = document.getElementById(`notes-${predictionId}`).value;
+
+            if (!grade) {
+                alert('Please select a grade first');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/predictions/grade', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prediction_id: predictionId,
+                        grade: grade,
+                        notes: notes
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Reload predictions to show updated state
+                    await loadPredictions();
+                } else {
+                    alert('Failed to save grading: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error submitting grade: ' + error.message);
+            }
+        }
+
+        async function generatePredictions() {
+            if (!confirm('Generate new predictions? This will call the 3090 API and may take a minute.')) {
+                return;
+            }
+
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Generating...';
+
+            try {
+                // Call the prediction generation script
+                // Note: You'll need to set up a proper endpoint or run the script via SSH
+                alert('To generate predictions, run:\npython3 monitoring/prediction_viewer_engine.py --count 10');
+
+                // Refresh after user generates
+                setTimeout(() => {
+                    refreshPredictions();
+                }, 3000);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Generate New Predictions';
+            }
+        }
+
+        function refreshPredictions() {
+            loadPredictions();
+        }
+
+        function showError(message) {
+            document.getElementById('content').innerHTML = `
+                <div class="error">
+                    <strong>Error:</strong> ${escapeHtml(message)}
+                </div>
+            `;
+        }
+
+        function showNoPredictions() {
+            document.getElementById('content').innerHTML = `
+                <div class="no-predictions">
+                    <h2>No Predictions Available</h2>
+                    <p>Generate predictions to get started</p>
+                    <br>
+                    <p style="color: #666; font-size: 14px;">Run: python3 monitoring/prediction_viewer_engine.py --count 10</p>
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load predictions on page load
+        loadPredictions();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadPredictions, 30000);
+    </script>
+</body>
+</html>

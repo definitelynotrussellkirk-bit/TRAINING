@@ -1,0 +1,30 @@
+{
+  "checkpoint": {
+    "path": "/path/to/training/current_model",
+    "step": 148000,
+    "generated_at": "2025-11-24T06:20:40.889516"
+  },
+  "predictions": [],
+  "stats": {
+    "total": 0,
+    "accuracy_auto": 0.0,
+    "accuracy_human": null,
+    "semantic_match_rate": 0.0,
+    "thinking_tag_rate": 0.0,
+    "by_difficulty": {
+      "easy": {
+        "total": 0,
+        "correct": 0
+      },
+      "medium": {
+        "total": 0,
+        "correct": 0
+      },
+      "hard": {
+        "total": 0,
+        "correct": 0
+      }
+    }
+  },
+  "generated_at": "2025-11-24T06:20:40.909230"
+}

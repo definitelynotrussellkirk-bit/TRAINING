@@ -1,13 +1,16 @@
 # CLAUDE INSTRUCTIONS - LLM Training System
 
-**Last Updated:** 2025-11-22 (Production Integration Complete)
+**Last Updated:** 2025-11-24 (Option C Architecture Complete)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 This document contains instructions for Claude to help with training operations.
 
-**MAJOR UPDATE:** Refactored trainer/ modules now integrated into production (core/train.py)
-- ✅ Steps 1-5: Created trainer/ architecture (config, profiles, monitoring)
-- ✅ **NEW:** Production integration - core/train.py uses ConfigLoader + profiles
+**MAJOR UPDATE:** Option C Architecture - Automated Deployment System
+- ✅ 3090 enhanced with /models/info and /models/reload endpoints
+- ✅ Deployment orchestrator automates checkpoint deployment
+- ✅ All monitoring consolidated on 4090 (training machine)
+- ✅ 3090 now pure inference server - serves trained models automatically
+- ✅ Complete system operational and production-ready
 
 ---
 
@@ -205,8 +208,19 @@ OBSERVATIONS/
 
 ---
 
-## 🆕 RECENT UPDATES (2025-11-22)
+## 🆕 RECENT UPDATES (2025-11-24)
 
+**Option C Architecture Complete** - Automated deployment system operational
+
+**What Changed:**
+- 3090 server enhanced with /models/info and /models/reload endpoints
+- Created deployment_orchestrator.py - automates checkpoint deployment
+- Created prediction_client.py - standardized API client
+- Moved all monitoring from 3090 to 4090 (model_comparison_engine, etc.)
+- 3090 now pure inference server - no evaluation logic
+- Complete automated flow: train → compare → deploy → serve
+
+**Previous Update (2025-11-22):**
 **Production Integration Complete** - trainer/ modules now in core/train.py (commit: 5cdebe4)
 
 **What's New:**
@@ -241,29 +255,30 @@ See CHANGELOG.md for details
 
 ## 🎯 CURRENT SYSTEM STATE
 
-**Last Verified:** 2025-11-22 04:40 AM
+**Last Verified:** 2025-11-24 18:30 PM
 
 ### Model Status
 - **Base model:** Qwen3-0.6B (exists at `/path/to/training/models/Qwen3-0.6B/`)
   - Size: 1.5GB
   - Type: Qwen3ForCausalLM
-  - Hidden size: 1024, Layers: 28, Vocab: 151936
-- **Current model:** EMPTY (needs initialization)
+- **Deployed model:** checkpoint-156000 (on 3090)
+  - Location: `/path/to/models/deployed/`
+  - Auto-deployed by orchestrator
 - **Training method:** Full model fine-tuning (no LoRA)
-- **Last training attempt:** Failed with OOM at 04:02 AM
+- **Current training:** Running at step 156945+
 
-### Queue Status
-- **Normal queue:** 0 files
-- **Stuck files:** 3 files (287MB each, 100k examples)
-  - 2 in `queue/failed/`
-  - 1 in `queue/processing/`
-- **Issue:** OOM crashes during training
+### Service Status (Option C Architecture)
 
-### Service Status
+**4090 (Training Machine):**
+- ✅ Training daemon: Running
+- ✅ model_comparison_engine: Running (PID in .pids/model_comparison.pid)
+- ✅ deployment_orchestrator: Running (PID in .pids/deployment_orchestrator.pid)
 - ✅ Disk manager: Running
-- ❌ Training daemon: NOT running (PID dead)
-- ❌ Monitors: NOT running
-- ❌ Watchdogs: NOT running
+
+**3090 (Inference Server):**
+- ✅ Inference API: Running (port 8765)
+- ✅ Model loaded: checkpoint-156000 (1.2GB VRAM)
+- ✅ Auto-reload: Enabled via /models/reload endpoint
 
 ### Configuration (`config.json`)
 ```json
@@ -287,18 +302,34 @@ See CHANGELOG.md for details
 
 ## ⚡ QUICK OPERATIONS
 
-### Start All Services
+### Start All Services (4090)
 ```bash
 cd /path/to/training
-scripts/start_all.sh
+
+# Start monitoring daemons
+nohup python3 monitoring/model_comparison_engine.py --base-dir . --interval 600 > logs/model_comparison.log 2>&1 &
+echo $! > .pids/model_comparison.pid
+
+nohup python3 monitoring/deployment_orchestrator.py --base-dir . --interval 600 > logs/deployment_orchestrator.log 2>&1 &
+echo $! > .pids/deployment_orchestrator.pid
+
+# Start training daemon (if not already running)
+ps aux | grep training_daemon | grep -v grep || \
+nohup python3 core/training_daemon.py --base-dir . > logs/training_output.log 2>&1 &
 ```
 
-This starts:
-1. Auto disk manager
-2. Training daemon
-3. Live monitor (port 8080)
-4. Memory stats API (port 8081)
-5. Enhanced monitor (port 8082)
+### Check System Status
+```bash
+# Check 4090 daemons
+ps aux | grep -E 'model_comparison|deployment_orchestrator|training_daemon' | grep python
+
+# Check 3090 server
+curl http://192.168.x.x:8765/health | jq .
+curl http://192.168.x.x:8765/models/info | jq .
+
+# Check deployment status
+cat status/deployment_status.json | jq '.[0]'
+```
 
 ### Control Training
 ```bash
@@ -328,10 +359,17 @@ python3 safety/comprehensive_health_check.py
 python3 tools/analysis/state_tracker.py --check
 ```
 
-### Monitor URLs
-- Main UI: http://localhost:8080/live_monitor_ui_v2.html
-- Memory Stats: http://localhost:8081/api/memory_stats
-- Status JSON: http://localhost:8080/status/training_status.json
+### Important URLs
+
+**3090 Inference Server:**
+- Health: http://192.168.x.x:8765/health
+- Model Info: http://192.168.x.x:8765/models/info
+- Chat Completions: http://192.168.x.x:8765/v1/chat/completions (POST)
+
+**4090 Status Files:**
+- Training: cat status/training_status.json
+- Comparisons: cat status/model_comparisons.json
+- Deployments: cat status/deployment_status.json
 
 ---
 
@@ -420,10 +458,11 @@ python3 tools/data/validate_data.py --file my_data.jsonl
 - All old documentation deleted (16 .md files removed)
 - Fresh start - trust code as ground truth, not old docs
 
-### Current Priorities
-1. Fix stuck queue files (3 x 287MB files causing OOM)
-2. Restart training daemon
-3. Monitor system health
+### Current State
+1. ✅ Automated deployment working (Option C complete)
+2. ✅ Training running normally (step 156945+)
+3. ✅ 3090 serving trained model automatically
+4. Next: Monitor system stability over 24 hours
 
 ### When in Doubt
 1. Run health check: `python3 safety/comprehensive_health_check.py`
@@ -434,6 +473,16 @@ python3 tools/data/validate_data.py --file my_data.jsonl
 ---
 
 ## 🔄 UPDATE LOG
+
+**2025-11-24 (Option C Architecture):**
+- ✅ Enhanced 3090 server with /models/info and /models/reload
+- ✅ Created deployment_orchestrator.py (automated deployment)
+- ✅ Created prediction_client.py (standardized API client)
+- ✅ Moved monitoring to 4090 (comparison, orchestration)
+- ✅ Achieved automated deployment: < 15 min from checkpoint to serving
+- ✅ 3090 now serves trained model (was serving base model)
+- ✅ Complete system operational and tested
+- 📝 Documentation: OPTION_C_MIGRATION_STATUS.md
 
 **2025-11-22 (Late - Refactor Complete):**
 - ✅ Completed full 5-step refactor (~3 hours)

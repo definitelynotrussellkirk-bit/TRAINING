@@ -556,8 +556,97 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": str(e)}).encode())
             return
 
+        # Serve predictions endpoint (fetch from 3090)
+        if self.path.startswith('/api/predictions'):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            try:
+                import subprocess
+                # Fetch predictions from 3090 where daemon is running
+                result = subprocess.run(
+                    ['ssh', '192.168.x.x', 'cat /home/user/TRAINING/status/latest_predictions.json'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+
+                if result.returncode == 0 and result.stdout:
+                    predictions_data = json.loads(result.stdout)
+                    self.wfile.write(json.dumps(predictions_data).encode())
+                else:
+                    # Fallback to local file
+                    predictions_file = DIRECTORY / 'status' / 'latest_predictions.json'
+                    if predictions_file.exists():
+                        with open(predictions_file, 'r') as f:
+                            predictions_data = json.load(f)
+                        self.wfile.write(json.dumps(predictions_data).encode())
+                    else:
+                        self.wfile.write(json.dumps({
+                            "error": "No predictions available",
+                            "checkpoint": None,
+                            "predictions": [],
+                            "stats": {
+                                "total": 0,
+                                "accuracy_auto": 0,
+                                "accuracy_human": None
+                            }
+                        }).encode())
+            except Exception as e:
+                self.wfile.write(json.dumps({"error": str(e)}).encode())
+            return
+
         # Default handling for other paths
         super().do_GET()
+
+    def do_POST(self):
+        """Handle POST requests for grading predictions"""
+
+        # Handle prediction grading
+        if self.path.startswith('/api/predictions/grade'):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            try:
+                # Read POST data
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data.decode('utf-8'))
+
+                prediction_id = data.get('prediction_id')
+                grade = data.get('grade')  # "correct", "incorrect", or "unsure"
+                notes = data.get('notes', '')
+
+                if not prediction_id or not grade:
+                    self.wfile.write(json.dumps({
+                        "success": False,
+                        "error": "prediction_id and grade required"
+                    }).encode())
+                    return
+
+                # Import and use the prediction engine to save grading
+                import sys
+                sys.path.insert(0, str(DIRECTORY / 'monitoring'))
+                from prediction_viewer_engine import PredictionViewerEngine
+
+                engine = PredictionViewerEngine(base_dir=DIRECTORY)
+                engine.save_grading(prediction_id, grade, notes)
+
+                self.wfile.write(json.dumps({
+                    "success": True,
+                    "message": f"Grading saved for {prediction_id}"
+                }).encode())
+
+            except Exception as e:
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": str(e)
+                }).encode())
+            return
+
+        # Default 404 for other POST paths
+        self.send_response(404)
+        self.end_headers()
 
 def main():
     socketserver.TCPServer.allow_reuse_address = True

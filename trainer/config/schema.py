@@ -42,6 +42,9 @@ class Hyperparams:
     eval_steps: int = 50
     eval_strategy: Literal["steps", "epoch", "no"] = "steps"
 
+    # Memory optimization
+    use_gradient_checkpointing: bool = False  # Trade compute for memory
+
     def __post_init__(self):
         """Calculate derived values"""
         self.effective_batch_size = self.batch_size * self.gradient_accumulation

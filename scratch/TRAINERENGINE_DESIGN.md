@@ -1,5 +1,11 @@
 # TrainerEngine Implementation Design
 
+> **ARCHIVE NOTE (2025-11-24):**
+> This document describes the pre-implementation state where TrainerEngine
+> was still a stub. The engine is now fully implemented in
+> `trainer/core/engine.py`. Treat this doc as historical design, not
+> current behavior.
+
 **Goal:** Implement full `TrainerEngine.run_job(config)` that orchestrates all training operations.
 
 ---

@@ -201,11 +201,13 @@ def is_valid_model_dir(model_path: Path) -> bool:
 
 ## Problem 3: Missing Gradient Checkpointing
 
-### Current State
+### Current State (updated 2025-11-24)
 
-**No gradient checkpointing enabled in either trainer:**
-- `UltimateTrainer` - No checkpointing
-- `TrainerEngine` - No checkpointing
+**UltimateTrainer:** ✅ Gradient checkpointing implemented via `use_gradient_checkpointing` flag
+- `UltimateTrainer.load_model()` uses `config.hyperparams.use_gradient_checkpointing`
+- Calls `model.gradient_checkpointing_enable()` when enabled
+
+**TrainerEngine:** ❌ Gradient checkpointing still needs to be wired up
 
 **Impact:**
 For 0.6B model with 2048 context on 24GB GPU:

@@ -1,5 +1,10 @@
 # Full Model Training Fix Plan - 2025-11-24
 
+> **Status (2025-11-24):**
+> Live code now uses `load_in_4bit` everywhere. Any `use_qlora` references
+> in this doc refer to *archived* paths and can be ignored for the current stack.
+> See config.json and trainer/config/schema.py for current implementation.
+
 ## Problem Summary
 Currently calling it "QLoRA" but not actually using LoRA adapters. Just doing 4-bit quantized full-model training (or full-precision full-model). This causes:
 - Snapshot verification fails (looks for adapter files that don't exist)

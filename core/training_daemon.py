@@ -331,43 +331,45 @@ class TrainingDaemon:
 
     def validate_config(self, config: dict) -> None:
         """
-        Validate configuration to prevent training failures before they occur.
+        Validate configuration and fail fast on bad values.
 
-        Checks all critical config parameters for common issues that would cause
-        training to fail. Logs warnings but does not raise exceptions (allows
-        daemon to continue with warnings for non-critical issues).
+        This is a strict validator: if any critical issues are found, a
+        ValueError is raised and the daemon refuses to start until
+        config.json is fixed.
 
         Args:
             config: Configuration dictionary loaded from config.json
 
-        Side Effects:
-            - Logs warnings for invalid parameters
-            - Does NOT raise exceptions (daemon continues)
+        Raises:
+            ValueError: If any validation errors are found
 
-        Validation Checks:
-            - base_model path exists (if specified)
+        Side Effects:
+            - Logs all validation warnings and errors
+            - Raises ValueError on errors (daemon will not start)
+
+        Validation checks (currently implemented):
+            - model_path/base_model path exists (if specified)
             - max_length in range [128, 32768]
             - learning_rate in range [1e-6, 1e-2]
             - batch_size in range [1, 128]
             - gradient_accumulation in range [1, 128]
-            - lora_r in range [1, 256] (if specified)
-            - lora_alpha in range [1, 512] (if specified)
-            - snapshot_time format "HH:MM"
+            - lora_r in range [0, 1024] (if specified; 0 = full-model, no LoRA)
+            - snapshot_time format "HH:MM" (if specified)
+            - auto_generate.* fields are sane when enabled
 
         Example:
             config = {"batch_size": 256, "learning_rate": 0.1}
             self.validate_config(config)
-            # Logs: "Batch size out of range (1-128): 256"
-            # Logs: "Learning rate out of range (1e-6 to 1e-2): 0.1"
-            # Daemon continues with warnings
+            # Raises: ValueError("Config validation failed: ...")
         """
         errors = []
 
-        # Check base model path exists (if specified)
-        if 'base_model' in config and config['base_model']:
-            base_model_path = Path(config['base_model'])
-            if not base_model_path.exists():
-                errors.append(f"Base model not found: {config['base_model']}")
+        # Check model path exists (accepts both model_path and legacy base_model)
+        model_path = config.get("model_path") or config.get("base_model")
+        if model_path:
+            model_path_obj = Path(model_path)
+            if not model_path_obj.exists():
+                errors.append(f"Model path does not exist: {model_path}")
 
         # Check max_length is reasonable (if specified)
         if 'max_length' in config:
@@ -399,6 +401,14 @@ class TrainingDaemon:
             lora_r = config['lora_r']
             if not (lora_r >= 0 and lora_r <= 1024):
                 errors.append(f"LoRA rank out of range (0-1024): {lora_r}")
+
+        # Check snapshot_time format (if specified)
+        snapshot_time = config.get("snapshot_time")
+        if snapshot_time is not None:
+            try:
+                datetime.strptime(snapshot_time, "%H:%M")
+            except ValueError:
+                errors.append(f"Invalid snapshot_time '{snapshot_time}', expected HH:MM format")
 
         auto_cfg = config.get("auto_generate", {}) or {}
         if auto_cfg.get("enabled"):

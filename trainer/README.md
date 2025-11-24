@@ -39,17 +39,30 @@ Layer 3: Plugins             (trainer/profiles/, trainer/monitoring/)
 
 **File:** `trainer/core/engine.py`
 **Purpose:** High-level orchestration
-**Status:** Proof-of-concept (not used in production yet)
+**Status:** Fully implemented, API-stable, currently used via trainer/cli_main.py (daemon still uses UltimateTrainer for now)
 
 ```python
-from trainer.core.engine import TrainerEngine
+from trainer.core import TrainerEngine
+from trainer.config import create_default_config
+from trainer.monitoring import TrainingStatusWriter
 
-engine = TrainerEngine(config_path="config.json")
-result = engine.run_job(
-    dataset_path="data.jsonl",
-    model_name="qwen3",
-    output_dir="outputs"
+# Create configuration
+config = create_default_config(
+    model_path="models/Qwen3-0.6B",
+    dataset_path="data/train.jsonl",
+    output_dir="outputs/engine_run",
+    base_model="Qwen/Qwen3-0.6B",
+    model_architecture="Qwen3ForCausalLM",
+    max_context_length=4096,
+    vocab_size=151936,
 )
+
+# Initialize engine with status writer
+status_writer = TrainingStatusWriter("status/training_status.json")
+engine = TrainerEngine(status_writer)
+
+# Run training job
+result = engine.run_job(config)
 ```
 
 ### Layer 2: Configuration

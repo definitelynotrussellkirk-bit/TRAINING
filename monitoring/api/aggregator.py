@@ -15,6 +15,13 @@ from .plugins import PluginRegistry
 from .plugins.training_status import TrainingStatusPlugin
 from .plugins.curriculum import CurriculumPlugin
 from .plugins.gpu_stats import GPU4090Plugin, GPU3090Plugin
+from .plugins.adversarial import AdversarialPlugin
+from .plugins.checkpoints import CheckpointSyncPlugin
+from .plugins.regression import RegressionPlugin
+from .plugins.model_comparison import ModelComparisonPlugin
+from .plugins.confidence import ConfidencePlugin
+from .plugins.testing import TestingPlugin
+from .plugins.self_correction import SelfCorrectionPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +70,35 @@ class DataAggregator:
 
             self.registry.register(GPU3090Plugin(
                 config=self.config.get('gpu_3090', {})
+            ))
+
+            # Phase 4: Intelligence system plugins (all 3090 remote)
+            self.registry.register(AdversarialPlugin(
+                config=self.config.get('adversarial', {})
+            ))
+
+            self.registry.register(CheckpointSyncPlugin(
+                config=self.config.get('checkpoint_sync', {})
+            ))
+
+            self.registry.register(RegressionPlugin(
+                config=self.config.get('regression', {})
+            ))
+
+            self.registry.register(ModelComparisonPlugin(
+                config=self.config.get('model_comparison', {})
+            ))
+
+            self.registry.register(ConfidencePlugin(
+                config=self.config.get('confidence', {})
+            ))
+
+            self.registry.register(TestingPlugin(
+                config=self.config.get('testing', {})
+            ))
+
+            self.registry.register(SelfCorrectionPlugin(
+                config=self.config.get('self_correction', {})
             ))
 
             logger.info(f"Registered {len(self.registry.plugins)} default plugins")

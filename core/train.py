@@ -117,24 +117,70 @@ STOP_COUNT_MIN = 2
 STOP_COUNT_MAX = 4
 
 # Helper functions for variable stop sequences
-def get_random_stop_emoji():
-    """Select a random stop emoji from the pool."""
+def get_random_stop_emoji() -> str:
+    """
+    Select a random stop emoji from the pool.
+
+    Returns:
+        str: One emoji from STOP_EMOJI_POOL (e.g., "🛑", "⛔", "🚫")
+
+    Example:
+        >>> emoji = get_random_stop_emoji()
+        >>> emoji in STOP_EMOJI_POOL
+        True
+    """
     import random
     return random.choice(STOP_EMOJI_POOL)
 
-def get_random_stop_count():
-    """Select a random stop count (2-4)."""
+def get_random_stop_count() -> int:
+    """
+    Select a random stop count (2-4).
+
+    Returns:
+        int: Random integer between STOP_COUNT_MIN and STOP_COUNT_MAX (inclusive)
+
+    Example:
+        >>> count = get_random_stop_count()
+        >>> 2 <= count <= 4
+        True
+    """
     import random
     return random.randint(STOP_COUNT_MIN, STOP_COUNT_MAX)
 
 def get_stop_instruction(emoji: str, count: int) -> str:
-    """Generate stop instruction for a specific emoji and count."""
+    """
+    Generate stop instruction text for user prompts.
+
+    Args:
+        emoji: Stop emoji to use (e.g., "🛑")
+        count: Number of times to repeat emoji (2-4)
+
+    Returns:
+        str: Instruction text to append to user messages
+
+    Example:
+        >>> get_stop_instruction("🛑", 3)
+        'When finished, emit 🛑 /three times/ to signal completion.'
+    """
     count_words = {2: "twice", 3: "three times", 4: "four times"}
     count_text = count_words.get(count, f"{count} times")
     return f"When finished, emit {emoji} /{count_text}/ to signal completion."
 
 def get_stop_suffix(emoji: str, count: int) -> str:
-    """Generate stop suffix for a specific emoji and count."""
+    """
+    Generate stop suffix for assistant responses.
+
+    Args:
+        emoji: Stop emoji to use (e.g., "🛑")
+        count: Number of times to repeat emoji (2-4)
+
+    Returns:
+        str: Suffix to append to assistant responses (newline + emoji * count)
+
+    Example:
+        >>> get_stop_suffix("🛑", 3)
+        '\\n🛑🛑🛑'
+    """
     return "\n" + emoji * count
 
 def get_thinking_pattern(example_index):
@@ -187,7 +233,92 @@ except ImportError:
 
 
 class UltimateTrainer:
-    """Main trainer orchestrator."""
+    """
+    Main training orchestrator that combines all training system components.
+
+    Responsibilities:
+        - Validate training data before execution
+        - Load and configure model + tokenizer (with optional quantization)
+        - Apply data profile transformations (emoji_think, regime3, etc.)
+        - Setup HuggingFace Trainer with all callbacks
+        - Execute training loop with monitoring and status updates
+        - Handle checkpointing, snapshots, and failure recovery
+
+    Data Flow:
+        1. Validate dataset format and quality (validator)
+        2. Load model from database (model_db) and tokenizer
+        3. Apply profile transformations to examples (if profile enabled)
+        4. Create train/validation splits (with optional fixed validation set)
+        5. Tokenize and pack sequences for training
+        6. Setup Trainer with callbacks:
+           - TrainingStatusWriter (writes training_status.json)
+           - LiveInferenceMonitor (periodic model inference)
+           - EvolutionTracker (tracks model evolution)
+           - LayerMonitor (tracks layer activations/norms)
+        7. Execute trainer.train() with HuggingFace Trainer
+        8. Save checkpoints and create final snapshot
+
+    Configuration:
+        Supports two modes:
+        1. New Config System: Uses trainer.config.TrainerConfig from config.json + CLI args
+        2. Legacy Mode: Falls back to CLI args only (backward compatible)
+
+    Key Components Integrated:
+        - DatasetValidator: Pre-training validation
+        - ModelDatabase: Model selection and adapter management
+        - TimeEstimator: Training duration estimation
+        - TrainingStatusWriter: Real-time status updates to JSON
+        - LiveInferenceMonitor: Periodic inference during training
+        - EvolutionTracker: Track model evolution over time
+        - LayerMonitor: Monitor internal layer statistics
+        - DataProfile: Apply transformations (emoji patterns, stop signals, etc.)
+
+    Attributes:
+        args: Command-line arguments (argparse.Namespace)
+        controller: Optional training controller for pause/resume/stop
+        config: TrainerConfig from new config system (or None if fallback)
+        model_db: ModelDatabase for model selection
+        validator: DatasetValidator instance
+        model: Loaded HuggingFace model (AutoModelForCausalLM)
+        tokenizer: Loaded tokenizer
+        train_dataset: Tokenized training dataset
+        val_dataset: Tokenized validation dataset (if split enabled)
+        fixed_val_dataset: Fixed validation set for generalization metrics
+        raw_train_examples: Original untokenized examples (for snapshots)
+        live_monitor: LiveInferenceMonitor (optional)
+        evolution_tracker: EvolutionTracker (tracks model evolution)
+        status_writer: TrainingStatusWriter (writes status JSON)
+        layer_monitor: LayerMonitor (optional, tracks layer statistics)
+        training_summary: Dict with final training metrics
+
+    Side Effects:
+        - Writes checkpoints to output_dir/checkpoint-{step}/
+        - Writes training_status.json to status/ directory
+        - Writes evolution data to data/evolution/ (if enabled)
+        - Writes layer statistics to status/layer_monitor.json (if enabled)
+        - Creates daily snapshots with model + metadata
+        - May create profile files (stop signal patterns, etc.)
+        - Sends desktop notifications on training completion
+
+    Example:
+        from argparse import Namespace
+
+        args = Namespace(
+            dataset="data.jsonl",
+            model="qwen3_0.6b",
+            output_dir="outputs",
+            epochs=2,
+            batch_size=16,
+            learning_rate=2e-4
+        )
+
+        trainer = UltimateTrainer(args)
+        trainer.run()  # Execute full pipeline
+
+        # Access results
+        print(f"Final loss: {trainer.training_summary['loss']}")
+        print(f"Trained {trainer.training_summary['global_step']} steps")
+    """
 
     def __init__(self, args, controller=None):
         self.args = args

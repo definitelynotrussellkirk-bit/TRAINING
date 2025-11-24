@@ -1,21 +1,86 @@
 #!/usr/bin/env python3
 """
-Training Control System
+Training Control System - Graceful Training Management
 
-Provides graceful control over training operations:
-- Pause training (finish current batch, then pause)
-- Stop training (finish current batch, then stop)
-- Skip current file (move to next in queue)
-- Resume training
-- Check status
+Provides a file-based signaling system for controlling training without killing processes.
+All control operations are graceful - training completes the current batch before acting.
 
-Control via simple signal files:
-- .pause    - Pause after current batch
-- .stop     - Stop after current batch
-- .skip     - Skip current file, move to next
-- .resume   - Resume from pause
+Key Features:
+    - Pause/Resume: Pause after current batch, resume when ready
+    - Stop: Finish current batch, then stop cleanly
+    - Skip: Skip current training file, move to next in queue
+    - Status: Query current training state and active signals
 
-NO PROCESS KILLING - Everything is graceful!
+Usage:
+    # From command line
+    python3 training_controller.py pause --reason "Maintenance"
+    python3 training_controller.py resume
+    python3 training_controller.py status
+
+    # From code
+    controller = TrainingController("/path/to/TRAINING")
+    controller.signal_pause("Need to check something")
+
+    # In training loop
+    if controller.should_pause_after_batch():
+        controller.wait_for_resume()
+
+Signal Files (control/*.signal)
+-------------------------------
+All signals are empty files in control/ directory:
+
+- .pause: Pause after current batch completes
+  - Training daemon checks this after each batch
+  - When detected, training finishes batch then pauses
+  - File contains: reason + timestamp
+
+- .stop: Stop after current batch completes
+  - Training finishes current batch then exits cleanly
+  - File contains: reason + timestamp
+
+- .skip: Skip current training file
+  - Moves current file to queue/failed/
+  - Continues with next file in queue
+  - File contains: reason + timestamp
+
+- .resume: Resume from paused state
+  - Clears .pause signal
+  - Training continues from where it paused
+  - File is empty (just marker)
+
+State File (control/state.json)
+-------------------------------
+Current controller state:
+
+{
+    "status": "training",  // "idle" | "training" | "paused" | "stopping" | "skipping"
+    "last_update": "2025-11-24T10:30:00",  // ISO timestamp
+    "current_file": "data.jsonl",  // File being trained (str or null)
+    "paused_at": "2025-11-24T10:25:00",  // When paused (ISO timestamp or null)
+    "reason": "User requested"  // Reason for current state (str or null)
+}
+
+State Transitions:
+    idle → training → paused → training
+    training → stopping → idle
+    training → skipping → training
+
+Thread Safety:
+    - Signal files are atomic (file exists or doesn't)
+    - State file writes are NOT atomic (use from single thread)
+    - Safe for training process to read, controller to write
+
+Example Workflow:
+    1. Training is running (status="training")
+    2. User runs: training_controller.py pause
+    3. .pause signal file created
+    4. Training completes current batch
+    5. Training checks should_pause_after_batch() → True
+    6. Training calls wait_for_resume()
+    7. Status becomes "paused"
+    8. User runs: training_controller.py resume
+    9. .resume signal created, .pause removed
+    10. Training continues
 """
 
 import json
@@ -30,7 +95,77 @@ logger = logging.getLogger(__name__)
 
 
 class TrainingController:
-    """Manages training control signals and state"""
+    """
+    Manages training control signals via file-based communication.
+
+    Responsibilities:
+        - Create/check signal files (.pause, .stop, .skip, .resume)
+        - Maintain persistent state (control/state.json)
+        - Provide query methods for training daemon
+        - Offer command-line interface for user control
+        - Wait for resume signals (blocking wait)
+
+    Signal Management:
+        - signal_pause(): Create .pause signal file
+        - signal_stop(): Create .stop signal file
+        - signal_skip(): Create .skip signal file
+        - signal_resume(): Create .resume signal, clear .pause
+        - clear_signals(): Remove all signal files
+
+    Query Methods (for training daemon):
+        - check_pause() -> bool: Is pause signal present?
+        - check_stop() -> bool: Is stop signal present?
+        - check_skip() -> bool: Is skip signal present?
+        - check_resume() -> bool: Is resume signal present?
+        - should_pause_after_batch() -> bool: Should pause now?
+        - should_stop_after_batch() -> bool: Should stop now?
+        - should_skip_current_file() -> bool: Should skip file?
+
+    State Management:
+        - set_status(): Update status (idle/training/paused/stopping/skipping)
+        - get_status() -> Dict: Get full state + signals
+        - wait_for_resume(): Block until resume signal (used when paused)
+
+    File Structure:
+        control/.pause         - Pause signal (contains reason + timestamp)
+        control/.stop          - Stop signal (contains reason + timestamp)
+        control/.skip          - Skip signal (contains reason + timestamp)
+        control/.resume        - Resume signal (empty marker)
+        control/state.json     - Current state (status, current_file, etc.)
+
+    Thread Safety:
+        - Signal file checks are thread-safe (atomic file existence)
+        - State file is NOT thread-safe (single-writer assumption)
+        - Training daemon reads, controller writes
+
+    Example (Training Daemon):
+        controller = TrainingController()
+
+        while training:
+            # Check signals after each batch
+            if controller.should_stop_after_batch():
+                controller.clear_stop()
+                break
+
+            if controller.should_pause_after_batch():
+                controller.wait_for_resume()  # Blocks until resumed
+
+            if controller.should_skip_current_file():
+                move_to_failed(current_file)
+                controller.clear_skip()
+                continue
+
+            train_batch()
+
+    Example (User Control):
+        controller = TrainingController()
+        controller.signal_pause("Need to check logs")
+        # Training will pause after current batch
+
+        # Later...
+        controller.signal_resume()
+        # Training will continue
+    """
 
     def __init__(self, base_dir: str = "/path/to/training"):
         self.base_dir = Path(base_dir)

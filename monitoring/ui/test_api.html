@@ -1,23 +1,180 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>API Test</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Connection Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #0f1419;
+            color: #e0e0e0;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #00ff88;
+        }
+        .status {
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 2px solid #333;
+        }
+        .success {
+            background: #1a3d2a;
+            border-color: #00ff88;
+        }
+        .error {
+            background: #3d1a1a;
+            border-color: #ff4444;
+        }
+        .info {
+            background: #1a2a3d;
+            border-color: #4488ff;
+        }
+        pre {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        button {
+            background: #00ff88;
+            color: #0f1419;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #00dd77;
+        }
+    </style>
 </head>
 <body>
-    <h1>API Test</h1>
-    <pre id="output">Loading...</pre>
+    <h1>🔧 API Connection Diagnostic</h1>
+
+    <div id="status" class="status info">
+        <strong>Status:</strong> Click "Test Connection" to begin
+    </div>
+
+    <div>
+        <button onclick="testLocalhost()">Test localhost:8081</button>
+        <button onclick="testIP()">Test 192.168.x.x:8081</button>
+        <button onclick="testBoth()">Test Both</button>
+    </div>
+
+    <div id="results"></div>
 
     <script>
-    async function test() {
-        try {
-            const response = await fetch('/api/status/live');
-            const data = await response.json();
-            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
-        } catch (error) {
-            document.getElementById('output').textContent = 'ERROR: ' + error.message;
+        const LOCALHOST_URL = 'http://localhost:8081/api/unified';
+        const IP_URL = 'http://192.168.x.x:8081/api/unified';
+
+        function updateStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = `<strong>Status:</strong> ${message}`;
         }
-    }
-    test();
+
+        function displayResult(title, data, success) {
+            const resultsDiv = document.getElementById('results');
+            const resultHTML = `
+                <div class="status ${success ? 'success' : 'error'}">
+                    <h3>${title}</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                </div>
+            `;
+            resultsDiv.innerHTML += resultHTML;
+        }
+
+        async function testEndpoint(url, label) {
+            try {
+                updateStatus(`Testing ${label}...`, 'info');
+                console.log(`Fetching from: ${url}`);
+
+                const response = await fetch(url);
+                console.log(`Response status: ${response.status}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('Data received:', data);
+
+                const jsonStr = JSON.stringify(data);
+                if (jsonStr.includes('NaN')) {
+                    throw new Error('Response contains NaN values');
+                }
+
+                displayResult(
+                    `✅ ${label} - SUCCESS`,
+                    {
+                        system_status: data.summary?.system_status,
+                        plugins_healthy: data.summary?.plugins_healthy,
+                        plugins_failed: data.summary?.plugins_failed,
+                        timestamp: data.timestamp,
+                        sources: Object.keys(data.sources || {})
+                    },
+                    true
+                );
+
+                updateStatus(`${label} working correctly!`, 'success');
+                return true;
+
+            } catch (error) {
+                console.error(`Error testing ${label}:`, error);
+                displayResult(
+                    `❌ ${label} - FAILED`,
+                    {
+                        error: error.message,
+                        details: error.stack
+                    },
+                    false
+                );
+
+                updateStatus(`${label} failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testLocalhost() {
+            document.getElementById('results').innerHTML = '';
+            await testEndpoint(LOCALHOST_URL, 'localhost:8081');
+        }
+
+        async function testIP() {
+            document.getElementById('results').innerHTML = '';
+            await testEndpoint(IP_URL, '192.168.x.x:8081');
+        }
+
+        async function testBoth() {
+            document.getElementById('results').innerHTML = '';
+            const localhostWorks = await testEndpoint(LOCALHOST_URL, 'localhost:8081');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const ipWorks = await testEndpoint(IP_URL, '192.168.x.x:8081');
+
+            if (localhostWorks && ipWorks) {
+                updateStatus('Both endpoints working!', 'success');
+            } else if (localhostWorks) {
+                updateStatus('Only localhost works - use IP address if accessing remotely', 'info');
+            } else if (ipWorks) {
+                updateStatus('Only IP works - localhost may have issues', 'info');
+            } else {
+                updateStatus('Both endpoints failed', 'error');
+            }
+        }
+
+        window.addEventListener('load', () => {
+            console.log('Page loaded, ready for testing');
+        });
     </script>
 </body>
 </html>

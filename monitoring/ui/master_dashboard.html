@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Monitoring Dashboard</title>
+    <link rel="stylesheet" href="/css/master_dashboard.css">
+</head>
+<body>
+    <!-- TOP STATUS BAR -->
+    <header class="master-header">
+        <div class="header-left">
+            <h1 class="master-title">⚡ Master Monitoring Dashboard</h1>
+            <div class="system-health">
+                <div class="health-dot" id="systemHealthDot"></div>
+                <span id="systemHealthLabel">INITIALIZING</span>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <div class="quick-metric">
+                <span class="quick-label">Training</span>
+                <span class="quick-value" id="quickTrainingStep">--</span>
+            </div>
+            <div class="quick-metric">
+                <span class="quick-label">Loss</span>
+                <span class="quick-value" id="quickLoss">--</span>
+            </div>
+            <div class="quick-metric">
+                <span class="quick-label">4090 VRAM</span>
+                <span class="quick-value" id="quick4090VRAM">--</span>
+            </div>
+            <div class="quick-metric">
+                <span class="quick-label">3090 VRAM</span>
+                <span class="quick-value" id="quick3090VRAM">--</span>
+            </div>
+            <div class="quick-metric">
+                <span class="quick-label">Plugins</span>
+                <span class="quick-value" id="quickPlugins">--</span>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div class="update-time">Last Update: <span id="lastUpdate">--</span></div>
+            <div class="refresh-indicator" id="refreshIndicator">●</div>
+        </div>
+    </header>
+
+    <!-- MAIN GRID -->
+    <div class="master-grid">
+        <!-- LEFT COLUMN: TRAINING MACHINE (4090) -->
+        <div class="column column-left">
+            <div class="column-header">
+                <h2>🚀 RTX 4090 - Training Machine</h2>
+                <div class="machine-badge machine-4090">LOCAL</div>
+            </div>
+
+            <!-- Training Status Card -->
+            <div class="card card-training">
+                <div class="card-header">
+                    <h3>📊 Training Status</h3>
+                    <div class="status-indicator" id="trainingStatusIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="metric-grid">
+                        <div class="metric-item">
+                            <span class="metric-label">Status</span>
+                            <span class="metric-value" id="trainingStatus">--</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Step</span>
+                            <span class="metric-value" id="trainingStep">-- / --</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Progress</span>
+                            <span class="metric-value" id="trainingProgress">--%</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Loss</span>
+                            <span class="metric-value metric-highlight" id="trainingLoss">--</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Val Loss</span>
+                            <span class="metric-value" id="trainingValLoss">--</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Gap</span>
+                            <span class="metric-value" id="trainingGap">--</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Accuracy</span>
+                            <span class="metric-value" id="trainingAccuracy">--%</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Tokens/sec</span>
+                            <span class="metric-value" id="trainingTokens">--</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="trainingProgressBar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GPU 4090 Card -->
+            <div class="card card-gpu">
+                <div class="card-header">
+                    <h3>🎮 GPU 4090 Statistics</h3>
+                    <div class="status-indicator" id="gpu4090Indicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="gpu-metrics">
+                        <div class="gpu-stat">
+                            <span class="gpu-label">VRAM Used</span>
+                            <span class="gpu-value" id="gpu4090VRAMUsed">-- GB</span>
+                        </div>
+                        <div class="gpu-stat">
+                            <span class="gpu-label">VRAM Total</span>
+                            <span class="gpu-value" id="gpu4090VRAMTotal">-- GB</span>
+                        </div>
+                        <div class="gpu-stat">
+                            <span class="gpu-label">Utilization</span>
+                            <span class="gpu-value" id="gpu4090Util">--%</span>
+                        </div>
+                        <div class="gpu-stat">
+                            <span class="gpu-label">Temperature</span>
+                            <span class="gpu-value" id="gpu4090Temp">--°C</span>
+                        </div>
+                    </div>
+                    <div class="vram-bar-container">
+                        <div class="vram-bar" id="vram4090Bar"></div>
+                        <span class="vram-label" id="vram4090Label">-- %</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER COLUMN: INTELLIGENCE SYSTEMS 1 (3090) -->
+        <div class="column column-center">
+            <div class="column-header">
+                <h2>🧠 RTX 3090 - Intelligence Systems</h2>
+                <div class="machine-badge machine-3090">REMOTE</div>
+            </div>
+
+            <!-- Curriculum Optimization Card -->
+            <div class="card card-intelligence">
+                <div class="card-header">
+                    <h3>📚 Curriculum Optimization</h3>
+                    <div class="status-indicator" id="curriculumIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="intel-metrics">
+                        <div class="intel-stat">
+                            <span class="intel-label">Easy Accuracy</span>
+                            <span class="intel-value intel-easy" id="curriculumEasy">--%</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Medium Accuracy</span>
+                            <span class="intel-value intel-medium" id="curriculumMedium">--%</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Hard Accuracy</span>
+                            <span class="intel-value intel-hard" id="curriculumHard">--%</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Step</span>
+                            <span class="intel-value" id="curriculumStep">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Regression Monitoring Card -->
+            <div class="card card-intelligence">
+                <div class="card-header">
+                    <h3>⚠️ Regression Monitoring</h3>
+                    <div class="status-indicator" id="regressionIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="intel-metrics">
+                        <div class="intel-stat">
+                            <span class="intel-label">Regression Detected</span>
+                            <span class="intel-value" id="regressionDetected">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Loss Increase</span>
+                            <span class="intel-value" id="regressionLossInc">--%</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Accuracy Drop</span>
+                            <span class="intel-value" id="regressionAccDrop">--%</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Total Regressions</span>
+                            <span class="intel-value" id="regressionTotal">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Comparison Card -->
+            <div class="card card-intelligence">
+                <div class="card-header">
+                    <h3>🏆 Model Comparison</h3>
+                    <div class="status-indicator" id="modelCompIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="intel-metrics">
+                        <div class="intel-stat">
+                            <span class="intel-label">Best Checkpoint</span>
+                            <span class="intel-value" id="modelCompBest">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Best Score</span>
+                            <span class="intel-value" id="modelCompScore">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Checkpoints Compared</span>
+                            <span class="intel-value" id="modelCompTotal">--</span>
+                        </div>
+                    </div>
+                    <div class="top-models" id="topModelsContainer">
+                        <!-- Top 3 models will be inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Automated Testing Card -->
+            <div class="card card-intelligence">
+                <div class="card-header">
+                    <h3>✅ Automated Testing</h3>
+                    <div class="status-indicator" id="testingIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="intel-metrics">
+                        <div class="intel-stat">
+                            <span class="intel-label">Pass Rate</span>
+                            <span class="intel-value" id="testingPassRate">--%</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Total Tests</span>
+                            <span class="intel-value" id="testingTotal">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Passed</span>
+                            <span class="intel-value intel-good" id="testingPassed">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Failed</span>
+                            <span class="intel-value intel-bad" id="testingFailed">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: INTELLIGENCE SYSTEMS 2 (3090) -->
+        <div class="column column-right">
+            <div class="column-header">
+                <h2>🔬 More Intelligence & Hardware</h2>
+            </div>
+
+            <!-- Adversarial Mining Card -->
+            <div class="card card-intelligence">
+                <div class="card-header">
+                    <h3>💀 Adversarial Mining</h3>
+                    <div class="status-indicator" id="advIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="intel-metrics">
+                        <div class="intel-stat">
+                            <span class="intel-label">Total Examples</span>
+                            <span class="intel-value" id="advTotal">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Categories</span>
+                            <span class="intel-value" id="advCategories">--</span>
+                        </div>
+                    </div>
+                    <div class="adv-categories" id="advCategoriesContainer">
+                        <!-- Categories will be inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confidence Calibration Card -->
+            <div class="card card-intelligence">
+                <div class="card-header">
+                    <h3>📈 Confidence Calibration</h3>
+                    <div class="status-indicator" id="confIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="intel-metrics">
+                        <div class="intel-stat">
+                            <span class="intel-label">ECE</span>
+                            <span class="intel-value" id="confECE">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Bins</span>
+                            <span class="intel-value" id="confBins">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Overconfidence</span>
+                            <span class="intel-value" id="confOverconf">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Self-Correction Loop Card -->
+            <div class="card card-intelligence">
+                <div class="card-header">
+                    <h3>🔄 Self-Correction Loop</h3>
+                    <div class="status-indicator" id="selfCorrIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="intel-metrics">
+                        <div class="intel-stat">
+                            <span class="intel-label">Errors Captured</span>
+                            <span class="intel-value" id="selfCorrErrors">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Patterns Found</span>
+                            <span class="intel-value" id="selfCorrPatterns">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Corrections Gen</span>
+                            <span class="intel-value" id="selfCorrGen">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Total Corrections</span>
+                            <span class="intel-value" id="selfCorrTotal">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Checkpoint Sync Card -->
+            <div class="card card-intelligence">
+                <div class="card-header">
+                    <h3>🔄 Checkpoint Sync</h3>
+                    <div class="status-indicator" id="checkpointIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="intel-metrics">
+                        <div class="intel-stat">
+                            <span class="intel-label">Sync Status</span>
+                            <span class="intel-value" id="checkpointStatus">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Latest Checkpoint</span>
+                            <span class="intel-value" id="checkpointLatest">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Total Synced</span>
+                            <span class="intel-value" id="checkpointSynced">--</span>
+                        </div>
+                        <div class="intel-stat">
+                            <span class="intel-label">Failures</span>
+                            <span class="intel-value" id="checkpointFailures">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GPU 3090 Card -->
+            <div class="card card-gpu">
+                <div class="card-header">
+                    <h3>🎮 GPU 3090 Statistics</h3>
+                    <div class="status-indicator" id="gpu3090Indicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="gpu-metrics">
+                        <div class="gpu-stat">
+                            <span class="gpu-label">VRAM Used</span>
+                            <span class="gpu-value" id="gpu3090VRAMUsed">-- GB</span>
+                        </div>
+                        <div class="gpu-stat">
+                            <span class="gpu-label">VRAM Total</span>
+                            <span class="gpu-value" id="gpu3090VRAMTotal">-- GB</span>
+                        </div>
+                        <div class="gpu-stat">
+                            <span class="gpu-label">Utilization</span>
+                            <span class="gpu-value" id="gpu3090Util">--%</span>
+                        </div>
+                        <div class="gpu-stat">
+                            <span class="gpu-label">Temperature</span>
+                            <span class="gpu-value" id="gpu3090Temp">--°C</span>
+                        </div>
+                    </div>
+                    <div class="vram-bar-container">
+                        <div class="vram-bar" id="vram3090Bar"></div>
+                        <span class="vram-label" id="vram3090Label">-- %</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER: API INFO -->
+    <footer class="master-footer">
+        <div class="api-info">
+            <span>API: <code>http://localhost:8081/api/unified</code></span>
+            <span class="divider">|</span>
+            <span>Auto-refresh: <span id="refreshRate">5s</span></span>
+            <span class="divider">|</span>
+            <span>Data Sources: <span id="dataSourceCount">11</span></span>
+        </div>
+        <div class="footer-links">
+            <a href="control_room_v2.html" class="footer-link">Control Room</a>
+            <a href="live_monitor_ui_v2.html" class="footer-link">Live Monitor</a>
+            <a href="/api/unified" target="_blank" class="footer-link">Raw JSON</a>
+        </div>
+    </footer>
+
+    <script src="/js/master_dashboard.js"></script>
+</body>
+</html>

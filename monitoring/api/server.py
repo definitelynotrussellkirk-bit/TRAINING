@@ -11,6 +11,8 @@ from flask import Flask, jsonify, request
 import logging
 import sys
 import os
+import json
+import math
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -62,6 +64,19 @@ def index():
     })
 
 
+def clean_nan(obj):
+    """Recursively replace NaN and Infinity with None in nested dicts/lists"""
+    if isinstance(obj, dict):
+        return {k: clean_nan(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_nan(item) for item in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    return obj
+
+
 @app.route('/api/unified')
 def api_unified():
     """
@@ -75,6 +90,8 @@ def api_unified():
     """
     try:
         data = aggregator.get_unified_data()
+        # Clean NaN values before returning
+        data = clean_nan(data)
         return jsonify(data)
     except Exception as e:
         logger.error(f"Error in /api/unified: {e}", exc_info=True)

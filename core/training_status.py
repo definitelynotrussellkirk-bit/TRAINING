@@ -1,14 +1,152 @@
 #!/usr/bin/env python3
 """
-Training Status Tracker
+Training Status Tracker - Communication Bridge Between Training and UI
 
-Writes JSON status files that the UI can read to show:
-- Current training step
-- Latest inference results (prompt, golden answer, model answer)
-- Training metrics
-- Crash information
+Provides a structured way to write and read training status as JSON files.
+The training process writes status updates, and the UI/monitoring systems
+read these files to display real-time progress.
 
-This creates a communication bridge between the training process and the UI.
+Key Components:
+    - TrainingStatus: Dataclass representing complete training state
+    - TrainingStatusWriter: Writes status updates to disk (atomic writes)
+    - TrainingStatusReader: Reads status from disk
+
+Usage:
+    writer = TrainingStatusWriter(Path("status/training_status.json"))
+
+    # During training
+    writer.update_progress(step=100, total_steps=1000, loss=0.45, lr=2e-4)
+
+    # After inference
+    writer.update_inference(step=100, prompt="What is 2+2?",
+                          golden="4", model_output="4", matches=True)
+
+    # On crash
+    writer.mark_crashed(error="CUDA OOM", error_type="OOM")
+
+training_status.json Format
+---------------------------
+Complete JSON schema for the status file:
+
+{
+    // Training state
+    "status": "training",  // "idle" | "training" | "crashed" | "completed"
+    "current_step": 1000,  // Current training step (int)
+    "total_steps": 10000,  // Total steps to train (int)
+    "epoch": 2,            // Current epoch (int)
+    "loss": 0.45,          // Current training loss (float)
+    "learning_rate": 0.0002, // Current learning rate (float)
+    "timestamp": "2025-11-24T10:30:00",  // ISO timestamp (str)
+
+    // Model information
+    "model_name": "Qwen3-0.6B",  // Display name for UI (str or null)
+    "max_output_tokens": 2048,   // Max generation length (int)
+    "context_window": 4096,      // Training context size (int)
+
+    // File/batch progress
+    "batch_step": 50,            // Step within current file (int or null)
+    "batch_total_steps": 118,    // Total steps for file (int or null)
+    "batch_number": 6,           // Current batch number (int or null)
+    "batch_queue_size": 22,      // Total batches queued (int or null)
+    "current_file": "data.jsonl", // Filename being trained (str or null)
+
+    // Latest inference results
+    "current_system_prompt": "...",  // System prompt (str or null)
+    "current_prompt": "What is 2+2?", // Input prompt (str or null)
+    "golden_answer": "4",            // Expected answer (str or null)
+    "model_answer": "4",             // Model's answer (str or null)
+    "answer_matches": true,          // Correct? (bool or null)
+
+    // Recent inference examples (last 5)
+    "recent_examples": [
+        {
+            "step": 950,
+            "current_file": "data.jsonl",
+            "system_prompt": "...",
+            "prompt": "What is 2+2?",
+            "golden": "4",
+            "model_output": "4",
+            "matches": true,
+            "loss": 0.45
+        }
+    ],
+
+    // Running accuracy
+    "total_evals": 100,       // Total inference evaluations (int)
+    "total_correct": 85,      // Correct answers (int)
+    "accuracy_percent": 85.0, // Accuracy (float)
+
+    // Validation metrics
+    "validation_loss": 0.52,  // Loss on fixed val set (float or null)
+    "val_train_gap": 0.07,    // val_loss - train_loss (float or null)
+
+    // Think tag tracking
+    "think_tag_count": 5,     // Count with <think> tags (int)
+    "think_tag_percent": 5.0, // Percentage with <think> (float)
+
+    // Output length tracking
+    "max_golden_output_length": 512,   // Max golden tokens (int or null)
+    "max_model_output_length": 1024,   // Max model tokens (int or null)
+    "current_golden_output_length": 128, // Current golden (int or null)
+    "current_model_output_length": 130,  // Current model (int or null)
+
+    // Fixed evaluation metrics
+    "fixed_eval_em": 0.82,    // Exact match on fixed set (float or null)
+    "fixed_eval_ce": 0.45,    // Cross-entropy (float or null)
+    "fixed_eval_ece": 0.08,   // Expected calibration error (float or null)
+    "fixed_eval_trend": "improving", // "improving"|"stable"|"degrading" (str or null)
+
+    // Extended accuracy tracking
+    "accuracy_last_20": 88.0,     // Last 20 evals (float or null)
+    "accuracy_last_50": 85.5,     // Last 50 evals (float or null)
+    "accuracy_trend": "improving", // Trend (str or null)
+
+    // Pattern analysis
+    "pattern_heatmap": {...},  // Pattern×length heatmap (dict or null)
+    "pattern_loss_trend": {...}, // Loss per pattern (dict or null)
+    "pattern_layer_correlation": {...}, // Layer influence (dict or null)
+    "length_bin_staleness": {...}, // Seconds since observation (dict or null)
+
+    // Layer activity
+    "layer_activity_summary": {...},  // Layer statistics (dict or null)
+    "layer_stability_summary": {...}, // Stability ranking (dict or null)
+
+    // LoRA monitoring
+    "lora_stats": {...},    // Per-layer gradient norms (dict or null)
+    "lora_summary": {...},  // High-level LoRA activity (dict or null)
+
+    // Streaming metrics
+    "streaming_ce": 0.44,       // EMA-smoothed cross-entropy (float or null)
+    "loss_variance": 0.02,      // Loss noise level (float or null)
+    "token_entropy": 1.25,      // Prediction uncertainty (float or null)
+    "loss_trend": "improving",  // Loss trend (str or null)
+
+    // Alerts
+    "active_alerts": [],     // List of active alerts (list or null)
+    "alert_summary": {...},  // Counts by severity (dict or null)
+
+    // Throughput
+    "tokens_per_sec": 1250.5,         // Current throughput (float or null)
+    "tokens_per_sec_avg": 1200.0,     // Average throughput (float or null)
+    "tokens_per_sec_baseline": 1220.0, // Baseline after warmup (float or null)
+    "throughput_trend": "stable",      // Trend (str or null)
+    "throughput_vram_samples": [...],  // Recent samples (list or null)
+    "queue_velocity": {...},           // Est. samples/sec/hour (dict or null)
+
+    // Logit penalties
+    "logit_penalty_stats": [...],  // Penalty hit counters (list or null)
+    "penalty_heatmap": {...},      // Penalty distribution (dict or null)
+
+    // Error info (if crashed)
+    "error_message": "CUDA OOM",   // Error description (str or null)
+    "error_type": "OOM"            // Error category (str or null)
+}
+
+Notes:
+    - All writes are atomic (write to temp file, then rename)
+    - Null values indicate the metric is not currently tracked
+    - Timestamps are ISO 8601 format (YYYY-MM-DDTHH:MM:SS)
+    - Dict/list fields have variable structure (see specific collectors)
 """
 
 import json
@@ -139,7 +277,76 @@ class TrainingStatus:
 
 
 class TrainingStatusWriter:
-    """Writes training status to disk for UI consumption."""
+    """
+    Writes training status updates to disk for UI and monitoring consumption.
+
+    Responsibilities:
+        - Maintain current training state (step, loss, lr, etc.)
+        - Track running inference accuracy and recent examples
+        - Write status updates to JSON file (atomic writes)
+        - Append detailed inference logs to daily log files
+        - Cache advanced metrics (pattern heatmaps, layer activity, etc.)
+
+    Data Flow:
+        1. Training loop calls update_progress() every step
+        2. Inference callbacks call update_inference() periodically
+        3. Advanced collectors call update_advanced_metrics() for detailed stats
+        4. Status written atomically to training_status.json
+        5. Inference details appended to logs/inference_YYYYMMDD.log
+
+    Key Methods:
+        - update_progress(): Update basic training progress (step, loss, lr)
+        - update_inference(): Update with inference results (prompt, answer, matches)
+        - update_advanced_metrics(): Update with advanced metrics (patterns, LoRA, etc.)
+        - mark_crashed(): Mark training as crashed with error info
+        - mark_completed(): Mark training as successfully completed
+
+    Caching Strategy:
+        - last_inference_data: Most recent inference (preserved across progress updates)
+        - recent_examples: Last 5 inference examples (deduped by step+file+output)
+        - pattern_heatmap: Aggregated pattern×length distribution
+        - penalty_heatmap: Aggregated logit penalty hits
+        - layer_stability_summary: Layer activity stability ranking
+        - vram_samples: Last 60 throughput+VRAM measurements
+
+    Side Effects:
+        - Writes training_status.json atomically (temp file + rename)
+        - Appends to logs/inference_YYYYMMDD.log (daily rotation)
+        - Appends to logs/pattern_layer_history.jsonl (pattern tracking)
+        - Creates status/ and logs/ directories if missing
+
+    Thread Safety:
+        - Write operations are atomic (temp file + rename)
+        - Not thread-safe for concurrent writes (use from single training thread)
+
+    Example:
+        writer = TrainingStatusWriter(
+            status_file=Path("status/training_status.json"),
+            max_output_tokens=2048,
+            context_window=4096,
+            model_name="Qwen3-0.6B"
+        )
+
+        # During training loop
+        for step in range(total_steps):
+            writer.update_progress(
+                step=step,
+                total_steps=total_steps,
+                epoch=epoch,
+                loss=loss,
+                lr=lr
+            )
+
+            # Periodic inference
+            if step % 50 == 0:
+                writer.update_inference(
+                    step=step,
+                    prompt="What is 2+2?",
+                    golden="4",
+                    model_output="4",
+                    matches=True
+                )
+    """
 
     def __init__(
         self,

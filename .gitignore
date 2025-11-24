@@ -40,6 +40,8 @@ __pycache__/
 training_output.log
 reports/
 tools/
+control/state.json
+skill_syllo_variant/.autogen_seed
 
 # Backup files
 .gitignore.backup

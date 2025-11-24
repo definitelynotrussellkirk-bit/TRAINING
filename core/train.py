@@ -762,6 +762,16 @@ class UltimateTrainer:
             self.model.config.use_cache = False
             print("   ✓ Disabled KV cache (use_cache=False)")
 
+            # Enable gradient checkpointing if configured (saves VRAM, trades compute)
+            use_grad_ckpt = False
+            if self.config and hasattr(self.config.hyperparams, 'use_gradient_checkpointing'):
+                use_grad_ckpt = self.config.hyperparams.use_gradient_checkpointing
+            if use_grad_ckpt and hasattr(self.model, 'gradient_checkpointing_enable'):
+                self.model.gradient_checkpointing_enable()
+                print("   ✓ Enabled gradient checkpointing (saves ~40% VRAM, ~15% slower training)")
+            else:
+                print("   ⚠️  Gradient checkpointing disabled (higher VRAM usage)")
+
             # Full model training (no LoRA)
             print("   ✓ Full model fine-tuning enabled (all weights trainable)")
 
@@ -827,14 +837,26 @@ class UltimateTrainer:
     def prepare_dataset(self) -> bool:
         """Load and prepare dataset."""
         try:
-            # Build enforced system prompt with date (use CLI arg if provided)
+            # Build enforced system prompt with date (use profile, CLI arg, or default)
             from datetime import datetime
 
-            # Use CLI system prompt if provided, otherwise use default
-            base_prompt = self.args.system_prompt if hasattr(self.args, 'system_prompt') else "You are a helpful assistant."
-
-            # Inject current date
-            enforced_system_prompt = f"Today is {datetime.now().strftime('%Y-%m-%d')}. {base_prompt}"
+            # Priority: profile > CLI arg > default
+            if self.profile and hasattr(self.profile, 'get_system_prompt_template'):
+                # Profile provides template with {current_date} placeholder
+                base_prompt = self.profile.get_system_prompt_template()
+                current_date = datetime.now().strftime('%Y-%m-%d')
+                enforced_system_prompt = base_prompt.replace("{current_date}", current_date)
+                print(f"   Using system prompt from profile: {self.profile.__class__.__name__}")
+            elif hasattr(self.args, 'system_prompt') and self.args.system_prompt:
+                # Use CLI arg with date prefix
+                base_prompt = self.args.system_prompt
+                enforced_system_prompt = f"Today is {datetime.now().strftime('%Y-%m-%d')}. {base_prompt}"
+                print(f"   Using system prompt from CLI arg")
+            else:
+                # Fallback to default
+                base_prompt = "You are a helpful assistant."
+                enforced_system_prompt = f"Today is {datetime.now().strftime('%Y-%m-%d')}. {base_prompt}"
+                print(f"   Using default system prompt")
 
             self.enforced_system_prompt = enforced_system_prompt
 

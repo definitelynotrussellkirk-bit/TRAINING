@@ -20,6 +20,22 @@
                 <div class="health-dot" id="systemHealthDot"></div>
                 <span id="systemHealthLabel">INITIALIZING</span>
             </div>
+            <!-- Daemon Status Badge with Dropdown -->
+            <div class="daemon-status-wrapper" id="daemonStatusWrapper">
+                <button class="daemon-status-badge" id="daemonStatusBadge" onclick="toggleDaemonDropdown()">
+                    <span class="daemon-badge-icon" id="daemonBadgeIcon">⏳</span>
+                    <span class="daemon-badge-text" id="daemonBadgeText">Loading...</span>
+                </button>
+                <div class="daemon-dropdown" id="daemonDropdown">
+                    <div class="daemon-dropdown-header">
+                        <span>Daemon Status</span>
+                        <button class="daemon-dropdown-close" onclick="toggleDaemonDropdown()">×</button>
+                    </div>
+                    <div class="daemon-dropdown-content" id="daemonDropdownContent">
+                        <!-- Daemon list will be populated here -->
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="header-center">

@@ -69,6 +69,9 @@ async function fetchData() {
         // Update error cards based on system health
         updateErrorCards(data);
 
+        // Update daemon status badge in header
+        updateDaemonStatusBadge(data);
+
         // Fetch queue data separately (different endpoint)
         fetchQueueData();
 
@@ -1598,6 +1601,183 @@ function updateAllDowntimes() {
 
 // Update downtime counters every second
 setInterval(updateAllDowntimes, 1000);
+
+// ===== Daemon Status Badge & Dropdown =====
+
+let daemonDropdownOpen = false;
+let allDaemonProcesses = []; // Store all processes for dropdown
+
+/**
+ * Toggle the daemon status dropdown
+ */
+function toggleDaemonDropdown() {
+    const dropdown = document.getElementById('daemonDropdown');
+    if (!dropdown) return;
+
+    daemonDropdownOpen = !daemonDropdownOpen;
+    dropdown.classList.toggle('open', daemonDropdownOpen);
+
+    // Close on outside click
+    if (daemonDropdownOpen) {
+        setTimeout(() => {
+            document.addEventListener('click', closeDaemonDropdownOnOutsideClick);
+        }, 10);
+    } else {
+        document.removeEventListener('click', closeDaemonDropdownOnOutsideClick);
+    }
+}
+
+/**
+ * Close dropdown when clicking outside
+ */
+function closeDaemonDropdownOnOutsideClick(event) {
+    const wrapper = document.getElementById('daemonStatusWrapper');
+    if (wrapper && !wrapper.contains(event.target)) {
+        const dropdown = document.getElementById('daemonDropdown');
+        if (dropdown) {
+            dropdown.classList.remove('open');
+            daemonDropdownOpen = false;
+        }
+        document.removeEventListener('click', closeDaemonDropdownOnOutsideClick);
+    }
+}
+
+/**
+ * Update daemon status badge and dropdown content
+ */
+function updateDaemonStatusBadge(data) {
+    const systemHealth = data.sources?.system_health?.data;
+    if (!systemHealth) return;
+
+    const badge = document.getElementById('daemonStatusBadge');
+    const iconEl = document.getElementById('daemonBadgeIcon');
+    const textEl = document.getElementById('daemonBadgeText');
+    const contentEl = document.getElementById('daemonDropdownContent');
+
+    if (!badge || !iconEl || !textEl || !contentEl) return;
+
+    // Get all processes and count status
+    const processes = systemHealth.processes || [];
+    allDaemonProcesses = processes;
+
+    const running = processes.filter(p => p.running).length;
+    const down = processes.filter(p => !p.running).length;
+    const total = processes.length;
+
+    // Update badge appearance
+    badge.classList.remove('healthy', 'warning', 'critical');
+
+    if (down === 0) {
+        badge.classList.add('healthy');
+        iconEl.textContent = '✓';
+        textEl.textContent = `${running}/${total} OK`;
+    } else if (down <= 2) {
+        badge.classList.add('warning');
+        iconEl.textContent = '⚠';
+        textEl.textContent = `${down} down`;
+    } else {
+        badge.classList.add('critical');
+        iconEl.textContent = '🚨';
+        textEl.textContent = `${down} down`;
+    }
+
+    // Build dropdown content grouped by machine
+    const byMachine = {};
+    for (const proc of processes) {
+        const machine = proc.machine || 'unknown';
+        if (!byMachine[machine]) byMachine[machine] = [];
+        byMachine[machine].push(proc);
+    }
+
+    let html = '';
+
+    // Sort machines: 4090 first, then 3090
+    const machines = Object.keys(byMachine).sort((a, b) => {
+        if (a === '4090') return -1;
+        if (b === '4090') return 1;
+        return a.localeCompare(b);
+    });
+
+    for (const machine of machines) {
+        const procs = byMachine[machine];
+        const machineDown = procs.filter(p => !p.running).length;
+        const machineTotal = procs.length;
+
+        html += `<div class="daemon-machine-section">`;
+        html += `<div class="daemon-machine-header m-${machine}">`;
+        html += `<span>RTX ${machine}</span>`;
+        html += `<span style="margin-left:auto; font-weight:400;">${machineTotal - machineDown}/${machineTotal}</span>`;
+        html += `</div>`;
+
+        // Sort: down processes first
+        procs.sort((a, b) => {
+            if (!a.running && b.running) return -1;
+            if (a.running && !b.running) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        for (const proc of procs) {
+            const statusClass = proc.running ? 'running' : 'down';
+            const icon = proc.running ? '✓' : '✗';
+            const statusIcon = proc.running ? '●' : '○';
+
+            html += `<div class="daemon-item ${statusClass}" onclick="scrollToErrorCard('${proc.machine}', '${proc.name}')">`;
+            html += `<span class="daemon-item-icon">${proc.running ? '✓' : '✗'}</span>`;
+            html += `<div class="daemon-item-info">`;
+            html += `<div class="daemon-item-name">${formatProcessName(proc.name)}</div>`;
+            html += `<div class="daemon-item-meta">`;
+            html += `<span class="daemon-item-status ${statusClass}">${statusIcon} ${proc.running ? 'Running' : 'Down'}</span>`;
+            if (proc.running && proc.uptime) {
+                html += `<span class="daemon-item-uptime">${proc.uptime}</span>`;
+            }
+            if (!proc.running && proc.error) {
+                html += `<span style="color: var(--color-danger); font-size: 0.7rem;">${proc.error}</span>`;
+            }
+            html += `</div></div></div>`;
+        }
+
+        html += `</div>`;
+    }
+
+    if (processes.length === 0) {
+        html = `<div class="daemon-dropdown-empty">No daemon data available</div>`;
+    }
+
+    contentEl.innerHTML = html;
+}
+
+/**
+ * Scroll to and highlight an error card for a specific daemon
+ */
+function scrollToErrorCard(machine, processName) {
+    // Find the error card for this daemon
+    const cardId = `error-card-process_down_${machine}_${processName}`;
+    let card = document.getElementById(cardId);
+
+    // Try alternate ID format
+    if (!card) {
+        const altCardId = `error-card-process_error_${machine}_${processName}`;
+        card = document.getElementById(altCardId);
+    }
+
+    if (card) {
+        // Close dropdown
+        toggleDaemonDropdown();
+
+        // Scroll into view and highlight
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.style.transform = 'scale(1.02)';
+        card.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.5)';
+
+        setTimeout(() => {
+            card.style.transform = '';
+            card.style.boxShadow = '';
+        }, 1500);
+    } else {
+        // No error card (daemon might be running) - just close dropdown
+        toggleDaemonDropdown();
+    }
+}
 
 // Initialize on load
 window.addEventListener('DOMContentLoaded', init);

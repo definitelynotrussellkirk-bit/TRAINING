@@ -88,6 +88,9 @@ TASK_TYPE_PRIORITIES = {
     "hard_example_eval": Priority.NORMAL,    # Quick inference tests
     "generate_visualizations": Priority.IDLE, # CPU only, lowest priority
     "update_learning_history": Priority.IDLE, # Quick file append
+    # Phase 3: Targeted corrections
+    "generate_corrections": Priority.LOW,    # Generate training data for error types
+    "error_feedback_loop": Priority.NORMAL,  # Full eval + generate + queue cycle
 }
 
 
@@ -226,6 +229,9 @@ class TaskExecutor:
             "hard_example_eval": self._handle_hard_example_eval,
             "generate_visualizations": self._handle_generate_visualizations,
             "update_learning_history": self._handle_update_learning_history,
+            # Phase 3: Targeted corrections
+            "generate_corrections": self._handle_generate_corrections,
+            "error_feedback_loop": self._handle_error_feedback_loop,
         }
 
     def register_handler(self, task_type: str, handler: Callable):
@@ -695,6 +701,126 @@ class TaskExecutor:
         except Exception as e:
             logger.error(f"Learning history update failed: {e}")
             return {"task": "update_learning_history", "error": str(e)}
+
+    def _handle_generate_corrections(self, params: Dict) -> Dict:
+        """Generate targeted training data for specific error types"""
+        base_dir = params.get("base_dir", "/path/to/training")
+        error_type = params.get("error_type")  # Optional: specific type
+        count = params.get("count", 30)
+        queue_data = params.get("queue", True)
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "pattern_generator",
+                f"{base_dir}/monitoring/analytics/pattern_generator.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                generator = module.PatternGenerator(base_dir)
+
+                if error_type:
+                    # Generate for specific type
+                    examples = generator.generate_for_type(error_type, count)
+                    if queue_data:
+                        filepath = generator.save_to_inbox(examples, error_type)
+                        return {
+                            "task": "generate_corrections",
+                            "error_type": error_type,
+                            "examples_generated": len(examples),
+                            "queued_file": str(filepath),
+                            "timestamp": datetime.now().isoformat()
+                        }
+                    return {
+                        "task": "generate_corrections",
+                        "error_type": error_type,
+                        "examples_generated": len(examples),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                else:
+                    # Auto-generate based on error distribution
+                    if queue_data:
+                        files = generator.generate_and_queue(count)
+                        return {
+                            "task": "generate_corrections",
+                            "files_created": len(files),
+                            "error_types": list(files.keys()),
+                            "total_examples": sum(1 for _ in files.values()),
+                            "timestamp": datetime.now().isoformat()
+                        }
+                    else:
+                        all_examples = generator.generate_auto(count)
+                        total = sum(len(ex) for ex in all_examples.values())
+                        return {
+                            "task": "generate_corrections",
+                            "examples_generated": total,
+                            "by_type": {k: len(v) for k, v in all_examples.items()},
+                            "timestamp": datetime.now().isoformat()
+                        }
+
+        except Exception as e:
+            logger.error(f"Generate corrections failed: {e}")
+            return {"task": "generate_corrections", "error": str(e)}
+
+    def _handle_error_feedback_loop(self, params: Dict) -> Dict:
+        """
+        Full feedback loop: Evaluate -> Analyze errors -> Generate corrections -> Queue
+
+        This is the key Phase 3 integration - runs the complete cycle.
+        """
+        base_dir = params.get("base_dir", "/path/to/training")
+        corrections_per_error = params.get("corrections_per_error", 30)
+
+        results = {
+            "task": "error_feedback_loop",
+            "steps": [],
+            "timestamp": datetime.now().isoformat()
+        }
+
+        try:
+            # Step 1: Run hard example evaluation
+            logger.info("Step 1: Evaluating hard examples...")
+            eval_result = self._handle_hard_example_eval({"base_dir": base_dir})
+            results["steps"].append({
+                "step": "hard_example_eval",
+                "accuracy": eval_result.get("accuracy", 0),
+                "error_types": eval_result.get("error_types", {})
+            })
+
+            # Step 2: Check if we need corrections
+            error_types = eval_result.get("error_types", {})
+            if not error_types:
+                results["message"] = "No errors found - skipping correction generation"
+                return results
+
+            # Step 3: Generate corrections for each error type
+            logger.info(f"Step 2: Generating corrections for {len(error_types)} error types...")
+            gen_result = self._handle_generate_corrections({
+                "base_dir": base_dir,
+                "count": corrections_per_error,
+                "queue": True
+            })
+            results["steps"].append({
+                "step": "generate_corrections",
+                "files_created": gen_result.get("files_created", 0),
+                "error_types": gen_result.get("error_types", [])
+            })
+
+            # Step 4: Summary
+            results["summary"] = {
+                "accuracy_before": eval_result.get("accuracy", 0),
+                "errors_targeted": list(error_types.keys()),
+                "corrections_queued": gen_result.get("files_created", 0)
+            }
+
+            logger.info(f"Feedback loop complete: {results['summary']}")
+            return results
+
+        except Exception as e:
+            logger.error(f"Error feedback loop failed: {e}")
+            results["error"] = str(e)
+            return results
 
 
 class GPUTaskScheduler:

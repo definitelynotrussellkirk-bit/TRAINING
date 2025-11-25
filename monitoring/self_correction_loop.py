@@ -545,6 +545,8 @@ Output:"""
 
 def run_with_scheduler(scheduler_url: str, interval: int, base_dir: str, error_threshold: int):
     """Run as a scheduler client - submit tasks instead of executing directly."""
+    import sys
+    sys.path.insert(0, str(Path(base_dir)))
     from monitoring.task_client import TaskClient
 
     client = TaskClient(scheduler_url)

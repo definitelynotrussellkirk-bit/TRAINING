@@ -423,8 +423,10 @@ class CurriculumEvalLoop:
                 time.sleep(self.interval)
 
 
-def run_with_scheduler(scheduler_url: str, interval: int, problems: int):
+def run_with_scheduler(scheduler_url: str, interval: int, problems: int, base_dir: str = "/path/to/training"):
     """Run as a scheduler client - submit tasks instead of executing directly."""
+    import sys
+    sys.path.insert(0, base_dir)
     from monitoring.task_client import TaskClient
 
     client = TaskClient(scheduler_url)

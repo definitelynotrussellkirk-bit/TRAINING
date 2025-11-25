@@ -392,6 +392,8 @@ class AutomatedTestingDaemon:
 
 def run_with_scheduler(scheduler_url: str, interval: int, base_dir: str, validation_file: str = None):
     """Run as a scheduler client - submit tasks instead of executing directly."""
+    import sys
+    sys.path.insert(0, base_dir)
     from monitoring.task_client import TaskClient
 
     client = TaskClient(scheduler_url)
@@ -415,7 +417,7 @@ def run_with_scheduler(scheduler_url: str, interval: int, base_dir: str, validat
                 params["validation_file"] = validation_file
 
             result = client.submit_and_wait(
-                task_type="automated_testing",
+                task_type="automated_test",
                 params=params,
                 priority=2,  # NORMAL
                 timeout=900.0  # 15 min timeout (testing takes longer)

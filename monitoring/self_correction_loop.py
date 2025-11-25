@@ -543,6 +543,59 @@ Output:"""
                 time.sleep(interval)
 
 
+def run_with_scheduler(scheduler_url: str, interval: int, base_dir: str, error_threshold: int):
+    """Run as a scheduler client - submit tasks instead of executing directly."""
+    from monitoring.task_client import TaskClient
+
+    client = TaskClient(scheduler_url)
+
+    logger.info("="*60)
+    logger.info("Self-Correction Loop - Scheduler Mode")
+    logger.info("="*60)
+    logger.info(f"Scheduler: {scheduler_url}")
+    logger.info(f"Interval: {interval}s")
+    logger.info(f"Error threshold: {error_threshold}")
+
+    if not client.is_healthy():
+        logger.error("Scheduler not available!")
+        return
+
+    while True:
+        try:
+            logger.info("\nSubmitting self_correction task to scheduler...")
+
+            result = client.submit_and_wait(
+                task_type="self_correction",
+                params={
+                    "base_dir": base_dir,
+                    "error_threshold": error_threshold,
+                    "batch_size": 100
+                },
+                priority=2,  # NORMAL
+                timeout=600.0  # 10 min timeout
+            )
+
+            if result:
+                logger.info(f"Task completed: {result.get('status')}")
+                if result.get('result'):
+                    r = result['result']
+                    logger.info(f"  Tested: {r.get('tested', 0)}")
+                    logger.info(f"  Errors captured: {r.get('errors_captured', 0)}")
+                    logger.info(f"  Corrections generated: {r.get('corrections_generated', 0)}")
+            else:
+                logger.warning("Task failed or timed out")
+
+            logger.info(f"\n💤 Next submission in {interval}s...")
+            time.sleep(interval)
+
+        except KeyboardInterrupt:
+            logger.info("\nStopping...")
+            break
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            time.sleep(interval)
+
+
 def main():
     """Main entry point"""
     import argparse
@@ -560,8 +613,17 @@ def main():
                        help='Check interval for continuous mode (seconds)')
     parser.add_argument('--error-threshold', type=int, default=50,
                        help='Min errors before analysis')
+    parser.add_argument('--use-scheduler', action='store_true',
+                       help='Submit tasks to GPU Task Scheduler instead of running directly')
+    parser.add_argument('--scheduler-url', default='http://192.168.x.x:8766',
+                       help='GPU Task Scheduler URL')
 
     args = parser.parse_args()
+
+    # Scheduler mode
+    if args.use_scheduler:
+        run_with_scheduler(args.scheduler_url, args.interval, args.base_dir, args.error_threshold)
+        return
 
     # Create loop
     loop = SelfCorrectionLoop(

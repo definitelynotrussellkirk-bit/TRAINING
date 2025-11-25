@@ -227,9 +227,23 @@ OBSERVATIONS/
 
 ## 🆕 RECENT UPDATES (2025-11-25)
 
-**Curriculum-Based Data Generation** - DataManager now uses local skill APIs
+**GPU Task Scheduler** - Central coordinator for 3090 GPU workloads
 
-**What Changed (2025-11-25 - Curriculum Integration):**
+**What Changed (2025-11-25 - GPU Scheduler):**
+- Created `monitoring/gpu_task_scheduler.py` - central daemon coordinating all GPU tasks
+- Created `monitoring/task_client.py` - client library for task submission
+- Updated daemons with `--use-scheduler` flag: curriculum_eval, self_correction, automated_testing
+- Scheduler monitors GPU utilization and dispatches tasks from priority queue
+- Target: maintain 20-80% GPU utilization, auto-dispatch idle tasks when under 20%
+- 11 task types: curriculum_eval, self_correction, automated_test, adversarial_mine, etc.
+- API on port 8766: `/api/health`, `/api/tasks/submit`, `/api/metrics`
+
+**Start GPU Scheduler (on 3090):**
+```bash
+nohup python3 /path/to/training/monitoring/gpu_task_scheduler.py --port 8766 > logs/gpu_scheduler.log 2>&1 &
+```
+
+**Previous (2025-11-25 - Curriculum Integration):**
 - DataManager rewritten to use `SkillAPIClient` instead of remote GPU (3090)
 - Now connects to local singleSKILL APIs: SYLLO (8080), Binary (8090)
 - Integrated `CurriculumManager` for adaptive difficulty progression
@@ -441,6 +455,12 @@ python3 tools/analysis/state_tracker.py --check
 - Health: http://192.168.x.x:8765/health
 - Model Info: http://192.168.x.x:8765/models/info
 - Chat Completions: http://192.168.x.x:8765/v1/chat/completions (POST)
+
+**3090 GPU Task Scheduler:**
+- Health: http://192.168.x.x:8766/api/health
+- Metrics: http://192.168.x.x:8766/api/metrics
+- Submit Task: http://192.168.x.x:8766/api/tasks/submit (POST)
+- Task Types: http://192.168.x.x:8766/api/task-types
 
 **4090 Status Files:**
 - Training: cat status/training_status.json

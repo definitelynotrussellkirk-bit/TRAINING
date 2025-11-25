@@ -390,6 +390,58 @@ class AutomatedTestingDaemon:
                 time.sleep(self.interval)
 
 
+def run_with_scheduler(scheduler_url: str, interval: int, base_dir: str, validation_file: str = None):
+    """Run as a scheduler client - submit tasks instead of executing directly."""
+    from monitoring.task_client import TaskClient
+
+    client = TaskClient(scheduler_url)
+
+    logger.info("="*60)
+    logger.info("Automated Testing Daemon - Scheduler Mode")
+    logger.info("="*60)
+    logger.info(f"Scheduler: {scheduler_url}")
+    logger.info(f"Interval: {interval}s")
+
+    if not client.is_healthy():
+        logger.error("Scheduler not available!")
+        return
+
+    while True:
+        try:
+            logger.info("\nSubmitting automated_testing task to scheduler...")
+
+            params = {"base_dir": base_dir}
+            if validation_file:
+                params["validation_file"] = validation_file
+
+            result = client.submit_and_wait(
+                task_type="automated_testing",
+                params=params,
+                priority=2,  # NORMAL
+                timeout=900.0  # 15 min timeout (testing takes longer)
+            )
+
+            if result:
+                logger.info(f"Task completed: {result.get('status')}")
+                if result.get('result'):
+                    r = result['result']
+                    logger.info(f"  Total: {r.get('total', 0)}")
+                    logger.info(f"  Correct: {r.get('correct', 0)}")
+                    logger.info(f"  Accuracy: {r.get('accuracy', 0)*100:.1f}%")
+            else:
+                logger.warning("Task failed or timed out")
+
+            logger.info(f"\n💤 Next submission in {interval}s...")
+            time.sleep(interval)
+
+        except KeyboardInterrupt:
+            logger.info("\nStopping...")
+            break
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            time.sleep(interval)
+
+
 def main():
     """Main entry point"""
     import argparse
@@ -403,8 +455,17 @@ def main():
                        help='Check interval (seconds)')
     parser.add_argument('--validation-file', type=str,
                        help='Path to validation dataset')
+    parser.add_argument('--use-scheduler', action='store_true',
+                       help='Submit tasks to GPU Task Scheduler instead of running directly')
+    parser.add_argument('--scheduler-url', default='http://192.168.x.x:8766',
+                       help='GPU Task Scheduler URL')
 
     args = parser.parse_args()
+
+    # Scheduler mode
+    if args.use_scheduler:
+        run_with_scheduler(args.scheduler_url, args.interval, args.base_dir, args.validation_file)
+        return
 
     # Create daemon
     daemon = AutomatedTestingDaemon(

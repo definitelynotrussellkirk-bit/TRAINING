@@ -227,9 +227,28 @@ OBSERVATIONS/
 
 ## 🆕 RECENT UPDATES (2025-11-25)
 
-**Code Review Session** - Verified monitoring systems are correctly implemented
+**Curriculum-Based Data Generation** - DataManager now uses local skill APIs
 
-**What Changed (2025-11-25 - Code Review):**
+**What Changed (2025-11-25 - Curriculum Integration):**
+- DataManager rewritten to use `SkillAPIClient` instead of remote GPU (3090)
+- Now connects to local singleSKILL APIs: SYLLO (8080), Binary (8090)
+- Integrated `CurriculumManager` for adaptive difficulty progression
+- **SYLLO-only** for now - master SYLLO before introducing Binary
+- Files named: `train_SKILL_levelN_COUNT_TIMESTAMP.jsonl`
+- Config updated: `auto_generate.count: 100` (was 100000)
+- State file: `data_manager/curriculum_state.json` (tracks levels, history)
+
+**Curriculum System:**
+- SYLLO: 5 levels (4-8 word puzzles)
+- Binary: 7 levels (magnitude 1-10 to 10K-100K)
+- Progression: 80% accuracy over 3 evaluations to advance
+
+**Requirement:** SYLLO API must be running:
+```bash
+cd /path/to/skills && python3 skill_syllo_variant/api_server.py --port 8080
+```
+
+**Previous (2025-11-25 - Code Review):**
 - Verified adversarial miner supports `messages[]` format (lines 193-229 `extract_prompt_and_expected()`)
 - Verified adversarial miner has plugin-compatible fields: `total_examples_mined`, `categories` (lines 377-402)
 - Verified self-correction loop writes `status/self_correction.json` with correct schema (lines 61, 93-132)

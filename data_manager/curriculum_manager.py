@@ -2,16 +2,14 @@
 """
 Curriculum Manager - Adaptive Difficulty Progression
 
-Automatically increases training difficulty when model achieves target accuracy.
+Integrates with singleSKILL API servers to generate training data
+at appropriate difficulty levels based on model performance.
 
-Progression for SYLLO skill:
-1. Mixed (Easy + Medium + Hard)  (start - DEFAULT)
-2. Medium + Hard                 (after 75% on mixed)
-3. Hard + Ultra                  (after 75% on medium+hard)
-4. Ultra only                    (after 75% on hard+ultra)
-5. Next skill                    (after 75% on ultra)
+Skills supported:
+- SYLLO: 5 levels (word count 4-8)
+- Binary: 7 levels (magnitude ranges)
 
-Target: 75% accuracy for progression
+Progression: Advance when accuracy >= threshold over N evaluations
 """
 
 import json
@@ -23,52 +21,44 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+# Skill definitions matching API server levels
+# All levels require 80% accuracy to advance
+SKILL_LEVELS = {
+    "syllo": {
+        "name": "SYLLO Puzzles",
+        "total_levels": 5,
+        "api_port": 8080,
+        "levels": [
+            {"level": 1, "name": "Beginner", "word_count": 4, "threshold": 0.80},
+            {"level": 2, "name": "Easy", "word_count": 5, "threshold": 0.80},
+            {"level": 3, "name": "Intermediate", "word_count": 6, "threshold": 0.80},
+            {"level": 4, "name": "Advanced", "word_count": 7, "threshold": 0.80},
+            {"level": 5, "name": "Expert", "word_count": 8, "threshold": None},  # Mastered
+        ]
+    },
+    "binary": {
+        "name": "Binary Arithmetic",
+        "total_levels": 7,
+        "api_port": 8090,
+        "levels": [
+            {"level": 1, "name": "Foundation", "magnitude": "1-10", "ops": ["add", "subtract"], "threshold": 0.80},
+            {"level": 2, "name": "Small Numbers", "magnitude": "1-20", "ops": ["add", "subtract", "multiply"], "threshold": 0.80},
+            {"level": 3, "name": "Two-Digit", "magnitude": "10-100", "ops": ["add", "subtract", "multiply"], "threshold": 0.80},
+            {"level": 4, "name": "Shifts", "magnitude": "10-100", "ops": ["all", "+shifts"], "threshold": 0.80},
+            {"level": 5, "name": "Medium", "magnitude": "100-1K", "ops": ["all"], "threshold": 0.80},
+            {"level": 6, "name": "Large", "magnitude": "1K-10K", "ops": ["all"], "threshold": 0.80},
+            {"level": 7, "name": "Expert", "magnitude": "10K-100K", "ops": ["all"], "threshold": None},  # Mastered
+        ]
+    }
+}
+
+
 class CurriculumManager:
     """
-    Manages adaptive curriculum based on model performance
+    Manages adaptive curriculum based on model performance.
 
-    Tracks difficulty levels and automatically progresses when
-    accuracy threshold is reached.
+    Integrates with singleSKILL APIs via skill_api_client.
     """
-
-    # Difficulty progression for SYLLO skill
-    SYLLO_LEVELS = [
-        {
-            "level": 1,
-            "name": "mixed_default",
-            "description": "Mixed (Easy + Medium + Hard) - DEFAULT",
-            "difficulties": ["easy", "medium", "hard"],
-            "next_threshold": 0.75
-        },
-        {
-            "level": 2,
-            "name": "medium_hard",
-            "description": "Medium + Hard",
-            "difficulties": ["medium", "hard"],
-            "next_threshold": 0.75
-        },
-        {
-            "level": 3,
-            "name": "hard_ultra",
-            "description": "Hard + Ultra",
-            "difficulties": ["hard", "ultra"],
-            "next_threshold": 0.75
-        },
-        {
-            "level": 4,
-            "name": "ultra_only",
-            "description": "Ultra only",
-            "difficulties": ["ultra"],
-            "next_threshold": 0.75
-        },
-        {
-            "level": 5,
-            "name": "mastered",
-            "description": "SYLLO mastered - ready for next skill",
-            "difficulties": ["ultra"],  # Keep generating ultra while transitioning
-            "next_threshold": None  # No next level
-        }
-    ]
 
     def __init__(self, base_dir: Path, config: Dict[str, Any]):
         self.base_dir = Path(base_dir)
@@ -83,102 +73,136 @@ class CurriculumManager:
 
         # Curriculum config
         self.curriculum_config = config.get("curriculum", {})
-        self.target_accuracy = self.curriculum_config.get("target_accuracy", 0.75)
         self.enabled = self.curriculum_config.get("enabled", True)
+        self.min_evals = self.curriculum_config.get("min_evals_for_progression", 3)
 
     def _load_state(self) -> Dict:
         """Load curriculum state from disk"""
         if self.state_file.exists():
             with open(self.state_file) as f:
-                return json.load(f)
+                state = json.load(f)
 
-        # Default state
+            # Migrate old format (single skill) to new format (multi-skill)
+            if "skills" not in state:
+                old_level = state.get("current_level", 1)
+                old_history = state.get("accuracy_history", [])
+                old_progressions = state.get("progression_history", [])
+
+                state = {
+                    "skills": {
+                        "syllo": {
+                            "current_level": old_level,
+                            "accuracy_history": old_history,
+                            "progression_history": old_progressions
+                        },
+                        "binary": {"current_level": 1, "accuracy_history": [], "progression_history": []},
+                    },
+                    "active_skill": state.get("current_skill", "syllo"),
+                    "started_at": state.get("started_at", datetime.now().isoformat()),
+                    "migrated_at": datetime.now().isoformat()
+                }
+                # Save migrated state
+                with open(self.state_file, 'w') as f:
+                    json.dump(state, f, indent=2)
+                logger.info("Migrated curriculum state to new multi-skill format")
+
+            return state
+
+        # Default state - start with SYLLO level 1
         return {
-            "current_skill": "syllo",
-            "current_level": 1,
-            "accuracy_history": [],
-            "progression_history": [],
+            "skills": {
+                "syllo": {"current_level": 1, "accuracy_history": [], "progression_history": []},
+                "binary": {"current_level": 1, "accuracy_history": [], "progression_history": []},
+            },
+            "active_skill": "syllo",
             "started_at": datetime.now().isoformat()
         }
 
     def _save_state(self):
         """Save curriculum state to disk"""
+        self.state["last_updated"] = datetime.now().isoformat()
         with open(self.state_file, 'w') as f:
             json.dump(self.state, f, indent=2)
+        logger.debug("Curriculum state saved")
 
-        logger.info(f"Curriculum state saved: Level {self.state['current_level']}")
+    def get_skill_config(self, skill: str) -> Dict[str, Any]:
+        """Get skill configuration"""
+        if skill not in SKILL_LEVELS:
+            raise ValueError(f"Unknown skill: {skill}")
+        return SKILL_LEVELS[skill]
 
-    def get_current_level(self) -> Dict[str, Any]:
-        """Get current difficulty level configuration"""
-        level_idx = self.state["current_level"] - 1
+    def get_current_level(self, skill: str) -> Dict[str, Any]:
+        """Get current level configuration for a skill"""
+        skill_config = self.get_skill_config(skill)
+        current_level = self.state["skills"][skill]["current_level"]
 
-        if self.state["current_skill"] == "syllo":
-            if level_idx < len(self.SYLLO_LEVELS):
-                return self.SYLLO_LEVELS[level_idx]
+        for lvl in skill_config["levels"]:
+            if lvl["level"] == current_level:
+                return lvl
 
-        # Fallback
-        return self.SYLLO_LEVELS[0]
+        # Fallback to first level
+        return skill_config["levels"][0]
 
-    def get_generation_config(self) -> Dict[str, Any]:
+    def get_generation_params(self, skill: str, count: int = 50) -> Dict[str, Any]:
         """
-        Get configuration for data generation based on current level
+        Get parameters for skill_api_client.generate_skill_data()
 
-        Returns dict with difficulty settings to pass to remote generator
+        Returns params ready to pass to the API.
         """
-        level = self.get_current_level()
+        current_level = self.get_current_level(skill)
 
         return {
-            "difficulties": level["difficulties"],
-            "difficulty_weights": self._get_difficulty_weights(level["difficulties"]),
-            "skill": self.state["current_skill"],
-            "level": level["level"],
-            "level_name": level["name"]
+            "skill": skill,
+            "level": current_level["level"],
+            "count": count,
         }
 
-    def _get_difficulty_weights(self, difficulties: List[str]) -> Dict[str, float]:
+    def record_accuracy(
+        self,
+        skill: str,
+        accuracy: float,
+        step: int,
+        metadata: Optional[Dict] = None
+    ):
         """
-        Get probability weights for each difficulty
-
-        Strategy: Equal weight across all difficulties in current level
-        """
-        if not difficulties:
-            return {"easy": 1.0}
-
-        weight = 1.0 / len(difficulties)
-        return {diff: weight for diff in difficulties}
-
-    def record_accuracy(self, accuracy: float, step: int, metadata: Optional[Dict] = None):
-        """
-        Record accuracy from evaluation
+        Record accuracy from evaluation.
 
         Args:
+            skill: Skill name ("syllo" or "binary")
             accuracy: Accuracy score (0-1)
             step: Training step number
-            metadata: Optional metadata (model_id, eval_job_id, etc.)
+            metadata: Optional metadata
         """
+        if skill not in self.state["skills"]:
+            self.state["skills"][skill] = {
+                "current_level": 1,
+                "accuracy_history": [],
+                "progression_history": []
+            }
+
+        skill_state = self.state["skills"][skill]
+
         record = {
             "step": step,
             "accuracy": accuracy,
-            "level": self.state["current_level"],
+            "level": skill_state["current_level"],
             "timestamp": datetime.now().isoformat()
         }
-
         if metadata:
             record["metadata"] = metadata
 
-        self.state["accuracy_history"].append(record)
+        skill_state["accuracy_history"].append(record)
 
         # Keep only last 100 records
-        if len(self.state["accuracy_history"]) > 100:
-            self.state["accuracy_history"] = self.state["accuracy_history"][-100:]
+        if len(skill_state["accuracy_history"]) > 100:
+            skill_state["accuracy_history"] = skill_state["accuracy_history"][-100:]
 
         self._save_state()
+        logger.info(f"[{skill}] Recorded accuracy: {accuracy:.1%} at step {step} (Level {skill_state['current_level']})")
 
-        logger.info(f"Recorded accuracy: {accuracy:.2%} at step {step} (Level {self.state['current_level']})")
-
-    def should_progress(self) -> Tuple[bool, str]:
+    def should_progress(self, skill: str) -> Tuple[bool, str]:
         """
-        Check if model should progress to next difficulty level
+        Check if should progress to next level.
 
         Returns:
             (should_progress, reason)
@@ -186,130 +210,146 @@ class CurriculumManager:
         if not self.enabled:
             return False, "Curriculum disabled"
 
-        current_level = self.get_current_level()
+        skill_state = self.state["skills"].get(skill, {})
+        current_level_num = skill_state.get("current_level", 1)
 
-        # Check if already at max level
-        if current_level["level"] >= 6:
-            return False, "Already at maximum level (SYLLO mastered)"
+        skill_config = self.get_skill_config(skill)
+        current_level = self.get_current_level(skill)
 
-        # Need at least 3 recent evals
-        recent_evals = [r for r in self.state["accuracy_history"]
-                       if r["level"] == self.state["current_level"]]
+        # Check if at max level
+        if current_level_num >= skill_config["total_levels"]:
+            return False, f"Already at max level ({skill_config['total_levels']})"
 
-        if len(recent_evals) < 3:
-            return False, f"Need more evals (have {len(recent_evals)}, need 3)"
+        threshold = current_level.get("threshold")
+        if threshold is None:
+            return False, "Skill mastered (no threshold)"
 
-        # Check last 3 evals
-        last_3 = recent_evals[-3:]
-        avg_accuracy = sum(r["accuracy"] for r in last_3) / len(last_3)
+        # Get recent evals at current level
+        history = skill_state.get("accuracy_history", [])
+        at_level = [r for r in history if r.get("level") == current_level_num]
 
-        threshold = current_level["next_threshold"]
+        if len(at_level) < self.min_evals:
+            return False, f"Need {self.min_evals} evals at level (have {len(at_level)})"
+
+        # Check last N evals
+        recent = at_level[-self.min_evals:]
+        avg_accuracy = sum(r["accuracy"] for r in recent) / len(recent)
 
         if avg_accuracy >= threshold:
-            return True, f"Average accuracy {avg_accuracy:.2%} ≥ {threshold:.0%}"
+            return True, f"Avg accuracy {avg_accuracy:.1%} >= threshold {threshold:.0%}"
 
-        return False, f"Average accuracy {avg_accuracy:.2%} < {threshold:.0%}"
+        return False, f"Avg accuracy {avg_accuracy:.1%} < threshold {threshold:.0%}"
 
-    def progress_to_next_level(self) -> Dict[str, Any]:
-        """
-        Progress to next difficulty level
-
-        Returns:
-            New level configuration
-        """
-        old_level = self.state["current_level"]
+    def progress_to_next_level(self, skill: str) -> Dict[str, Any]:
+        """Progress to next level."""
+        skill_state = self.state["skills"][skill]
+        old_level = skill_state["current_level"]
         new_level = old_level + 1
+
+        skill_config = self.get_skill_config(skill)
+        if new_level > skill_config["total_levels"]:
+            new_level = skill_config["total_levels"]
 
         # Record progression
         progression = {
             "from_level": old_level,
             "to_level": new_level,
-            "timestamp": datetime.now().isoformat(),
-            "trigger_accuracy": self.state["accuracy_history"][-1]["accuracy"] if self.state["accuracy_history"] else None
+            "timestamp": datetime.now().isoformat()
         }
-
-        self.state["progression_history"].append(progression)
-        self.state["current_level"] = new_level
+        skill_state["progression_history"].append(progression)
+        skill_state["current_level"] = new_level
 
         self._save_state()
 
-        new_level_config = self.get_current_level()
-
-        logger.info(f"📈 CURRICULUM PROGRESSION!")
-        logger.info(f"   Level {old_level} → Level {new_level}")
-        logger.info(f"   {new_level_config['description']}")
-        logger.info(f"   Difficulties: {', '.join(new_level_config['difficulties'])}")
+        new_level_config = self.get_current_level(skill)
+        logger.info(f"[{skill}] PROGRESSION: Level {old_level} -> {new_level} ({new_level_config['name']})")
 
         return new_level_config
 
-    def check_and_progress(self, accuracy: float, step: int,
-                          metadata: Optional[Dict] = None) -> Tuple[bool, Optional[Dict]]:
+    def check_and_progress(
+        self,
+        skill: str,
+        accuracy: float,
+        step: int,
+        metadata: Optional[Dict] = None
+    ) -> Tuple[bool, Optional[Dict]]:
         """
-        Record accuracy and check if should progress
-
-        Args:
-            accuracy: Accuracy from eval
-            step: Training step
-            metadata: Optional metadata
+        Record accuracy and check if should progress.
 
         Returns:
             (progressed, new_level_config or None)
         """
-        # Record accuracy
-        self.record_accuracy(accuracy, step, metadata)
+        self.record_accuracy(skill, accuracy, step, metadata)
 
-        # Check if should progress
-        should_prog, reason = self.should_progress()
-
-        logger.info(f"Progression check: {reason}")
+        should_prog, reason = self.should_progress(skill)
+        logger.info(f"[{skill}] Progression check: {reason}")
 
         if should_prog:
-            new_level = self.progress_to_next_level()
+            new_level = self.progress_to_next_level(skill)
             return True, new_level
 
         return False, None
 
-    def get_status(self) -> Dict[str, Any]:
-        """Get curriculum status"""
-        level = self.get_current_level()
-
-        # Recent accuracy
-        recent = self.state["accuracy_history"][-5:] if self.state["accuracy_history"] else []
-        recent_at_level = [r for r in self.state["accuracy_history"]
-                          if r["level"] == self.state["current_level"]]
-
-        avg_recent = sum(r["accuracy"] for r in recent_at_level[-3:]) / len(recent_at_level[-3:]) if len(recent_at_level) >= 3 else None
-
-        should_prog, reason = self.should_progress()
+    def get_status(self, skill: Optional[str] = None) -> Dict[str, Any]:
+        """Get curriculum status for one or all skills."""
+        if skill:
+            return self._get_skill_status(skill)
 
         return {
             "enabled": self.enabled,
-            "current_skill": self.state["current_skill"],
-            "current_level": self.state["current_level"],
-            "level_name": level["name"],
-            "level_description": level["description"],
-            "difficulties": level["difficulties"],
-            "target_accuracy": level["next_threshold"],
-            "recent_accuracy": [{"step": r["step"], "acc": r["accuracy"]} for r in recent],
-            "avg_accuracy_current_level": avg_recent,
-            "evals_at_current_level": len(recent_at_level),
-            "should_progress": should_prog,
-            "progression_reason": reason,
-            "total_progressions": len(self.state["progression_history"])
+            "active_skill": self.state.get("active_skill", "syllo"),
+            "skills": {
+                s: self._get_skill_status(s) for s in SKILL_LEVELS.keys()
+            }
         }
 
-    def reset(self):
-        """Reset curriculum to start (Level 1)"""
-        self.state = {
-            "current_skill": "syllo",
+    def _get_skill_status(self, skill: str) -> Dict[str, Any]:
+        """Get status for a single skill."""
+        skill_state = self.state["skills"].get(skill, {"current_level": 1, "accuracy_history": []})
+        skill_config = self.get_skill_config(skill)
+        current_level = self.get_current_level(skill)
+
+        # Recent accuracy at current level
+        history = skill_state.get("accuracy_history", [])
+        at_level = [r for r in history if r.get("level") == skill_state["current_level"]]
+        recent = at_level[-self.min_evals:] if at_level else []
+        avg_accuracy = sum(r["accuracy"] for r in recent) / len(recent) if recent else None
+
+        should_prog, reason = self.should_progress(skill)
+
+        return {
+            "skill": skill,
+            "skill_name": skill_config["name"],
+            "current_level": skill_state["current_level"],
+            "total_levels": skill_config["total_levels"],
+            "level_name": current_level["name"],
+            "level_details": current_level,
+            "threshold": current_level.get("threshold"),
+            "evals_at_level": len(at_level),
+            "avg_accuracy": avg_accuracy,
+            "should_progress": should_prog,
+            "reason": reason,
+            "progressions": len(skill_state.get("progression_history", []))
+        }
+
+    def set_active_skill(self, skill: str):
+        """Set the active skill for training."""
+        if skill not in SKILL_LEVELS:
+            raise ValueError(f"Unknown skill: {skill}")
+        self.state["active_skill"] = skill
+        self._save_state()
+        logger.info(f"Active skill set to: {skill}")
+
+    def reset_skill(self, skill: str):
+        """Reset a skill to level 1."""
+        self.state["skills"][skill] = {
             "current_level": 1,
             "accuracy_history": [],
             "progression_history": [],
-            "started_at": datetime.now().isoformat(),
             "reset_at": datetime.now().isoformat()
         }
         self._save_state()
-        logger.info("Curriculum reset to Level 1")
+        logger.info(f"[{skill}] Reset to Level 1")
 
 
 def main():
@@ -317,96 +357,93 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Curriculum Manager - Adaptive Difficulty")
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base directory')
+    parser.add_argument('--base-dir', default='/path/to/training')
 
     subparsers = parser.add_subparsers(dest='command', help='Command')
 
     # Status
-    subparsers.add_parser('status', help='Show curriculum status')
+    status_p = subparsers.add_parser('status', help='Show curriculum status')
+    status_p.add_argument('--skill', choices=['syllo', 'binary'], help='Specific skill')
 
     # Record accuracy
-    record_parser = subparsers.add_parser('record', help='Record accuracy')
-    record_parser.add_argument('accuracy', type=float, help='Accuracy (0-1)')
-    record_parser.add_argument('step', type=int, help='Training step')
+    record_p = subparsers.add_parser('record', help='Record accuracy')
+    record_p.add_argument('skill', choices=['syllo', 'binary'])
+    record_p.add_argument('accuracy', type=float, help='Accuracy (0-1)')
+    record_p.add_argument('step', type=int, help='Training step')
 
-    # Check progression
-    check_parser = subparsers.add_parser('check', help='Check if should progress')
-    check_parser.add_argument('accuracy', type=float, help='Accuracy (0-1)')
-    check_parser.add_argument('step', type=int, help='Training step')
+    # Check & progress
+    check_p = subparsers.add_parser('check', help='Record and check for progression')
+    check_p.add_argument('skill', choices=['syllo', 'binary'])
+    check_p.add_argument('accuracy', type=float)
+    check_p.add_argument('step', type=int)
 
     # Force progress
-    subparsers.add_parser('progress', help='Force progress to next level')
+    prog_p = subparsers.add_parser('progress', help='Force progress to next level')
+    prog_p.add_argument('skill', choices=['syllo', 'binary'])
+
+    # Set level
+    set_p = subparsers.add_parser('set-level', help='Set skill level')
+    set_p.add_argument('skill', choices=['syllo', 'binary'])
+    set_p.add_argument('level', type=int)
 
     # Reset
-    subparsers.add_parser('reset', help='Reset to Level 1')
+    reset_p = subparsers.add_parser('reset', help='Reset skill to level 1')
+    reset_p.add_argument('skill', choices=['syllo', 'binary'])
+
+    # Generate params
+    gen_p = subparsers.add_parser('gen-params', help='Get generation params for current level')
+    gen_p.add_argument('skill', choices=['syllo', 'binary'])
+    gen_p.add_argument('--count', type=int, default=50)
 
     args = parser.parse_args()
 
-    # Setup logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
     # Load config
     base_dir = Path(args.base_dir)
     config_file = base_dir / "config.json"
-
     with open(config_file) as f:
         config = json.load(f)
 
     manager = CurriculumManager(base_dir, config)
 
     if args.command == 'status':
-        status = manager.get_status()
-
-        print("\n" + "="*80)
-        print("CURRICULUM STATUS")
-        print("="*80 + "\n")
-
-        print(f"Skill: {status['current_skill'].upper()}")
-        print(f"Level: {status['current_level']} - {status['level_description']}")
-        print(f"Difficulties: {', '.join(status['difficulties'])}")
-        print(f"Target for next level: {status['target_accuracy']:.0%}")
-
-        print(f"\nProgress:")
-        print(f"  Evals at current level: {status['evals_at_current_level']}")
-
-        if status['avg_accuracy_current_level']:
-            print(f"  Avg accuracy (last 3): {status['avg_accuracy_current_level']:.2%}")
-
-        print(f"  Should progress: {status['should_progress']}")
-        print(f"  Reason: {status['progression_reason']}")
-
-        print(f"\nRecent accuracy:")
-        for r in status['recent_accuracy']:
-            print(f"  Step {r['step']}: {r['acc']:.2%}")
-
-        print(f"\nTotal progressions: {status['total_progressions']}")
-        print("="*80 + "\n")
+        status = manager.get_status(args.skill)
+        print(json.dumps(status, indent=2))
 
     elif args.command == 'record':
-        manager.record_accuracy(args.accuracy, args.step)
-        print(f"✅ Recorded: {args.accuracy:.2%} at step {args.step}")
+        manager.record_accuracy(args.skill, args.accuracy, args.step)
+        print(f"Recorded: {args.skill} {args.accuracy:.1%} at step {args.step}")
 
     elif args.command == 'check':
-        progressed, new_level = manager.check_and_progress(args.accuracy, args.step)
-
+        progressed, new_level = manager.check_and_progress(args.skill, args.accuracy, args.step)
         if progressed:
-            print(f"\n📈 PROGRESSED to Level {new_level['level']}!")
-            print(f"   {new_level['description']}")
-            print(f"   Difficulties: {', '.join(new_level['difficulties'])}\n")
+            print(f"PROGRESSED to Level {new_level['level']}: {new_level['name']}")
         else:
-            print(f"\n✅ Recorded accuracy, no progression\n")
+            print("No progression")
+        status = manager.get_status(args.skill)
+        print(f"Current: Level {status['current_level']} ({status['reason']})")
 
     elif args.command == 'progress':
-        new_level = manager.progress_to_next_level()
-        print(f"\n📈 Manually progressed to Level {new_level['level']}")
-        print(f"   {new_level['description']}\n")
+        new_level = manager.progress_to_next_level(args.skill)
+        print(f"Progressed to Level {new_level['level']}: {new_level['name']}")
+
+    elif args.command == 'set-level':
+        manager.state["skills"][args.skill]["current_level"] = args.level
+        manager._save_state()
+        print(f"Set {args.skill} to Level {args.level}")
 
     elif args.command == 'reset':
-        manager.reset()
-        print("\n🔄 Curriculum reset to Level 1\n")
+        manager.reset_skill(args.skill)
+        print(f"Reset {args.skill} to Level 1")
+
+    elif args.command == 'gen-params':
+        params = manager.get_generation_params(args.skill, args.count)
+        print(json.dumps(params, indent=2))
+        print(f"\nUse: python3 data_manager/skill_api_client.py {args.skill} --level {params['level']} --count {params['count']}")
 
     else:
         parser.print_help()

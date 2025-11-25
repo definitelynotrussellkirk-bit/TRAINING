@@ -4,10 +4,15 @@ Data Manager - Unified coordinator for data generation, testing, and queueing
 
 Responsibilities:
 1. Monitor queue depth
-2. Request data generation from remote GPU when needed
+2. Request data generation from skill APIs when needed
 3. Run quality tests on generated data
 4. Queue approved data for training
 5. Track metrics and performance
+
+Updated 2025-11-25: Now uses local skill APIs (singleSKILL) instead of remote GPU.
+- SkillAPIClient: Connects to SYLLO (8080) and Binary (8090) servers
+- CurriculumManager: Manages difficulty progression per skill
+- Active skill: Configured in curriculum (defaults to "syllo")
 """
 
 import json
@@ -21,7 +26,8 @@ from typing import Dict, List, Any, Optional, Tuple
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from data_manager.remote_client import RemoteGPUClient
+from data_manager.skill_api_client import SkillAPIClient, syllo_to_training_format, SKILL_APIS
+from data_manager.curriculum_manager import CurriculumManager
 from data_manager.quality_checker import QualityChecker
 from core.training_queue import TrainingQueue
 
@@ -33,21 +39,14 @@ class DataManager:
     Unified Data Manager
 
     Coordinates data generation, quality testing, and queue management.
-    Acts as both pipeline orchestrator and test suite.
+    Uses singleSKILL APIs (local) for data generation with curriculum-based difficulty.
     """
 
     def __init__(self, base_dir: Path, config: Dict[str, Any]):
         self.base_dir = Path(base_dir)
         self.config = config
 
-        # Initialize components
-        auto_cfg = config.get("auto_generate", {})
-        self.remote_client = RemoteGPUClient(
-            host=auto_cfg.get("host", "192.168.x.x"),
-            port=auto_cfg.get("port", 8765),
-            timeout=auto_cfg.get("timeout", 300)
-        )
-
+        # Initialize quality checker
         self.quality_checker = QualityChecker(
             min_length=config.get("min_length", 10),
             max_length=config.get("max_length", 4096)
@@ -55,14 +54,14 @@ class DataManager:
 
         self.queue = TrainingQueue(str(base_dir))
 
-        # Curriculum Manager (for adaptive difficulty)
-        try:
-            from curriculum_manager import CurriculumManager
-            self.curriculum = CurriculumManager(base_dir, config)
-            logger.info(f"✅ Curriculum enabled: Level {self.curriculum.state['current_level']}")
-        except Exception as e:
-            logger.warning(f"Curriculum disabled: {e}")
-            self.curriculum = None
+        # Curriculum Manager (manages difficulty progression for all skills)
+        self.curriculum = CurriculumManager(base_dir, config)
+        active_skill = self.curriculum.state.get("active_skill", "syllo")
+        level_info = self.curriculum.get_current_level(active_skill)
+        logger.info(f"✅ Curriculum enabled: {active_skill} Level {level_info['level']} ({level_info['name']})")
+
+        # Skill API clients (lazy-initialized)
+        self._skill_clients: Dict[str, SkillAPIClient] = {}
 
         # Directories
         self.inbox_dir = self.base_dir / "inbox"
@@ -83,24 +82,45 @@ class DataManager:
             "quality_scores": []
         }
 
-    def check_remote_status(self) -> bool:
-        """Check if remote GPU server is available"""
-        logger.info(f"Checking remote GPU at {self.remote_client.host}:{self.remote_client.port}")
+    def _get_skill_client(self, skill: str) -> SkillAPIClient:
+        """Get or create skill API client (lazy initialization)."""
+        if skill not in self._skill_clients:
+            self._skill_clients[skill] = SkillAPIClient(skill)
+        return self._skill_clients[skill]
 
-        if not self.remote_client.is_available():
-            logger.error("❌ Remote GPU server is not available")
+    def check_skill_api_status(self, skill: Optional[str] = None) -> bool:
+        """Check if skill API server is available."""
+        if skill is None:
+            skill = self.curriculum.state.get("active_skill", "syllo")
+
+        client = self._get_skill_client(skill)
+        skill_config = SKILL_APIS[skill]
+
+        logger.info(f"Checking {skill_config['name']} API at {skill_config['base_url']}")
+
+        if not client.health_check():
+            logger.error(f"❌ {skill} API server is not available")
+            logger.error(f"   Start with: cd /path/to/skills && python3 {skill_config['server_script']} --port {skill_config['base_url'].split(':')[-1]}")
             return False
 
-        health = self.remote_client.health_check()
-        gpu_info = health.get("gpu", {})
+        try:
+            info = client.get_info()
+            logger.info(f"✅ {skill_config['name']} API online:")
+            logger.info(f"   Skill: {info.get('skill_name', skill)}")
+            logger.info(f"   Levels: {info.get('total_levels', '?')}")
 
-        logger.info(f"✅ Remote GPU online:")
-        logger.info(f"   Device: {gpu_info.get('device_name', 'Unknown')}")
-        logger.info(f"   VRAM: {gpu_info.get('memory_allocated_gb', 0):.1f}GB / 24GB")
-        logger.info(f"   Active model: {health.get('active_model', 'None')}")
-        logger.info(f"   Worker busy: {health.get('worker_busy', False)}")
+            # Show current curriculum level
+            level_info = self.curriculum.get_current_level(skill)
+            logger.info(f"   Current level: {level_info['level']} ({level_info['name']})")
+        except Exception as e:
+            logger.warning(f"Could not get server info: {e}")
 
         return True
+
+    # Legacy alias for backward compatibility
+    def check_remote_status(self) -> bool:
+        """Legacy method - use check_skill_api_status instead."""
+        return self.check_skill_api_status()
 
     def should_generate(self) -> Tuple[bool, str]:
         """
@@ -132,54 +152,65 @@ class DataManager:
         if time_since_last < cooldown:
             return False, f"Cooldown: {cooldown - int(time_since_last)}s remaining"
 
-        # Check remote availability
-        if not self.remote_client.is_available():
-            return False, "Remote GPU server unavailable"
+        # Check skill API availability
+        active_skill = self.curriculum.state.get("active_skill", "syllo")
+        client = self._get_skill_client(active_skill)
+        if not client.health_check():
+            return False, f"{active_skill} API server unavailable"
 
         return True, "All checks passed"
 
     def generate_batch(self, count: int, seed: Optional[int] = None) -> Tuple[bool, List[Dict], Dict]:
         """
-        Generate a batch of training data
+        Generate a batch of training data using skill API.
+
+        Uses curriculum to determine:
+        - Active skill (syllo or binary)
+        - Current difficulty level
 
         Returns:
             (success, data, metadata)
         """
-        logger.info(f"🎲 Generating {count:,} examples from remote GPU...")
+        active_skill = self.curriculum.state.get("active_skill", "syllo")
+        gen_params = self.curriculum.get_generation_params(active_skill, count)
+        level = gen_params["level"]
+        level_info = self.curriculum.get_current_level(active_skill)
+
+        logger.info(f"🎲 Generating {count:,} {active_skill} examples at Level {level} ({level_info['name']})")
 
         start_time = time.time()
 
         try:
-            auto_cfg = self.config.get("auto_generate", {})
-            payload = auto_cfg.get("payload", {}).copy()
+            client = self._get_skill_client(active_skill)
 
-            # Add curriculum difficulty if enabled
-            if self.curriculum:
-                curriculum_config = self.curriculum.get_generation_config()
-                # TEMPORARY: Remote API doesn't support curriculum yet
-                # Just log the intended config but don't send it
-                logger.info(f"   📚 Curriculum Level {curriculum_config['level']}: {curriculum_config['level_name']}")
-                logger.info(f"   Difficulties: {', '.join(curriculum_config['difficulties'])}")
-                logger.info(f"   ⚠️  Remote API doesn't support curriculum - generating with default mix")
+            # Build request params
+            params = {"count": count, "level": level}
+            if seed is not None:
+                params["seed"] = seed
 
-            raw_data = self.remote_client.generate_data(
-                count=count,
-                seed=seed,
-                payload=payload
-            )
-
+            response = client.generate(**params)
             generation_time = time.time() - start_time
 
-            logger.info(f"✅ Generated {len(raw_data):,} examples in {generation_time:.1f}s")
-            logger.info(f"   Rate: {len(raw_data) / generation_time:.1f} examples/sec")
+            # Convert to training format based on skill
+            training_data = []
+            if active_skill == "syllo":
+                for puzzle in response.get("puzzles", []):
+                    training_data.append(syllo_to_training_format(puzzle))
+            elif active_skill == "binary":
+                from data_manager.skill_api_client import binary_to_training_format
+                for conv in response.get("conversations", []):
+                    training_data.append(binary_to_training_format(conv))
 
-            # Convert to training format
-            training_data = self._convert_to_training_format(raw_data)
+            logger.info(f"✅ Generated {len(training_data):,} examples in {generation_time:.1f}s")
+            logger.info(f"   Rate: {len(training_data) / generation_time:.1f} examples/sec")
 
             metadata = {
+                "skill": active_skill,
+                "level": level,
+                "level_name": level_info["name"],
                 "count": len(training_data),
                 "generation_time": generation_time,
-                "rate": len(training_data) / generation_time,
+                "rate": len(training_data) / generation_time if generation_time > 0 else 0,
                 "seed": seed,
                 "timestamp": datetime.now().isoformat()
             }
@@ -190,6 +221,8 @@ class DataManager:
 
         except Exception as e:
             logger.error(f"❌ Generation failed: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
             return False, [], {"error": str(e)}
 
     def test_quality(self, data: List[Dict]) -> Tuple[bool, Dict]:
@@ -228,7 +261,9 @@ class DataManager:
             True if successfully queued
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"syllo_autogen_{timestamp}_count{len(data)}.jsonl"
+        skill = metadata.get("skill", "syllo")
+        level = metadata.get("level", 1)
+        filename = f"train_{skill}_level{level}_{len(data)}_{timestamp}.jsonl"
         filepath = self.inbox_dir / filename
 
         logger.info(f"📝 Writing {len(data):,} examples to {filename}")
@@ -317,7 +352,7 @@ class DataManager:
         return False
 
     def get_stats(self) -> Dict:
-        """Get data manager statistics"""
+        """Get data manager statistics including curriculum status."""
         avg_quality = (sum(self.stats["quality_scores"]) / len(self.stats["quality_scores"])
                       if self.stats["quality_scores"] else 0.0)
 
@@ -330,15 +365,8 @@ class DataManager:
                             if self.stats["total_generated"] > 0 else 0.0),
             "avg_quality_score": avg_quality,
             "queue_status": self.queue.get_queue_status(),
-            "remote_gpu": self.remote_client.get_memory_usage() if self.remote_client.is_available() else {}
+            "curriculum": self.curriculum.get_status()
         }
-
-    def _convert_to_training_format(self, raw_data: List[Dict]) -> List[Dict]:
-        """Convert raw generated data to training format"""
-        # This depends on what format the remote server returns
-        # For now, assume it returns data in the correct format
-        # Override this method if conversion is needed
-        return raw_data
 
 
 def main():
@@ -386,12 +414,26 @@ def main():
         print("DATA MANAGER STATUS")
         print("="*80 + "\n")
 
-        if manager.check_remote_status():
-            print("\n✅ Remote GPU is online and ready\n")
+        # Check skill API
+        active_skill = manager.curriculum.state.get("active_skill", "syllo")
+        if manager.check_skill_api_status(active_skill):
+            print(f"\n✅ {active_skill.upper()} API is online and ready\n")
         else:
-            print("\n❌ Remote GPU is offline or unreachable\n")
+            print(f"\n❌ {active_skill.upper()} API is offline\n")
 
         stats = manager.get_stats()
+
+        # Curriculum status
+        curriculum = stats.get("curriculum", {})
+        print("📚 Curriculum Status:")
+        print(f"   Active skill: {curriculum.get('active_skill', 'syllo')}")
+        for skill_name, skill_status in curriculum.get("skills", {}).items():
+            level = skill_status.get("current_level", 1)
+            level_name = skill_status.get("level_name", "Unknown")
+            total = skill_status.get("total_levels", "?")
+            print(f"   {skill_name}: Level {level}/{total} ({level_name})")
+        print()
+
         print(f"Generation Count: {stats['generation_count']}")
         print(f"Total Generated:  {stats['total_generated']:,}")
         print(f"Total Approved:   {stats['total_approved']:,}")

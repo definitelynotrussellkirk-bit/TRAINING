@@ -1,0 +1,30 @@
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute: (15 choose 5) / (10 choose 3).", "expected_answer": "2", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Solve for x: x^2 - 17x + 72 = 0. Give the smaller root.", "expected_answer": "9", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "If 4/x + 6/y = 1 and x + y = 20, find xy.", "expected_answer": "240", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute the number of positive divisors of 96.", "expected_answer": "12", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "If a+b=18 and ab=65, compute a^2 + b^2.", "expected_answer": "254", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Find the smallest positive integer divisible by 8, 9, and 15.", "expected_answer": "360", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute: (2/3 + 3/4 + 4/5) * 60.", "expected_answer": "154", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "If the area of a circle is 225π, find its diameter.", "expected_answer": "30", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute: (11!) / (9! * 2!).", "expected_answer": "55", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "If x + 1/x = 4, find x^3 + 1/x^3.", "expected_answer": "52", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Find the perimeter of an equilateral triangle with area 49√3.", "expected_answer": "42", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute: 3^6 - 2*3^4.", "expected_answer": "567", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "If the legs of a right triangle are 20 and 21, find its hypotenuse.", "expected_answer": "29", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute the sum of the first 12 positive multiples of 11.", "expected_answer": "858", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Find the value of (8 choose 2) + (8 choose 3).", "expected_answer": "84", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "If 3^x = 81, compute 9^x.", "expected_answer": "6561", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute the sum of interior angles of a 15-gon (degrees).", "expected_answer": "2340", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Solve for x: (x-3)(x-7)=0. Give the larger root.", "expected_answer": "7", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute: (7^4 - 7^2) / 14.", "expected_answer": "168", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "If x+y=16 and xy=60, find (x/y)+(y/x).", "expected_answer": "136/15", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute the area of a triangle with sides 13, 14, and 15.", "expected_answer": "84", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute: 2^5 * 5^3.", "expected_answer": "4000", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "If 0.3 of N equals 81, find N.", "expected_answer": "270", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Find the radius of a circle with circumference 50π.", "expected_answer": "25", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute the greatest common divisor of 210 and 588.", "expected_answer": "42", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "If a+b+c=18 and ab+bc+ca=107, with a,b,c integers, find abc.", "expected_answer": "210", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute: (12 choose 5) - (11 choose 4).", "expected_answer": "132", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Solve for n: 1+2+...+n = 190.", "expected_answer": "19", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute: (3/8 + 5/6) / (1/3).", "expected_answer": "41/4", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "hard", "user_prompt": "Compute the product of the roots of x^2 - 19x + 90 = 0.", "expected_answer": "90", "metadata": {"type": "algebra"}}

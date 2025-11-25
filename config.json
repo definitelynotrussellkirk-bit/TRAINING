@@ -27,14 +27,11 @@
   },
   "auto_generate": {
     "enabled": true,
-    "host": "192.168.x.x",
-    "port": 8765,
-    "count": 100000,
+    "_comment": "Now uses local singleSKILL APIs (8080=syllo, 8090=binary) via curriculum",
+    "count": 100,
     "priority": "normal",
     "threshold": 0,
-    "seed": 93001,
-    "cooldown_sec": 180,
-    "payload": {}
+    "cooldown_sec": 180
   },
   "remote_eval": {
     "enabled": true,

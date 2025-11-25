@@ -1,0 +1,315 @@
+#!/usr/bin/env python3
+"""
+Unified Skill API Client
+
+Connects to singleSKILL API servers to generate training data.
+
+Skills supported:
+- syllo: Syllable puzzles (5 levels, word count 4-8)
+- binary: Binary emoji arithmetic (7 levels, magnitude ranges)
+
+Usage:
+    # Generate SYLLO data
+    python3 data_manager/skill_api_client.py syllo --level 3 --count 100
+
+    # Generate Binary data
+    python3 data_manager/skill_api_client.py binary --level 1 --count 50
+
+    # Generate both skills, all levels
+    python3 data_manager/skill_api_client.py all --count 50
+"""
+
+import argparse
+import json
+import requests
+import sys
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, Any, List, Optional
+
+# Skill API configuration
+SKILL_APIS = {
+    "syllo": {
+        "name": "SYLLO Puzzles",
+        "base_url": "http://127.0.0.1:8080",
+        "levels": 5,
+        "server_script": "/path/to/skills/skill_syllo_variant/api_server.py",
+    },
+    "binary": {
+        "name": "Binary Arithmetic",
+        "base_url": "http://127.0.0.1:8090",
+        "levels": 7,
+        "server_script": "/path/to/skills/skill_basic_math/api_server.py",
+    }
+}
+
+# Output directory
+BASE_DIR = Path(__file__).resolve().parents[1]
+QUEUE_DIR = BASE_DIR / "queue" / "normal"
+
+
+class SkillAPIClient:
+    """Client for skill API servers."""
+
+    def __init__(self, skill: str, base_url: Optional[str] = None):
+        if skill not in SKILL_APIS:
+            raise ValueError(f"Unknown skill: {skill}. Available: {list(SKILL_APIS.keys())}")
+
+        self.skill = skill
+        self.config = SKILL_APIS[skill]
+        self.base_url = base_url or self.config["base_url"]
+
+    def health_check(self) -> bool:
+        """Check if API server is running."""
+        try:
+            r = requests.get(f"{self.base_url}/health", timeout=5)
+            return r.status_code == 200 and r.json().get("status") == "ok"
+        except Exception:
+            return False
+
+    def get_info(self) -> Dict[str, Any]:
+        """Get server info and metadata."""
+        r = requests.get(f"{self.base_url}/info", timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_levels(self) -> List[Dict[str, Any]]:
+        """Get available difficulty levels."""
+        r = requests.get(f"{self.base_url}/levels", timeout=10)
+        r.raise_for_status()
+        return r.json().get("levels", [])
+
+    def generate(self, **params) -> Dict[str, Any]:
+        """Generate training data."""
+        r = requests.post(
+            f"{self.base_url}/generate",
+            json=params,
+            timeout=120
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+def syllo_to_training_format(puzzle: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert SYLLO puzzle to training messages format.
+
+    The puzzle contains:
+    - words: list of word specs with hints
+    - syllable_bank: shuffled syllables
+    - solution: formatted answer
+    - format_instruction: how to format the answer
+    """
+    # Build user prompt
+    words_section = []
+    for i, w in enumerate(puzzle["words"], 1):
+        slots = " ".join(w["slots"])
+        words_section.append(f"{i}. {w['definition']}: {slots}")
+
+    syllable_bank = ", ".join(puzzle["syllable_bank"])
+
+    user_content = f"""Syllable Puzzle
+
+Fill in the blanks using syllables from the bank. Each syllable is used exactly once.
+
+Words to complete:
+{chr(10).join(words_section)}
+
+Syllable Bank: [{syllable_bank}]
+
+{puzzle.get('format_instruction', 'List each word with its syllables.')}"""
+
+    # Build assistant response (the solution)
+    assistant_content = puzzle["solution"]
+
+    return {
+        "messages": [
+            {"role": "user", "content": user_content},
+            {"role": "assistant", "content": assistant_content}
+        ],
+        "metadata": {
+            "skill": "syllo",
+            "puzzle_id": puzzle.get("puzzle_id"),
+            "word_count": puzzle["rules"]["word_count"],
+            "format": puzzle.get("solution_format", "unknown")
+        }
+    }
+
+
+def binary_to_training_format(conversation: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert binary conversation to training messages format.
+
+    The conversation already has messages[] format from the API.
+    """
+    return {
+        "messages": conversation["conversation"]["messages"],
+        "metadata": {
+            "skill": "binary",
+            "conversation_id": conversation.get("conversation_id"),
+            "level": conversation.get("level"),
+            "level_name": conversation.get("level_name"),
+            "bits": conversation.get("bits"),
+            "operations": conversation.get("operations"),
+        }
+    }
+
+
+def generate_skill_data(
+    skill: str,
+    level: int,
+    count: int,
+    seed: Optional[int] = None,
+    output_dir: Optional[Path] = None,
+    **extra_params
+) -> Path:
+    """
+    Generate training data for a skill at a specific level.
+
+    Returns path to the generated JSONL file.
+    """
+    output_dir = output_dir or QUEUE_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    client = SkillAPIClient(skill)
+
+    if not client.health_check():
+        raise ConnectionError(
+            f"{skill} API not running. Start with:\n"
+            f"  cd /path/to/skills && python3 {client.config['server_script']} --port {client.base_url.split(':')[-1]}"
+        )
+
+    # Build request params
+    params = {"count": count, "level": level}
+    if seed is not None:
+        params["seed"] = seed
+    params.update(extra_params)
+
+    print(f"Generating {count} {skill} examples at level {level}...")
+    response = client.generate(**params)
+
+    # Convert to training format
+    training_examples = []
+
+    if skill == "syllo":
+        for puzzle in response.get("puzzles", []):
+            training_examples.append(syllo_to_training_format(puzzle))
+    elif skill == "binary":
+        for conv in response.get("conversations", []):
+            training_examples.append(binary_to_training_format(conv))
+
+    # Write to file
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"train_{skill}_level{level}_{count}_{timestamp}.jsonl"
+    output_path = output_dir / filename
+
+    with open(output_path, 'w') as f:
+        for ex in training_examples:
+            f.write(json.dumps(ex) + '\n')
+
+    print(f"  Wrote {len(training_examples)} examples to {output_path.name}")
+    return output_path
+
+
+def generate_all_levels(
+    skill: str,
+    count_per_level: int,
+    seed: Optional[int] = None,
+    output_dir: Optional[Path] = None
+) -> List[Path]:
+    """Generate training data for all levels of a skill."""
+    config = SKILL_APIS[skill]
+    paths = []
+
+    for level in range(1, config["levels"] + 1):
+        path = generate_skill_data(
+            skill=skill,
+            level=level,
+            count=count_per_level,
+            seed=seed + level if seed else None,
+            output_dir=output_dir
+        )
+        paths.append(path)
+
+    return paths
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate training data from singleSKILL APIs",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Generate 100 SYLLO puzzles at level 3
+  python3 skill_api_client.py syllo --level 3 --count 100
+
+  # Generate 50 binary conversations at level 1
+  python3 skill_api_client.py binary --level 1 --count 50
+
+  # Generate all levels for both skills
+  python3 skill_api_client.py all --count 30
+
+  # Check API status
+  python3 skill_api_client.py status
+"""
+    )
+
+    parser.add_argument(
+        "skill",
+        choices=["syllo", "binary", "all", "status"],
+        help="Skill to generate (or 'all' for both, 'status' to check APIs)"
+    )
+    parser.add_argument("--level", type=int, help="Difficulty level (skill-specific)")
+    parser.add_argument("--count", type=int, default=50, help="Number of examples per level")
+    parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
+    parser.add_argument("--output-dir", type=Path, help="Output directory (default: queue/normal)")
+
+    args = parser.parse_args()
+
+    if args.skill == "status":
+        print("Skill API Status:")
+        for skill, config in SKILL_APIS.items():
+            client = SkillAPIClient(skill)
+            status = "OK" if client.health_check() else "NOT RUNNING"
+            print(f"  {skill:8} ({config['base_url']}): {status}")
+            if status == "NOT RUNNING":
+                print(f"           Start: cd /path/to/skills && python3 {config['server_script']} --port {config['base_url'].split(':')[-1]}")
+        return
+
+    if args.skill == "all":
+        # Generate all levels for both skills
+        for skill in ["syllo", "binary"]:
+            print(f"\n=== Generating {SKILL_APIS[skill]['name']} ===")
+            try:
+                generate_all_levels(
+                    skill=skill,
+                    count_per_level=args.count,
+                    seed=args.seed,
+                    output_dir=args.output_dir
+                )
+            except ConnectionError as e:
+                print(f"ERROR: {e}")
+        return
+
+    # Single skill
+    if args.level:
+        # Single level
+        generate_skill_data(
+            skill=args.skill,
+            level=args.level,
+            count=args.count,
+            seed=args.seed,
+            output_dir=args.output_dir
+        )
+    else:
+        # All levels for this skill
+        generate_all_levels(
+            skill=args.skill,
+            count_per_level=args.count,
+            seed=args.seed,
+            output_dir=args.output_dir
+        )
+
+
+if __name__ == "__main__":
+    main()

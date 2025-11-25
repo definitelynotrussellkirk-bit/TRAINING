@@ -1,0 +1,30 @@
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Solve for x: x^2 - 11x + 30 = 0. Give the larger root.", "expected_answer": "6", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute the value of (7 choose 3) + (7 choose 4).", "expected_answer": "70", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "If 3/x + x/3 = 2, find x^2.", "expected_answer": "9", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "A triangle has sides 7, 8, and 9. Find its perimeter.", "expected_answer": "24", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute the sum of the first 20 positive even integers.", "expected_answer": "420", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "If x + y = 12 and xy = 20, find x^2 + y^2.", "expected_answer": "104", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Find the smallest positive integer n such that 6n is divisible by 8 and 9.", "expected_answer": "12", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute: 1/1 + 1/2 + 1/3 + 1/6.", "expected_answer": "2", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "If 5x - 2y = 11 and x + y = 6, find x.", "expected_answer": "4", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute the number of ways to choose 2 people from 9.", "expected_answer": "36", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "The area of a square is 196. Find its perimeter.", "expected_answer": "56", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "If 2^x = 5, compute 4^x.", "expected_answer": "25", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Find the least common multiple of 18, 24, and 30.", "expected_answer": "360", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute: (10 choose 2) - (9 choose 2).", "expected_answer": "9", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "If a+b=14 and ab=32, find (a-b)^2.", "expected_answer": "68", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute the radius of a circle with area 100π.", "expected_answer": "10", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Solve for n: 1+2+...+n = 105.", "expected_answer": "14", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute: (3^5 - 3^3) / 3^2.", "expected_answer": "24", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "If the legs of a right triangle are 9 and 12, find its hypotenuse.", "expected_answer": "15", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute the remainder when 7^4 is divided by 5.", "expected_answer": "1", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "If 1/x + 1/y = 1/4 and x+y=12, find xy.", "expected_answer": "48", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute: (8 choose 3) / (8 choose 5).", "expected_answer": "1", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Find the area of a triangle with base 14 and height 9.", "expected_answer": "63", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "If x^2 - 5x + 6 = 0, find x^3 - 11x^2 + 36x.", "expected_answer": "0", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute the sum of the divisors of 28.", "expected_answer": "56", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "If x + y = 10 and xy = 21, find (x/y) + (y/x).", "expected_answer": "67/21", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute: 2^3 * 3^2 * 5.", "expected_answer": "360", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "If a rectangle's length is twice its width and the area is 128, find its perimeter.", "expected_answer": "48", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute the product of the roots of 2x^2 - 5x + 3 = 0.", "expected_answer": "1.5", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "medium", "user_prompt": "Compute: (4^4 - 2^4) / 2.", "expected_answer": "120", "metadata": {"type": "algebra"}}

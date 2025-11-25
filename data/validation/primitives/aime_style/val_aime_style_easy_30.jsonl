@@ -1,0 +1,30 @@
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute: 7*8 + 6*9.", "expected_answer": "110", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute: (15^2 - 9^2) / 6.", "expected_answer": "24", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "If x + 1/x = 5, find x^2 + 1/x^2.", "expected_answer": "23", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute the sum of the interior angles of a hexagon (in degrees).", "expected_answer": "720", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "If the average of 8, 10, 12, and x is 11, find x.", "expected_answer": "14", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Find the smallest positive integer divisible by 6 and 15.", "expected_answer": "30", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Solve for x: 3x + 7 = 2x + 15.", "expected_answer": "8", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute 12 choose 2.", "expected_answer": "66", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "A rectangle has area 60 and width 5. Find its perimeter.", "expected_answer": "34", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute: (3/4 + 2/3) * 12.", "expected_answer": "17", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "If 2^x = 32, find x.", "expected_answer": "5", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Find the greatest common divisor of 84 and 126.", "expected_answer": "42", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute the number of diagonals in an octagon.", "expected_answer": "20", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "If 5% of N is 12, find N.", "expected_answer": "240", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute: (9!) / (7! * 2!).", "expected_answer": "36", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "If the radius of a circle is 7, find its circumference (use π = 22/7).", "expected_answer": "44", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Solve for x: x^2 - 9x + 20 = 0. Give the smaller root.", "expected_answer": "4", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute the least common multiple of 18 and 24.", "expected_answer": "72", "metadata": {"type": "number_theory"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "If a triangle has sides 5, 5, and 6, find its perimeter.", "expected_answer": "16", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute: (2/5) of 150.", "expected_answer": "60", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Simplify: (4^3 * 4^2) / 4.", "expected_answer": "64", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "If a fair coin is flipped twice, how many distinct outcomes are possible?", "expected_answer": "4", "metadata": {"type": "combinatorics"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute 3^4 - 2^4.", "expected_answer": "65", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "If 4x = 3y and x = 6, find y.", "expected_answer": "8", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute: 1/2 + 1/3 + 1/6.", "expected_answer": "1", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "If a regular pentagon has side 5, what is its perimeter?", "expected_answer": "25", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute: (6*7*8) / (6+7+8).", "expected_answer": "16", "metadata": {"type": "arithmetic"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "If x - 1 = 5, find x^2.", "expected_answer": "36", "metadata": {"type": "algebra"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Compute the area of a right triangle with legs 6 and 8.", "expected_answer": "24", "metadata": {"type": "geometry"}}
+{"skill": "aime_style", "difficulty": "easy", "user_prompt": "Simplify: (10!)/(9!).", "expected_answer": "10", "metadata": {"type": "algebra"}}

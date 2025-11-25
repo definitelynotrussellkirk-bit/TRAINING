@@ -1,0 +1,14 @@
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 86 + 33 =", "expected_answer": "119", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 16 + 72 =", "expected_answer": "88", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 47 + 8 =", "expected_answer": "55", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 749 + 750 =", "expected_answer": "1499", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 13 + 476 =", "expected_answer": "489", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 5 + 2 =", "expected_answer": "7", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 5 + 6 =", "expected_answer": "11", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 30 + 58 =", "expected_answer": "88", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 30 + 89 =", "expected_answer": "119", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 15 + 63 =", "expected_answer": "78", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 3 + 3 =", "expected_answer": "6", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 516 + 962 =", "expected_answer": "1478", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 348 + 227 =", "expected_answer": "575", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}
+{"skill": "bb_simple_arithmetic_json", "difficulty": "medium", "user_prompt": "Q: 76 + 812 =", "expected_answer": "888", "metadata": {"source": "bigbench", "task": "simple_arithmetic_json"}}

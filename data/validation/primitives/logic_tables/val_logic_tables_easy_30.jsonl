@@ -1,0 +1,30 @@
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=true, what is A AND B? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "A AND B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=false, what is A AND B? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "A AND B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=true, what is A AND B? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "A AND B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=false, what is A AND B? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "A AND B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=false, what is A OR B? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "A OR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=false, what is A OR B? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "A OR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=false, what is NOT B? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "NOT B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=true, what is NOT A? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "NOT A"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=false, what is A XOR B? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "A XOR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=true, what is A XOR B? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "A XOR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=true, what is A XOR B? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "A XOR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=false, what is A XOR B? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "A XOR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=true, what is NOT (A AND B)? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "NOT (A AND B)"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=false, what is NOT (A OR B)? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "NOT (A OR B)"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=false, what is NOT (A OR B)? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "NOT (A OR B)"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=false, is (A AND B) equal to false? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "(A AND B) == false"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=true, is (A OR B) equal to true? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "(A OR B) == true"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=true, is (NOT A) equal to true? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "NOT A"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=false, is (A XOR B) equal to true? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "A XOR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=false, is (A XOR B) equal to true? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "A XOR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=true, what is (A OR B) AND A? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "(A OR B) AND A"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=true, what is (A OR B) AND B? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "(A OR B) AND B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=false, what is (A AND B) OR A? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "(A AND B) OR A"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=true, what is (A AND B) OR B? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "(A AND B) OR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=false, what is NOT A OR B? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "NOT A OR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=false, what is NOT A OR B? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "NOT A OR B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=true, what is NOT B OR A? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "NOT B OR A"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=true, what is A == B? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "A == B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=true and B=false, what is A == B? Answer true or false.", "expected_answer": "false", "metadata": {"expression": "A == B"}}
+{"skill": "logic_tables", "difficulty": "easy", "user_prompt": "Given A=false and B=false, what is A == B? Answer true or false.", "expected_answer": "true", "metadata": {"expression": "A == B"}}

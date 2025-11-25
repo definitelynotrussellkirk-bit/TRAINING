@@ -4,65 +4,115 @@ Track changes and updates to the system.
 
 ---
 
-## 2025-11-22 (Latest) - TrainerEngine Complete: Full 4-Phase Refactor Done! 🎉
+## 2025-11-25 - Curriculum-Based Data Generation
 
-**STATUS: 100% COMPLETE** - All 4 phases of comprehensive refactor finished in one session!
+### Data Manager Rewrite
+- **DataManager** now uses local singleSKILL APIs instead of remote GPU (3090)
+- Uses `SkillAPIClient` to connect to SYLLO (8080) and Binary (8090) servers
+- Integrates `CurriculumManager` for adaptive difficulty progression
 
-### What This Completes
+### Curriculum System
+- **Skill-based curriculum:** SYLLO (5 levels) and Binary (7 levels)
+- **Active skill:** Set via `data_manager/curriculum_state.json`
+- **Progression:** 80% accuracy over 3 evaluations to advance
+- **SYLLO-only for now:** Focus on mastering SYLLO before introducing Binary
 
-This is the **final commit** (156b046) completing the entire architectural refactor outlined in the original plan. System now has:
+### File Changes
+- `data_manager/manager.py` - Rewritten to use skill APIs + curriculum
+- `data_manager/skill_api_client.py` - Client for singleSKILL APIs
+- `data_manager/curriculum_manager.py` - Difficulty progression logic
+- `config.json` - Updated `auto_generate` section (count: 100, removed remote host/port)
 
-1. ✅ Single source of truth for config (TrainerConfig + ConfigLoader)
-2. ✅ Profile-based data transformation (emoji_think, regime3)
-3. ✅ Unified precision handling (bf16/fp16/fp32)
-4. ✅ Preview backend abstraction (local/remote 3090)
-5. ✅ **Clean training engine API** ← NEW!
+### Generated File Naming
+- Old: `syllo_autogen_TIMESTAMP_countN.jsonl`
+- New: `train_SKILL_levelN_COUNT_TIMESTAMP.jsonl` (e.g., `train_syllo_level1_100_20251125_060704.jsonl`)
 
-### Phase 4: TrainerEngine Implementation
+### Requirements
+- SYLLO API must be running: `cd /path/to/skills && python3 skill_syllo_variant/api_server.py --port 8080`
 
-**Created:** `trainer/core/engine.py` (457 lines) - Full implementation
+---
 
-**Components:**
-- `run_job(config)` - Single entry point, 7-step flow
-- `_load_model_and_tokenizer()` - Load model with config precision
-- `_prepare_dataset()` - Load data + apply profile transformations
-- `_create_trainer()` - Setup HF Trainer from config
-- `TrainingResult` - Structured results dataclass
+## 2025-11-25 - Transfer Learning Metrics + Dashboard Updates
 
-**Architecture Flow:**
-```
-run_job(config)
-  ├─ 1. Validate config
-  ├─ 2. Load profile (emoji_think/regime3)
-  ├─ 3. Load model & tokenizer
-  ├─ 4. Prepare datasets (profile transformations)
-  ├─ 5. Create HF Trainer
-  ├─ 6. Execute training
-  └─ 7. Save checkpoint & return TrainingResult
-```
+### Skill Metrics Plugin
+- **New:** `monitoring/api/plugins/skill_metrics.py` - Aggregates baseline test results
+- Tracks 3 skill categories: trained (syllable, binary), primitives (26), benchmarks (bAbI, BIG-Bench)
+- Compares base model vs trained model performance
+- Reads from local + remote baseline results via SSH
 
-**Usage:**
-```python
-from trainer.core import TrainerEngine, TrainingResult
-from trainer.config import create_default_config
-from trainer.monitoring import TrainingStatusWriter
+### Dashboard Transfer Learning Card
+- Added Transfer Learning summary card to master dashboard
+- Shows base/trained accuracy and delta for each skill category
+- Highlights best/worst transfer performers
 
-config = create_default_config(...)
-engine = TrainerEngine(TrainingStatusWriter('status.json'))
-result = engine.run_job(config)
+### Data Organization
+- Moved validation datasets to `data/validation/benchmarks/`, `data/validation/binary/`, `data/validation/primitives/`
+- Old flat structure archived to `data/validation_archive_20251124/`
 
-if result.success:
-    print(f"Training complete! Loss: {result.final_loss}")
-    print(f"Checkpoint: {result.last_checkpoint_path}")
-```
+---
 
-**Benefits:**
-- Single entry point (no scattered calls)
-- Testable in isolation
-- No config.json reads scattered throughout
-- Profile-based transformations
-- Structured results
-- Full error handling
+## 2025-11-24 - Two-Layer Validation System + Refactoring Cleanup
+
+### Validation Architecture
+- **New:** `core/validation/spec.py` - SpecValidator with deny-by-default schema validation
+- **New:** `core/validation/validator.py` - DataValidator (QUICK/STANDARD/DEEP content checks)
+- Jobs must map to known spec: `chat_sft_v1`, `syllo_v1`, `completion_v1`
+- QUICK validation integrated into daemon for early rejection
+
+### Daemon Service Extraction
+- Extracted `PIDManager` to `core/daemon/pid_manager.py`
+- Extracted `FileWatcher` to `core/daemon/file_watcher.py`
+- Extracted `SnapshotService` to `core/daemon/snapshot_service.py`
+- Extracted `BackgroundWorker` to `core/daemon/background_worker.py`
+
+### Training Component Extraction
+- Extracted `ModelLoader` to `core/training/model_loader.py`
+- Extracted `DatasetPreparer` to `core/training/dataset_preparer.py`
+- Extracted `MonitoringBundle` to `core/training/monitoring_bundle.py`
+
+### Package Structure
+- **New:** `pyproject.toml` - Package now pip-installable
+- GPU deps (torch, transformers) moved to optional `[training]` extra
+- `pip install -e .` for lightweight CI, `pip install -e ".[training]"` for GPU
+
+### Path Auto-Detection
+- **New:** `core/paths.py` with `get_base_dir()` function
+- Auto-detects base directory with resolution logging
+
+### Testing
+- Added pytest markers: `slow`, `gpu`, `integration`
+- Added `tests/test_inference_auth.py` (14 tests)
+- Deprecation notice added to `core/validator.py`
+
+---
+
+## 2025-11-23 - Autonomous Training System: 10 Intelligence Systems Deployed
+
+**STATUS: Production Ready** - Complete autonomous training intelligence deployed across dual-GPU setup
+
+### What Was Built
+
+Deployed 10 intelligent automation systems across dual-GPU setup:
+
+**RTX 3090 (7 systems):**
+- `curriculum_optimizer.py` - A/B tests curriculum strategies
+- `adversarial_miner.py` - Mines hard examples from failures
+- `continuous_regression_monitor.py` - Detects bad checkpoints
+- `model_comparison_engine.py` - Ranks checkpoints
+- `confidence_calibrator.py` - Calibrates predictions
+- `self_correction_loop.py` - Data validation & error correction
+- `automated_testing_daemon.py` - Continuous checkpoint validation
+
+**RTX 4090 (2 systems):**
+- `data_generation_automation.py` - Auto-generates when queue < 2
+- `checkpoint_auto_deployment.py` - Auto-deploys best checkpoint
+
+### Autonomous Capabilities
+- Evaluates checkpoints against validation data
+- Optimizes curriculum difficulty progression
+- Detects performance regressions
+- Auto-generates training data when depleted
+- Auto-deploys best checkpoint to inference server
 
 ---
 
@@ -209,95 +259,4 @@ python3 core/train.py --dataset data.jsonl --model qwen3 --output outputs
 ## Prior History
 
 See git log for earlier changes.
-
-## 2025-11-23 - Autonomous Training System: 10 Intelligence Systems Deployed 🚀
-
-**STATUS: Production Ready** - Complete autonomous training intelligence deployed across dual-GPU setup
-
-### What Was Built
-
-Deployed 10 intelligent automation systems that transform the training pipeline into a fully autonomous, self-improving system.
-
-**New Files Created:**
-1. `monitoring/self_correction_loop.py` (513 lines) - Data validation & error correction
-2. `monitoring/automated_testing_daemon.py` (422 lines) - Continuous checkpoint validation
-3. `monitoring/data_generation_automation.py` (110 lines) - Auto-generates data when queue low
-4. `monitoring/checkpoint_auto_deployment.py` (135 lines) - Auto-deploys best checkpoints
-
-**Previously Deployed (Earlier Sessions):**
-5. `monitoring/curriculum_optimizer.py` (680 lines) - A/B tests curriculum strategies
-6. `monitoring/adversarial_miner.py` (750 lines) - Mines hard examples
-7. `monitoring/diversity_analyzer.py` (620 lines) - Analyzes pattern coverage
-8. `monitoring/continuous_regression_monitor.py` (425 lines) - Detects bad checkpoints
-9. `monitoring/model_comparison_engine.py` (451 lines) - Ranks checkpoints
-10. `monitoring/confidence_calibrator.py` (288 lines) - Calibrates predictions
-
-**Total:** ~4,400 lines of production code across 10 systems
-
-### System Architecture
-
-**RTX 3090 (Intelligence Hub - 7 systems):**
-- Curriculum optimization (5 min intervals)
-- Adversarial mining (5 min intervals)
-- Regression detection (5 min intervals)
-- Model comparison & ranking (10 min intervals)
-- Confidence calibration (10 min intervals)
-- Self-correction loop (5 min intervals)
-- Automated testing (10 min intervals)
-
-**RTX 4090 (Training Machine - 2 systems):**
-- Data generation automation (5 min intervals)
-- Checkpoint auto-deployment (10 min intervals)
-
-### Autonomous Capabilities
-
-The system now operates fully autonomously 24/7:
-- ✅ Evaluates checkpoints against validation data
-- ✅ Optimizes curriculum difficulty progression
-- ✅ Mines adversarial examples from model failures
-- ✅ Detects performance regressions
-- ✅ Ranks checkpoints by composite quality
-- ✅ Calibrates prediction confidence scores
-- ✅ Validates data quality & generates corrections
-- ✅ Auto-generates training data when queue depletes
-- ✅ Auto-deploys best checkpoint to inference server
-
-### Resource Usage
-
-**Efficient Deployment:**
-- RTX 3090: 2GB VRAM / 24GB (8% usage, 92% available)
-- RTX 4090: Minimal overhead (~50MB)
-- Temperature: 44°C (cool)
-- Total CPU: ~5%
-
-### Impact
-
-**Before:** Manual training, no quality control, static curriculum  
-**After:** Fully autonomous, self-correcting, self-optimizing training system
-
-The model now:
-- Improves from its own mistakes
-- Adapts difficulty automatically
-- Never runs out of training data
-- Always deploys best checkpoint
-- Continuously monitors quality
-
-**Development Time:** ~2.5 hours  
-**Bugs Fixed:** 0  
-**Systems Operational:** 10/10 (100%)
-
-### Files Added
-- `monitoring/self_correction_loop.py`
-- `monitoring/automated_testing_daemon.py`
-- `monitoring/data_generation_automation.py`
-- `monitoring/checkpoint_auto_deployment.py`
-- `COMPLETE_DEPLOYMENT_SUMMARY.txt` (comprehensive documentation)
-
-### Configuration Changes
-None - all systems use existing config.json settings
-
-### Next Steps
-- Optional: Implement Control Room UI enhancements (see CONTROL_ROOM_IMPLEMENTATION_PLAN.md)
-- Monitor system outputs in status/*.json files
-- Wait 10-15 minutes for first autonomous cycle to complete
 

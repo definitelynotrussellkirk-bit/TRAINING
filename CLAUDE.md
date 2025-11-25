@@ -1,16 +1,19 @@
 # CLAUDE INSTRUCTIONS - LLM Training System
 
-**Last Updated:** 2025-11-24 (Option C Architecture Complete)
+**Last Updated:** 2025-11-24 (Refactoring Complete)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 This document contains instructions for Claude to help with training operations.
 
-**MAJOR UPDATE:** Option C Architecture - Automated Deployment System
-- ✅ 3090 enhanced with /models/info and /models/reload endpoints
-- ✅ Deployment orchestrator automates checkpoint deployment
-- ✅ All monitoring consolidated on 4090 (training machine)
-- ✅ 3090 now pure inference server - serves trained models automatically
-- ✅ Complete system operational and production-ready
+**MAJOR UPDATE:** Code Refactoring Complete (TASK001-009)
+- ✅ API authentication added to inference server
+- ✅ Test infrastructure cleaned up for CI
+- ✅ RetentionManager wired into daemon
+- ✅ Extracted daemon services: PIDManager, FileWatcher, SnapshotService, BackgroundWorker
+- ✅ Extracted training components: ModelLoader, DatasetPreparer, MonitoringBundle
+- ✅ Created pyproject.toml - package now installable with `pip install -e .`
+- ✅ Unified DataValidator with QUICK/STANDARD/DEEP levels
+- ✅ Path auto-detection via get_base_dir() or $TRAINING_BASE_DIR
 
 ---
 
@@ -100,16 +103,29 @@ This document contains instructions for Claude to help with training operations.
 ├── DEVELOPMENT.md               # Development guide
 ├── CHANGELOG.md                 # Change tracking
 │
-├── core/                        # Core training system (11 files)
-│   ├── train.py                 # Main training script (HuggingFace Trainer) - STILL WORKS
-│   ├── train_v1_backup.py       # Backup before refactor
+├── pyproject.toml               # 🆕 Package config (pip install -e .)
+│
+├── core/                        # Core training system
+│   ├── train.py                 # Main training script (HuggingFace Trainer)
 │   ├── training_daemon.py       # File watcher + orchestrator
 │   ├── training_controller.py   # Control commands (pause/resume/stop)
 │   ├── training_queue.py        # Queue management
-│   ├── training_status.py       # Status writer (copied to trainer/monitoring/)
+│   ├── training_status.py       # Status writer
+│   ├── paths.py                 # 🆕 Path auto-detection (get_base_dir)
+│   ├── daemon/                  # 🆕 Extracted daemon services
+│   │   ├── pid_manager.py       # Single-instance enforcement
+│   │   ├── file_watcher.py      # Directory monitoring + inbox flattening
+│   │   ├── snapshot_service.py  # Checkpoint snapshots
+│   │   └── background_worker.py # Non-blocking task runner
+│   ├── training/                # 🆕 Extracted training components
+│   │   ├── model_loader.py      # Model loading with precision config
+│   │   ├── dataset_preparer.py  # Dataset preparation
+│   │   └── monitoring_bundle.py # Training monitoring
+│   ├── validation/              # 🆕 Unified data validation
+│   │   └── validator.py         # DataValidator (QUICK/STANDARD/DEEP)
 │   ├── custom_collator.py       # Data collator
 │   ├── logit_penalty.py         # Penalty processors
-│   ├── validator.py             # Data validation
+│   ├── validator.py             # Legacy validator (deprecated)
 │   ├── model_db.py              # Model database
 │   └── time_estimator.py        # Time estimation
 │
@@ -210,15 +226,20 @@ OBSERVATIONS/
 
 ## 🆕 RECENT UPDATES (2025-11-24)
 
-**Option C Architecture Complete** - Automated deployment system operational
+**Code Refactoring Complete** - TASK001-009 finished
 
-**What Changed:**
-- 3090 server enhanced with /models/info and /models/reload endpoints
-- Created deployment_orchestrator.py - automates checkpoint deployment
-- Created prediction_client.py - standardized API client
-- Moved all monitoring from 3090 to 4090 (model_comparison_engine, etc.)
-- 3090 now pure inference server - no evaluation logic
-- Complete automated flow: train → compare → deploy → serve
+**What Changed (Session 2):**
+- TASK004: Extracted ModelLoader, DatasetPreparer, MonitoringBundle from UltimateTrainer
+- TASK005: Extracted PIDManager, FileWatcher, SnapshotService, BackgroundWorker from daemon
+- TASK006: Added paths.py with get_base_dir() for path auto-detection
+- TASK007: Created pyproject.toml - package now installable
+- TASK008: Created unified DataValidator with QUICK/STANDARD/DEEP levels
+- TASK009: Created BackgroundWorker for non-blocking heavy tasks
+
+**What Changed (Session 1):**
+- TASK001: API authentication for inference server
+- TASK002: Test infrastructure cleanup (pytest.ini, conftest.py)
+- TASK003: RetentionManager wired into daemon
 
 **Previous Update (2025-11-22):**
 **Production Integration Complete** - trainer/ modules now in core/train.py (commit: 5cdebe4)

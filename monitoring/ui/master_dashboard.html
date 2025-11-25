@@ -7,6 +7,11 @@
     <link rel="stylesheet" href="/css/master_dashboard.css">
 </head>
 <body>
+    <!-- ERROR ALERT CARDS CONTAINER -->
+    <div id="errorCardsContainer" class="error-cards-container">
+        <!-- Error cards will be dynamically inserted here -->
+    </div>
+
     <!-- TOP STATUS BAR -->
     <header class="master-header">
         <div class="header-left">
@@ -19,23 +24,23 @@
 
         <div class="header-center">
             <div class="quick-metric">
-                <span class="quick-label">Training</span>
+                <span class="quick-label" data-tooltip="Current training step number">Training</span>
                 <span class="quick-value" id="quickTrainingStep">--</span>
             </div>
             <div class="quick-metric">
-                <span class="quick-label">Loss</span>
+                <span class="quick-label" data-tooltip="Current training loss - lower is better">Loss</span>
                 <span class="quick-value" id="quickLoss">--</span>
             </div>
             <div class="quick-metric">
-                <span class="quick-label">4090 VRAM</span>
+                <span class="quick-label" data-tooltip="4090 GPU memory usage percentage">4090 VRAM</span>
                 <span class="quick-value" id="quick4090VRAM">--</span>
             </div>
             <div class="quick-metric">
-                <span class="quick-label">3090 VRAM</span>
+                <span class="quick-label" data-tooltip="3090 GPU memory usage percentage">3090 VRAM</span>
                 <span class="quick-value" id="quick3090VRAM">--</span>
             </div>
             <div class="quick-metric">
-                <span class="quick-label">Plugins</span>
+                <span class="quick-label" data-tooltip="Healthy data sources / total data sources">Plugins</span>
                 <span class="quick-value" id="quickPlugins">--</span>
             </div>
         </div>
@@ -64,40 +69,76 @@
                 <div class="card-body">
                     <div class="metric-grid">
                         <div class="metric-item">
-                            <span class="metric-label">Status</span>
+                            <span class="metric-label" data-tooltip="Current training state: training, paused, stopped, or idle">Status</span>
                             <span class="metric-value" id="trainingStatus">--</span>
                         </div>
                         <div class="metric-item">
-                            <span class="metric-label">Step</span>
+                            <span class="metric-label" data-tooltip="Current step / total steps in the training run. Each step processes one batch of data.">Step</span>
                             <span class="metric-value" id="trainingStep">-- / --</span>
                         </div>
                         <div class="metric-item">
-                            <span class="metric-label">Progress</span>
+                            <span class="metric-label" data-tooltip="Percentage of training completed (current_step / total_steps × 100)">Progress</span>
                             <span class="metric-value" id="trainingProgress">--%</span>
                         </div>
                         <div class="metric-item">
-                            <span class="metric-label">Loss</span>
+                            <span class="metric-label" data-tooltip="Training loss - measures how wrong predictions are. Lower is better. Target: < 0.5">Loss</span>
                             <span class="metric-value metric-highlight" id="trainingLoss">--</span>
                         </div>
                         <div class="metric-item">
-                            <span class="metric-label">Val Loss</span>
+                            <span class="metric-label" data-tooltip="Validation loss - loss on held-out data. Should track training loss. If higher, model may be overfitting.">Val Loss</span>
                             <span class="metric-value" id="trainingValLoss">--</span>
                         </div>
                         <div class="metric-item">
-                            <span class="metric-label">Gap</span>
+                            <span class="metric-label" data-tooltip="Val-Train gap: difference between validation and training loss. < 0.3 = good, > 0.5 = overfitting risk">Gap</span>
                             <span class="metric-value" id="trainingGap">--</span>
                         </div>
                         <div class="metric-item">
-                            <span class="metric-label">Accuracy</span>
+                            <span class="metric-label" data-tooltip="Token prediction accuracy on validation set. Higher is better. Measures exact token match rate.">Accuracy</span>
                             <span class="metric-value" id="trainingAccuracy">--%</span>
                         </div>
                         <div class="metric-item">
-                            <span class="metric-label">Tokens/sec</span>
+                            <span class="metric-label" data-tooltip="Training throughput - tokens processed per second. Higher = faster training.">Tokens/sec</span>
                             <span class="metric-value" id="trainingTokens">--</span>
                         </div>
                     </div>
                     <div class="progress-bar-container">
                         <div class="progress-bar" id="trainingProgressBar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Training Queue Card (Interactive) -->
+            <div class="card card-queue">
+                <div class="card-header">
+                    <h3>📦 Training Queue</h3>
+                    <button onclick="refreshQueue()" class="refresh-btn">↻</button>
+                </div>
+                <div class="card-body">
+                    <div class="queue-summary">
+                        <div class="queue-stat-mini">
+                            <span class="queue-val" id="queueTotalFiles">--</span>
+                            <span class="queue-lbl">Files</span>
+                        </div>
+                        <div class="queue-stat-mini">
+                            <span class="queue-val" id="queueTotalExamples">--</span>
+                            <span class="queue-lbl">Examples</span>
+                        </div>
+                        <div class="queue-stat-mini">
+                            <span class="queue-val" id="queueInboxCount">--</span>
+                            <span class="queue-lbl">Inbox</span>
+                        </div>
+                    </div>
+                    <div class="queue-tabs">
+                        <button class="q-tab active" data-priority="all" onclick="filterQueueMain('all')">All</button>
+                        <button class="q-tab" data-priority="high" onclick="filterQueueMain('high')">🔴 <span id="qCountHigh">0</span></button>
+                        <button class="q-tab" data-priority="normal" onclick="filterQueueMain('normal')">🟡 <span id="qCountNormal">0</span></button>
+                        <button class="q-tab" data-priority="low" onclick="filterQueueMain('low')">🟢 <span id="qCountLow">0</span></button>
+                    </div>
+                    <div id="queueFileList" class="queue-file-list">
+                        <div class="queue-loading">Loading...</div>
+                    </div>
+                    <div id="queueEmptyState" class="queue-empty" style="display: none;">
+                        📭 Queue empty
                     </div>
                 </div>
             </div>
@@ -111,19 +152,19 @@
                 <div class="card-body">
                     <div class="gpu-metrics">
                         <div class="gpu-stat">
-                            <span class="gpu-label">VRAM Used</span>
+                            <span class="gpu-label" data-tooltip="GPU memory currently allocated for training. Approaches 24GB during training batches.">VRAM Used</span>
                             <span class="gpu-value" id="gpu4090VRAMUsed">-- GB</span>
                         </div>
                         <div class="gpu-stat">
-                            <span class="gpu-label">VRAM Total</span>
+                            <span class="gpu-label" data-tooltip="Total GPU memory available. RTX 4090 has 24GB VRAM.">VRAM Total</span>
                             <span class="gpu-value" id="gpu4090VRAMTotal">-- GB</span>
                         </div>
                         <div class="gpu-stat">
-                            <span class="gpu-label">Utilization</span>
+                            <span class="gpu-label" data-tooltip="GPU compute utilization percentage. Should be >90% during active training.">Utilization</span>
                             <span class="gpu-value" id="gpu4090Util">--%</span>
                         </div>
                         <div class="gpu-stat">
-                            <span class="gpu-label">Temperature</span>
+                            <span class="gpu-label" data-tooltip="GPU temperature in Celsius. Safe range: <80°C. Throttling may occur >85°C.">Temperature</span>
                             <span class="gpu-value" id="gpu4090Temp">--°C</span>
                         </div>
                     </div>
@@ -151,19 +192,19 @@
                 <div class="card-body">
                     <div class="intel-metrics">
                         <div class="intel-stat">
-                            <span class="intel-label">Easy Accuracy</span>
+                            <span class="intel-label" data-tooltip="Model accuracy on easy difficulty problems. Target: >80%. Green = good performance.">Easy Accuracy</span>
                             <span class="intel-value intel-easy" id="curriculumEasy">--%</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Medium Accuracy</span>
+                            <span class="intel-label" data-tooltip="Model accuracy on medium difficulty problems. Target: >70%. Yellow = acceptable.">Medium Accuracy</span>
                             <span class="intel-value intel-medium" id="curriculumMedium">--%</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Hard Accuracy</span>
+                            <span class="intel-label" data-tooltip="Model accuracy on hard difficulty problems. Target: >60%. Red = challenging.">Hard Accuracy</span>
                             <span class="intel-value intel-hard" id="curriculumHard">--%</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Step</span>
+                            <span class="intel-label" data-tooltip="Training step at which this evaluation was performed.">Step</span>
                             <span class="intel-value" id="curriculumStep">--</span>
                         </div>
                     </div>
@@ -179,19 +220,19 @@
                 <div class="card-body">
                     <div class="intel-metrics">
                         <div class="intel-stat">
-                            <span class="intel-label">Regression Detected</span>
+                            <span class="intel-label" data-tooltip="YES if current checkpoint performs worse than previous. Triggers alert for investigation.">Regression Detected</span>
                             <span class="intel-value" id="regressionDetected">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Loss Increase</span>
+                            <span class="intel-label" data-tooltip="Percentage increase in loss compared to best checkpoint. >15% = significant regression.">Loss Increase</span>
                             <span class="intel-value" id="regressionLossInc">--%</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Accuracy Drop</span>
+                            <span class="intel-label" data-tooltip="Percentage decrease in accuracy compared to best checkpoint.">Accuracy Drop</span>
                             <span class="intel-value" id="regressionAccDrop">--%</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Total Regressions</span>
+                            <span class="intel-label" data-tooltip="Total number of regressions detected during this training run.">Total Regressions</span>
                             <span class="intel-value" id="regressionTotal">--</span>
                         </div>
                     </div>
@@ -207,15 +248,15 @@
                 <div class="card-body">
                     <div class="intel-metrics">
                         <div class="intel-stat">
-                            <span class="intel-label">Best Checkpoint</span>
+                            <span class="intel-label" data-tooltip="Checkpoint with the highest composite score (loss + accuracy + inference speed).">Best Checkpoint</span>
                             <span class="intel-value" id="modelCompBest">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Best Score</span>
+                            <span class="intel-label" data-tooltip="Composite quality score (0-1). Higher is better. Combines loss, accuracy, and throughput.">Best Score</span>
                             <span class="intel-value" id="modelCompScore">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Checkpoints Compared</span>
+                            <span class="intel-label" data-tooltip="Total number of checkpoints evaluated and ranked.">Checkpoints Compared</span>
                             <span class="intel-value" id="modelCompTotal">--</span>
                         </div>
                     </div>
@@ -234,21 +275,164 @@
                 <div class="card-body">
                     <div class="intel-metrics">
                         <div class="intel-stat">
-                            <span class="intel-label">Pass Rate</span>
+                            <span class="intel-label" data-tooltip="Percentage of validation tests passed. Target: >70%. Measures real-world task completion.">Pass Rate</span>
                             <span class="intel-value" id="testingPassRate">--%</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Total Tests</span>
+                            <span class="intel-label" data-tooltip="Total number of test cases in the fixed validation suite.">Total Tests</span>
                             <span class="intel-value" id="testingTotal">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Passed</span>
+                            <span class="intel-label" data-tooltip="Number of tests where model output matched expected answer.">Passed</span>
                             <span class="intel-value intel-good" id="testingPassed">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Failed</span>
+                            <span class="intel-label" data-tooltip="Number of tests where model output did not match expected answer.">Failed</span>
                             <span class="intel-value intel-bad" id="testingFailed">--</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Version Selector for Skills -->
+            <div class="skill-version-selector" style="margin-bottom: 1rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <label style="font-size: 0.9rem;">Compare version:</label>
+                <select id="skillVersionSelect" style="background: #2a2a2a; color: #e0e0e0; border: 1px solid #444; padding: 0.3rem 0.5rem; border-radius: 4px; min-width: 220px;">
+                    <option value="">Loading...</option>
+                </select>
+                <span id="skillVersionInfo" style="font-size: 0.8rem; color: #888;"></span>
+                <span id="skillCheckpointInfo" style="font-size: 0.8rem; color: #4fc3f7; background: rgba(79,195,247,0.1); padding: 0.2rem 0.5rem; border-radius: 3px; display: none;"></span>
+            </div>
+
+            <!-- SYLLABLE Skill Card -->
+            <div class="card card-skill">
+                <div class="card-header">
+                    <h3><a href="/ui/syllo_dashboard.html" style="color: inherit; text-decoration: none;">🧩 SYLLABLE Skill</a></h3>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <a href="/ui/syllo_dashboard.html" class="detail-link" style="font-size: 0.75rem; color: #a855f7; text-decoration: none;">Details →</a>
+                        <div class="status-indicator" id="syllableIndicator">●</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="skill-overview">
+                        <div class="skill-accuracy-large">
+                            <span class="accuracy-value" id="syllableOverall">--%</span>
+                            <span class="accuracy-label">Overall Accuracy</span>
+                        </div>
+                        <div class="skill-delta" id="syllableDelta">
+                            <span class="delta-arrow">↑</span>
+                            <span class="delta-value">--</span>
+                            <span class="delta-label" data-tooltip="Improvement over base model (Qwen3-0.6B untrained)">vs base</span>
+                        </div>
+                    </div>
+                    <div class="skill-difficulty-bars">
+                        <div class="difficulty-row">
+                            <span class="diff-label" data-tooltip="4-5 word puzzles, unique syllables, no red herrings">Easy</span>
+                            <div class="diff-bar-container">
+                                <div class="diff-bar diff-easy" id="syllableEasyBar" style="width: 0%"></div>
+                            </div>
+                            <span class="diff-value" id="syllableEasy">--%</span>
+                        </div>
+                        <div class="difficulty-row">
+                            <span class="diff-label" data-tooltip="5-6 word puzzles, some overlap, 1-2 red herrings">Medium</span>
+                            <div class="diff-bar-container">
+                                <div class="diff-bar diff-medium" id="syllableMediumBar" style="width: 0%"></div>
+                            </div>
+                            <span class="diff-value" id="syllableMedium">--%</span>
+                        </div>
+                        <div class="difficulty-row">
+                            <span class="diff-label" data-tooltip="6-8 word puzzles, high overlap, 3-5 red herrings">Hard</span>
+                            <div class="diff-bar-container">
+                                <div class="diff-bar diff-hard" id="syllableHardBar" style="width: 0%"></div>
+                            </div>
+                            <span class="diff-value" id="syllableHard">--%</span>
+                        </div>
+                    </div>
+                    <div class="skill-meta">
+                        <span class="meta-item" data-tooltip="When this skill was last evaluated">Last eval: <span id="syllableLastEval">--</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BINARY Skill Card -->
+            <div class="card card-skill">
+                <div class="card-header">
+                    <h3>⓪① BINARY Skill</h3>
+                    <div class="status-indicator" id="binaryIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="skill-overview">
+                        <div class="skill-accuracy-large">
+                            <span class="accuracy-value" id="binaryOverall">--%</span>
+                            <span class="accuracy-label">Overall Accuracy</span>
+                        </div>
+                        <div class="skill-delta" id="binaryDelta">
+                            <span class="delta-arrow">↑</span>
+                            <span class="delta-value">--</span>
+                            <span class="delta-label" data-tooltip="Improvement over base model (Qwen3-0.6B untrained)">vs base</span>
+                        </div>
+                    </div>
+                    <div class="skill-difficulty-bars">
+                        <div class="difficulty-row">
+                            <span class="diff-label" data-tooltip="Basic operations: add, subtract, conversions with small numbers">Easy</span>
+                            <div class="diff-bar-container">
+                                <div class="diff-bar diff-easy" id="binaryEasyBar" style="width: 0%"></div>
+                            </div>
+                            <span class="diff-value" id="binaryEasy">--%</span>
+                        </div>
+                        <div class="difficulty-row">
+                            <span class="diff-label" data-tooltip="Chained operations, carry/borrow propagation, shifts">Medium</span>
+                            <div class="diff-bar-container">
+                                <div class="diff-bar diff-medium" id="binaryMediumBar" style="width: 0%"></div>
+                            </div>
+                            <span class="diff-value" id="binaryMedium">--%</span>
+                        </div>
+                        <div class="difficulty-row">
+                            <span class="diff-label" data-tooltip="Large numbers, complex chains, pattern recognition">Hard</span>
+                            <div class="diff-bar-container">
+                                <div class="diff-bar diff-hard" id="binaryHardBar" style="width: 0%"></div>
+                            </div>
+                            <span class="diff-value" id="binaryHard">--%</span>
+                        </div>
+                    </div>
+                    <div class="skill-meta">
+                        <span class="meta-item" data-tooltip="When this skill was last evaluated">Last eval: <span id="binaryLastEval">--</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transfer Learning Summary Card -->
+            <div class="card card-intelligence" id="transferCard">
+                <div class="card-header">
+                    <h3>🧬 Transfer Learning</h3>
+                    <div class="status-indicator" id="transferIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <p style="font-size: 0.75rem; color: #888; margin-bottom: 0.5rem;">
+                        Does training on syllables/binary help or hurt other skills?
+                    </p>
+                    <div class="transfer-summary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                        <!-- Primitives -->
+                        <div class="transfer-category" style="text-align: center; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 4px;">
+                            <div style="font-size: 0.7rem; color: #888; margin-bottom: 0.2rem;">Primitives (26)</div>
+                            <div id="primitivesAvg" style="font-size: 1.2rem; font-weight: bold;">--</div>
+                            <div id="primitivesDelta" style="font-size: 0.8rem; color: #888;">vs base</div>
+                        </div>
+                        <!-- bAbI -->
+                        <div class="transfer-category" style="text-align: center; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 4px;">
+                            <div style="font-size: 0.7rem; color: #888; margin-bottom: 0.2rem;">bAbI (20)</div>
+                            <div id="babiAvg" style="font-size: 1.2rem; font-weight: bold;">--</div>
+                            <div id="babiDelta" style="font-size: 0.8rem; color: #888;">vs base</div>
+                        </div>
+                        <!-- BIG-Bench -->
+                        <div class="transfer-category" style="text-align: center; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 4px;">
+                            <div style="font-size: 0.7rem; color: #888; margin-bottom: 0.2rem;">BIG-Bench</div>
+                            <div id="bigbenchAvg" style="font-size: 1.2rem; font-weight: bold;">--</div>
+                            <div id="bigbenchDelta" style="font-size: 0.8rem; color: #888;">vs base</div>
+                        </div>
+                    </div>
+                    <div id="transferDetails" style="margin-top: 0.5rem; font-size: 0.75rem; color: #666; max-height: 100px; overflow-y: auto;">
+                        <!-- Best/worst performers will be shown here -->
                     </div>
                 </div>
             </div>
@@ -269,11 +453,11 @@
                 <div class="card-body">
                     <div class="intel-metrics">
                         <div class="intel-stat">
-                            <span class="intel-label">Total Examples</span>
+                            <span class="intel-label" data-tooltip="Hard examples mined from model failures. These get added to training to improve weak areas.">Total Examples</span>
                             <span class="intel-value" id="advTotal">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Categories</span>
+                            <span class="intel-label" data-tooltip="Number of failure categories identified (e.g., math errors, logic gaps, format issues).">Categories</span>
                             <span class="intel-value" id="advCategories">--</span>
                         </div>
                     </div>
@@ -292,15 +476,15 @@
                 <div class="card-body">
                     <div class="intel-metrics">
                         <div class="intel-stat">
-                            <span class="intel-label">ECE</span>
+                            <span class="intel-label" data-tooltip="Expected Calibration Error - measures if model confidence matches actual accuracy. Lower is better. <0.1 = well calibrated.">ECE</span>
                             <span class="intel-value" id="confECE">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Bins</span>
+                            <span class="intel-label" data-tooltip="Number of confidence bins used for calibration analysis (typically 6-10).">Bins</span>
                             <span class="intel-value" id="confBins">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Overconfidence</span>
+                            <span class="intel-label" data-tooltip="Proportion of predictions where confidence exceeds accuracy. High = model is overconfident.">Overconfidence</span>
                             <span class="intel-value" id="confOverconf">--</span>
                         </div>
                     </div>
@@ -316,19 +500,19 @@
                 <div class="card-body">
                     <div class="intel-metrics">
                         <div class="intel-stat">
-                            <span class="intel-label">Errors Captured</span>
+                            <span class="intel-label" data-tooltip="Number of model errors collected for analysis. Used to identify systematic failure patterns.">Errors Captured</span>
                             <span class="intel-value" id="selfCorrErrors">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Patterns Found</span>
+                            <span class="intel-label" data-tooltip="Distinct error patterns identified (e.g., 'forgets stop token', 'wrong JSON format').">Patterns Found</span>
                             <span class="intel-value" id="selfCorrPatterns">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Corrections Gen</span>
+                            <span class="intel-label" data-tooltip="Correction examples generated this session. These are targeted training data to fix errors.">Corrections Gen</span>
                             <span class="intel-value" id="selfCorrGen">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Total Corrections</span>
+                            <span class="intel-label" data-tooltip="Total correction examples generated across all sessions.">Total Corrections</span>
                             <span class="intel-value" id="selfCorrTotal">--</span>
                         </div>
                     </div>
@@ -344,21 +528,86 @@
                 <div class="card-body">
                     <div class="intel-metrics">
                         <div class="intel-stat">
-                            <span class="intel-label">Sync Status</span>
+                            <span class="intel-label" data-tooltip="Current sync status: syncing, idle, error. Checkpoints transfer from 4090 to 3090 for evaluation.">Sync Status</span>
                             <span class="intel-value" id="checkpointStatus">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Latest Checkpoint</span>
+                            <span class="intel-label" data-tooltip="Most recent checkpoint synced to 3090 for evaluation/deployment.">Latest Checkpoint</span>
                             <span class="intel-value" id="checkpointLatest">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Total Synced</span>
+                            <span class="intel-label" data-tooltip="Total number of checkpoints successfully synced to 3090.">Total Synced</span>
                             <span class="intel-value" id="checkpointSynced">--</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label">Failures</span>
+                            <span class="intel-label" data-tooltip="Number of sync failures (network issues, disk full, etc.).">Failures</span>
                             <span class="intel-value" id="checkpointFailures">--</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Layer Drift Analysis Card -->
+            <div class="card card-analytics">
+                <div class="card-header">
+                    <h3>📊 Layer Drift Analysis</h3>
+                    <div class="status-indicator" id="layerDriftIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="drift-summary">
+                        <div class="drift-metric">
+                            <span class="drift-label" data-tooltip="Total weight change vs base model. Higher = more learning.">Total Change</span>
+                            <span class="drift-value" id="driftTotalChange">--</span>
+                        </div>
+                        <div class="drift-metric">
+                            <span class="drift-label" data-tooltip="Change distribution: 'uniform'=all layers, 'top_heavy'=mostly top layers, 'bottom_heavy'=mostly bottom layers">Pattern</span>
+                            <span class="drift-value" id="driftPattern">--</span>
+                        </div>
+                        <div class="drift-metric">
+                            <span class="drift-label" data-tooltip="Layer with most weight change - where task-specific features form">Max Drift</span>
+                            <span class="drift-value" id="driftMaxLayer">--</span>
+                        </div>
+                    </div>
+                    <div class="drift-comparison">
+                        <span class="drift-ref" id="driftRef">-- vs --</span>
+                    </div>
+                    <div class="layer-drift-chart" id="layerDriftChart">
+                        <!-- 28 layer bars will be injected here by JS -->
+                    </div>
+                    <div class="drift-legend">
+                        <span class="legend-item"><span class="legend-color low"></span>&lt;20%</span>
+                        <span class="legend-item"><span class="legend-color medium"></span>20-35%</span>
+                        <span class="legend-item"><span class="legend-color high"></span>&gt;35%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Parameter Stability Card -->
+            <div class="card card-analytics">
+                <div class="card-header">
+                    <h3>⚖️ Parameter Stability</h3>
+                    <div class="status-indicator" id="paramStabilityIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="stability-summary">
+                        <div class="stability-metric">
+                            <span class="stability-label" data-tooltip="Overall health: 'healthy'=no issues, 'warning'=minor concerns, 'critical'=action needed">Health</span>
+                            <span class="stability-value" id="stabilityHealth">--</span>
+                        </div>
+                        <div class="stability-metric">
+                            <span class="stability-label" data-tooltip="Average L2 norm of weights across all transformer layers">Avg Norm</span>
+                            <span class="stability-value" id="stabilityAvgNorm">--</span>
+                        </div>
+                        <div class="stability-metric">
+                            <span class="stability-label" data-tooltip="Number of stability alerts (exploding/vanishing weights)">Alerts</span>
+                            <span class="stability-value" id="stabilityAlerts">--</span>
+                        </div>
+                    </div>
+                    <div class="stability-alerts" id="stabilityAlertsContainer">
+                        <!-- Alerts will be injected here by JS -->
+                    </div>
+                    <div class="layer-norms-chart" id="layerNormsChart">
+                        <!-- Norm bars will be injected here by JS -->
                     </div>
                 </div>
             </div>
@@ -372,19 +621,19 @@
                 <div class="card-body">
                     <div class="gpu-metrics">
                         <div class="gpu-stat">
-                            <span class="gpu-label">VRAM Used</span>
+                            <span class="gpu-label" data-tooltip="GPU memory used for inference server. Typically ~2GB for loaded model.">VRAM Used</span>
                             <span class="gpu-value" id="gpu3090VRAMUsed">-- GB</span>
                         </div>
                         <div class="gpu-stat">
-                            <span class="gpu-label">VRAM Total</span>
+                            <span class="gpu-label" data-tooltip="Total GPU memory available. RTX 3090 has 24GB VRAM.">VRAM Total</span>
                             <span class="gpu-value" id="gpu3090VRAMTotal">-- GB</span>
                         </div>
                         <div class="gpu-stat">
-                            <span class="gpu-label">Utilization</span>
+                            <span class="gpu-label" data-tooltip="GPU compute utilization. Spikes during inference requests, low when idle.">Utilization</span>
                             <span class="gpu-value" id="gpu3090Util">--%</span>
                         </div>
                         <div class="gpu-stat">
-                            <span class="gpu-label">Temperature</span>
+                            <span class="gpu-label" data-tooltip="GPU temperature in Celsius. Should stay below 80°C for optimal performance.">Temperature</span>
                             <span class="gpu-value" id="gpu3090Temp">--°C</span>
                         </div>
                     </div>
@@ -404,12 +653,12 @@
             <span class="divider">|</span>
             <span>Auto-refresh: <span id="refreshRate">5s</span></span>
             <span class="divider">|</span>
-            <span>Data Sources: <span id="dataSourceCount">11</span></span>
+            <span>Data Sources: <span id="dataSourceCount">13</span></span>
         </div>
         <div class="footer-links">
-            <a href="control_room_v2.html" class="footer-link">Control Room</a>
-            <a href="live_monitor_ui_v2.html" class="footer-link">Live Monitor</a>
+            <a href="syllo_dashboard.html" class="footer-link">Syllo Dashboard</a>
             <a href="predictions.html" class="footer-link">Predictions</a>
+            <a href="test_api.html" class="footer-link">Test API</a>
             <a href="/api/unified" target="_blank" class="footer-link">Raw JSON</a>
         </div>
     </footer>

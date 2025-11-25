@@ -554,3 +554,969 @@ body {
     0%, 100% { background-color: transparent; }
     50% { background-color: rgba(59, 130, 246, 0.3); }
 }
+
+/* TOOLTIP SYSTEM */
+[data-tooltip] {
+    position: relative;
+    cursor: help;
+}
+
+[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-4px);
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-primary);
+    white-space: nowrap;
+    max-width: 280px;
+    white-space: normal;
+    text-align: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    box-shadow: var(--shadow-lg);
+    pointer-events: none;
+    text-transform: none;
+    letter-spacing: normal;
+    line-height: 1.4;
+}
+
+[data-tooltip]::after {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    border: 6px solid transparent;
+    border-top-color: var(--bg-dark);
+    z-index: 1001;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    pointer-events: none;
+}
+
+[data-tooltip]:hover::before,
+[data-tooltip]:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Tooltip position variants for edge cases */
+[data-tooltip-pos="right"]::before {
+    bottom: auto;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%) translateX(8px);
+}
+
+[data-tooltip-pos="right"]::after {
+    bottom: auto;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-right-color: var(--bg-dark);
+}
+
+[data-tooltip-pos="left"]::before {
+    bottom: auto;
+    left: auto;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%) translateX(-8px);
+}
+
+[data-tooltip-pos="left"]::after {
+    bottom: auto;
+    left: auto;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-left-color: var(--bg-dark);
+}
+
+/* ==========================================
+   SKILL CARDS - Per-skill performance display
+   ========================================== */
+
+.card-skill {
+    border-left: 3px solid var(--color-info);
+}
+
+.card-skill .card-header {
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.1), transparent);
+}
+
+.skill-overview {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+}
+
+.skill-accuracy-large {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.skill-accuracy-large .accuracy-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.skill-accuracy-large .accuracy-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.skill-delta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+}
+
+.skill-delta .delta-arrow {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.skill-delta .delta-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.skill-delta .delta-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.skill-delta.positive {
+    color: var(--color-success);
+}
+
+.skill-delta.negative {
+    color: var(--color-danger);
+}
+
+.skill-delta.neutral {
+    color: var(--text-secondary);
+}
+
+/* Difficulty Breakdown Bars */
+.skill-difficulty-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.difficulty-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.difficulty-row .diff-label {
+    width: 60px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.difficulty-row.diff-easy .diff-label {
+    color: var(--color-success);
+}
+
+.difficulty-row.diff-medium .diff-label {
+    color: var(--color-warning);
+}
+
+.difficulty-row.diff-hard .diff-label {
+    color: var(--color-danger);
+}
+
+.diff-bar-container {
+    flex: 1;
+    height: 20px;
+    background: var(--bg-dark);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.diff-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    min-width: 2px;
+}
+
+.diff-easy .diff-bar {
+    background: linear-gradient(90deg, var(--color-success), #059669);
+}
+
+.diff-medium .diff-bar {
+    background: linear-gradient(90deg, var(--color-warning), #d97706);
+}
+
+.diff-hard .diff-bar {
+    background: linear-gradient(90deg, var(--color-danger), #dc2626);
+}
+
+.diff-bar-container .diff-pct {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.diff-bar-container .diff-count {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Skill Metadata Footer */
+.skill-meta {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.skill-meta .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.skill-meta .meta-label {
+    color: var(--text-secondary);
+}
+
+.skill-meta .meta-value {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* Base Model Comparison Indicator */
+.baseline-comparison {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-dark);
+    border-radius: 4px;
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+}
+
+.baseline-comparison .baseline-label {
+    color: var(--text-secondary);
+}
+
+.baseline-comparison .baseline-value {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.baseline-comparison .improvement-value {
+    margin-left: auto;
+    font-weight: 700;
+}
+
+.baseline-comparison .improvement-value.positive {
+    color: var(--color-success);
+}
+
+.baseline-comparison .improvement-value.negative {
+    color: var(--color-danger);
+}
+
+/* =====================================================
+   TRAINING ANALYTICS CARDS (Layer Drift & Stability)
+   ===================================================== */
+
+.card-analytics {
+    border-left: 3px solid var(--color-info);
+}
+
+/* Drift Summary Metrics */
+.drift-summary, .stability-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.drift-metric, .stability-metric {
+    text-align: center;
+    padding: 0.5rem;
+    background: var(--bg-dark);
+    border-radius: 4px;
+}
+
+.drift-label, .stability-label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+.drift-value, .stability-value {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.drift-comparison {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    text-align: center;
+}
+
+/* Layer Drift Chart - Horizontal Bar Chart */
+.layer-drift-chart, .layer-norms-chart {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin: 0.75rem 0;
+}
+
+.layer-bar-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 10px;
+    max-width: 14px;
+}
+
+.layer-bar {
+    height: 40px;
+    width: 100%;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.layer-bar:hover {
+    opacity: 0.8;
+    transform: scaleY(1.1);
+}
+
+.layer-bar.low {
+    background: linear-gradient(to top, #2ecc71, #27ae60);
+}
+
+.layer-bar.medium {
+    background: linear-gradient(to top, #f1c40f, #f39c12);
+}
+
+.layer-bar.high {
+    background: linear-gradient(to top, #e74c3c, #c0392b);
+}
+
+.layer-bar-label {
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    display: none;
+}
+
+.layer-bar-wrapper:hover .layer-bar-label {
+    display: block;
+}
+
+/* Norm-based coloring for stability */
+.layer-bar.norm-healthy {
+    background: linear-gradient(to top, #2ecc71, #27ae60);
+}
+
+.layer-bar.norm-warning {
+    background: linear-gradient(to top, #f1c40f, #f39c12);
+}
+
+.layer-bar.norm-critical {
+    background: linear-gradient(to top, #e74c3c, #c0392b);
+}
+
+/* Drift Legend */
+.drift-legend {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.legend-color {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.legend-color.low {
+    background: #2ecc71;
+}
+
+.legend-color.medium {
+    background: #f1c40f;
+}
+
+.legend-color.high {
+    background: #e74c3c;
+}
+
+/* Stability Alerts */
+.stability-alerts {
+    margin: 0.5rem 0;
+}
+
+.stability-alert {
+    padding: 0.4rem 0.6rem;
+    margin-bottom: 0.3rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.stability-alert.warning {
+    background: rgba(241, 196, 15, 0.2);
+    border-left: 2px solid var(--color-warning);
+    color: var(--color-warning);
+}
+
+.stability-alert.critical {
+    background: rgba(231, 76, 60, 0.2);
+    border-left: 2px solid var(--color-danger);
+    color: var(--color-danger);
+}
+
+.stability-alert .alert-icon {
+    font-size: 0.85rem;
+}
+
+/* Health Status Colors */
+.stability-value.healthy {
+    color: var(--color-success);
+}
+
+.stability-value.warning {
+    color: var(--color-warning);
+}
+
+.stability-value.critical {
+    color: var(--color-danger);
+}
+
+/* Pattern Badge */
+.drift-value.uniform {
+    color: var(--color-info);
+}
+
+.drift-value.top_heavy {
+    color: var(--color-success);
+}
+
+.drift-value.bottom_heavy {
+    color: var(--color-warning);
+}
+
+/* ===== Training Queue Card ===== */
+.card-queue {
+    border-color: var(--color-4090);
+}
+
+.refresh-btn {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid var(--color-4090);
+    color: var(--color-4090);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+    background: rgba(59, 130, 246, 0.3);
+}
+
+.queue-summary {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.queue-stat-mini {
+    text-align: center;
+}
+
+.queue-val {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-4090);
+}
+
+.queue-lbl {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.queue-tabs {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+
+.q-tab {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 0.3rem 0.4rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+}
+
+.q-tab:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-primary);
+}
+
+.q-tab.active {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: var(--color-4090);
+    color: var(--color-4090);
+}
+
+.q-tab span {
+    font-weight: 600;
+}
+
+.queue-file-list {
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.queue-loading {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 1rem;
+    font-size: 0.8rem;
+}
+
+.queue-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 1.5rem;
+    font-size: 0.85rem;
+}
+
+.q-file {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    background: rgba(255,255,255,0.02);
+    border-radius: 4px;
+    margin-bottom: 0.3rem;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+}
+
+.q-file:hover {
+    background: rgba(255,255,255,0.04);
+    border-color: var(--border-color);
+}
+
+.q-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.q-dot.high { background: #ef4444; }
+.q-dot.normal { background: #f59e0b; }
+.q-dot.low { background: #10b981; }
+
+.q-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.q-name {
+    font-family: monospace;
+    font-size: 0.7rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.q-meta {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+.q-size {
+    font-size: 0.7rem;
+    color: var(--color-4090);
+    font-weight: 600;
+    min-width: 45px;
+    text-align: right;
+}
+
+/* =====================================================
+   ERROR ALERT CARDS - Pop-up notifications for issues
+   ===================================================== */
+
+.error-cards-container {
+    position: fixed;
+    top: 80px; /* Below header */
+    right: 1.5rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    pointer-events: none;
+}
+
+.error-card {
+    background: var(--bg-card);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    width: 320px;
+    overflow: hidden;
+    pointer-events: auto;
+    animation: slideInRight 0.3s ease-out;
+    transition: all 0.3s ease;
+}
+
+.error-card:hover {
+    transform: translateX(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+.error-card.dismissing {
+    animation: slideOutRight 0.3s ease-in forwards;
+}
+
+.error-card.resolved {
+    animation: resolveCard 0.5s ease-out forwards;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+@keyframes resolveCard {
+    0% {
+        opacity: 1;
+        border-color: var(--color-success);
+        background: rgba(16, 185, 129, 0.1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.02);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.95) translateX(20px);
+    }
+}
+
+/* Card severity borders */
+.error-card.critical {
+    border-left: 4px solid var(--color-danger);
+}
+
+.error-card.warning {
+    border-left: 4px solid var(--color-warning);
+}
+
+.error-card.info {
+    border-left: 4px solid var(--color-info);
+}
+
+/* Card header */
+.error-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.error-card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.error-card-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.error-card.critical .error-card-icon {
+    color: var(--color-danger);
+}
+
+.error-card.warning .error-card-icon {
+    color: var(--color-warning);
+}
+
+.error-card.info .error-card-icon {
+    color: var(--color-info);
+}
+
+.error-card-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.error-card-dismiss {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.error-card-dismiss:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+/* Card body */
+.error-card-body {
+    padding: 0.75rem 1rem;
+}
+
+.error-card-detail {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.error-card-detail:last-child {
+    margin-bottom: 0;
+}
+
+.error-card-label {
+    color: var(--text-secondary);
+}
+
+.error-card-value {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.error-card-value.machine-4090 {
+    color: var(--color-4090);
+}
+
+.error-card-value.machine-3090 {
+    color: var(--color-3090);
+}
+
+/* Downtime counter with pulse animation for critical */
+.error-card-downtime {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+}
+
+.error-card.critical .error-card-downtime {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--color-danger);
+    animation: criticalPulse 2s ease-in-out infinite;
+}
+
+@keyframes criticalPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Card actions */
+.error-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid var(--border-color);
+}
+
+.error-card-btn {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.error-card-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.error-card-btn.primary {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: var(--color-4090);
+    color: var(--color-4090);
+}
+
+.error-card-btn.primary:hover {
+    background: rgba(59, 130, 246, 0.3);
+}
+
+/* Error summary badge in header */
+.error-summary-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid var(--color-danger);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    animation: badgePulse 2s ease-in-out infinite;
+}
+
+.error-summary-badge:hover {
+    background: rgba(239, 68, 68, 0.25);
+}
+
+.error-summary-badge.warning {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: var(--color-warning);
+}
+
+.error-summary-badge.hidden {
+    display: none;
+}
+
+@keyframes badgePulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+    }
+}
+
+.error-badge-icon {
+    font-size: 1rem;
+}
+
+.error-badge-count {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--color-danger);
+}
+
+.error-summary-badge.warning .error-badge-count {
+    color: var(--color-warning);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .error-cards-container {
+        right: 0.5rem;
+        left: 0.5rem;
+    }
+
+    .error-card {
+        width: 100%;
+    }
+}

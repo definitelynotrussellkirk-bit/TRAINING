@@ -91,6 +91,9 @@ TASK_TYPE_PRIORITIES = {
     # Phase 3: Targeted corrections
     "generate_corrections": Priority.LOW,    # Generate training data for error types
     "error_feedback_loop": Priority.NORMAL,  # Full eval + generate + queue cycle
+    # Phase 4: Self-improving pipeline
+    "impact_snapshot": Priority.IDLE,        # Take performance snapshot
+    "self_improve_cycle": Priority.NORMAL,   # Full self-improving cycle
 }
 
 
@@ -232,6 +235,9 @@ class TaskExecutor:
             # Phase 3: Targeted corrections
             "generate_corrections": self._handle_generate_corrections,
             "error_feedback_loop": self._handle_error_feedback_loop,
+            # Phase 4: Self-improving pipeline
+            "impact_snapshot": self._handle_impact_snapshot,
+            "self_improve_cycle": self._handle_self_improve_cycle,
         }
 
     def register_handler(self, task_type: str, handler: Callable):
@@ -819,6 +825,114 @@ class TaskExecutor:
 
         except Exception as e:
             logger.error(f"Error feedback loop failed: {e}")
+            results["error"] = str(e)
+            return results
+
+    def _handle_impact_snapshot(self, params: Dict) -> Dict:
+        """Take a performance snapshot for impact tracking."""
+        base_dir = params.get("base_dir", "/path/to/training")
+        notes = params.get("notes")
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "impact_tracker",
+                f"{base_dir}/monitoring/analytics/impact_tracker.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                tracker = module.ImpactTracker(base_dir)
+                snapshot = tracker.take_snapshot(notes)
+
+                return {
+                    "task": "impact_snapshot",
+                    "accuracy": snapshot.hard_example_accuracy,
+                    "step": snapshot.step,
+                    "corrections_pending": snapshot.corrections_pending,
+                    "timestamp": snapshot.timestamp
+                }
+
+        except Exception as e:
+            logger.error(f"Impact snapshot failed: {e}")
+            return {"task": "impact_snapshot", "error": str(e)}
+
+    def _handle_self_improve_cycle(self, params: Dict) -> Dict:
+        """
+        Full self-improving cycle:
+        1. Take baseline snapshot
+        2. Run hard example evaluation
+        3. Generate targeted corrections
+        4. Queue corrections for training
+        5. (Future: After training, compare to baseline)
+
+        This is designed to run periodically (e.g., every 2-4 hours).
+        """
+        base_dir = params.get("base_dir", "/path/to/training")
+        corrections_per_error = params.get("corrections_per_error", 25)
+        min_errors_to_correct = params.get("min_errors", 3)
+
+        results = {
+            "task": "self_improve_cycle",
+            "phases": [],
+            "timestamp": datetime.now().isoformat()
+        }
+
+        try:
+            # Phase 1: Take baseline snapshot
+            logger.info("Phase 1: Taking baseline snapshot...")
+            snapshot_result = self._handle_impact_snapshot({
+                "base_dir": base_dir,
+                "notes": "Pre-cycle baseline"
+            })
+            results["phases"].append({
+                "phase": "baseline_snapshot",
+                "accuracy": snapshot_result.get("accuracy", 0),
+                "step": snapshot_result.get("step", 0)
+            })
+
+            # Phase 2: Evaluate hard examples
+            logger.info("Phase 2: Evaluating hard examples...")
+            eval_result = self._handle_hard_example_eval({"base_dir": base_dir})
+            results["phases"].append({
+                "phase": "hard_example_eval",
+                "accuracy": eval_result.get("accuracy", 0),
+                "error_types": eval_result.get("error_types", {})
+            })
+
+            # Phase 3: Check if corrections needed
+            error_count = sum(eval_result.get("error_types", {}).values())
+            if error_count < min_errors_to_correct:
+                results["message"] = f"Only {error_count} errors - below threshold ({min_errors_to_correct})"
+                results["action"] = "skipped_corrections"
+                return results
+
+            # Phase 4: Generate corrections
+            logger.info(f"Phase 3: Generating corrections for {error_count} errors...")
+            gen_result = self._handle_generate_corrections({
+                "base_dir": base_dir,
+                "count": corrections_per_error,
+                "queue": True
+            })
+            results["phases"].append({
+                "phase": "generate_corrections",
+                "files_created": gen_result.get("files_created", 0),
+                "categories": gen_result.get("error_types", [])
+            })
+
+            # Summary
+            results["summary"] = {
+                "baseline_accuracy": snapshot_result.get("accuracy", 0),
+                "errors_found": error_count,
+                "corrections_queued": gen_result.get("files_created", 0),
+                "next_action": "Train corrections, then run another cycle to measure impact"
+            }
+
+            logger.info(f"Self-improve cycle complete: {results['summary']}")
+            return results
+
+        except Exception as e:
+            logger.error(f"Self-improve cycle failed: {e}")
             results["error"] = str(e)
             return results
 

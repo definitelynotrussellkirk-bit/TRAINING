@@ -465,6 +465,29 @@ GENERATORS = {
     ],
 }
 
+# Map error types from hard_example_tracker to generator categories
+# This handles the wrong_* errors from classify_error()
+ERROR_TYPE_MAP = {
+    # Direct mappings
+    'over_confident': 'over_confident',
+    'under_confident': 'over_confident',  # Train on "Cannot determine" cases
+    'false_negative': 'false_negative',
+    'false_positive': 'false_positive',
+    # Category-specific mappings (from hard_example_tracker.classify_error)
+    'wrong_negation': 'over_confident',           # Negation errors → need "Cannot determine"
+    'wrong_double_negation': 'false_negative',    # Should be "Yes"
+    'wrong_quantifier': 'over_confident',         # Quantifier scope → "Cannot determine"
+    'wrong_modus_tollens': 'false_positive',      # Should be "No"
+    'wrong_transitivity': 'false_negative',       # Should be "Yes"
+    'wrong_contradiction': 'false_positive',      # Should be "No"
+    'wrong_existential': 'over_confident',        # Should be "Cannot determine"
+    'wrong_negation_chain': 'over_confident',     # Should be "Cannot determine"
+    'wrong_implicit_quantifier': 'false_negative', # Should be "Yes"
+    'wrong_vacuous': 'over_confident',            # Should be "Cannot determine"
+    'api_error': None,                            # Skip these
+    'unknown': None,                              # Skip these
+}
+
 
 class PatternGenerator:
     """Generate targeted training data for error types."""
@@ -520,6 +543,7 @@ class PatternGenerator:
         """
         Auto-generate based on recent error distribution.
         Generates more examples for more frequent errors.
+        Maps error types from hard_example_tracker to generator categories.
         """
         error_dist = self.get_error_distribution()
 
@@ -527,30 +551,46 @@ class PatternGenerator:
             logger.info("No error distribution found, generating balanced set")
             error_dist = {k: 1 for k in GENERATORS.keys()}
 
-        all_examples = {}
-        total_errors = sum(error_dist.values())
+        # Aggregate by generator category
+        category_counts: Dict[str, int] = {}
+        unmapped_errors: List[str] = []
 
         for error_type, count in error_dist.items():
-            if error_type not in GENERATORS:
-                # Try to map error type
-                if 'over' in error_type.lower():
+            # Use ERROR_TYPE_MAP for proper mapping
+            if error_type in ERROR_TYPE_MAP:
+                mapped = ERROR_TYPE_MAP[error_type]
+                if mapped is None:
+                    continue  # Skip api_error, unknown, etc.
+            elif error_type in GENERATORS:
+                mapped = error_type
+            else:
+                # Try fallback heuristics for unknown error types
+                if 'over' in error_type.lower() or 'confident' in error_type.lower():
                     mapped = 'over_confident'
-                elif 'under' in error_type.lower():
-                    mapped = 'over_confident'  # Similar fix
-                elif 'false_neg' in error_type.lower() or 'negative' in error_type.lower():
-                    mapped = 'false_negative'
-                elif 'false_pos' in error_type.lower() or 'positive' in error_type.lower():
-                    mapped = 'false_positive'
+                elif 'wrong' in error_type.lower():
+                    # Most "wrong_*" errors that aren't mapped likely need more training
+                    mapped = 'over_confident'  # Default to "Cannot determine" training
                 else:
+                    unmapped_errors.append(error_type)
                     continue
-                error_type = mapped
 
-            # Scale count by frequency
+            category_counts[mapped] = category_counts.get(mapped, 0) + count
+
+        if unmapped_errors:
+            logger.warning(f"Unmapped error types (skipped): {unmapped_errors}")
+
+        # Generate examples for each category
+        all_examples = {}
+        total_errors = sum(category_counts.values())
+
+        for category, count in category_counts.items():
+            # Scale count by frequency - more errors = more training data
             scaled_count = max(per_error, int(per_error * count / max(total_errors, 1) * 3))
 
-            logger.info(f"Generating {scaled_count} examples for {error_type}")
-            examples = self.generate_for_type(error_type, scaled_count)
-            all_examples[error_type] = examples
+            logger.info(f"Generating {scaled_count} examples for {category} (from {count} errors)")
+            examples = self.generate_for_type(category, scaled_count)
+            if examples:
+                all_examples[category] = examples
 
         return all_examples
 

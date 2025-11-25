@@ -1,0 +1,5806 @@
+{
+  "created": "2025-11-25T09:48:14.540184",
+  "total": 401,
+  "probes": [
+    {
+      "id": "probe_0000",
+      "prompt": "No dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0001",
+      "prompt": "All teachers are professionals. Some educators are not professionals. Are all educators also teachers?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0002",
+      "prompt": "No birds are animals. No animals are creatures. Are any birds also creatures?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0003",
+      "prompt": "All roses that are flowers are also plants. Rosa is a roses but not a plants. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0004",
+      "prompt": "Some roses are flowers. Some flowers are plants. Are some roses also plants?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0005",
+      "prompt": "It is not true that all cars are vehicles. Is it true that some cars are not vehicles?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0006",
+      "prompt": "All dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0007",
+      "prompt": "All dogs are mammals. No mammals are pets. Are any dogs also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0008",
+      "prompt": "It is not the case that no dogs bark. Do some dogs bark?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0009",
+      "prompt": "All teachers are professionals. All professionals are educators. Is every teachers a educators?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0010",
+      "prompt": "All dogs are mammals. All mammals are pets. Is every dogs a pets?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0011",
+      "prompt": "If all books are objects, and all objects are items, and Novel is not a items, is Novel a books?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0012",
+      "prompt": "No roses are flowers. Rosa is a roses. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0013",
+      "prompt": "It is not true that all roses are flowers. Is it true that some roses are not flowers?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0014",
+      "prompt": "All birds that are animals are also creatures. Tweety is a birds but not a creatures. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0015",
+      "prompt": "All teachers are professionals. No professionals are educators. Are any teachers also educators?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0016",
+      "prompt": "Some dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0017",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0018",
+      "prompt": "No mammals can fly. Bats are mammals. Can bats fly?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0019",
+      "prompt": "Some dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0020",
+      "prompt": "All cars are vehicles. No vehicles are machines. Are any cars also machines?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0021",
+      "prompt": "All roses are flowers. Some plants are not flowers. Are all plants also roses?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0022",
+      "prompt": "If all students are people, and all people are learners, and Alice is not a learners, is Alice a students?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0023",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0024",
+      "prompt": "It is not true that all trees are plants. Is it true that some trees are not plants?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0025",
+      "prompt": "All birds are animals. All animals are creatures. Is every birds a creatures?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0026",
+      "prompt": "All students are people. All people are learners. Is every students a learners?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0027",
+      "prompt": "No birds are animals. Tweety is a birds. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0028",
+      "prompt": "All students that are people are also learners. Alice is a students but not a learners. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0029",
+      "prompt": "No birds are animals. All creatures are birds. Are any creatures also animals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0030",
+      "prompt": "All cars are vehicles. Some machines are not vehicles. Are all machines also cars?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0031",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0032",
+      "prompt": "No students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0033",
+      "prompt": "All birds are animals. Some creatures are not animals. Are all creatures also birds?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0034",
+      "prompt": "Some cars are vehicles. Some vehicles are machines. Are some cars also machines?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0035",
+      "prompt": "No trees are plants. Oak is a trees. Is Oak a plants?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0036",
+      "prompt": "No dogs are mammals. All pets are dogs. Are any pets also mammals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0037",
+      "prompt": "Some birds can fly. Are all birds able to fly?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0038",
+      "prompt": "All trees are plants. All plants are living things. Is every trees a living things?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0039",
+      "prompt": "Some dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0040",
+      "prompt": "No teachers are professionals. All educators are teachers. Are any educators also professionals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0041",
+      "prompt": "What is the capital of France?",
+      "category": "knowledge",
+      "difficulty": "easy",
+      "expected_answer": "Paris",
+      "metadata": {}
+    },
+    {
+      "id": "probe_0042",
+      "prompt": "It is false that all swans are not white. Are some swans white?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0043",
+      "prompt": "Some cars are vehicles. Tesla is a cars. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0044",
+      "prompt": "All teachers are professionals. All professionals are educators. Is every teachers a educators?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0045",
+      "prompt": "All trees are plants. Some living things are not plants. Are all living things also trees?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0046",
+      "prompt": "All dogs are mammals. No mammals are pets. Are any dogs also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0047",
+      "prompt": "Complete: The quick brown fox jumps over the lazy ___",
+      "category": "completion",
+      "difficulty": "easy",
+      "expected_answer": "dog",
+      "metadata": {}
+    },
+    {
+      "id": "probe_0048",
+      "prompt": "All fish are animals. No animals are swimmers. Are any fish also swimmers?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0049",
+      "prompt": "Some birds can fly. Are all birds able to fly?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0050",
+      "prompt": "All trees that are plants are also living things. Oak is a trees but not a living things. Is Oak a plants?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0051",
+      "prompt": "No cats are animals. No animals are pets. Are any cats also pets?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0052",
+      "prompt": "No cars are vehicles. No vehicles are machines. Are any cars also machines?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0053",
+      "prompt": "It is false that all swans are not white. Are some swans white?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0054",
+      "prompt": "All trees that are plants are also living things. Oak is a trees but not a living things. Is Oak a plants?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0055",
+      "prompt": "No fish are animals. Nemo is a fish. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0056",
+      "prompt": "Some fish are animals. Nemo is a fish. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0057",
+      "prompt": "It is false that all swans are not white. Are some swans white?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0058",
+      "prompt": "No teachers are professionals. No professionals are educators. Are any teachers also educators?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0059",
+      "prompt": "If all dogs are mammals, and all mammals are pets, and Rex is not a pets, is Rex a dogs?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0060",
+      "prompt": "All teachers are professionals. No professionals are educators. Are any teachers also educators?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0061",
+      "prompt": "Some cats are animals. Felix is a cats. Is Felix a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0062",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0063",
+      "prompt": "It is not true that all fish are animals. Is it true that some fish are not animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0064",
+      "prompt": "It is not true that all dogs are mammals. Is it true that some dogs are not mammals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0065",
+      "prompt": "If all books are objects, and all objects are items, and Novel is not a items, is Novel a books?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0066",
+      "prompt": "It is not true that all teachers are professionals. Is it true that some teachers are not professionals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0067",
+      "prompt": "Some students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0068",
+      "prompt": "No books are objects. No objects are items. Are any books also items?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0069",
+      "prompt": "If all fish are animals, and all animals are swimmers, and Nemo is not a swimmers, is Nemo a fish?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0070",
+      "prompt": "No fish are animals. All swimmers are fish. Are any swimmers also animals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0071",
+      "prompt": "No birds are animals. Tweety is a birds. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0072",
+      "prompt": "Some teachers are professionals. Bob is a teachers. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0073",
+      "prompt": "No birds are animals. All creatures are birds. Are any creatures also animals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0074",
+      "prompt": "No teachers are professionals. No professionals are educators. Are any teachers also educators?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0075",
+      "prompt": "No dogs are mammals. No mammals are pets. Are any dogs also pets?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0076",
+      "prompt": "All students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0077",
+      "prompt": "No mammals can fly. Bats are mammals. Can bats fly?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0078",
+      "prompt": "Some cats are animals. Some animals are pets. Are some cats also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0079",
+      "prompt": "No mammals can fly. Bats are mammals. Can bats fly?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0080",
+      "prompt": "All cars that are vehicles are also machines. Tesla is a cars but not a machines. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0081",
+      "prompt": "No birds are fish. All sparrows are birds. Are any sparrows fish?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0082",
+      "prompt": "No dogs are mammals. No mammals are pets. Are any dogs also pets?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0083",
+      "prompt": "No books are objects. All items are books. Are any items also objects?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0084",
+      "prompt": "All dogs are mammals. No mammals are pets. Are any dogs also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0085",
+      "prompt": "All books that are objects are also items. Novel is a books but not a items. Is Novel a objects?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0086",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0087",
+      "prompt": "No birds are fish. All sparrows are birds. Are any sparrows fish?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0088",
+      "prompt": "Everyone loves someone. Does someone love everyone?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0089",
+      "prompt": "It is not the case that no dogs bark. Do some dogs bark?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0090",
+      "prompt": "No birds are animals. All creatures are birds. Are any creatures also animals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0091",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0092",
+      "prompt": "It is not the case that no dogs bark. Do some dogs bark?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0093",
+      "prompt": "All unicorns are purple. Are there purple unicorns?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0094",
+      "prompt": "All cars that are vehicles are also machines. Tesla is a cars but not a machines. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0095",
+      "prompt": "Some birds are animals. Some animals are creatures. Are some birds also creatures?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0096",
+      "prompt": "All roses are flowers. Rosa is a roses. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0097",
+      "prompt": "All birds that are animals are also creatures. Tweety is a birds but not a creatures. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0098",
+      "prompt": "No books are objects. No objects are items. Are any books also items?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0099",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0100",
+      "prompt": "No students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0101",
+      "prompt": "It is not true that all teachers are professionals. Is it true that some teachers are not professionals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0102",
+      "prompt": "Some teachers are professionals. Bob is a teachers. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0103",
+      "prompt": "All cats are animals. All animals are pets. Is every cats a pets?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0104",
+      "prompt": "Some trees are plants. Oak is a trees. Is Oak a plants?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0105",
+      "prompt": "No cats are animals. Felix is a cats. Is Felix a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0106",
+      "prompt": "It is not true that all teachers are professionals. Is it true that some teachers are not professionals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0107",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0108",
+      "prompt": "All teachers are professionals. Bob is a teachers. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0109",
+      "prompt": "No books are objects. No objects are items. Are any books also items?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0110",
+      "prompt": "All teachers are professionals. All professionals are educators. Is every teachers a educators?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0111",
+      "prompt": "No trees are plants. Oak is a trees. Is Oak a plants?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0112",
+      "prompt": "Some teachers are professionals. Some professionals are educators. Are some teachers also educators?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0113",
+      "prompt": "It is not the case that no dogs bark. Do some dogs bark?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0114",
+      "prompt": "If all books are objects, and all objects are items, and Novel is not a items, is Novel a books?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0115",
+      "prompt": "All teachers are professionals. All professionals are educators. Is every teachers a educators?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0116",
+      "prompt": "Some roses are flowers. Some flowers are plants. Are some roses also plants?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0117",
+      "prompt": "It is false that all swans are not white. Are some swans white?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0118",
+      "prompt": "All students are people. Some learners are not people. Are all learners also students?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0119",
+      "prompt": "No teachers are professionals. Bob is a teachers. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0120",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0121",
+      "prompt": "All students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0122",
+      "prompt": "No roses are flowers. All plants are roses. Are any plants also flowers?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0123",
+      "prompt": "Some cats are animals. Felix is a cats. Is Felix a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0124",
+      "prompt": "Some fish are animals. Some animals are swimmers. Are some fish also swimmers?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0125",
+      "prompt": "Some birds can fly. Are all birds able to fly?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0126",
+      "prompt": "Some students are people. Some people are learners. Are some students also learners?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0127",
+      "prompt": "Some students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0128",
+      "prompt": "No mammals can fly. Bats are mammals. Can bats fly?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0129",
+      "prompt": "All roses are flowers. No flowers are plants. Are any roses also plants?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0130",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0131",
+      "prompt": "No fish are animals. No animals are swimmers. Are any fish also swimmers?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0132",
+      "prompt": "All cars that are vehicles are also machines. Tesla is a cars but not a machines. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0133",
+      "prompt": "No trees are plants. Oak is a trees. Is Oak a plants?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0134",
+      "prompt": "No trees are plants. No plants are living things. Are any trees also living things?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0135",
+      "prompt": "No mammals can fly. Bats are mammals. Can bats fly?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0136",
+      "prompt": "Some trees are plants. Some plants are living things. Are some trees also living things?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0137",
+      "prompt": "All students are people. Some learners are not people. Are all learners also students?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0138",
+      "prompt": "No birds are fish. All sparrows are birds. Are any sparrows fish?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0139",
+      "prompt": "No students are people. No people are learners. Are any students also learners?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0140",
+      "prompt": "All birds that are animals are also creatures. Tweety is a birds but not a creatures. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0141",
+      "prompt": "Not all cats are black. Are some cats not black?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0142",
+      "prompt": "If all cars are vehicles, and all vehicles are machines, and Tesla is not a machines, is Tesla a cars?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0143",
+      "prompt": "All books are objects. No objects are items. Are any books also items?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0144",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0145",
+      "prompt": "No fish are animals. Nemo is a fish. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0146",
+      "prompt": "If all students are people, and all people are learners, and Alice is not a learners, is Alice a students?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0147",
+      "prompt": "All birds are animals. All animals are creatures. Is every birds a creatures?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0148",
+      "prompt": "All cars are vehicles. Tesla is a cars. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0149",
+      "prompt": "All dogs are mammals. All mammals are pets. Is every dogs a pets?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0150",
+      "prompt": "All cats are animals. Some pets are not animals. Are all pets also cats?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0151",
+      "prompt": "Some birds can fly. Are all birds able to fly?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0152",
+      "prompt": "Is the following statement true: 'This statement is false'?",
+      "category": "paradox",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {}
+    },
+    {
+      "id": "probe_0153",
+      "prompt": "It is false that all swans are not white. Are some swans white?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0154",
+      "prompt": "It is not true that all trees are plants. Is it true that some trees are not plants?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0155",
+      "prompt": "If all students are people, and all people are learners, and Alice is not a learners, is Alice a students?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0156",
+      "prompt": "All roses are flowers. All flowers are plants. Is every roses a plants?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0157",
+      "prompt": "It is not true that all students are people. Is it true that some students are not people?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0158",
+      "prompt": "No books are objects. All items are books. Are any items also objects?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0159",
+      "prompt": "No birds are fish. All sparrows are birds. Are any sparrows fish?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0160",
+      "prompt": "No birds are animals. Tweety is a birds. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0161",
+      "prompt": "All students are people. Some learners are not people. Are all learners also students?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0162",
+      "prompt": "All trees are plants. All plants are living things. Is every trees a living things?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0163",
+      "prompt": "Some cars are vehicles. Some vehicles are machines. Are some cars also machines?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0164",
+      "prompt": "No roses are flowers. Rosa is a roses. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0165",
+      "prompt": "No books are objects. No objects are items. Are any books also items?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0166",
+      "prompt": "If all cats are animals, and all animals are pets, and Felix is not a pets, is Felix a cats?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0167",
+      "prompt": "It is not true that all students are people. Is it true that some students are not people?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0168",
+      "prompt": "All cars are vehicles. Tesla is a cars. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0169",
+      "prompt": "All teachers that are professionals are also educators. Bob is a teachers but not a educators. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0170",
+      "prompt": "No books are objects. No objects are items. Are any books also items?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0171",
+      "prompt": "Some cars are vehicles. Some vehicles are machines. Are some cars also machines?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0172",
+      "prompt": "All students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0173",
+      "prompt": "All unicorns are purple. Are there purple unicorns?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0174",
+      "prompt": "No birds are animals. Tweety is a birds. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0175",
+      "prompt": "All fish are animals. Nemo is a fish. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0176",
+      "prompt": "All unicorns are purple. Are there purple unicorns?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0177",
+      "prompt": "If all cars are vehicles, and all vehicles are machines, and Tesla is not a machines, is Tesla a cars?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0178",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0179",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0180",
+      "prompt": "Some roses are flowers. Rosa is a roses. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0181",
+      "prompt": "No cars are vehicles. All machines are cars. Are any machines also vehicles?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0182",
+      "prompt": "All roses are flowers. No flowers are plants. Are any roses also plants?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0183",
+      "prompt": "No books are objects. All items are books. Are any items also objects?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0184",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0185",
+      "prompt": "Everyone loves someone. Does someone love everyone?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0186",
+      "prompt": "If all cars are vehicles, and all vehicles are machines, and Tesla is not a machines, is Tesla a cars?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0187",
+      "prompt": "It is not the case that no dogs bark. Do some dogs bark?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0188",
+      "prompt": "Everyone loves someone. Does someone love everyone?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0189",
+      "prompt": "All trees are plants. No plants are living things. Are any trees also living things?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0190",
+      "prompt": "All cats that are animals are also pets. Felix is a cats but not a pets. Is Felix a animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0191",
+      "prompt": "Some roses are flowers. Some flowers are plants. Are some roses also plants?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0192",
+      "prompt": "It is not the case that no dogs bark. Do some dogs bark?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0193",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0194",
+      "prompt": "No teachers are professionals. All educators are teachers. Are any educators also professionals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0195",
+      "prompt": "All cats are animals. Felix is a cats. Is Felix a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0196",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0197",
+      "prompt": "No students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0198",
+      "prompt": "No fish are animals. No animals are swimmers. Are any fish also swimmers?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0199",
+      "prompt": "All teachers that are professionals are also educators. Bob is a teachers but not a educators. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0200",
+      "prompt": "It is not true that all cats are animals. Is it true that some cats are not animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0201",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0202",
+      "prompt": "All students are people. Some learners are not people. Are all learners also students?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0203",
+      "prompt": "All cats are animals. Felix is a cats. Is Felix a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0204",
+      "prompt": "Some cats are animals. Some animals are pets. Are some cats also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0205",
+      "prompt": "No cars are vehicles. All machines are cars. Are any machines also vehicles?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0206",
+      "prompt": "No cats are animals. All pets are cats. Are any pets also animals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0207",
+      "prompt": "No dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0208",
+      "prompt": "If all dogs are mammals, and all mammals are pets, and Rex is not a pets, is Rex a dogs?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0209",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0210",
+      "prompt": "If all roses are flowers, and all flowers are plants, and Rosa is not a plants, is Rosa a roses?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0211",
+      "prompt": "All cars are vehicles. Tesla is a cars. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0212",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0213",
+      "prompt": "No students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0214",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0215",
+      "prompt": "Not all cats are black. Are some cats not black?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0216",
+      "prompt": "All teachers that are professionals are also educators. Bob is a teachers but not a educators. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0217",
+      "prompt": "All cars are vehicles. No vehicles are machines. Are any cars also machines?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0218",
+      "prompt": "If it rains, the ground gets wet. It rained. Is the ground wet?",
+      "category": "logic",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {}
+    },
+    {
+      "id": "probe_0219",
+      "prompt": "All dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0220",
+      "prompt": "Some trees are plants. Some plants are living things. Are some trees also living things?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0221",
+      "prompt": "Some fish are animals. Some animals are swimmers. Are some fish also swimmers?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0222",
+      "prompt": "All dogs are mammals. No mammals are pets. Are any dogs also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0223",
+      "prompt": "If all cars are vehicles, and all vehicles are machines, and Tesla is not a machines, is Tesla a cars?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0224",
+      "prompt": "All cars that are vehicles are also machines. Tesla is a cars but not a machines. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0225",
+      "prompt": "No birds are fish. All sparrows are birds. Are any sparrows fish?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0226",
+      "prompt": "Everyone loves someone. Does someone love everyone?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0227",
+      "prompt": "All birds are animals. No animals are creatures. Are any birds also creatures?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0228",
+      "prompt": "Some fish are animals. Nemo is a fish. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0229",
+      "prompt": "Some students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0230",
+      "prompt": "All books are objects. Some items are not objects. Are all items also books?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0231",
+      "prompt": "All teachers are professionals. Bob is a teachers. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0232",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0233",
+      "prompt": "What is 2 + 2?",
+      "category": "math",
+      "difficulty": "easy",
+      "expected_answer": "4",
+      "metadata": {}
+    },
+    {
+      "id": "probe_0234",
+      "prompt": "All birds are animals. Some creatures are not animals. Are all creatures also birds?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0235",
+      "prompt": "No roses are flowers. No flowers are plants. Are any roses also plants?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0236",
+      "prompt": "All trees are plants. Some living things are not plants. Are all living things also trees?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0237",
+      "prompt": "All birds are animals. Some creatures are not animals. Are all creatures also birds?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0238",
+      "prompt": "It is not true that all teachers are professionals. Is it true that some teachers are not professionals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0239",
+      "prompt": "It is not true that all birds are animals. Is it true that some birds are not animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0240",
+      "prompt": "All teachers are professionals. Bob is a teachers. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0241",
+      "prompt": "It is not true that all books are objects. Is it true that some books are not objects?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0242",
+      "prompt": "Some dogs are mammals. Some mammals are pets. Are some dogs also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0243",
+      "prompt": "No birds are animals. All creatures are birds. Are any creatures also animals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0244",
+      "prompt": "All birds are animals. No animals are creatures. Are any birds also creatures?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0245",
+      "prompt": "All cats are animals. Some pets are not animals. Are all pets also cats?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0246",
+      "prompt": "All fish are animals. All animals are swimmers. Is every fish a swimmers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0247",
+      "prompt": "No trees are plants. All living things are trees. Are any living things also plants?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0248",
+      "prompt": "It is not true that all trees are plants. Is it true that some trees are not plants?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0249",
+      "prompt": "No trees are plants. No plants are living things. Are any trees also living things?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0250",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0251",
+      "prompt": "All trees are plants. Oak is a trees. Is Oak a plants?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0252",
+      "prompt": "If all teachers are professionals, and all professionals are educators, and Bob is not a educators, is Bob a teachers?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0253",
+      "prompt": "All roses are flowers. No flowers are plants. Are any roses also plants?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0254",
+      "prompt": "No students are people. All learners are students. Are any learners also people?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0255",
+      "prompt": "Some fish are animals. Nemo is a fish. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0256",
+      "prompt": "Some birds are animals. Some animals are creatures. Are some birds also creatures?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0257",
+      "prompt": "Some birds are animals. Tweety is a birds. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0258",
+      "prompt": "No cars are vehicles. Tesla is a cars. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0259",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0260",
+      "prompt": "All cats are animals. No animals are pets. Are any cats also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0261",
+      "prompt": "If all fish are animals, and all animals are swimmers, and Nemo is not a swimmers, is Nemo a fish?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0262",
+      "prompt": "All cats are animals. All animals are pets. Is every cats a pets?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0263",
+      "prompt": "It is not the case that no dogs bark. Do some dogs bark?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0264",
+      "prompt": "No trees are plants. No plants are living things. Are any trees also living things?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0265",
+      "prompt": "All fish that are animals are also swimmers. Nemo is a fish but not a swimmers. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0266",
+      "prompt": "If all roses are flowers, and all flowers are plants, and Rosa is not a plants, is Rosa a roses?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0267",
+      "prompt": "No trees are plants. All living things are trees. Are any living things also plants?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0268",
+      "prompt": "It is not true that all cars are vehicles. Is it true that some cars are not vehicles?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0269",
+      "prompt": "It is false that all swans are not white. Are some swans white?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0270",
+      "prompt": "It is not true that all dogs are mammals. Is it true that some dogs are not mammals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0271",
+      "prompt": "All trees are plants. Oak is a trees. Is Oak a plants?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0272",
+      "prompt": "All books that are objects are also items. Novel is a books but not a items. Is Novel a objects?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0273",
+      "prompt": "No birds are fish. All sparrows are birds. Are any sparrows fish?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0274",
+      "prompt": "All dogs are mammals. No mammals are pets. Are any dogs also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0275",
+      "prompt": "Some roses are flowers. Rosa is a roses. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0276",
+      "prompt": "It is not the case that no dogs bark. Do some dogs bark?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0277",
+      "prompt": "It is false that all swans are not white. Are some swans white?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0278",
+      "prompt": "All books are objects. All objects are items. Is every books a items?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0279",
+      "prompt": "Some teachers are professionals. Some professionals are educators. Are some teachers also educators?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0280",
+      "prompt": "It is false that all swans are not white. Are some swans white?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0281",
+      "prompt": "It is not the case that no dogs bark. Do some dogs bark?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0282",
+      "prompt": "It is not true that all cars are vehicles. Is it true that some cars are not vehicles?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0283",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0284",
+      "prompt": "All cars that are vehicles are also machines. Tesla is a cars but not a machines. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0285",
+      "prompt": "Some dogs are mammals. Some mammals are pets. Are some dogs also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0286",
+      "prompt": "No mammals can fly. Bats are mammals. Can bats fly?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0287",
+      "prompt": "All fish are animals. Some swimmers are not animals. Are all swimmers also fish?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0288",
+      "prompt": "No birds are animals. Tweety is a birds. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0289",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0290",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0291",
+      "prompt": "Some students are people. Some people are learners. Are some students also learners?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0292",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0293",
+      "prompt": "All dogs are mammals. All mammals are pets. Is every dogs a pets?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0294",
+      "prompt": "Everyone loves someone. Does someone love everyone?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0295",
+      "prompt": "All students passed some exam. Did some exam fail all students?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0296",
+      "prompt": "Not all cats are black. Are some cats not black?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0297",
+      "prompt": "All dogs that are mammals are also pets. Rex is a dogs but not a pets. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0298",
+      "prompt": "All fish are animals. All animals are swimmers. Is every fish a swimmers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0299",
+      "prompt": "No mammals can fly. Bats are mammals. Can bats fly?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0300",
+      "prompt": "All students are people. All people are learners. Is every students a learners?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0301",
+      "prompt": "It is not true that all trees are plants. Is it true that some trees are not plants?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0302",
+      "prompt": "All roses are flowers. Rosa is a roses. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0303",
+      "prompt": "All cars are vehicles. No vehicles are machines. Are any cars also machines?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0304",
+      "prompt": "Some students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0305",
+      "prompt": "All roses are flowers. Rosa is a roses. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0306",
+      "prompt": "All dogs are mammals. Some pets are not mammals. Are all pets also dogs?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0307",
+      "prompt": "Some fish are animals. Some animals are swimmers. Are some fish also swimmers?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0308",
+      "prompt": "All cars are vehicles. No vehicles are machines. Are any cars also machines?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0309",
+      "prompt": "Some teachers are professionals. Bob is a teachers. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0310",
+      "prompt": "Some trees are plants. Oak is a trees. Is Oak a plants?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0311",
+      "prompt": "No dogs are mammals. No mammals are pets. Are any dogs also pets?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0312",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0313",
+      "prompt": "If all cars are vehicles, and all vehicles are machines, and Tesla is not a machines, is Tesla a cars?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0314",
+      "prompt": "Some birds can fly. Are all birds able to fly?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0315",
+      "prompt": "All students are people. Some learners are not people. Are all learners also students?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0316",
+      "prompt": "All birds that are animals are also creatures. Tweety is a birds but not a creatures. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0317",
+      "prompt": "No fish are animals. No animals are swimmers. Are any fish also swimmers?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0318",
+      "prompt": "All trees are plants. No plants are living things. Are any trees also living things?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0319",
+      "prompt": "All books that are objects are also items. Novel is a books but not a items. Is Novel a objects?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0320",
+      "prompt": "All cats are animals. No animals are pets. Are any cats also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0321",
+      "prompt": "No mammals can fly. Bats are mammals. Can bats fly?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0322",
+      "prompt": "Some birds can fly. Are all birds able to fly?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0323",
+      "prompt": "Not all cats are black. Are some cats not black?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0324",
+      "prompt": "If all cars are vehicles, and all vehicles are machines, and Tesla is not a machines, is Tesla a cars?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0325",
+      "prompt": "If all roses are flowers, and all flowers are plants, and Rosa is not a plants, is Rosa a roses?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0326",
+      "prompt": "All students are people. All people are learners. Is every students a learners?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0327",
+      "prompt": "Some cats are animals. Some animals are pets. Are some cats also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0328",
+      "prompt": "All fish are animals. Nemo is a fish. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0329",
+      "prompt": "No dogs are mammals. All pets are dogs. Are any pets also mammals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0330",
+      "prompt": "It is not true that all books are objects. Is it true that some books are not objects?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0331",
+      "prompt": "No teachers are professionals. Bob is a teachers. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0332",
+      "prompt": "All dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0333",
+      "prompt": "Some birds can fly. Are all birds able to fly?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0334",
+      "prompt": "It is not the case that no dogs bark. Do some dogs bark?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0335",
+      "prompt": "No fish are animals. No animals are swimmers. Are any fish also swimmers?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0336",
+      "prompt": "Some cars are vehicles. Tesla is a cars. Is Tesla a vehicles?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0337",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0338",
+      "prompt": "No trees are plants. No plants are living things. Are any trees also living things?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0339",
+      "prompt": "All fish are animals. All animals are swimmers. Is every fish a swimmers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. All {B} are {C}. Is every {A} a {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0340",
+      "prompt": "Some teachers are professionals. Bob is a teachers. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0341",
+      "prompt": "All birds that are animals are also creatures. Tweety is a birds but not a creatures. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0342",
+      "prompt": "All cats are animals. No animals are pets. Are any cats also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0343",
+      "prompt": "No dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0344",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0345",
+      "prompt": "Some cats are animals. Some animals are pets. Are some cats also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0346",
+      "prompt": "No students are people. No people are learners. Are any students also learners?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0347",
+      "prompt": "All students that are people are also learners. Alice is a students but not a learners. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0348",
+      "prompt": "All fish that are animals are also swimmers. Nemo is a fish but not a swimmers. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0349",
+      "prompt": "All books are objects. No objects are items. Are any books also items?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0350",
+      "prompt": "No fish are animals. No animals are swimmers. Are any fish also swimmers?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "No {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0351",
+      "prompt": "All dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0352",
+      "prompt": "No birds are animals. Tweety is a birds. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0353",
+      "prompt": "If all students are people, and all people are learners, and Alice is not a learners, is Alice a students?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "If all {A} are {B}, and all {B} are {C}, and {x} is not a {C}, is {x} a {A}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0354",
+      "prompt": "It is false that all swans are not white. Are some swans white?",
+      "category": "edge_double_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "double_negation"
+      }
+    },
+    {
+      "id": "probe_0355",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0356",
+      "prompt": "No dogs are mammals. All pets are dogs. Are any pets also mammals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0357",
+      "prompt": "All roses that are flowers are also plants. Rosa is a roses but not a plants. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0358",
+      "prompt": "All fish are animals. Nemo is a fish. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0359",
+      "prompt": "All students are people. Alice is a students. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0360",
+      "prompt": "Some roses are flowers. Some flowers are plants. Are some roses also plants?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0361",
+      "prompt": "Some birds are animals. Tweety is a birds. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0362",
+      "prompt": "All books that are objects are also items. Novel is a books but not a items. Is Novel a objects?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0363",
+      "prompt": "Some birds can fly. Are all birds able to fly?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0364",
+      "prompt": "No fish are animals. Nemo is a fish. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0365",
+      "prompt": "All students are people. No people are learners. Are any students also learners?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0366",
+      "prompt": "No cats are animals. Felix is a cats. Is Felix a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "cats",
+          "animals",
+          "pets",
+          "Felix"
+        ]
+      }
+    },
+    {
+      "id": "probe_0367",
+      "prompt": "All fish are animals. Some swimmers are not animals. Are all swimmers also fish?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0368",
+      "prompt": "All dogs are mammals. No mammals are pets. Are any dogs also pets?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0369",
+      "prompt": "No birds are animals. All creatures are birds. Are any creatures also animals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0370",
+      "prompt": "Some fish are animals. Nemo is a fish. Is Nemo a animals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0371",
+      "prompt": "Some roses are flowers. Rosa is a roses. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0372",
+      "prompt": "No dogs are mammals. All pets are dogs. Are any pets also mammals?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. All {C} are {A}. Are any {C} also {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0373",
+      "prompt": "No mammals can fly. Bats are mammals. Can bats fly?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0374",
+      "prompt": "It is not true that all roses are flowers. Is it true that some roses are not flowers?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0375",
+      "prompt": "Not all cats are black. Are some cats not black?",
+      "category": "edge_negation",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "edge_type": "negation"
+      }
+    },
+    {
+      "id": "probe_0376",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0377",
+      "prompt": "Some trees are plants. Some plants are living things. Are some trees also living things?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0378",
+      "prompt": "All students that are people are also learners. Alice is a students but not a learners. Is Alice a people?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0379",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0380",
+      "prompt": "All birds are animals. Some creatures are not animals. Are all creatures also birds?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0381",
+      "prompt": "All unicorns are purple. Are there purple unicorns?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0382",
+      "prompt": "All roses are flowers. Rosa is a roses. Is Rosa a flowers?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0383",
+      "prompt": "Everyone loves someone. Does someone love everyone?",
+      "category": "edge_quantifier_scope",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "quantifier_scope"
+      }
+    },
+    {
+      "id": "probe_0384",
+      "prompt": "It is not true that all cars are vehicles. Is it true that some cars are not vehicles?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0385",
+      "prompt": "Every square circle is red. Are there red square circles?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0386",
+      "prompt": "All unicorns are purple. Are there purple unicorns?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    },
+    {
+      "id": "probe_0387",
+      "prompt": "Some trees are plants. Some plants are living things. Are some trees also living things?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0388",
+      "prompt": "No teachers are professionals. Bob is a teachers. Is Bob a professionals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "No {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "teachers",
+          "professionals",
+          "educators",
+          "Bob"
+        ]
+      }
+    },
+    {
+      "id": "probe_0389",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0390",
+      "prompt": "All dogs are mammals. Rex is a dogs. Is Rex a mammals?",
+      "category": "syllo",
+      "difficulty": "easy",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "All {A} are {B}. {x} is a {A}. Is {x} a {B}?",
+        "words": [
+          "dogs",
+          "mammals",
+          "pets",
+          "Rex"
+        ]
+      }
+    },
+    {
+      "id": "probe_0391",
+      "prompt": "All books are objects. Some items are not objects. Are all items also books?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "books",
+          "objects",
+          "items",
+          "Novel"
+        ]
+      }
+    },
+    {
+      "id": "probe_0392",
+      "prompt": "All roses are flowers. No flowers are plants. Are any roses also plants?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "roses",
+          "flowers",
+          "plants",
+          "Rosa"
+        ]
+      }
+    },
+    {
+      "id": "probe_0393",
+      "prompt": "Some trees are plants. Some plants are living things. Are some trees also living things?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "trees",
+          "plants",
+          "living things",
+          "Oak"
+        ]
+      }
+    },
+    {
+      "id": "probe_0394",
+      "prompt": "All cars are vehicles. No vehicles are machines. Are any cars also machines?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. No {B} are {C}. Are any {A} also {C}?",
+        "words": [
+          "cars",
+          "vehicles",
+          "machines",
+          "Tesla"
+        ]
+      }
+    },
+    {
+      "id": "probe_0395",
+      "prompt": "It is not true that all fish are animals. Is it true that some fish are not animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "Yes",
+      "metadata": {
+        "template": "It is not true that all {A} are {B}. Is it true that some {A} are not {B}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0396",
+      "prompt": "Some cats are black. Is every cat black?",
+      "category": "edge_existential",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "edge_type": "existential"
+      }
+    },
+    {
+      "id": "probe_0397",
+      "prompt": "Some fish are animals. Some animals are swimmers. Are some fish also swimmers?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "template": "Some {A} are {B}. Some {B} are {C}. Are some {A} also {C}?",
+        "words": [
+          "fish",
+          "animals",
+          "swimmers",
+          "Nemo"
+        ]
+      }
+    },
+    {
+      "id": "probe_0398",
+      "prompt": "All students are people. Some learners are not people. Are all learners also students?",
+      "category": "syllo",
+      "difficulty": "medium",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} are {B}. Some {C} are not {B}. Are all {C} also {A}?",
+        "words": [
+          "students",
+          "people",
+          "learners",
+          "Alice"
+        ]
+      }
+    },
+    {
+      "id": "probe_0399",
+      "prompt": "All birds that are animals are also creatures. Tweety is a birds but not a creatures. Is Tweety a animals?",
+      "category": "syllo",
+      "difficulty": "hard",
+      "expected_answer": "No",
+      "metadata": {
+        "template": "All {A} that are {B} are also {C}. {x} is a {A} but not a {C}. Is {x} a {B}?",
+        "words": [
+          "birds",
+          "animals",
+          "creatures",
+          "Tweety"
+        ]
+      }
+    },
+    {
+      "id": "probe_0400",
+      "prompt": "All unicorns are purple. Are there purple unicorns?",
+      "category": "edge_vacuous",
+      "difficulty": "hard",
+      "expected_answer": "Cannot determine",
+      "metadata": {
+        "edge_type": "vacuous"
+      }
+    }
+  ]
+}

@@ -281,7 +281,8 @@ class TrainingDaemon:
 - [x] Extract `InboxFlattener` class (added as part of FileWatcher)
 - [x] Wire PIDManager into daemon (acquire_lock/release_lock delegate)
 - [x] Wire InboxFlattener into daemon (flatten_inbox delegates)
-- [ ] Extract `SnapshotService` class (future work)
+- [x] Extract `SnapshotService` class (with tests)
+- [x] Wire SnapshotService into daemon (should_create/verify/create delegate)
 - [ ] Extract `DataGenerator` class (future work)
 - [ ] Slim `training_daemon.py` to ~200 lines (future work)
 - [ ] Add integration tests

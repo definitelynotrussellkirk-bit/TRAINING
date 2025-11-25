@@ -83,6 +83,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
 # Extracted daemon services (TASK005)
 from daemon.pid_manager import PIDManager
 from daemon.file_watcher import InboxFlattener
+from daemon.snapshot_service import SnapshotService, SnapshotConfig
 
 # Checkpoint retention (new system)
 from retention_service import RetentionService
@@ -246,6 +247,11 @@ class TrainingDaemon:
         # Extracted services (TASK005)
         self.pid_manager = PIDManager(self.pid_file)
         self.inbox_flattener = InboxFlattener(self.inbox_dir)
+        self.snapshot_service = SnapshotService(SnapshotConfig(
+            checkpoints_dir=self.current_model_dir,
+            snapshots_dir=self.snapshots_dir,
+            snapshot_time=self.config.get("snapshot_time", "02:00")
+        ))
 
         # Checkpoint retention (new RetentionManager-based system)
         self.last_retention_check = 0
@@ -485,125 +491,30 @@ class TrainingDaemon:
 
     def should_create_snapshot(self) -> bool:
         """Check if we should create a daily snapshot"""
-        today = datetime.now().date()
-
-        # Already created snapshot today?
-        if self.last_snapshot_date == today:
-            return False
-
-        # Check if we're past snapshot time
-        snapshot_time = datetime.strptime(self.config["snapshot_time"], "%H:%M").time()
-        current_time = datetime.now().time()
-
-        if current_time >= snapshot_time:
-            return True
-
-        return False
+        # Delegate to SnapshotService (TASK005)
+        # Sync last_snapshot_date with service
+        if self.last_snapshot_date:
+            self.snapshot_service.last_snapshot_date = self.last_snapshot_date
+        return self.snapshot_service.should_create_snapshot()
 
     def verify_snapshot(self, snapshot_dir: Path) -> bool:
-        """
-        CRITICAL FIX #7: Verify snapshot integrity before trusting it
-
-        Checks that essential HuggingFace checkpoint files exist and are readable
-        (For full model fine-tuning, not LoRA adapters)
-        """
-        try:
-            # Check for HuggingFace checkpoint files (full model training)
-            config_file = snapshot_dir / "config.json"
-
-            # Check for model weights (either safetensors or pytorch)
-            model_file = snapshot_dir / "model.safetensors"
-            if not model_file.exists():
-                model_file = snapshot_dir / "pytorch_model.bin"
-
-            # Check for tokenizer
-            tokenizer_file = snapshot_dir / "tokenizer.json"
-
-            # At minimum, need config and model weights
-            if not config_file.exists() or not model_file.exists():
-                return False
-
-            # Verify model file is not empty
-            model_size = model_file.stat().st_size
-            if model_size == 0:
-                return False
-
-            # Try to read config as JSON
-            import json
-            with open(config_file) as f:
-                json.load(f)
-
-            return True
-        except Exception as e:
-            self.logger.error(f"Snapshot verification failed: {e}")
-            return False
+        """Verify snapshot integrity"""
+        # Delegate to SnapshotService (TASK005)
+        return self.snapshot_service.verify_snapshot(snapshot_dir)
 
     def create_snapshot(self):
         """Create daily snapshot of current model (latest checkpoint only)"""
-        today = datetime.now().date()
-        snapshot_dir = self.snapshots_dir / today.strftime("%Y-%m-%d")
+        # Delegate to SnapshotService (TASK005)
+        result = self.snapshot_service.create_snapshot()
 
-        # TOCTOU FIX: Use try/except instead of checking exists first
-        try:
-            if snapshot_dir.exists():
-                # Verify existing snapshot
-                if self.verify_snapshot(snapshot_dir):
-                    self.logger.info(f"Snapshot already exists and verified: {snapshot_dir}")
-                    self.last_snapshot_date = today
-                    return
-                else:
-                    self.logger.warning(f"Existing snapshot corrupt - recreating")
-                    shutil.rmtree(snapshot_dir)
-        except Exception as e:
-            self.logger.warning(f"Error checking snapshot: {e}")
-
-        # Copy only latest checkpoint + essential files
-        self.logger.info(f"Creating daily snapshot: {snapshot_dir}")
-
-        try:
-            snapshot_dir.mkdir(parents=True, exist_ok=True)
-
-            # Find latest checkpoint
-            checkpoints = sorted([d for d in self.current_model_dir.glob("checkpoint-*") if d.is_dir()])
-            if checkpoints:
-                latest_checkpoint = checkpoints[-1]
-                self.logger.info(f"   Copying latest checkpoint: {latest_checkpoint.name}")
-                shutil.copytree(latest_checkpoint, snapshot_dir / latest_checkpoint.name)
-
-            # Copy essential adapter files (not in checkpoints)
-            essential_files = [
-                "adapter_config.json",
-                "adapter_model.safetensors",
-                "added_tokens.json",
-                "chat_template.jinja",
-                "special_tokens_map.json",
-                "tokenizer_config.json",
-                "tokenizer.json",
-                "vocab.json",
-                "merges.txt"
-            ]
-
-            for filename in essential_files:
-                src = self.current_model_dir / filename
-                if src.exists():
-                    shutil.copy2(src, snapshot_dir / filename)
-
-            # CRITICAL: Verify snapshot after creation
-            if not self.verify_snapshot(snapshot_dir):
-                self.logger.error("❌ Snapshot verification failed after creation!")
-                self.logger.error("   Removing corrupt snapshot")
-                shutil.rmtree(snapshot_dir)
-                raise Exception("Snapshot creation produced corrupt files")
-
-            self.last_snapshot_date = today
-            self.logger.info(f"✅ Snapshot created and verified: {snapshot_dir}")
-
-            # Log snapshot size
-            snapshot_size = sum(f.stat().st_size for f in snapshot_dir.rglob('*') if f.is_file())
-            self.logger.info(f"   Size: {snapshot_size / 1024 / 1024:.1f} MB")
-
-        except Exception as e:
-            self.logger.error(f"Failed to create snapshot: {e}")
+        if result.success:
+            self.last_snapshot_date = self.snapshot_service.last_snapshot_date
+            self.logger.info(f"✅ Snapshot created: {result.snapshot_path}")
+            if result.checkpoint_name:
+                self.logger.info(f"   Checkpoint: {result.checkpoint_name}")
+            self.logger.info(f"   Size: {result.size_bytes / 1024 / 1024:.1f} MB")
+        else:
+            self.logger.error(f"Failed to create snapshot: {result.error}")
 
     def should_consolidate(self) -> bool:
         """Check if we should consolidate (merge adapter into base model)"""

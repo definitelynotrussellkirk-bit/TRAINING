@@ -15,8 +15,14 @@ Usage:
 """
 
 import os
+import logging
 from pathlib import Path
 from functools import lru_cache
+
+logger = logging.getLogger(__name__)
+
+# Track whether we've logged the resolution (to avoid spam)
+_resolution_logged = False
 
 
 @lru_cache(maxsize=1)
@@ -25,8 +31,11 @@ def get_base_dir() -> Path:
     Get the base training directory.
 
     Resolution order:
-    1. TRAINING_BASE_DIR environment variable (if set)
+    1. TRAINING_BASE_DIR environment variable (if set and exists)
     2. Auto-detect by searching for CLAUDE.md from current file location
+    3. Fallback to common locations
+
+    The resolution method is logged once at INFO level for debugging.
 
     Returns:
         Path to the base training directory
@@ -34,10 +43,15 @@ def get_base_dir() -> Path:
     Raises:
         RuntimeError: If base directory cannot be determined
     """
+    global _resolution_logged
+
     # Check environment variable first
     if "TRAINING_BASE_DIR" in os.environ:
         path = Path(os.environ["TRAINING_BASE_DIR"])
         if path.exists():
+            if not _resolution_logged:
+                logger.info(f"Base dir from $TRAINING_BASE_DIR: {path}")
+                _resolution_logged = True
             return path
         # If env var is set but doesn't exist, warn but continue to auto-detect
         import warnings
@@ -50,6 +64,9 @@ def get_base_dir() -> Path:
     current = Path(__file__).resolve().parent
     while current != current.parent:
         if (current / "CLAUDE.md").exists():
+            if not _resolution_logged:
+                logger.info(f"Base dir auto-detected (CLAUDE.md): {current}")
+                _resolution_logged = True
             return current
         current = current.parent
 
@@ -62,6 +79,9 @@ def get_base_dir() -> Path:
 
     for fallback in fallbacks:
         if fallback.exists() and (fallback / "CLAUDE.md").exists():
+            if not _resolution_logged:
+                logger.info(f"Base dir from fallback path: {fallback}")
+                _resolution_logged = True
             return fallback
 
     raise RuntimeError(

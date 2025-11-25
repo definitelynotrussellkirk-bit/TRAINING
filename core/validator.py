@@ -1,5 +1,27 @@
 #!/usr/bin/env python3
 """
+DEPRECATED: Use core.validation.validator.DataValidator instead.
+
+This module is kept for backward compatibility but will be removed in a future version.
+The new DataValidator supports QUICK/STANDARD/DEEP validation levels and provides
+a cleaner programmatic API.
+
+Migration:
+    # Old (deprecated)
+    from core.validator import DatasetValidator
+    validator = DatasetValidator(tokenizer, max_length=4096)
+    validator.run_full_validation(file_path)
+
+    # New (recommended)
+    from core.validation.validator import DataValidator, ValidationLevel
+    validator = DataValidator(tokenizer, max_length=4096)
+    result = validator.validate(file_path, ValidationLevel.DEEP)
+    if result.should_proceed():
+        # Valid data
+        pass
+
+---
+
 Pre-Training Data Validator - The gatekeeper that prevents bad training runs.
 
 THE CRITICAL COMPONENT - Catches data mistakes in 30 seconds instead of discovering them

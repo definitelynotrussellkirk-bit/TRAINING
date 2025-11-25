@@ -85,6 +85,10 @@ from daemon.pid_manager import PIDManager
 from daemon.file_watcher import InboxFlattener
 from daemon.snapshot_service import SnapshotService, SnapshotConfig
 
+# Unified validation (TASK008 + spec validation)
+from validation.validator import DataValidator, ValidationLevel
+from validation.spec import SpecValidator, SpecValidationError, DATASET_SPECS
+
 # Checkpoint retention (new system)
 from retention_service import RetentionService
 
@@ -247,6 +251,12 @@ class TrainingDaemon:
         # Extracted services (TASK005)
         self.pid_manager = PIDManager(self.pid_file)
         self.inbox_flattener = InboxFlattener(self.inbox_dir)
+        self.quick_validator = DataValidator()  # For QUICK content checks on inbox files
+        self.spec_validator = SpecValidator(
+            registry=DATASET_SPECS,
+            allow_default=True,  # Use chat_sft_v1 if no schema_id specified
+            strict_mode=False    # Don't require metadata keys yet
+        )
         self.snapshot_service = SnapshotService(SnapshotConfig(
             checkpoints_dir=self.current_model_dir,
             snapshots_dir=self.snapshots_dir,
@@ -605,6 +615,35 @@ class TrainingDaemon:
         """Get all JSONL files in inbox"""
         return sorted(self.inbox_dir.glob("*.jsonl"))
 
+    def quick_validate_inbox_files(self) -> int:
+        """
+        Run QUICK validation on inbox files, rejecting obviously bad ones.
+
+        This catches schema errors (invalid JSON, missing fields) early,
+        before files enter the processing queue. More comprehensive
+        validation happens in validate_data_before_training().
+
+        Returns:
+            Number of files rejected
+        """
+        rejected = 0
+        for inbox_file in self.get_inbox_files():
+            result = self.quick_validator.validate(inbox_file, ValidationLevel.QUICK)
+            if not result.should_proceed():
+                # Move to failed queue immediately
+                error_msg = "; ".join(result.errors[:3])  # First 3 errors
+                self.logger.warning(f"Quick validation failed: {inbox_file.name}")
+                self.logger.warning(f"  Errors: {error_msg}")
+                try:
+                    failed_path = self.base_dir / "queue" / "failed" / inbox_file.name
+                    failed_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(inbox_file), str(failed_path))
+                    self.logger.info(f"  Moved to: {failed_path}")
+                    rejected += 1
+                except Exception as e:
+                    self.logger.error(f"  Failed to move: {e}")
+        return rejected
+
     def validate_data_before_training(self, data_file: Path) -> bool:
         """
         GUARDRAIL: Validate training data against config settings
@@ -873,6 +912,20 @@ class TrainingDaemon:
         # CRITICAL FIX: Empty file check
         if num_examples == 0:
             self.logger.error(f"❌ Empty file: {data_file.name} (0 examples)")
+            return False
+
+        # SPEC VALIDATION: Ensure job maps to a known schema (deny-by-default)
+        try:
+            job_config = {
+                "dataset_path": str(data_file),
+                "base_model": self.config.get("model_path") or self.config.get("base_model"),
+                "schema_id": self.config.get("schema_id"),  # Optional: from config.json
+            }
+            spec = self.spec_validator.validate_job(job_config)
+            self.logger.info(f"📋 Spec validation passed: {spec.id} ({spec.kind})")
+        except SpecValidationError as e:
+            self.logger.error(f"❌ Spec validation failed: {e}")
+            self.logger.error("   Add 'schema_id' to config.json or register a new spec")
             return False
 
         # GUARDRAIL: Validate data against config
@@ -1316,6 +1369,11 @@ class TrainingDaemon:
 
                 # Flatten inbox (move .jsonl files from subdirs to root)
                 self.flatten_inbox()
+
+                # Quick validation: reject obviously bad files before queueing
+                rejected = self.quick_validate_inbox_files()
+                if rejected > 0:
+                    self.logger.info(f"Quick validation rejected {rejected} file(s)")
 
                 # Process inbox files into queue
                 self.queue.process_inbox(default_priority="normal")

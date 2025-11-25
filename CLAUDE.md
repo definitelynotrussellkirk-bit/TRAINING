@@ -5,15 +5,15 @@
 
 This document contains instructions for Claude to help with training operations.
 
-**MAJOR UPDATE:** Code Refactoring Complete (TASK001-009)
+**MAJOR UPDATE:** Code Refactoring Complete (TASK001-009) + Cleanup (2025-11-24)
 - ✅ API authentication added to inference server
 - ✅ Test infrastructure cleaned up for CI
 - ✅ RetentionManager wired into daemon
 - ✅ Extracted daemon services: PIDManager, FileWatcher, SnapshotService, BackgroundWorker
 - ✅ Extracted training components: ModelLoader, DatasetPreparer, MonitoringBundle
-- ✅ Created pyproject.toml - package now installable with `pip install -e .`
-- ✅ Unified DataValidator with QUICK/STANDARD/DEEP levels
-- ✅ Path auto-detection via get_base_dir() or $TRAINING_BASE_DIR
+- ✅ Created pyproject.toml - GPU deps now optional `[training]` extra
+- ✅ DataValidator (QUICK/STANDARD/DEEP) - integrated into daemon for early rejection
+- ✅ Path auto-detection via get_base_dir() with resolution logging
 
 ---
 
@@ -121,8 +121,9 @@ This document contains instructions for Claude to help with training operations.
 │   │   ├── model_loader.py      # Model loading with precision config
 │   │   ├── dataset_preparer.py  # Dataset preparation
 │   │   └── monitoring_bundle.py # Training monitoring
-│   ├── validation/              # 🆕 Unified data validation
-│   │   └── validator.py         # DataValidator (QUICK/STANDARD/DEEP)
+│   ├── validation/              # 🆕 Two-layer validation system
+│   │   ├── spec.py              # SpecValidator + DatasetSpec registry (deny-by-default)
+│   │   └── validator.py         # DataValidator (QUICK/STANDARD/DEEP content checks)
 │   ├── custom_collator.py       # Data collator
 │   ├── logit_penalty.py         # Penalty processors
 │   ├── validator.py             # Legacy validator (deprecated)
@@ -226,17 +227,40 @@ OBSERVATIONS/
 
 ## 🆕 RECENT UPDATES (2025-11-24)
 
-**Code Refactoring Complete** - TASK001-009 finished
+**Code Cleanup Session** - Review findings addressed
 
-**What Changed (Session 2):**
+**What Changed (Session 3 - Cleanup, Testing & Spec Validation):**
+- Fixed pyproject.toml: Moved GPU deps (torch, transformers) to `[training]` optional extra
+  - `pip install -e .` now lightweight (CI-friendly)
+  - `pip install -e ".[training]"` for full GPU training
+- **NEW: Two-layer validation architecture**
+  - Layer 1: SpecValidator (outer gate) - denies unknown schemas
+  - Layer 2: DataValidator (content) - QUICK/STANDARD/DEEP checks
+- Added SpecValidator with deny-by-default schema validation
+  - Jobs MUST map to a known spec (or use default: chat_sft_v1)
+  - Registry: `DATASET_SPECS` in `core/validation/spec.py`
+  - Known specs: `chat_sft_v1`, `syllo_v1`, `completion_v1`
+- Integrated DataValidator into daemon: QUICK validation on inbox files
+  - Files with schema errors rejected before entering queue
+  - Comprehensive validation still runs before training
+- Added answer leakage detection to DataValidator (DEEP level)
+  - Detects full answer in prompt, answer previews, composition patterns
+- Added resolution logging to paths.py (debug visibility)
+- Documented BackgroundWorker timeout limitation (not enforced)
+- Added deprecation notice to core/validator.py (use core/validation/validator.py)
+- Added pytest markers: `slow`, `gpu`, `integration` for CI filtering
+  - CI can run: `pytest -m "not slow and not gpu"`
+- Added inference auth tests (tests/test_inference_auth.py) - 14 tests, all passing
+
+**What Changed (Session 2 - Refactoring):**
 - TASK004: Extracted ModelLoader, DatasetPreparer, MonitoringBundle from UltimateTrainer
 - TASK005: Extracted PIDManager, FileWatcher, SnapshotService, BackgroundWorker from daemon
 - TASK006: Added paths.py with get_base_dir() for path auto-detection
 - TASK007: Created pyproject.toml - package now installable
-- TASK008: Created unified DataValidator with QUICK/STANDARD/DEEP levels
+- TASK008: Created DataValidator module (core/validation/validator.py)
 - TASK009: Created BackgroundWorker for non-blocking heavy tasks
 
-**What Changed (Session 1):**
+**What Changed (Session 1 - Auth & Tests):**
 - TASK001: API authentication for inference server
 - TASK002: Test infrastructure cleanup (pytest.ini, conftest.py)
 - TASK003: RetentionManager wired into daemon
@@ -311,9 +335,13 @@ See CHANGELOG.md for details
   "eval_steps": 50,
   "save_steps": 1000,
   "max_length": 4096,
-  "poll_interval": 30
+  "poll_interval": 30,
+  "schema_id": "chat_sft_v1"
 }
 ```
+
+**Note:** `schema_id` is optional. If not specified, defaults to `chat_sft_v1`.
+Available schemas: `chat_sft_v1`, `syllo_v1`, `completion_v1`
 
 ### Disk Space
 - **Available:** 731GB / 1.8TB (58% used)

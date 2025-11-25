@@ -25,29 +25,36 @@ classifiers = [
 ]
 
 dependencies = [
-    "torch>=2.0",
-    "transformers>=4.35",
-    "datasets>=2.14",
-    "accelerate>=0.25",
-    "safetensors>=0.4",
+    # Light dependencies only - GPU packages moved to [training] extra
     "psutil>=5.9",
     "requests>=2.31",
 ]
 
 [project.optional-dependencies]
+# GPU training dependencies (heavy)
+training = [
+    "torch>=2.0",
+    "transformers>=4.35",
+    "datasets>=2.14",
+    "accelerate>=0.25",
+    "safetensors>=0.4",
+]
+# Inference server dependencies
 inference = [
     "fastapi>=0.100",
     "uvicorn>=0.23",
     "pydantic>=2.0",
 ]
+# Development dependencies
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "black>=23.0",
     "ruff>=0.1",
 ]
+# Full installation (training + inference + dev)
 all = [
-    "llm-training[inference,dev]",
+    "llm-training[training,inference,dev]",
 ]
 
 [project.scripts]
@@ -99,6 +106,14 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::UserWarning",
 ]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "gpu: marks tests that require GPU/CUDA (deselect with '-m \"not gpu\"')",
+    "integration: marks integration tests that may require external services",
+]
+# CI command: pytest -m "not slow and not gpu"
+# Local full: pytest
+# GPU only: pytest -m gpu
 
 [tool.black]
 line-length = 100

@@ -36,12 +36,28 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Task:
-    """A task to run in the background."""
+    """
+    A task to run in the background.
+
+    IMPORTANT: The `timeout` parameter is metadata only and is NOT enforced.
+    Tasks will run to completion regardless of timeout value. If a task hangs,
+    it cannot be forcibly terminated - the daemon would need to be restarted.
+
+    For critical operations that must respect timeouts, implement timeout logic
+    within the task function itself (e.g., using signal.alarm or threading.Timer).
+
+    Attributes:
+        name: Human-readable task name for logging/status
+        func: Callable to execute
+        args: Positional arguments for func
+        kwargs: Keyword arguments for func
+        timeout: Advisory timeout in seconds (not enforced)
+    """
     name: str
     func: Callable
     args: tuple = ()
     kwargs: Dict[str, Any] = field(default_factory=dict)
-    timeout: Optional[float] = None  # Not enforced, just metadata
+    timeout: Optional[float] = None  # Advisory only - NOT enforced by worker
 
 
 @dataclass

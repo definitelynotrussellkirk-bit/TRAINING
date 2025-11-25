@@ -260,6 +260,7 @@ class DataValidator:
         try:
             seen_hashes: Set[int] = set()
             duplicates = 0
+            examples = []
 
             with open(file_path) as f:
                 for line in f:
@@ -273,14 +274,104 @@ class DataValidator:
                     else:
                         seen_hashes.add(h)
 
+                    # Collect examples for leakage check
+                    if len(examples) < sample_size:
+                        try:
+                            examples.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            pass
+
             stats["unique_examples"] = len(seen_hashes)
             stats["duplicates"] = duplicates
 
             if duplicates > 0:
                 warnings.append(f"Found {duplicates} duplicate examples")
 
+            # Run answer leakage detection
+            leakage_result = self._check_answer_leakage(examples)
+            warnings.extend(leakage_result.warnings)
+            stats.update(leakage_result.stats)
+
         except Exception as e:
             warnings.append(f"Content check failed: {e}")
+
+        return ValidationResult(valid=True, warnings=warnings, stats=stats)
+
+    def _check_answer_leakage(self, examples: List[Dict]) -> ValidationResult:
+        """
+        Detect if answers appear in inputs (critical data quality issue).
+
+        Checks for:
+        - Full answer appearing in prompt
+        - Answer preview (first line) in prompt
+        - Composition patterns like "(1 6)" appearing in both
+
+        This catches training data issues where the answer is already
+        visible in the input, leading to memorization rather than learning.
+        """
+        import re
+        warnings = []
+        stats = {"leakage_samples_checked": 0, "leakage_found": 0}
+
+        leakage_examples = []
+
+        for example in examples:
+            messages = example.get("messages", [])
+            if len(messages) < 2:
+                continue
+
+            # Find user and assistant content
+            user_content = ""
+            assistant_content = ""
+            for msg in messages:
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+                if role == "user":
+                    user_content = content
+                elif role == "assistant":
+                    assistant_content = content
+
+            if not user_content or not assistant_content:
+                continue
+
+            stats["leakage_samples_checked"] += 1
+            leakage_found = []
+
+            # Check 1: Full answer in input
+            if assistant_content.strip() in user_content:
+                leakage_found.append("Full answer appears in input")
+
+            # Check 2: Answer preview (first 50 chars or first line) in input
+            answer_preview = assistant_content.strip().split('\n')[0][:50]
+            if len(answer_preview) > 10 and answer_preview in user_content:
+                leakage_found.append(f"Answer preview in input: '{answer_preview[:30]}...'")
+
+            # Check 3: Composition patterns like "(1 6)" in both
+            comp_pattern = r'\([0-9\s]+\)'
+            user_comps = set(re.findall(comp_pattern, user_content))
+            assistant_comps = set(re.findall(comp_pattern, assistant_content))
+            common_comps = user_comps & assistant_comps
+            if common_comps:
+                leakage_found.append(f"Common patterns in both: {common_comps}")
+
+            if leakage_found:
+                stats["leakage_found"] += 1
+                leakage_examples.append({
+                    "issues": leakage_found,
+                    "user_preview": user_content[:100],
+                    "assistant_preview": assistant_content[:100]
+                })
+
+        # Generate warnings
+        if stats["leakage_found"] > 0:
+            pct = stats["leakage_found"] / max(stats["leakage_samples_checked"], 1) * 100
+            warnings.append(
+                f"ANSWER LEAKAGE DETECTED: {stats['leakage_found']}/{stats['leakage_samples_checked']} "
+                f"({pct:.1f}%) examples have answer visible in input"
+            )
+            # Add first few examples as warnings
+            for i, ex in enumerate(leakage_examples[:3]):
+                warnings.append(f"  Leakage example {i+1}: {ex['issues']}")
 
         return ValidationResult(valid=True, warnings=warnings, stats=stats)
 

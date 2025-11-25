@@ -603,88 +603,90 @@ python3 tools/data/validate_data.py --file my_data.jsonl
 
 ---
 
-## 🤖 AUTONOMOUS SYSTEMS (NEW - 2025-11-23)
+## 🤖 AUTONOMOUS SYSTEMS (Updated 2025-11-25)
 
-**10 Intelligent Systems Running 24/7**
+**Central GPU Task Scheduler + Coordinated Daemons**
 
-### RTX 3090 Systems (7 monitoring & intelligence)
+### RTX 3090 - GPU Task Scheduler (NEW)
 
-1. **Curriculum Optimizer** - `monitoring/curriculum_optimizer.py`
-   - A/B tests curriculum strategies every 5 minutes
-   - Auto-adjusts difficulty progression
-   - Output: `status/curriculum_optimization.json`
+**Central Coordinator** - `monitoring/gpu_task_scheduler.py` (port 8766)
+- Monitors GPU utilization in real-time (target: 20-80%)
+- Priority queue: CRITICAL(0) → HIGH(1) → NORMAL(2) → LOW(3) → IDLE(4)
+- Auto-dispatches idle tasks when utilization < 20%
+- 11 task types available
+- API: http://192.168.x.x:8766/api/
 
-2. **Adversarial Miner** - `monitoring/adversarial_miner.py`
-   - Mines hard examples from model failures
-   - Creates targeted training data
-   - Output: `data/adversarial_examples/*.jsonl`
+**Scheduler-Managed Daemons** (submit tasks to scheduler):
 
-3. **Regression Monitor** - `monitoring/continuous_regression_monitor.py`
-   - Detects bad checkpoints (>15% loss increase)
-   - Runs every 5 minutes
-   - Output: `status/regression_monitoring.json`
+1. **Self-Correction Loop** - `--use-scheduler` flag
+   - Validates data, captures errors, generates corrections
+   - Interval: 300s
+   - Task type: `self_correction`
 
-4. **Model Comparison Engine** - `monitoring/model_comparison_engine.py`
+2. **Automated Testing Daemon** - `--use-scheduler` flag
+   - Runs validation suite against checkpoints
+   - Interval: 600s
+   - Task type: `automated_test`
+
+3. **Curriculum Eval Loop** - `--use-scheduler` flag
+   - Tests model against curriculum problems
+   - Task type: `curriculum_eval`
+
+**Direct Daemons** (run independently):
+
+4. **Inference Server** - `inference_server.py` (port 8765)
+   - Serves model for all inference requests
+   - Always running
+
+5. **Model Comparison Engine** - `model_comparison_engine.py`
    - Ranks checkpoints by composite score
    - Runs every 10 minutes
-   - Output: `status/model_comparisons.json`
 
-5. **Confidence Calibrator** - `monitoring/confidence_calibrator.py`
-   - Calibrates prediction confidence
-   - 6 confidence bins
-   - Output: `status/confidence_calibration.json`
+### RTX 4090 Systems
 
-6. **Self-Correction Loop** - `monitoring/self_correction_loop.py`
-   - Validates data quality
-   - Captures & analyzes errors
-   - Generates correction examples
-   - Output: `status/self_correction.json`, `queue/corrections/*.jsonl`, `logs/error_patterns/*.json`
+6. **Training Daemon** - `core/training_daemon.py`
+   - File watcher + training orchestrator
+   - Always running
 
-7. **Automated Testing Daemon** - `monitoring/automated_testing_daemon.py`
-   - Runs fixed validation suite against checkpoints
-   - Calculates accuracy by difficulty
-   - Detects regressions
-   - Output: `status/automated_testing.json`
-
-### RTX 4090 Systems (2 automation)
-
-8. **Data Generation Automation** - `monitoring/data_generation_automation.py`
-   - Auto-generates when queue < 2 files
-   - Uses curriculum-optimized difficulty
-   - Never runs out of data
-
-9. **Checkpoint Auto-Deployment** - `monitoring/checkpoint_auto_deployment.py`
+7. **Deployment Orchestrator** - `deployment_orchestrator.py`
    - Auto-deploys best checkpoint to 3090
-   - Based on model comparison rankings
    - Runs every 10 minutes
 
-### Verify All Systems
+### Start All Systems
 
 ```bash
-# Check 3090 systems (should show 7)
-ssh 192.168.x.x "ps aux | grep python3 | grep monitoring | wc -l"
+# 3090 - Start scheduler first
+ssh 192.168.x.x "nohup python3 /path/to/training/monitoring/gpu_task_scheduler.py --port 8766 > logs/gpu_scheduler.log 2>&1 &"
 
-# Check 4090 systems (should show 2)
-ps aux | grep python3 | grep monitoring | wc -l
+# 3090 - Start scheduler-aware daemons
+ssh 192.168.x.x "nohup python3 /path/to/training/monitoring/self_correction_loop.py --continuous --use-scheduler --interval 300 --base-dir /path/to/training > logs/self_correction.log 2>&1 &"
+ssh 192.168.x.x "nohup python3 /path/to/training/monitoring/automated_testing_daemon.py --use-scheduler --interval 600 --base-dir /path/to/training > logs/automated_testing.log 2>&1 &"
 
-# View system status
-cat status/*.json | jq .
+# 4090 - Start local daemons
+nohup python3 monitoring/deployment_orchestrator.py --base-dir . --interval 600 > logs/deployment_orchestrator.log 2>&1 &
+```
 
-# Monitor logs
-tail -f logs/curriculum_optimizer.log
-tail -f logs/self_correction.log
-tail -f logs/automated_testing.log
+### Verify Systems
+
+```bash
+# Check scheduler health
+curl http://192.168.x.x:8766/api/health | jq .
+
+# Check scheduler metrics
+curl http://192.168.x.x:8766/api/metrics | jq .
+
+# Check 3090 processes
+ssh 192.168.x.x "ps aux | grep python3 | grep -E 'gpu_task|self_correction|automated_testing|inference' | grep -v grep"
+
+# Check 4090 processes
+ps aux | grep python3 | grep -E 'training_daemon|deployment_orchestrator' | grep -v grep
 ```
 
 ### System Outputs
 
-All systems write to `status/*.json` files:
-- `curriculum_optimization.json` - Best curriculum strategy
-- `adversarial_mining.json` - Hard examples found (includes `total_examples_mined`, `categories`)
-- `regression_monitoring.json` - Regression alerts
-- `model_comparisons.json` - Checkpoint rankings
-- `confidence_calibration.json` - Confidence bins
-- `self_correction.json` - Correction runs, error patterns, totals
+Status files in `status/`:
+- `self_correction.json` - Correction runs, error patterns
 - `automated_testing.json` - Validation results
-- `last_deployment.json` - Latest checkpoint deployed
+- `model_comparisons.json` - Checkpoint rankings
+- `deployment_status.json` - Latest deployments
 

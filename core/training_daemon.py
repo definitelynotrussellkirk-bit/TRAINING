@@ -80,6 +80,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "management"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
 
+# Extracted daemon services (TASK005)
+from daemon.pid_manager import PIDManager
+from daemon.file_watcher import InboxFlattener
+
 # Checkpoint retention (new system)
 from retention_service import RetentionService
 
@@ -238,6 +242,10 @@ class TrainingDaemon:
 
         # Initialize Data Manager (handles auto-generation + quality testing)
         self.data_manager = DataManager(self.base_dir, self.config)
+
+        # Extracted services (TASK005)
+        self.pid_manager = PIDManager(self.pid_file)
+        self.inbox_flattener = InboxFlattener(self.inbox_dir)
 
         # Checkpoint retention (new RetentionManager-based system)
         self.last_retention_check = 0
@@ -677,49 +685,8 @@ class TrainingDaemon:
 
     def flatten_inbox(self):
         """Move any .jsonl files from subdirectories to inbox root"""
-        # Find all .jsonl files in subdirectories (not at root)
-        subdirs = [d for d in self.inbox_dir.iterdir() if d.is_dir()]
-
-        if not subdirs:
-            return  # No subdirectories, nothing to do
-
-        moved_count = 0
-
-        for subdir in subdirs:
-            # Find all .jsonl files recursively in this subdir
-            jsonl_files = list(subdir.rglob("*.jsonl"))
-
-            for jsonl_file in jsonl_files:
-                # Construct new filename at inbox root
-                # Use subdirectory name to make it unique
-                subdir_name = subdir.name
-                original_name = jsonl_file.stem  # filename without extension
-                new_name = f"{original_name}_{subdir_name}.jsonl"
-                dest_path = self.inbox_dir / new_name
-
-                # Handle collision (if file already exists at destination)
-                counter = 1
-                while dest_path.exists():
-                    new_name = f"{original_name}_{subdir_name}_{counter}.jsonl"
-                    dest_path = self.inbox_dir / new_name
-                    counter += 1
-
-                # Move file
-                try:
-                    shutil.move(str(jsonl_file), str(dest_path))
-                    self.logger.info(f"📁 Flattened: {jsonl_file.relative_to(self.inbox_dir)} → {new_name}")
-                    moved_count += 1
-                except Exception as e:
-                    self.logger.error(f"Failed to move {jsonl_file}: {e}")
-
-            # Clean up empty subdirectory
-            try:
-                if subdir.exists() and not any(subdir.iterdir()):
-                    subdir.rmdir()
-                    self.logger.info(f"🗑️  Removed empty subdir: {subdir.name}")
-            except Exception as e:
-                self.logger.warning(f"Could not remove subdir {subdir.name}: {e}")
-
+        # Delegate to InboxFlattener (TASK005)
+        moved_count = self.inbox_flattener.flatten()
         if moved_count > 0:
             self.logger.info(f"✅ Flattened {moved_count} file(s) from subdirectories")
 
@@ -1230,28 +1197,17 @@ class TrainingDaemon:
 
     def acquire_lock(self):
         """Acquire PID file lock - prevents multiple daemons"""
-        if self.pid_file.exists():
-            try:
-                old_pid = int(self.pid_file.read_text().strip())
-                # Check if process is still running
-                os.kill(old_pid, 0)  # Doesn't kill, just checks
-                self.logger.error(f"❌ Another daemon is running (PID {old_pid})")
-                self.logger.error("   Stop it first or remove .daemon.pid if stale")
-                sys.exit(1)
-            except (OSError, ValueError):
-                # Process not running, clean up stale PID file
-                self.logger.warning(f"⚠️  Removing stale PID file (old PID: {old_pid if 'old_pid' in locals() else 'unknown'})")
-                self.pid_file.unlink()
-
-        # Write our PID
-        self.pid_file.write_text(str(os.getpid()))
-        self.logger.info(f"✅ Acquired daemon lock (PID: {os.getpid()})")
+        # Delegate to PIDManager (TASK005)
+        if not self.pid_manager.acquire():
+            running_pid = self.pid_manager.get_running_pid()
+            self.logger.error(f"❌ Another daemon is running (PID {running_pid})")
+            self.logger.error("   Stop it first or remove .daemon.pid if stale")
+            sys.exit(1)
 
     def release_lock(self):
         """Release PID file lock"""
-        if self.pid_file.exists():
-            self.pid_file.unlink()
-        self.logger.info("✅ Released daemon lock")
+        # Delegate to PIDManager (TASK005)
+        self.pid_manager.release()
 
     def recover_orphaned_files(self):
         """Move orphaned files from processing/ back to normal queue on startup"""
@@ -1559,17 +1515,22 @@ class TrainingDaemon:
 
 
 def main():
+    # Import paths module for auto-detection
+    from paths import get_base_dir
+
     parser = argparse.ArgumentParser(description="Training Daemon for RTX 3090")
     parser.add_argument(
         "--base-dir",
         type=str,
-        default="/training",
-        help="Base directory for training system (default: /training)"
+        default=None,
+        help="Base directory for training system (default: auto-detect or $TRAINING_BASE_DIR)"
     )
 
     args = parser.parse_args()
 
-    daemon = TrainingDaemon(Path(args.base_dir))
+    # Use provided base_dir or auto-detect
+    base_dir = Path(args.base_dir) if args.base_dir else get_base_dir()
+    daemon = TrainingDaemon(base_dir)
     daemon.run()
 
 

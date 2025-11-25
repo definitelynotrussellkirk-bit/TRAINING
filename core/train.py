@@ -1914,7 +1914,9 @@ class UltimateTrainer:
                         # Get remote config
                         remote_user = self.remote_eval_config.get("remote_user", "user")
                         remote_host = self.remote_eval_config.get("host", "192.168.x.x")
-                        remote_dir = self.remote_eval_config.get("remote_models_dir", "/path/to/models")
+                        # Use paths.py constant for remote models dir fallback
+                        from paths import REMOTE_MODELS_DIR
+                        remote_dir = self.remote_eval_config.get("remote_models_dir", str(REMOTE_MODELS_DIR))
                         model_id = f"qwen3-step-{state.global_step}"
                         remote_path = f"{remote_dir}/{model_id}"
 

@@ -159,14 +159,14 @@ If not set, the system auto-detects the repository root.
 
 - [x] Create `core/paths.py` with path utilities (supports TRAINING_BASE_DIR env var)
 - [x] Update `training_controller.py` CLI defaults (uses get_base_dir())
-- [ ] Update `training_queue.py` CLI default
-- [ ] Update `training_daemon.py` CLI default
-- [ ] Update `train.py` CLI default
+- [x] Update `training_queue.py` CLI default (auto-detects or uses $TRAINING_BASE_DIR)
+- [x] Update `training_daemon.py` CLI default (auto-detects or uses $TRAINING_BASE_DIR)
+- [x] Update `train.py` remote path fallback (uses REMOTE_MODELS_DIR constant)
 - [x] Create test fixtures in `conftest.py` (done in TASK002)
 - [x] Move hardcoded test files to experiments/ (done in TASK002)
-- [ ] Update shell scripts to use env var
-- [ ] Update remaining 130+ files in monitoring/, tools/, etc.
-- [ ] Verify: `grep -r "/home/user" --include="*.py"` returns nothing
+- [ ] Update shell scripts to use env var (future work)
+- [ ] Update remaining 130+ files in monitoring/, tools/, etc. (future work)
+- [ ] Verify: `grep -r "/home/user" --include="*.py"` returns nothing (future work)
 
 ## Verification
 

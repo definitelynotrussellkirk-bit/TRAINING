@@ -153,8 +153,13 @@ class TrainingQueue:
         print(f"  Low: {status['queued']['low']}")
     """
 
-    def __init__(self, base_dir: str = "/path/to/training"):
-        self.base_dir = Path(base_dir)
+    def __init__(self, base_dir: str = None):
+        # Import here to avoid circular imports
+        if base_dir is None:
+            from paths import get_base_dir
+            self.base_dir = get_base_dir()
+        else:
+            self.base_dir = Path(base_dir)
         self.inbox = self.base_dir / "inbox"
         self.queue_dir = self.base_dir / "queue"
 
@@ -511,9 +516,10 @@ class TrainingQueue:
 def main():
     """Command-line interface for queue management"""
     import argparse
+    from paths import get_base_dir
 
     parser = argparse.ArgumentParser(description="Training Queue Management")
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base directory')
+    parser.add_argument('--base-dir', default=None, help='Base directory (default: auto-detect or $TRAINING_BASE_DIR)')
 
     subparsers = parser.add_subparsers(dest='command', help='Queue command')
 

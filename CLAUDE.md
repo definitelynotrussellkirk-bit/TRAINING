@@ -1,11 +1,11 @@
 # CLAUDE INSTRUCTIONS - LLM Training System
 
-**Last Updated:** 2025-11-24 (Refactoring Complete)
+**Last Updated:** 2025-11-25 (Code Review + Cleanup)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 This document contains instructions for Claude to help with training operations.
 
-**MAJOR UPDATE:** Code Refactoring Complete (TASK001-009) + Cleanup (2025-11-24)
+**MAJOR UPDATE:** Code Review Validated Monitoring Systems (2025-11-25)
 - ✅ API authentication added to inference server
 - ✅ Test infrastructure cleaned up for CI
 - ✅ RetentionManager wired into daemon
@@ -225,11 +225,19 @@ OBSERVATIONS/
 
 ---
 
-## 🆕 RECENT UPDATES (2025-11-24)
+## 🆕 RECENT UPDATES (2025-11-25)
 
-**Code Cleanup Session** - Review findings addressed
+**Code Review Session** - Verified monitoring systems are correctly implemented
 
-**What Changed (Session 3 - Cleanup, Testing & Spec Validation):**
+**What Changed (2025-11-25 - Code Review):**
+- Verified adversarial miner supports `messages[]` format (lines 193-229 `extract_prompt_and_expected()`)
+- Verified adversarial miner has plugin-compatible fields: `total_examples_mined`, `categories` (lines 377-402)
+- Verified self-correction loop writes `status/self_correction.json` with correct schema (lines 61, 93-132)
+- Archived stale task specs (TASK010, 012, 013) that described already-implemented features
+- TASK011 (self-correction impact monitor) remains valid as future work ("did it help?" tracking)
+- Only real gap: no mechanism to track if corrections improve error rates over time
+
+**Previous (2025-11-24) - Code Cleanup Session:**
 - Fixed pyproject.toml: Moved GPU deps (torch, transformers) to `[training]` optional extra
   - `pip install -e .` now lightweight (CI-friendly)
   - `pip install -e ".[training]"` for full GPU training
@@ -300,7 +308,7 @@ See CHANGELOG.md for details
 
 ## 🎯 CURRENT SYSTEM STATE
 
-**Last Verified:** 2025-11-24 18:30 PM
+**Last Verified:** 2025-11-25
 
 ### Model Status
 - **Base model:** Qwen3-0.6B (exists at `/path/to/training/models/Qwen3-0.6B/`)
@@ -591,7 +599,7 @@ python3 tools/data/validate_data.py --file my_data.jsonl
    - Validates data quality
    - Captures & analyzes errors
    - Generates correction examples
-   - Output: `queue/corrections/*.jsonl`, `logs/error_patterns/*.json`
+   - Output: `status/self_correction.json`, `queue/corrections/*.jsonl`, `logs/error_patterns/*.json`
 
 7. **Automated Testing Daemon** - `monitoring/automated_testing_daemon.py`
    - Runs fixed validation suite against checkpoints
@@ -633,10 +641,11 @@ tail -f logs/automated_testing.log
 
 All systems write to `status/*.json` files:
 - `curriculum_optimization.json` - Best curriculum strategy
-- `adversarial_mining.json` - Hard examples found
+- `adversarial_mining.json` - Hard examples found (includes `total_examples_mined`, `categories`)
 - `regression_monitoring.json` - Regression alerts
 - `model_comparisons.json` - Checkpoint rankings
 - `confidence_calibration.json` - Confidence bins
+- `self_correction.json` - Correction runs, error patterns, totals
 - `automated_testing.json` - Validation results
 - `last_deployment.json` - Latest checkpoint deployed
 

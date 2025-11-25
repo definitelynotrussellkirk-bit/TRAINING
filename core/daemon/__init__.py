@@ -14,8 +14,10 @@ Components:
 from .pid_manager import PIDManager
 from .file_watcher import FileWatcher, InboxFlattener
 from .snapshot_service import SnapshotService, SnapshotConfig, SnapshotResult
+from .background_worker import BackgroundWorker, Task, TaskStatus
 
 __all__ = [
     "PIDManager", "FileWatcher", "InboxFlattener",
     "SnapshotService", "SnapshotConfig", "SnapshotResult",
+    "BackgroundWorker", "Task", "TaskStatus",
 ]

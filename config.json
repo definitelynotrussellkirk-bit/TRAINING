@@ -53,6 +53,10 @@
     "current_skill": "syllo",
     "progression_mode": "automatic"
   },
+  "retention": {
+    "enabled": true,
+    "_comment": "Uses RetentionManager with 36h age rule and 150GB limit"
+  },
 
   "_comment_refactor": "New fields for refactored architecture (2025-11-22)",
   "profile": {

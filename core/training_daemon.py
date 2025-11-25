@@ -80,8 +80,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "management"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
 
-# Checkpoint retention
-from checkpoint_retention import enforce_retention
+# Checkpoint retention (new system)
+from retention_service import RetentionService
 
 from train import UltimateTrainer
 from training_queue import TrainingQueue
@@ -239,10 +239,14 @@ class TrainingDaemon:
         # Initialize Data Manager (handles auto-generation + quality testing)
         self.data_manager = DataManager(self.base_dir, self.config)
 
-        # Checkpoint retention tracking
+        # Checkpoint retention (new RetentionManager-based system)
         self.last_retention_check = 0
-        self.recent_checkpoint_cap_gb = 100
-        self.historic_checkpoint_cap_gb = 150
+        retention_config = self.config.get("retention", {})
+        self.retention_service = RetentionService(
+            output_dir=self.current_model_dir,
+            config=retention_config,
+            custom_logger=None  # Will be set after logging is configured
+        )
 
         # Shutdown flag for signal handling
         self.shutdown_requested = False
@@ -1289,25 +1293,33 @@ class TrainingDaemon:
         return True
 
     def run_checkpoint_retention(self, force: bool = False):
-        """Enforce checkpoint caps: 100GB recent, 150GB historic (daily)."""
+        """
+        Enforce checkpoint retention using RetentionManager.
+
+        Policy:
+        - 36-hour minimum age before deletion
+        - 150GB total size limit
+        - Protected: latest, best, today, yesterday
+        """
         now = time.time()
         # Throttle to once per 30 minutes unless forced
         if not force and self.last_retention_check and (now - self.last_retention_check) < 1800:
             return
 
         try:
-            roots = [
-                self.current_model_dir,
-                self.base_dir / "current_model_small",
-                self.snapshots_dir,
-            ]
-            enforce_retention(
-                roots,
-                recent_limit_gb=self.recent_checkpoint_cap_gb,
-                historic_limit_gb=self.historic_checkpoint_cap_gb,
-                logger=self.logger,
-                dry_run=False,
-            )
+            summary = self.retention_service.enforce(dry_run=False)
+
+            if summary.get("skipped"):
+                self.logger.debug(f"Retention skipped: {summary.get('reason', 'unknown')}")
+            else:
+                deleted = summary.get("deleted_checkpoints", 0) + summary.get("deleted_snapshots", 0)
+                if deleted > 0:
+                    freed_gb = summary.get("deleted_size_gb", 0)
+                    self.logger.info(
+                        f"Retention: deleted {deleted} items, freed {freed_gb:.1f}GB "
+                        f"(total: {summary.get('total_size_gb', 0):.1f}GB)"
+                    )
+
             self.last_retention_check = now
         except Exception as e:
             self.logger.warning(f"Checkpoint retention failed: {e}")

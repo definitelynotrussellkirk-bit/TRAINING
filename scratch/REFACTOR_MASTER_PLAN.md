@@ -58,7 +58,7 @@ This plan addresses feedback identifying sharp edges in the codebase. Issues are
 |------|---------|-----------|-------|
 | TASK001 | 2025-11-24 | 2025-11-24 | Auth middleware, endpoint protection, client updates |
 | TASK002 | 2025-11-24 | 2025-11-24 | pytest.ini, conftest.py, 20+ tests moved to experiments |
-| TASK003 | | | |
+| TASK003 | 2025-11-24 | 2025-11-24 | RetentionService adapter, daemon integration, deprecation |
 | TASK004 | | | |
 | TASK005 | | | |
 | TASK006 | | | |

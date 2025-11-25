@@ -1,5 +1,12 @@
 """Checkpoint retention utilities.
 
+DEPRECATED: This module is deprecated. Use retention_service.RetentionService instead.
+The new system uses retention_manager.RetentionManager with:
+- 36-hour minimum age rule
+- 150GB total limit
+- Protection for latest, best, today, yesterday
+
+Legacy behavior (kept for backward compatibility):
 Enforces a two-tier limit:
 - Recent: keep newest checkpoints up to a size budget (default 100 GB).
 - Historic: from the remaining, keep at most one per day until a second
@@ -11,6 +18,7 @@ Anything outside those budgets is deleted.
 from __future__ import annotations
 
 import shutil
+import warnings
 import subprocess
 import time
 from dataclasses import dataclass
@@ -144,7 +152,16 @@ def enforce_retention(
     logger=None,
     dry_run: bool = False,
 ) -> dict:
-    """Compute and apply a retention plan. Deletes old checkpoints when needed."""
+    """Compute and apply a retention plan. Deletes old checkpoints when needed.
+
+    DEPRECATED: Use retention_service.RetentionService instead.
+    """
+    warnings.warn(
+        "checkpoint_retention.enforce_retention is deprecated. "
+        "Use retention_service.RetentionService instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     checkpoints = find_checkpoints(dirs)
 
     def _is_relative_to(path: Path, root: Path) -> bool:

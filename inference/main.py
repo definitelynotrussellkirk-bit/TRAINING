@@ -4,10 +4,13 @@ RTX 3090 Inference API Server
 Single HTTP endpoint to control all inference/eval/data-gen
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import uvicorn
+
+from auth import require_admin, require_read, check_auth_configured
 import sqlite3
 import json
 import os
@@ -152,9 +155,9 @@ async def health():
         "worker_busy": False  # TODO: Check worker status
     }
 
-@app.get("/info")
+@app.get("/info", dependencies=[Depends(require_admin)])
 async def info():
-    """System information"""
+    """System information (admin only)"""
     return {
         "base_dir": str(BASE_DIR),
         "models_dir": str(MODELS_DIR),
@@ -165,9 +168,9 @@ async def info():
     }
 
 # ===== Model Management =====
-@app.get("/models")
+@app.get("/models", dependencies=[Depends(require_read)])
 async def list_models():
-    """List all registered models"""
+    """List all registered models (read)"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -188,9 +191,9 @@ async def list_models():
     conn.close()
     return {"models": models}
 
-@app.post("/models/register")
+@app.post("/models/register", dependencies=[Depends(require_admin)])
 async def register_model(req: ModelRegister):
-    """Register a new model snapshot"""
+    """Register a new model snapshot (admin only)"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
@@ -216,9 +219,9 @@ async def register_model(req: ModelRegister):
 
     return {"status": "registered", "id": req.id}
 
-@app.post("/models/set_active")
+@app.post("/models/set_active", dependencies=[Depends(require_admin)])
 async def set_active_model(req: ModelSetActive):
-    """Set active model for inference"""
+    """Set active model for inference (admin only)"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
@@ -240,9 +243,9 @@ async def set_active_model(req: ModelSetActive):
 
     return {"status": "activated", "id": req.id}
 
-@app.get("/models/active")
+@app.get("/models/active", dependencies=[Depends(require_read)])
 async def get_active_model():
-    """Get currently active model"""
+    """Get currently active model (read)"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id, path FROM models WHERE is_active = 1")
@@ -254,9 +257,9 @@ async def get_active_model():
 
     return {"id": row[0], "path": row[1]}
 
-@app.get("/models/info")
+@app.get("/models/info", dependencies=[Depends(require_read)])
 async def get_model_info():
-    """Get currently loaded model information"""
+    """Get currently loaded model information (read)"""
     try:
         from inference_worker import get_worker
         worker = get_worker()
@@ -293,9 +296,9 @@ async def get_model_info():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get model info: {str(e)}")
 
-@app.post("/models/reload")
+@app.post("/models/reload", dependencies=[Depends(require_admin)])
 async def reload_model():
-    """Force reload of deployed model"""
+    """Force reload of deployed model (admin only)"""
     try:
         from inference_worker import get_worker
         import torch
@@ -355,9 +358,9 @@ async def reload_model():
         raise HTTPException(status_code=500, detail=f"Reload failed: {str(e)}")
 
 # ===== Inference =====
-@app.post("/generate")
+@app.post("/generate", dependencies=[Depends(require_read)])
 async def generate(req: GenerateRequest):
-    """Generate text (synchronous for now, async later)"""
+    """Generate text (read access)"""
     # TODO: Implement actual generation via GPU worker
     # For now, just queue the job
 
@@ -386,9 +389,9 @@ async def generate(req: GenerateRequest):
     }
 
 # ===== Eval Jobs =====
-@app.post("/eval/jobs")
+@app.post("/eval/jobs", dependencies=[Depends(require_admin)])
 async def create_eval_job(req: EvalJobRequest):
-    """Create evaluation job"""
+    """Create evaluation job (admin only)"""
     job_id = f"eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     conn = sqlite3.connect(DB_PATH)
@@ -409,9 +412,9 @@ async def create_eval_job(req: EvalJobRequest):
 
     return {"job_id": job_id, "status": "pending"}
 
-@app.get("/eval/jobs/{job_id}")
+@app.get("/eval/jobs/{job_id}", dependencies=[Depends(require_admin)])
 async def get_eval_job(job_id: str):
-    """Get eval job status and results"""
+    """Get eval job status and results (admin only)"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -438,9 +441,9 @@ async def get_eval_job(job_id: str):
     }
 
 # ===== Data Generation Jobs =====
-@app.post("/data_gen/jobs")
+@app.post("/data_gen/jobs", dependencies=[Depends(require_admin)])
 async def create_data_gen_job(req: DataGenJobRequest):
-    """Create data generation job"""
+    """Create data generation job (admin only)"""
     job_id = f"datagen_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     conn = sqlite3.connect(DB_PATH)
@@ -461,9 +464,9 @@ async def create_data_gen_job(req: DataGenJobRequest):
 
     return {"job_id": job_id, "status": "pending"}
 
-@app.get("/data_gen/jobs/{job_id}")
+@app.get("/data_gen/jobs/{job_id}", dependencies=[Depends(require_admin)])
 async def get_data_gen_job(job_id: str):
-    """Get data generation job status"""
+    """Get data generation job status (admin only)"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -485,9 +488,9 @@ async def get_data_gen_job(job_id: str):
     }
 
 # ===== Job Management =====
-@app.get("/jobs")
+@app.get("/jobs", dependencies=[Depends(require_admin)])
 async def list_jobs(type: Optional[str] = None, status: Optional[str] = None, limit: int = 100):
-    """List jobs with optional filters"""
+    """List jobs with optional filters (admin only)"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
@@ -520,9 +523,9 @@ async def list_jobs(type: Optional[str] = None, status: Optional[str] = None, li
     return {"jobs": jobs}
 
 # ===== GPU & System Telemetry =====
-@app.get("/gpu")
+@app.get("/gpu", dependencies=[Depends(require_admin)])
 async def gpu_stats():
-    """Get GPU statistics"""
+    """Get GPU statistics (admin only)"""
     try:
         import subprocess
         # Query nvidia-smi for detailed stats
@@ -551,9 +554,9 @@ async def gpu_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"GPU query failed: {str(e)}")
 
-@app.get("/system")
+@app.get("/system", dependencies=[Depends(require_admin)])
 async def system_stats():
-    """Get system statistics"""
+    """Get system statistics (admin only)"""
     import psutil
 
     # CPU
@@ -584,9 +587,9 @@ async def system_stats():
         "disk": disks
     }
 
-@app.get("/jobs/stats")
+@app.get("/jobs/stats", dependencies=[Depends(require_admin)])
 async def job_stats():
-    """Get job queue statistics"""
+    """Get job queue statistics (admin only)"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
@@ -616,18 +619,18 @@ POWER_PROFILES = {
     "max": {"power_limit_w": 350, "max_concurrent_jobs": 2, "description": "Maximum performance"}
 }
 
-@app.get("/settings/power_profile")
+@app.get("/settings/power_profile", dependencies=[Depends(require_admin)])
 async def get_power_profile():
-    """Get current power profile"""
+    """Get current power profile (admin only)"""
     # TODO: Read from config/db
     return {
         "current": "normal",
         "profiles": POWER_PROFILES
     }
 
-@app.post("/settings/power_profile")
+@app.post("/settings/power_profile", dependencies=[Depends(require_admin)])
 async def set_power_profile(profile: str):
-    """Set power profile"""
+    """Set power profile (admin only - DANGEROUS: runs sudo)"""
     if profile not in POWER_PROFILES:
         raise HTTPException(status_code=400, detail=f"Invalid profile. Choose from: {list(POWER_PROFILES.keys())}")
 
@@ -663,9 +666,9 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: int = 256
     stream: bool = False
 
-@app.post("/v1/chat/completions")
+@app.post("/v1/chat/completions", dependencies=[Depends(require_read)])
 async def chat_completions(req: ChatCompletionRequest):
-    """OpenAI-compatible chat completions endpoint"""
+    """OpenAI-compatible chat completions endpoint (read access)"""
     # Convert messages to prompt
     prompt = ""
     for msg in req.messages:
@@ -754,9 +757,9 @@ async def chat_completions(req: ChatCompletionRequest):
         }
 
 # ===== Ops & Maintenance =====
-@app.get("/logs/{component}")
+@app.get("/logs/{component}", dependencies=[Depends(require_admin)])
 async def get_logs(component: str, lines: int = 100):
-    """Get recent logs for a component"""
+    """Get recent logs for a component (admin only)"""
     valid_components = ["api_server", "gpu_worker", "jobs"]
     if component not in valid_components:
         raise HTTPException(status_code=400, detail=f"Invalid component. Choose from: {valid_components}")
@@ -791,9 +794,9 @@ async def get_version():
         "cuda_version": torch.version.cuda if torch.cuda.is_available() else None
     }
 
-@app.get("/config")
+@app.get("/config", dependencies=[Depends(require_admin)])
 async def get_config():
-    """Get current configuration"""
+    """Get current configuration (admin only)"""
     return {
         "base_dir": str(BASE_DIR),
         "models_dir": str(MODELS_DIR),

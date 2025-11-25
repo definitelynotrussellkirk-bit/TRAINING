@@ -19,10 +19,15 @@ import logging
 import subprocess
 import hashlib
 import sys
+import os
 import requests
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
+
+# API keys from environment
+ADMIN_KEY = os.environ.get("INFERENCE_ADMIN_KEY", "")
+READ_KEY = os.environ.get("INFERENCE_READ_KEY", "")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -223,6 +228,8 @@ class DeploymentOrchestrator:
         """
         Call 3090 /models/reload API
 
+        Requires INFERENCE_ADMIN_KEY environment variable.
+
         Returns:
             (success: bool, response: Optional[Dict])
         """
@@ -230,8 +237,15 @@ class DeploymentOrchestrator:
 
         logger.info("🔄 Triggering model reload on 3090...")
 
+        # Build headers with admin API key
+        headers = {}
+        if ADMIN_KEY:
+            headers['X-API-Key'] = ADMIN_KEY
+        else:
+            logger.warning("⚠️  INFERENCE_ADMIN_KEY not set - reload may fail")
+
         try:
-            response = requests.post(url, timeout=60)
+            response = requests.post(url, headers=headers, timeout=60)
             response.raise_for_status()
 
             result = response.json()
@@ -253,6 +267,8 @@ class DeploymentOrchestrator:
         """
         Verify 3090 is serving expected checkpoint
 
+        Requires INFERENCE_READ_KEY or INFERENCE_ADMIN_KEY environment variable.
+
         Returns:
             True if deployment verified
         """
@@ -260,8 +276,14 @@ class DeploymentOrchestrator:
 
         logger.info(f"🔍 Verifying deployment (expecting step {expected_step})...")
 
+        # Build headers with API key (read key or admin key)
+        headers = {}
+        api_key = READ_KEY or ADMIN_KEY
+        if api_key:
+            headers['X-API-Key'] = api_key
+
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
 
             info = response.json()

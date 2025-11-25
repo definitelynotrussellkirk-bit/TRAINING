@@ -9,12 +9,17 @@ All monitoring scripts should use this instead of raw requests to ensure:
 - Standard request/response format
 """
 
+import os
 import requests
 import time
 import logging
 from typing import List, Dict, Optional, Any
 
 logger = logging.getLogger(__name__)
+
+# Default API key from environment
+DEFAULT_READ_KEY = os.environ.get("INFERENCE_READ_KEY", "")
+DEFAULT_ADMIN_KEY = os.environ.get("INFERENCE_ADMIN_KEY", "")
 
 
 class PredictionClient:
@@ -41,7 +46,9 @@ class PredictionClient:
         base_url: str = "http://192.168.x.x:8765",
         timeout: int = 120,
         max_retries: int = 3,
-        retry_backoff: float = 2.0
+        retry_backoff: float = 2.0,
+        api_key: Optional[str] = None,
+        admin_key: Optional[str] = None
     ):
         """
         Initialize prediction client.
@@ -51,13 +58,23 @@ class PredictionClient:
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             retry_backoff: Exponential backoff multiplier
+            api_key: Read-level API key (defaults to INFERENCE_READ_KEY env var)
+            admin_key: Admin-level API key (defaults to INFERENCE_ADMIN_KEY env var)
         """
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self.max_retries = max_retries
         self.retry_backoff = retry_backoff
 
+        # API keys for authentication
+        self.api_key = api_key or DEFAULT_READ_KEY
+        self.admin_key = admin_key or DEFAULT_ADMIN_KEY
+
         logger.info(f"PredictionClient initialized: {self.base_url}")
+        if self.api_key:
+            logger.info("  Read API key: configured")
+        if self.admin_key:
+            logger.info("  Admin API key: configured")
 
     def chat(
         self,
@@ -119,6 +136,8 @@ class PredictionClient:
         """
         Trigger model reload from deployed checkpoint.
 
+        Requires admin API key (INFERENCE_ADMIN_KEY).
+
         Returns:
             {
                 'status': 'reloaded',
@@ -130,7 +149,7 @@ class PredictionClient:
             }
         """
         url = f"{self.base_url}/models/reload"
-        return self._request_with_retry("POST", url)
+        return self._request_with_retry("POST", url, require_admin=True)
 
     def health_check(self) -> bool:
         """
@@ -165,6 +184,7 @@ class PredictionClient:
         self,
         method: str,
         url: str,
+        require_admin: bool = False,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -173,6 +193,7 @@ class PredictionClient:
         Args:
             method: HTTP method (GET, POST, etc.)
             url: Full URL
+            require_admin: If True, use admin API key; otherwise use read key
             **kwargs: Passed to requests.request()
 
         Returns:
@@ -188,6 +209,13 @@ class PredictionClient:
                 # Set timeout if not specified
                 if 'timeout' not in kwargs:
                     kwargs['timeout'] = self.timeout
+
+                # Add API key header
+                headers = kwargs.pop('headers', {})
+                api_key = self.admin_key if require_admin else self.api_key
+                if api_key:
+                    headers['X-API-Key'] = api_key
+                kwargs['headers'] = headers
 
                 # Make request
                 response = requests.request(method, url, **kwargs)
@@ -233,19 +261,29 @@ class PredictionClient:
 _client = None
 
 
-def get_client(base_url: str = "http://192.168.x.x:8765") -> PredictionClient:
+def get_client(
+    base_url: str = "http://192.168.x.x:8765",
+    api_key: Optional[str] = None,
+    admin_key: Optional[str] = None
+) -> PredictionClient:
     """
     Get global PredictionClient instance (singleton pattern).
 
     Args:
         base_url: API base URL (only used on first call)
+        api_key: Read API key (defaults to INFERENCE_READ_KEY env var)
+        admin_key: Admin API key (defaults to INFERENCE_ADMIN_KEY env var)
 
     Returns:
         PredictionClient instance
     """
     global _client
     if _client is None:
-        _client = PredictionClient(base_url=base_url)
+        _client = PredictionClient(
+            base_url=base_url,
+            api_key=api_key,
+            admin_key=admin_key
+        )
     return _client
 
 

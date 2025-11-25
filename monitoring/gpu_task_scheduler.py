@@ -83,6 +83,11 @@ TASK_TYPE_PRIORITIES = {
     "adversarial_mine": Priority.LOW,
     "live_prediction": Priority.IDLE,
     "idle_warmup": Priority.IDLE,
+    # Analytics tasks
+    "collect_embeddings": Priority.LOW,      # GPU intensive, run when idle
+    "hard_example_eval": Priority.NORMAL,    # Quick inference tests
+    "generate_visualizations": Priority.IDLE, # CPU only, lowest priority
+    "update_learning_history": Priority.IDLE, # Quick file append
 }
 
 
@@ -216,6 +221,11 @@ class TaskExecutor:
             "adversarial_mine": self._handle_adversarial_mine,
             "checkpoint_eval": self._handle_checkpoint_eval,
             "idle_warmup": self._handle_idle_warmup,
+            # Analytics tasks
+            "collect_embeddings": self._handle_collect_embeddings,
+            "hard_example_eval": self._handle_hard_example_eval,
+            "generate_visualizations": self._handle_generate_visualizations,
+            "update_learning_history": self._handle_update_learning_history,
         }
 
     def register_handler(self, task_type: str, handler: Callable):
@@ -543,6 +553,148 @@ class TaskExecutor:
             return {"warmup": "success", "response_time_ms": resp.elapsed.total_seconds() * 1000}
         except Exception as e:
             return {"warmup": "failed", "error": str(e)}
+
+    def _handle_collect_embeddings(self, params: Dict) -> Dict:
+        """Collect embeddings for the probe set (GPU-intensive)"""
+        base_dir = params.get("base_dir", "/path/to/training")
+        model_path = params.get("model_path")
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "embedding_tracker",
+                f"{base_dir}/monitoring/analytics/embedding_tracker.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                collector = module.EmbeddingCollector(base_dir, model_path)
+                output_path = collector.collect_for_probe_set()
+
+                if output_path:
+                    return {
+                        "task": "collect_embeddings",
+                        "output": str(output_path),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                else:
+                    return {"task": "collect_embeddings", "error": "Collection failed"}
+        except Exception as e:
+            logger.error(f"Embedding collection failed: {e}")
+            return {"task": "collect_embeddings", "error": str(e)}
+
+    def _handle_hard_example_eval(self, params: Dict) -> Dict:
+        """Evaluate model on hard examples"""
+        base_dir = params.get("base_dir", "/path/to/training")
+        checkpoint = params.get("checkpoint", "current")
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "hard_example_tracker",
+                f"{base_dir}/monitoring/analytics/hard_example_tracker.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                tracker = module.HardExampleTracker(base_dir, self.inference_url)
+                entry = tracker.evaluate_all(checkpoint)
+
+                return {
+                    "task": "hard_example_eval",
+                    "correct": entry.total_correct,
+                    "total": entry.total,
+                    "accuracy": entry.accuracy,
+                    "error_types": entry.error_types,
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            logger.error(f"Hard example eval failed: {e}")
+            return {"task": "hard_example_eval", "error": str(e)}
+
+    def _handle_generate_visualizations(self, params: Dict) -> Dict:
+        """Generate all visualization outputs (CPU-only)"""
+        base_dir = params.get("base_dir", "/path/to/training")
+        viz_types = params.get("types", ["skill_radar", "hard_example_board"])
+
+        results = {"task": "generate_visualizations", "generated": []}
+
+        try:
+            # Skill radar
+            if "skill_radar" in viz_types:
+                spec = importlib.util.spec_from_file_location(
+                    "skill_radar",
+                    f"{base_dir}/monitoring/analytics/skill_radar.py"
+                )
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    generator = module.SkillRadarGenerator(base_dir)
+                    path = generator.generate_current()
+                    results["generated"].append(str(path))
+
+            # Hard example board
+            if "hard_example_board" in viz_types:
+                spec = importlib.util.spec_from_file_location(
+                    "hard_example_tracker",
+                    f"{base_dir}/monitoring/analytics/hard_example_tracker.py"
+                )
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    tracker = module.HardExampleTracker(base_dir)
+                    path = tracker.generate_board_image()
+                    if path:
+                        results["generated"].append(str(path))
+
+            # UMAP visualization
+            if "umap" in viz_types:
+                spec = importlib.util.spec_from_file_location(
+                    "embedding_tracker",
+                    f"{base_dir}/monitoring/analytics/embedding_tracker.py"
+                )
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    visualizer = module.EmbeddingVisualizer(base_dir)
+                    path = visualizer.visualize_latest()
+                    if path:
+                        results["generated"].append(str(path))
+
+            results["timestamp"] = datetime.now().isoformat()
+            return results
+
+        except Exception as e:
+            logger.error(f"Visualization generation failed: {e}")
+            return {"task": "generate_visualizations", "error": str(e)}
+
+    def _handle_update_learning_history(self, params: Dict) -> Dict:
+        """Append current metrics to learning history"""
+        base_dir = params.get("base_dir", "/path/to/training")
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "learning_history",
+                f"{base_dir}/monitoring/analytics/learning_history.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                history = module.LearningHistory(base_dir)
+                snapshot = history.collect_current_metrics()
+                history.append(snapshot)
+
+                return {
+                    "task": "update_learning_history",
+                    "step": snapshot.step,
+                    "train_loss": snapshot.train_loss,
+                    "val_loss": snapshot.val_loss,
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            logger.error(f"Learning history update failed: {e}")
+            return {"task": "update_learning_history", "error": str(e)}
 
 
 class GPUTaskScheduler:

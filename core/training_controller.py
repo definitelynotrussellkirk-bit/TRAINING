@@ -225,7 +225,7 @@ From Python code:
     from training_controller import TrainingController
 
     # Initialize
-    controller = TrainingController("/path/to/training")
+    controller = TrainingController(str(get_base_dir()))
 
     # Send signals
     controller.signal_pause("Need to check something")
@@ -313,6 +313,17 @@ from typing import Optional, Dict
 from datetime import datetime
 import logging
 
+# Import path utilities for auto-detection
+try:
+    from paths import get_base_dir
+except ImportError:
+    # Fallback if running standalone
+    def get_base_dir():
+        current = Path(__file__).resolve().parent.parent
+        if (current / "CLAUDE.md").exists():
+            return current
+        return Path("/path/to/training")  # Legacy fallback
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -390,7 +401,10 @@ class TrainingController:
         # Training will continue
     """
 
-    def __init__(self, base_dir: str = "/path/to/training"):
+    def __init__(self, base_dir: str = None):
+        # Use provided path or auto-detect
+        if base_dir is None:
+            base_dir = str(get_base_dir())
         self.base_dir = Path(base_dir)
         self.control_dir = self.base_dir / "control"
         self.control_dir.mkdir(exist_ok=True)
@@ -585,7 +599,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Training Control System")
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base directory')
+    parser.add_argument('--base-dir', default=None, help='Base directory (auto-detected if not set)')
 
     subparsers = parser.add_subparsers(dest='command', help='Control command')
 

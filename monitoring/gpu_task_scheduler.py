@@ -94,6 +94,8 @@ TASK_TYPE_PRIORITIES = {
     # Phase 4: Self-improving pipeline
     "impact_snapshot": Priority.IDLE,        # Take performance snapshot
     "self_improve_cycle": Priority.NORMAL,   # Full self-improving cycle
+    # Phase 6: Hard example discovery
+    "expand_hard_examples": Priority.LOW,    # Discover new hard examples from failures
 }
 
 
@@ -238,6 +240,8 @@ class TaskExecutor:
             # Phase 4: Self-improving pipeline
             "impact_snapshot": self._handle_impact_snapshot,
             "self_improve_cycle": self._handle_self_improve_cycle,
+            # Phase 6: Hard example discovery
+            "expand_hard_examples": self._handle_expand_hard_examples,
         }
 
     def register_handler(self, task_type: str, handler: Callable):
@@ -935,6 +939,47 @@ class TaskExecutor:
             logger.error(f"Self-improve cycle failed: {e}")
             results["error"] = str(e)
             return results
+
+    def _handle_expand_hard_examples(self, params: Dict) -> Dict:
+        """
+        Discover and add new hard examples from training failures.
+        Grows the test suite organically based on real weaknesses.
+        """
+        base_dir = params.get("base_dir", "/path/to/training")
+        max_new = params.get("max_new", 3)
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "hard_example_expander",
+                f"{base_dir}/monitoring/analytics/hard_example_expander.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                expander = module.HardExampleExpander(base_dir, self.inference_url)
+
+                # Generate candidates from failures
+                candidates = expander.generate_candidates()
+                expander.candidates.extend(candidates)
+
+                # Test and expand
+                added = expander.expand_hard_examples(max_new)
+
+                summary = expander.get_summary()
+
+                return {
+                    "task": "expand_hard_examples",
+                    "candidates_generated": len(candidates),
+                    "examples_added": len(added),
+                    "new_examples": [ex["id"] for ex in added],
+                    "total_hard_examples": summary["current_hard_examples"],
+                    "timestamp": datetime.now().isoformat()
+                }
+
+        except Exception as e:
+            logger.error(f"Hard example expansion failed: {e}")
+            return {"task": "expand_hard_examples", "error": str(e)}
 
 
 class GPUTaskScheduler:

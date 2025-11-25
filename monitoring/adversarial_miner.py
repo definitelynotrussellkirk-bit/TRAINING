@@ -190,6 +190,44 @@ class AdversarialMiner:
 
         return None
 
+    def extract_prompt_and_expected(self, example: Dict) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Extract prompt and expected output from various data formats.
+
+        Supports:
+        - {"text": "prompt\nExpected: answer"}
+        - {"messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]}
+        - {"input": "...", "output": "..."}
+
+        Returns: (prompt, expected_answer)
+        """
+        prompt = None
+        expected = None
+
+        # Format 1: text field (legacy)
+        if "text" in example and example["text"]:
+            prompt = example["text"]
+            expected = self.extract_expected_output(prompt)
+            return prompt, expected
+
+        # Format 2: messages array (chat format - most common for your data)
+        if "messages" in example:
+            messages = example["messages"]
+            for msg in messages:
+                if msg.get("role") == "user":
+                    prompt = msg.get("content", "")
+                elif msg.get("role") == "assistant":
+                    expected = msg.get("content", "")
+            return prompt, expected
+
+        # Format 3: input/output fields
+        if "input" in example:
+            prompt = example["input"]
+            expected = example.get("output", example.get("answer"))
+            return prompt, expected
+
+        return None, None
+
     def calculate_confidence(self, logits: torch.Tensor) -> float:
         """
         Calculate prediction confidence from logits.
@@ -254,13 +292,14 @@ class AdversarialMiner:
             with torch.no_grad():
                 for idx, example in enumerate(test_sample):
                     try:
-                        text = example.get("text", "")
-                        if not text:
+                        # Use helper to extract prompt and expected from any format
+                        prompt, expected = self.extract_prompt_and_expected(example)
+                        if not prompt:
                             continue
 
                         # Tokenize input
                         inputs = tokenizer(
-                            text,
+                            prompt,
                             return_tensors="pt",
                             truncation=True,
                             max_length=512
@@ -299,22 +338,25 @@ class AdversarialMiner:
                             adversarial_type = "low_confidence"
                             stats["low_confidence"] += 1
 
-                        # Try to extract expected output and check correctness
-                        expected = self.extract_expected_output(text)
-                        if expected and expected.lower() not in prediction.lower():
-                            is_adversarial = True
-                            adversarial_type = "incorrect_prediction"
-                            stats["incorrect_predictions"] += 1
+                        # Check correctness using pre-extracted expected
+                        if expected:
+                            prediction_check = prediction.lower().strip()
+                            expected_check = expected.lower().strip()
+                            if expected_check not in prediction_check:
+                                is_adversarial = True
+                                adversarial_type = "incorrect_prediction"
+                                stats["incorrect_predictions"] += 1
 
                         if is_adversarial:
                             adversarial_examples.append({
-                                "text": text,
-                                "prediction": prediction,
+                                "prompt": prompt,
                                 "expected": expected,
+                                "prediction": prediction,
                                 "confidence": confidence,
                                 "type": adversarial_type,
                                 "checkpoint_step": step,
-                                "timestamp": datetime.now().isoformat()
+                                "timestamp": datetime.now().isoformat(),
+                                "source_format": "messages" if "messages" in example else "text"
                             })
 
                     except Exception as e:
@@ -324,12 +366,26 @@ class AdversarialMiner:
             stats["avg_confidence"] = np.mean(confidences) if confidences else 0.0
 
             # Save adversarial examples
+            output_file = None
             if adversarial_examples:
                 output_file = self.output_dir / f"adversarial_step_{step}.jsonl"
                 with open(output_file, 'w') as f:
                     for ex in adversarial_examples:
                         f.write(json.dumps(ex) + '\n')
                 logger.info(f"Saved {len(adversarial_examples)} adversarial examples to {output_file}")
+
+            # Build categories for plugin compatibility (TASK013)
+            categories = defaultdict(lambda: {"count": 0, "avg_confidence": 0.0, "confidences": []})
+            for ex in adversarial_examples:
+                cat = ex.get("type", "unknown")
+                categories[cat]["count"] += 1
+                categories[cat]["confidences"].append(ex.get("confidence", 0.5))
+
+            # Compute avg confidence per category
+            for cat_name, cat_data in categories.items():
+                if cat_data["confidences"]:
+                    cat_data["avg_confidence"] = sum(cat_data["confidences"]) / len(cat_data["confidences"])
+                del cat_data["confidences"]  # Remove intermediate data
 
             # Clean up
             del model
@@ -341,7 +397,9 @@ class AdversarialMiner:
                 "timestamp": datetime.now().isoformat(),
                 "stats": stats,
                 "adversarial_count": len(adversarial_examples),
-                "output_file": str(output_file) if adversarial_examples else None
+                "total_examples_mined": len(adversarial_examples),  # Plugin compatibility
+                "categories": dict(categories),  # Plugin compatibility
+                "output_file": str(output_file) if output_file else None
             }
 
         except Exception as e:

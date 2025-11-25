@@ -57,6 +57,10 @@ class SelfCorrectionLoop:
         # Directories
         self.setup_directories()
 
+        # Status tracking (for plugin compatibility)
+        self.status_file = self.base_dir / "status" / "self_correction.json"
+        self.status = self._load_status()
+
     def setup_directories(self):
         """Create necessary directories"""
         dirs = [
@@ -65,10 +69,67 @@ class SelfCorrectionLoop:
             'queue/corrections',
             'queue/rejected',
             'logs/error_patterns',
-            'logs/corrections'
+            'logs/corrections',
+            'status'
         ]
         for d in dirs:
             (self.base_dir / d).mkdir(parents=True, exist_ok=True)
+
+    def _load_status(self) -> Dict:
+        """Load previous status if exists"""
+        if self.status_file.exists():
+            try:
+                with open(self.status_file) as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError):
+                logger.warning(f"Could not load status file, starting fresh")
+        return {
+            "correction_runs": [],
+            "total_errors_captured": 0,
+            "total_corrections_generated": 0,
+            "last_updated": None
+        }
+
+    def _save_status(self):
+        """Save status to JSON"""
+        self.status["last_updated"] = datetime.now().isoformat()
+        self.status_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.status_file, 'w') as f:
+            json.dump(self.status, f, indent=2)
+
+    def update_status(self, patterns: List[Dict] = None):
+        """
+        Update status file after pipeline run.
+        Format matches what SelfCorrectionPlugin expects.
+        """
+        # Build error_patterns list for this run
+        error_patterns = []
+        if patterns:
+            for p in patterns[:10]:  # Top 10 patterns
+                error_patterns.append({
+                    "type": p.get("error_type", "Unknown"),
+                    "count": p.get("frequency", 0),
+                    "description": p.get("sample_problems", [""])[0][:100] if p.get("sample_problems") else ""
+                })
+
+        # Create run record
+        run_record = {
+            "timestamp": datetime.now().isoformat(),
+            "errors_captured": self.stats["incorrect"],
+            "corrections_generated": self.stats["corrections_generated"],
+            "error_patterns": error_patterns,
+            "tested": self.stats["tested"],
+            "correct": self.stats["correct"],
+            "incorrect": self.stats["incorrect"]
+        }
+
+        # Update status
+        self.status["correction_runs"].append(run_record)
+        self.status["total_errors_captured"] += self.stats["incorrect"]
+        self.status["total_corrections_generated"] += self.stats["corrections_generated"]
+
+        self._save_status()
+        logger.info(f"Status updated: {self.status_file}")
 
     def call_api(
         self,
@@ -436,6 +497,10 @@ Output:"""
         logger.info(f"Corrections generated: {self.stats['corrections_generated']}")
         logger.info(f"Patterns found: {self.stats['patterns_found']}")
         logger.info("=" * 80)
+
+        # Update status file for plugin compatibility
+        patterns = self.mine_patterns() if self.pattern_db else []
+        self.update_status(patterns)
 
     def run_continuous(self, interval: int = 300):
         """Run continuous self-correction loop"""

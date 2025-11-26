@@ -96,6 +96,7 @@ from train import UltimateTrainer
 from training_queue import TrainingQueue
 from training_controller import TrainingController
 from atomic_ops import write_json_atomic, safe_file_operation
+from data_file_impact import DataFileImpactTracker
 
 # Data Manager (for auto-generation with quality testing)
 sys.path.insert(0, str(Path(__file__).parent.parent / "data_manager"))
@@ -274,6 +275,9 @@ class TrainingDaemon:
 
         # Shutdown flag for signal handling
         self.shutdown_requested = False
+
+        # Data file impact tracker (Phase 4)
+        self.impact_tracker = DataFileImpactTracker(self.base_dir / "status")
 
         # Register signal handlers
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -1214,6 +1218,23 @@ class TrainingDaemon:
 
         return True
 
+    def get_current_training_metrics(self) -> dict:
+        """Read current training metrics from status file for impact tracking."""
+        status_file = self.base_dir / "status" / "training_status.json"
+        try:
+            if status_file.exists():
+                with open(status_file) as f:
+                    data = json.load(f)
+                return {
+                    'step': data.get('current_step'),
+                    'loss': data.get('loss'),
+                    'accuracy': data.get('accuracy_percent'),
+                    'val_loss': data.get('validation_loss')
+                }
+        except Exception:
+            pass
+        return {'step': None, 'loss': None, 'accuracy': None, 'val_loss': None}
+
     def run_checkpoint_retention(self, force: bool = False):
         """
         Enforce checkpoint retention using RetentionManager.
@@ -1414,11 +1435,31 @@ class TrainingDaemon:
                         # Update controller state
                         self.controller.update_state("training", current_file=data_file.name)
 
+                        # Record start metrics for impact tracking
+                        start_metrics = self.get_current_training_metrics()
+                        self.impact_tracker.start_file(
+                            filename=data_file.name,
+                            step=start_metrics['step'] or 0,
+                            loss=start_metrics['loss'],
+                            accuracy=start_metrics['accuracy'],
+                            val_loss=start_metrics['val_loss']
+                        )
+
                         # Train on file
                         success = self.train_on_file(
                             data_file,
                             batch_number=None,  # Queue handles ordering
                             batch_queue_size=queue_status["total_queued"]
+                        )
+
+                        # Record end metrics for impact tracking
+                        end_metrics = self.get_current_training_metrics()
+                        self.impact_tracker.finish_file(
+                            filename=data_file.name,
+                            step=end_metrics['step'] or 0,
+                            loss=end_metrics['loss'],
+                            accuracy=end_metrics['accuracy'],
+                            val_loss=end_metrics['val_loss']
                         )
 
                         # Handle result

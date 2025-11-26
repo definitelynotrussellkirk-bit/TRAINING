@@ -51,6 +51,7 @@ async function fetchData() {
         updateSystemHealth(data);
         updateQuickMetrics(data);
         updateTrainingStatus(data);
+        updateDataHealth(data);
         updateGPU4090(data);
         updateGPU3090(data);
         updateCurriculum(data);
@@ -62,6 +63,7 @@ async function fetchData() {
         updateSelfCorrection(data);
         updateCheckpointSync(data);
         updateSkillMetrics(data);
+        updateSyllo10LevelBars(data);  // Override SYLLO with 10-level data
         updateTransferLearning(data);
         updateLayerDrift(data);
         updateParameterStability(data);
@@ -70,6 +72,9 @@ async function fetchData() {
         updateScheduler(data);
         updateRetention(data);
         updateDataImpact(data);
+
+        // Fetch and update data lineage (separate API call)
+        fetchDataLineage();
 
         // Update error cards based on system health
         updateErrorCards(data);
@@ -262,6 +267,92 @@ function updateTrainingActionHint(status, gap, loss, acc) {
 }
 
 /**
+ * Update Data Health card (Protocol Conformance)
+ * Displays emoji/direct mode mix and protocol violations
+ */
+function updateDataHealth(data) {
+    const source = data.sources?.training_status;
+    if (!source || source.status !== 'ok') {
+        setCardOffline('dataHealthIndicator');
+        return;
+    }
+
+    const training = source.data;
+    const stats = training.protocol_stats;
+
+    // If no protocol stats yet, show defaults
+    if (!stats) {
+        setText('protocolEmojiPct', '--');
+        setText('protocolDirectPct', '--');
+        setText('protocolMalformed', '--');
+        setText('protocolChecked', '0');
+        setCardNeutral('dataHealthIndicator');
+        return;
+    }
+
+    // Update text values
+    const emojiPct = stats.emoji_mode_pct || 0;
+    const directPct = stats.direct_mode_pct || 0;
+    const malformed = stats.malformed || 0;
+    const checked = stats.protocol_checked || 0;
+
+    setText('protocolEmojiPct', `${emojiPct.toFixed(1)}%`);
+    setText('protocolDirectPct', `${directPct.toFixed(1)}%`);
+    setText('protocolMalformed', malformed.toString());
+    setText('protocolChecked', checked.toString());
+
+    // Update progress bars
+    const emojiBar = document.getElementById('protocolEmojiBar');
+    const directBar = document.getElementById('protocolDirectBar');
+    if (emojiBar) emojiBar.style.width = `${emojiPct}%`;
+    if (directBar) directBar.style.width = `${directPct}%`;
+
+    // Update status indicator
+    const indicator = document.getElementById('dataHealthIndicator');
+    const malformedEl = document.getElementById('protocolMalformed');
+
+    if (malformed > 0) {
+        // Has errors - critical
+        if (indicator) {
+            indicator.className = 'status-indicator critical';
+        }
+        if (malformedEl) {
+            malformedEl.classList.add('has-errors');
+        }
+    } else if (checked > 0 && (emojiPct < 30 || emojiPct > 70)) {
+        // Mix is skewed - warning
+        if (indicator) {
+            indicator.className = 'status-indicator warning';
+        }
+        if (malformedEl) {
+            malformedEl.classList.remove('has-errors');
+        }
+    } else if (checked > 0) {
+        // All good
+        if (indicator) {
+            indicator.className = 'status-indicator healthy';
+        }
+        if (malformedEl) {
+            malformedEl.classList.remove('has-errors');
+        }
+    } else {
+        // No data yet
+        setCardNeutral('dataHealthIndicator');
+    }
+}
+
+/**
+ * Set card to neutral (not yet populated)
+ */
+function setCardNeutral(indicatorId) {
+    const el = document.getElementById(indicatorId);
+    if (el) {
+        el.className = 'status-indicator';
+        el.style.color = 'var(--text-muted)';
+    }
+}
+
+/**
  * Update GPU 4090 card
  */
 function updateGPU4090(data) {
@@ -339,17 +430,28 @@ function updateCurriculum(data) {
     const latest = curriculum.latest_summary;
     const dataFlow = curriculum.data_flow;
 
-    // Update legacy accuracy display
-    if (latest) {
-        const acc = latest.accuracies || {};
-        setText('curriculumEasy', acc.easy ? `${(acc.easy * 100).toFixed(0)}%` : '--');
-        setText('curriculumMedium', acc.medium ? `${(acc.medium * 100).toFixed(0)}%` : '--');
-        setText('curriculumHard', acc.hard ? `${(acc.hard * 100).toFixed(0)}%` : '--');
+    // Update 10-level accuracy display from skill_metrics.syllo_10level
+    const tenLevel = data.sources?.skill_metrics?.data?.syllo_10level;
+    if (tenLevel?.available) {
+        const byLevel = tenLevel.by_level || {};
+        setText('curriculumL1', byLevel.L1 ? `${byLevel.L1.accuracy.toFixed(0)}%` : '--');
+        setText('curriculumL2', byLevel.L2 ? `${byLevel.L2.accuracy.toFixed(0)}%` : '--');
+        // L3-4 average
+        const l3 = byLevel.L3?.accuracy || 0;
+        const l4 = byLevel.L4?.accuracy || 0;
+        const l34Avg = (l3 + l4) / 2;
+        setText('curriculumL34', `${l34Avg.toFixed(0)}%`);
+        setText('curriculumStep', latest?.step || '--');
+    } else if (latest) {
+        // Fallback to legacy if 10-level not available
+        setText('curriculumL1', '--');
+        setText('curriculumL2', '--');
+        setText('curriculumL34', '--');
         setText('curriculumStep', latest.step || '--');
     } else {
-        setText('curriculumEasy', '--');
-        setText('curriculumMedium', '--');
-        setText('curriculumHard', '--');
+        setText('curriculumL1', '--');
+        setText('curriculumL2', '--');
+        setText('curriculumL34', '--');
         setText('curriculumStep', '--');
     }
 
@@ -985,6 +1087,51 @@ function updateDifficultyBars(skill, byDifficulty) {
         // Update percentage text
         setText(valueId, `${acc.toFixed(0)}%`);
     });
+}
+
+/**
+ * Update SYLLO 10-level bars from syllo_10level data
+ */
+function updateSyllo10LevelBars(data) {
+    const tenLevel = data.sources?.skill_metrics?.data?.syllo_10level;
+    if (!tenLevel?.available) return;
+
+    const byLevel = tenLevel.by_level || {};
+
+    // Update L1-L4 directly
+    ['L1', 'L2', 'L3', 'L4'].forEach(lvl => {
+        const levelData = byLevel[lvl] || {};
+        const acc = levelData.accuracy || 0;
+
+        const barEl = document.getElementById(`syllable${lvl}Bar`);
+        if (barEl) {
+            barEl.style.width = `${Math.min(100, acc)}%`;
+        }
+        setText(`syllable${lvl}`, `${acc.toFixed(0)}%`);
+    });
+
+    // L5+ is average of L5-L10
+    let l5PlusTotal = 0, l5PlusCount = 0;
+    ['L5', 'L6', 'L7', 'L8', 'L9', 'L10'].forEach(lvl => {
+        const levelData = byLevel[lvl];
+        if (levelData && levelData.total > 0) {
+            l5PlusTotal += levelData.accuracy || 0;
+            l5PlusCount++;
+        }
+    });
+    const l5PlusAcc = l5PlusCount > 0 ? l5PlusTotal / l5PlusCount : 0;
+
+    const l5Bar = document.getElementById('syllableL5Bar');
+    if (l5Bar) {
+        l5Bar.style.width = `${Math.min(100, l5PlusAcc)}%`;
+    }
+    setText('syllableL5', `${l5PlusAcc.toFixed(0)}%`);
+
+    // Update overall accuracy from 10-level data
+    setText('syllableOverall', `${tenLevel.overall_accuracy?.toFixed(1) || 0}%`);
+
+    // Update indicator
+    setCardOnline('syllableIndicator');
 }
 
 /**
@@ -2393,3 +2540,137 @@ document.addEventListener('click', (e) => {
         closePreview();
     }
 });
+
+// ================================
+// Data Lineage Card
+// ================================
+
+const LINEAGE_API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8081/api/lineage'
+    : `http://${window.location.hostname}:8081/api/lineage`;
+
+/**
+ * Fetch data lineage stats from dedicated API endpoint
+ */
+async function fetchDataLineage() {
+    try {
+        const response = await fetch(LINEAGE_API_URL);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        updateDataLineage(data);
+    } catch (error) {
+        console.error('Error fetching lineage data:', error);
+        setCardOffline('lineageIndicator');
+    }
+}
+
+/**
+ * Update the Data Lineage card with generator/validator stats
+ */
+function updateDataLineage(data) {
+    const indicator = document.getElementById('lineageIndicator');
+    if (!indicator) return;
+
+    // Check if we have data
+    const totalValidations = data.total_validations || 0;
+    const generators = data.generators || {};
+    const validators = data.validators || {};
+    const summary = data.summary || {};
+
+    if (totalValidations === 0) {
+        indicator.className = 'status-indicator offline';
+        document.getElementById('lineageTotalValidations').textContent = '0';
+        document.getElementById('lineageOverallFailRate').textContent = '--%';
+        return;
+    }
+
+    // Determine card status based on overall fail rate
+    const overallFailRate = summary.overall_fail_rate || 0;
+    if (overallFailRate > 10) {
+        indicator.className = 'status-indicator critical';
+    } else if (overallFailRate > 5) {
+        indicator.className = 'status-indicator warning';
+    } else {
+        indicator.className = 'status-indicator healthy';
+    }
+
+    // Update summary stats
+    document.getElementById('lineageTotalValidations').textContent = totalValidations.toLocaleString();
+    document.getElementById('lineageOverallFailRate').textContent = `${overallFailRate.toFixed(1)}%`;
+
+    // Update generator table
+    const genBody = document.getElementById('generatorTableBody');
+    if (genBody) {
+        if (Object.keys(generators).length === 0) {
+            genBody.innerHTML = '<tr><td colspan="3" class="empty-row">No data yet</td></tr>';
+        } else {
+            // Sort by total descending
+            const sorted = Object.entries(generators)
+                .sort((a, b) => b[1].total - a[1].total)
+                .slice(0, 5); // Top 5
+
+            genBody.innerHTML = sorted.map(([key, stats]) => {
+                const shortKey = key.split('@')[0]; // Remove version for brevity
+                const failRate = stats.fail_rate || 0;
+                const failClass = getFailRateClass(failRate);
+                return `<tr>
+                    <td title="${key}">${shortKey}</td>
+                    <td>${stats.total}</td>
+                    <td class="${failClass}">${failRate.toFixed(1)}%</td>
+                </tr>`;
+            }).join('');
+        }
+    }
+
+    // Update validator table
+    const valBody = document.getElementById('validatorTableBody');
+    if (valBody) {
+        if (Object.keys(validators).length === 0) {
+            valBody.innerHTML = '<tr><td colspan="3" class="empty-row">No data yet</td></tr>';
+        } else {
+            // Sort by total descending
+            const sorted = Object.entries(validators)
+                .sort((a, b) => b[1].total - a[1].total)
+                .slice(0, 5); // Top 5
+
+            valBody.innerHTML = sorted.map(([key, stats]) => {
+                const shortKey = key.split('@')[0]; // Remove version for brevity
+                const failRate = stats.fail_rate || 0;
+                const failClass = getFailRateClass(failRate);
+                return `<tr>
+                    <td title="${key}">${shortKey}</td>
+                    <td>${stats.total}</td>
+                    <td class="${failClass}">${failRate.toFixed(1)}%</td>
+                </tr>`;
+            }).join('');
+        }
+    }
+
+    // Update worst generator/validator warning
+    const worstEl = document.getElementById('lineageWorst');
+    if (worstEl) {
+        const worstGen = summary.worst_generator;
+        const worstVal = summary.worst_validator;
+
+        if (worstGen && worstGen.fail_rate > 5) {
+            worstEl.innerHTML = `⚠️ <strong>${worstGen.id}</strong> has ${worstGen.fail_rate.toFixed(1)}% rejection rate (${worstGen.total} validations)`;
+            worstEl.classList.add('visible');
+        } else if (worstVal && worstVal.fail_rate > 5) {
+            worstEl.innerHTML = `⚠️ <strong>${worstVal.id}</strong> validator rejecting ${worstVal.fail_rate.toFixed(1)}% (${worstVal.total} validations)`;
+            worstEl.classList.add('visible');
+        } else {
+            worstEl.classList.remove('visible');
+        }
+    }
+}
+
+/**
+ * Get CSS class for fail rate coloring
+ */
+function getFailRateClass(rate) {
+    if (rate > 10) return 'fail-rate-bad';
+    if (rate > 5) return 'fail-rate-warn';
+    return 'fail-rate-ok';
+}

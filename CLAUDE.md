@@ -1,11 +1,20 @@
 # CLAUDE INSTRUCTIONS - LLM Training System
 
-**Last Updated:** 2025-11-26 (10-Level SYLLO System + Static File Serving)
+**Last Updated:** 2025-11-26 (Data Lineage System)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 This document contains instructions for Claude to help with training operations.
 
-**MAJOR UPDATE:** Code Review Validated Monitoring Systems (2025-11-25)
+**MAJOR UPDATE:** Data Lineage System (2025-11-26)
+- ✅ Generator versioning: `GENERATOR_ID` + `GENERATOR_VERSION` in all generators
+- ✅ Validator versioning: `VALIDATOR_NAME` + `VALIDATOR_VERSION` in all validators
+- ✅ `.meta.json` sidecar files for data provenance tracking
+- ✅ LineageTracker aggregates per-generator/validator rejection stats
+- ✅ New `/api/lineage` endpoint for dashboard
+- ✅ New "Data Lineage" card on master dashboard
+- ✅ Answers: "Which generator produces most rejections?", "Which validator is most aggressive?"
+
+**PREVIOUS UPDATE:** Code Review Validated Monitoring Systems (2025-11-25)
 - ✅ API authentication added to inference server
 - ✅ Test infrastructure cleaned up for CI
 - ✅ RetentionManager wired into daemon
@@ -226,6 +235,90 @@ OBSERVATIONS/
 ---
 
 ## 🆕 RECENT UPDATES (2025-11-26)
+
+**Data Lineage System** - Track generator/validator provenance for all training data
+
+**What Changed (2025-11-26 - Data Lineage):**
+- Every generator now has `GENERATOR_ID` and `GENERATOR_VERSION` constants
+- Every validator now has `VALIDATOR_NAME` and `VALIDATOR_VERSION` constants
+- Generators write `.meta.json` sidecar files alongside training JSONL
+- `LineageTracker` aggregates rejection stats to `status/data_lineage.json`
+- New `/api/lineage` endpoint serves lineage stats
+- New "Data Lineage" dashboard card shows per-generator/validator fail rates
+
+**Key Files Created:**
+- `core/lineage.py` - Generator registry + FileLineage dataclass + sidecar I/O
+- `core/lineage_tracker.py` - LineageTracker aggregation class
+
+**Files Modified for Versioning:**
+- `monitoring/discrimination_generator.py` - `GENERATOR_ID="discrimination"`, `GENERATOR_VERSION="1.0.0"`
+- `data_manager/generators/syllogism_generator.py` - `GENERATOR_ID="syllo_local"`, `GENERATOR_VERSION="1.0.0"`
+- `core/validation/validator.py` - `VALIDATOR_NAME="data_validator"`, `VALIDATOR_VERSION="1.0.0"`
+- `core/validation/spec.py` - `VALIDATOR_NAME="spec_validator"`, `VALIDATOR_VERSION="1.0.0"`
+- `core/training_daemon.py` - Integrated LineageTracker
+- `monitoring/api/server.py` - Added `/api/lineage` endpoint
+- `monitoring/ui/master_dashboard.html` - Added Data Lineage card
+- `monitoring/css/master_dashboard.css` - Lineage card styles
+- `monitoring/js/master_dashboard.js` - `fetchDataLineage()` + `updateDataLineage()`
+
+**Generator Registry (in `core/lineage.py`):**
+```python
+GENERATOR_REGISTRY = {
+    "discrimination": {"version": "1.0.0", "source": "monitoring/discrimination_generator.py"},
+    "syllo_local": {"version": "1.0.0", "source": "data_manager/generators/syllogism_generator.py"},
+    "syllo_api": {"version": "1.0.0", "source": "singleSKILL SYLLO API"},
+    "curriculum": {"version": "1.0.0", "source": "data_manager/curriculum_manager.py"},
+    "manual": {"version": "1.0.0", "source": "human"},
+}
+```
+
+**How to Bump Versions:**
+When changing generator/validator logic significantly, increment the version:
+```python
+# In monitoring/discrimination_generator.py
+GENERATOR_VERSION = "1.1.0"  # Was "1.0.0"
+```
+
+**API Endpoint:**
+```bash
+curl http://localhost:8081/api/lineage | jq .
+```
+
+**Dashboard:** http://localhost:8081/master_dashboard.html (Data Lineage card in left column)
+
+---
+
+**50% Protocol Mode + Data Health Dashboard** - Emoji protocol enforcement now 50/50
+
+**What Changed (2025-11-26 - Protocol Layer):**
+- **50% Emoji Mode**: Half of training examples use emoji thinking (💭...🔚), half are direct answers
+- Deterministic split based on example index (reproducible)
+- Protocol validation in `core/validation/validator.py` (runs at DEEP level)
+- EmojiThinkProfile in `trainer/profiles/emoji_think.py` now conditionally applies markers
+- Training status tracks `protocol_stats` (emoji_mode_pct, direct_mode_pct, malformed)
+- New "Data Health" card on master dashboard shows protocol conformance
+
+**Protocol Validation Rules:**
+```
+EMOJI MODE (valid): thinking emoji at start AND stop emoji at end
+DIRECT MODE (valid): NO thinking emoji at start (stop emoji optional)
+MALFORMED (error):   thinking emoji at start WITHOUT stop emoji at end
+```
+
+**Constants (single source of truth in validator.py):**
+- `THINKING_EMOJIS`: 🤔, 💭, 🧠, 💡, 🎯, 🔍, 🤨, 🧐, ⚡, ✨
+- `STOP_EMOJIS`: 🛑, ⛔, 🚫, ❌, 🔴, ⏹️, 🔚, ✋, 🚦, 🛡️
+- Stop count: 2-4 repetitions
+
+**Files Modified:**
+- `core/validation/validator.py` - Protocol constants + `_check_protocol()` method
+- `trainer/profiles/emoji_think.py` - `should_use_emoji_mode()` + 50% mode in `transform_example()`
+- `core/training_status.py` - Added `protocol_stats` field to TrainingStatus
+- `monitoring/ui/master_dashboard.html` - Added Data Health card
+- `monitoring/css/master_dashboard.css` - Styles for protocol mix bar
+- `monitoring/js/master_dashboard.js` - `updateDataHealth()` function
+
+---
 
 **10-Level SYLLO Signal Degradation System** - Replaces old 5-level system
 

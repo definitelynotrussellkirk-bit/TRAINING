@@ -1,6 +1,6 @@
 # System Architecture
 
-**Last Updated:** 2025-11-25
+**Last Updated:** 2025-11-26
 
 ## System Split
 
@@ -68,6 +68,59 @@ spec = spec_validator.validate_job(job_config, metadata)  # Raises on unknown sc
 issues = data_validator.validate_file(file_path, level='QUICK')  # Raises on bad data
 ```
 
+## Data Lineage System
+
+Tracks generator and validator provenance for all training data, enabling debugging of data quality issues.
+
+### Components
+| Module | Location | Purpose |
+|--------|----------|---------|
+| Generator Registry | `core/lineage.py` | Known generators + versions |
+| FileLineage | `core/lineage.py` | Metadata dataclass for sidecar files |
+| LineageTracker | `core/lineage_tracker.py` | Aggregates validation stats per generator/validator |
+
+### Data Flow
+```
+Generator creates JSONL  →  Writes .meta.json sidecar  →  Daemon validates
+                                                              ↓
+Dashboard ← /api/lineage ← status/data_lineage.json ← LineageTracker records
+```
+
+### Sidecar Files
+Each training file can have a `.meta.json` sidecar:
+```
+train_SYLLO_level3_100_20251126.jsonl
+train_SYLLO_level3_100_20251126.jsonl.meta.json  ← lineage metadata
+```
+
+### Generator Versioning
+```python
+# In each generator file
+GENERATOR_ID = "discrimination"
+GENERATOR_VERSION = "1.0.0"  # Bump when logic changes
+```
+
+Registered generators: `discrimination`, `syllo_local`, `syllo_api`, `curriculum`, `manual`
+
+### Validator Versioning
+```python
+# In each validator file
+VALIDATOR_NAME = "data_validator"
+VALIDATOR_VERSION = "1.0.0"  # Bump when logic changes
+```
+
+### Stats Aggregation
+LineageTracker aggregates per-generator and per-validator:
+- Total validations, passed, failed
+- Fail rate percentage
+- Top error reasons
+- Worst offenders (generators/validators with >5% rejection)
+
+### API Access
+```bash
+curl http://localhost:8081/api/lineage | jq .summary
+```
+
 ## Key Modules
 
 ### Training Core
@@ -93,6 +146,12 @@ issues = data_validator.validate_file(file_path, level='QUICK')  # Raises on bad
 | aggregator.py | `monitoring/api/aggregator.py` | Plugin-based data aggregation |
 | skill_metrics.py | `monitoring/api/plugins/skill_metrics.py` | Baseline test results |
 | model_comparison.py | `monitoring/api/plugins/model_comparison.py` | Checkpoint rankings |
+
+### Data Lineage
+| Module | Location | Responsibility |
+|--------|----------|----------------|
+| lineage.py | `core/lineage.py` | Generator registry + FileLineage dataclass |
+| lineage_tracker.py | `core/lineage_tracker.py` | Validation stats aggregation |
 
 ## Configuration
 

@@ -28,6 +28,28 @@ import random
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# DATA LINEAGE - Validator identification for tracking
+# =============================================================================
+# Bump DATA_VALIDATOR_VERSION when validation logic changes significantly
+VALIDATOR_NAME = "data_validator"
+VALIDATOR_VERSION = "1.0.0"
+
+# =============================================================================
+# PROTOCOL CONSTANTS (Single Source of Truth)
+# =============================================================================
+
+# Thinking emoji pool - assistant responses may start with these
+THINKING_EMOJIS = [
+    "🤔", "💭", "🧠", "💡", "🎯", "🔍", "🤨", "🧐", "⚡", "✨"
+]
+
+# Stop emoji pool - assistant responses may end with these (2-4 repetitions)
+STOP_EMOJIS = ["🛑", "⛔", "🚫", "❌", "🔴", "⏹️", "🔚", "✋", "🚦", "🛡️"]
+
+STOP_COUNT_MIN = 2
+STOP_COUNT_MAX = 4
+
 
 class ValidationLevel(Enum):
     """Validation thoroughness levels."""
@@ -44,9 +66,28 @@ class ValidationResult:
     warnings: List[str] = field(default_factory=list)
     stats: Dict[str, Any] = field(default_factory=dict)
 
+    # Lineage tracking fields
+    validator_name: str = VALIDATOR_NAME
+    validator_version: str = VALIDATOR_VERSION
+    generator_id: Optional[str] = None
+    generator_version: Optional[str] = None
+
     def should_proceed(self) -> bool:
         """Check if validation passed and can proceed."""
         return self.valid and len(self.errors) == 0
+
+    def to_lineage_report(self) -> Dict[str, Any]:
+        """Generate a report suitable for lineage tracking."""
+        return {
+            "valid": self.valid,
+            "validator_name": self.validator_name,
+            "validator_version": self.validator_version,
+            "generator_id": self.generator_id,
+            "generator_version": self.generator_version,
+            "error_count": len(self.errors),
+            "warning_count": len(self.warnings),
+            "stats": self.stats,
+        }
 
 
 class DataValidator:
@@ -86,7 +127,9 @@ class DataValidator:
         self,
         file_path: Path,
         level: ValidationLevel = ValidationLevel.STANDARD,
-        sample_size: int = 100
+        sample_size: int = 100,
+        generator_id: Optional[str] = None,
+        generator_version: Optional[str] = None,
     ) -> ValidationResult:
         """
         Validate a dataset file.
@@ -95,20 +138,35 @@ class DataValidator:
             file_path: Path to JSONL file
             level: How thorough to validate
             sample_size: Max samples for length analysis
+            generator_id: Optional generator ID for lineage tracking
+            generator_version: Optional generator version for lineage tracking
 
         Returns:
-            ValidationResult with errors, warnings, stats
+            ValidationResult with errors, warnings, stats, and lineage info
         """
         file_path = Path(file_path)
         errors = []
         warnings = []
         stats = {"file": str(file_path), "level": level.value}
 
+        # Try to read lineage from sidecar if not provided
+        if generator_id is None:
+            try:
+                from core.lineage import read_file_lineage
+                lineage = read_file_lineage(file_path)
+                if lineage:
+                    generator_id = lineage.generator_id
+                    generator_version = lineage.generator_version
+            except ImportError:
+                pass
+
         # Check file exists
         if not file_path.exists():
             return ValidationResult(
                 valid=False,
-                errors=[f"File not found: {file_path}"]
+                errors=[f"File not found: {file_path}"],
+                generator_id=generator_id,
+                generator_version=generator_version,
             )
 
         # Always check schema
@@ -137,7 +195,9 @@ class DataValidator:
             valid=valid,
             errors=errors,
             warnings=warnings,
-            stats=stats
+            stats=stats,
+            generator_id=generator_id,
+            generator_version=generator_version,
         )
 
     def _check_schema(self, file_path: Path) -> ValidationResult:
@@ -292,6 +352,11 @@ class DataValidator:
             warnings.extend(leakage_result.warnings)
             stats.update(leakage_result.stats)
 
+            # Run protocol conformance check (50% emoji mode)
+            protocol_result = self._check_protocol(examples)
+            warnings.extend(protocol_result.warnings)
+            stats["protocol_stats"] = protocol_result.stats
+
         except Exception as e:
             warnings.append(f"Content check failed: {e}")
 
@@ -372,6 +437,115 @@ class DataValidator:
             # Add first few examples as warnings
             for i, ex in enumerate(leakage_examples[:3]):
                 warnings.append(f"  Leakage example {i+1}: {ex['issues']}")
+
+        return ValidationResult(valid=True, warnings=warnings, stats=stats)
+
+    def _check_protocol(self, examples: List[Dict]) -> ValidationResult:
+        """
+        Check emoji protocol conformance (50% mode).
+
+        The protocol allows two valid modes:
+        1. EMOJI MODE: Thinking emoji at start AND stop emoji at end
+        2. DIRECT MODE: NO thinking emoji at start (stop emoji optional)
+
+        INVALID: Thinking emoji at start WITHOUT stop emoji at end (malformed)
+
+        This supports 50/50 training where half examples use emoji thinking
+        and half give direct answers without the thinking protocol.
+
+        Args:
+            examples: List of parsed example dicts
+
+        Returns:
+            ValidationResult with protocol stats
+        """
+        warnings = []
+        stats = {
+            "protocol_checked": 0,
+            "emoji_mode_valid": 0,
+            "direct_mode_valid": 0,
+            "malformed": 0,
+            "malformed_details": [],
+            "emoji_mode_pct": 0.0,
+            "direct_mode_pct": 0.0,
+        }
+
+        for idx, example in enumerate(examples):
+            messages = example.get("messages", [])
+
+            # Find assistant content
+            assistant_content = ""
+            for msg in messages:
+                if msg.get("role") == "assistant":
+                    assistant_content = msg.get("content", "")
+                    break
+
+            if not assistant_content:
+                continue
+
+            stats["protocol_checked"] += 1
+
+            # Check for thinking emoji at start
+            has_thinking = any(
+                assistant_content.strip().startswith(emoji)
+                for emoji in THINKING_EMOJIS
+            )
+
+            # Check for stop emoji sequence at end
+            has_stop = False
+            stripped_end = assistant_content.rstrip()
+            for emoji in STOP_EMOJIS:
+                for count in range(STOP_COUNT_MIN, STOP_COUNT_MAX + 1):
+                    if stripped_end.endswith(emoji * count):
+                        has_stop = True
+                        break
+                if has_stop:
+                    break
+
+            # Classify
+            if has_thinking and has_stop:
+                # Valid emoji mode
+                stats["emoji_mode_valid"] += 1
+            elif not has_thinking:
+                # Valid direct mode (no thinking = direct answer)
+                stats["direct_mode_valid"] += 1
+            else:
+                # Malformed: has thinking but no stop
+                stats["malformed"] += 1
+                if len(stats["malformed_details"]) < 5:
+                    stats["malformed_details"].append({
+                        "idx": idx,
+                        "preview": assistant_content[:100],
+                        "issue": "thinking_without_stop"
+                    })
+
+        # Calculate percentages
+        total = stats["protocol_checked"]
+        if total > 0:
+            stats["emoji_mode_pct"] = round(stats["emoji_mode_valid"] / total * 100, 1)
+            stats["direct_mode_pct"] = round(stats["direct_mode_valid"] / total * 100, 1)
+
+        # Generate warnings
+        if stats["malformed"] > 0:
+            pct = stats["malformed"] / max(total, 1) * 100
+            warnings.append(
+                f"PROTOCOL MALFORMED: {stats['malformed']}/{total} ({pct:.1f}%) "
+                f"examples have thinking emoji without stop emoji"
+            )
+
+        # Warn if mix is heavily skewed (should be ~50/50)
+        emoji_pct = stats["emoji_mode_pct"]
+        if total >= 20:  # Only warn with enough samples
+            if emoji_pct < 30:
+                warnings.append(
+                    f"Protocol mix skewed: only {emoji_pct}% emoji mode "
+                    f"(expected ~50%). Consider balancing."
+                )
+            elif emoji_pct > 70:
+                warnings.append(
+                    f"Protocol mix skewed: {emoji_pct}% emoji mode "
+                    f"(expected ~50%). Consider adding direct examples."
+                )
 
         return ValidationResult(valid=True, warnings=warnings, stats=stats)
 

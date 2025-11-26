@@ -4,6 +4,66 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-11-26 - Data Lineage System
+
+### Overview
+Track generator and validator provenance for all training data. Answers questions like:
+- "Which generator produces the most rejections?"
+- "Did quality drop after generator version bump?"
+- "Which validator is most aggressive?"
+
+### New Files
+- `core/lineage.py` - Generator registry + FileLineage dataclass + sidecar I/O utilities
+- `core/lineage_tracker.py` - LineageTracker class for aggregating per-generator/validator stats
+
+### Generator Versioning
+Added `GENERATOR_ID` and `GENERATOR_VERSION` constants to:
+- `monitoring/discrimination_generator.py` - `discrimination@1.0.0`
+- `data_manager/generators/syllogism_generator.py` - `syllo_local@1.0.0`
+
+Generators now write `.meta.json` sidecar files alongside JSONL output:
+```json
+{
+  "generator_id": "discrimination",
+  "generator_version": "1.0.0",
+  "generated_at": "2025-11-26T...",
+  "example_count": 100,
+  "params": {"levels": [1], "difficulty": "L1"}
+}
+```
+
+### Validator Versioning
+Added `VALIDATOR_NAME` and `VALIDATOR_VERSION` constants to:
+- `core/validation/validator.py` - `data_validator@1.0.0`
+- `core/validation/spec.py` - `spec_validator@1.0.0`
+
+`ValidationResult` extended with lineage fields: `generator_id`, `generator_version`, `validator_name`, `validator_version`
+
+### Lineage Tracking Integration
+- `core/training_daemon.py` - Integrated LineageTracker, records validation outcomes
+- Stats persisted to `status/data_lineage.json`
+
+### Dashboard & API
+- New `/api/lineage` endpoint in `monitoring/api/server.py`
+- New "Data Lineage" card in `monitoring/ui/master_dashboard.html`
+- CSS styles in `monitoring/css/master_dashboard.css`
+- JS functions `fetchDataLineage()` and `updateDataLineage()` in `monitoring/js/master_dashboard.js`
+
+### Usage
+```bash
+# View lineage stats via API
+curl http://localhost:8081/api/lineage | jq .
+
+# View in dashboard
+http://localhost:8081/master_dashboard.html  # Data Lineage card in left column
+
+# Bump generator version when logic changes
+# In monitoring/discrimination_generator.py:
+GENERATOR_VERSION = "1.1.0"  # Was "1.0.0"
+```
+
+---
+
 ## 2025-11-25 - Synology NAS Storage Integration
 
 ### New Storage Module

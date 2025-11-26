@@ -781,6 +781,23 @@ body {
     background: linear-gradient(90deg, var(--color-danger), #dc2626);
 }
 
+/* Level-based bars (L1-L5+) */
+.diff-l1 {
+    background: linear-gradient(90deg, #22c55e, #16a34a) !important;
+}
+.diff-l2 {
+    background: linear-gradient(90deg, #84cc16, #65a30d) !important;
+}
+.diff-l3 {
+    background: linear-gradient(90deg, #eab308, #ca8a04) !important;
+}
+.diff-l4 {
+    background: linear-gradient(90deg, #f97316, #ea580c) !important;
+}
+.diff-l5 {
+    background: linear-gradient(90deg, #ef4444, #dc2626) !important;
+}
+
 .diff-bar-container .diff-pct {
     position: absolute;
     right: 8px;
@@ -2224,4 +2241,211 @@ body {
 
 .queue-file:hover .queue-file-name {
     text-decoration-color: var(--color-info);
+}
+
+/* ====================================
+   DATA HEALTH CARD (Protocol Conformance)
+   ==================================== */
+
+.card-data-health {
+    border-left: 3px solid var(--color-info);
+}
+
+.card-data-health .card-header h3 {
+    color: var(--color-info);
+}
+
+/* Protocol mix stacked bar */
+.protocol-mix-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 0.75rem;
+    background: var(--bg-dark);
+}
+
+.protocol-emoji-bar {
+    background: linear-gradient(90deg, #a855f7, #d946ef);
+    transition: width 0.5s ease;
+}
+
+.protocol-direct-bar {
+    background: linear-gradient(90deg, #06b6d4, #3b82f6);
+    transition: width 0.5s ease;
+}
+
+.protocol-legend {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.legend-emoji::before {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background: linear-gradient(90deg, #a855f7, #d946ef);
+    border-radius: 2px;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+}
+
+.legend-direct::before {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background: linear-gradient(90deg, #06b6d4, #3b82f6);
+    border-radius: 2px;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+}
+
+/* Data health status colors */
+#dataHealthIndicator.healthy {
+    color: var(--color-success);
+}
+
+#dataHealthIndicator.warning {
+    color: var(--color-warning);
+}
+
+#dataHealthIndicator.critical {
+    color: var(--color-danger);
+}
+
+#protocolMalformed.has-errors {
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+/* ====================================
+   DATA LINEAGE CARD
+   ==================================== */
+
+.card-lineage {
+    border-left: 3px solid #f97316; /* orange */
+}
+
+.card-lineage .card-header h3 {
+    color: #f97316;
+}
+
+.lineage-summary {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.lineage-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.lineage-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.lineage-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+}
+
+.lineage-tables {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.lineage-section h4 {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.35rem;
+}
+
+.lineage-table {
+    width: 100%;
+    font-size: 0.75rem;
+    border-collapse: collapse;
+}
+
+.lineage-table th {
+    text-align: left;
+    padding: 0.25rem 0.35rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.lineage-table td {
+    padding: 0.25rem 0.35rem;
+    border-bottom: 1px solid var(--border-subtle);
+    font-family: var(--font-mono);
+}
+
+.lineage-table td.empty-row {
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+    font-family: inherit;
+}
+
+.lineage-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Fail rate coloring */
+.lineage-table .fail-rate-ok {
+    color: var(--color-success);
+}
+
+.lineage-table .fail-rate-warn {
+    color: var(--color-warning);
+}
+
+.lineage-table .fail-rate-bad {
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+.lineage-worst {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(249, 115, 22, 0.1);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: #f97316;
+    display: none; /* Hidden by default, shown by JS */
+}
+
+.lineage-worst.visible {
+    display: block;
+}
+
+#lineageIndicator.healthy {
+    color: var(--color-success);
+}
+
+#lineageIndicator.warning {
+    color: var(--color-warning);
+}
+
+#lineageIndicator.critical {
+    color: var(--color-danger);
 }

@@ -522,38 +522,60 @@
             </div>
         </div>
 
-        <!-- Difficulty Breakdown Card (Base Model) -->
+        <!-- 10-Level Performance Card -->
         <div class="card">
             <div class="card-header">
-                <h3>🎯 Base Model by Difficulty</h3>
+                <h3>🎯 10-Level Baseline Evaluation</h3>
+                <span class="status-badge" id="levelBadge">--</span>
             </div>
             <div class="card-body">
-                <div id="baseDiffContainer">
+                <div id="levelBarsContainer">
                     <div class="diff-row">
-                        <span class="diff-label">Easy</span>
+                        <span class="diff-label">L1</span>
                         <div class="diff-bar-outer">
-                            <div class="diff-bar-inner easy" id="baseEasyBar" style="width: 0%"></div>
+                            <div class="diff-bar-inner" id="barL1" style="width: 0%; background: linear-gradient(90deg, #10b981, #34d399);"></div>
                         </div>
-                        <span class="diff-value" id="baseEasy">--%</span>
+                        <span class="diff-value" id="accL1">--%</span>
                     </div>
                     <div class="diff-row">
-                        <span class="diff-label">Medium</span>
+                        <span class="diff-label">L2</span>
                         <div class="diff-bar-outer">
-                            <div class="diff-bar-inner medium" id="baseMediumBar" style="width: 0%"></div>
+                            <div class="diff-bar-inner" id="barL2" style="width: 0%; background: linear-gradient(90deg, #22c55e, #4ade80);"></div>
                         </div>
-                        <span class="diff-value" id="baseMedium">--%</span>
+                        <span class="diff-value" id="accL2">--%</span>
                     </div>
                     <div class="diff-row">
-                        <span class="diff-label">Hard</span>
+                        <span class="diff-label">L3</span>
                         <div class="diff-bar-outer">
-                            <div class="diff-bar-inner hard" id="baseHardBar" style="width: 0%"></div>
+                            <div class="diff-bar-inner" id="barL3" style="width: 0%; background: linear-gradient(90deg, #84cc16, #a3e635);"></div>
                         </div>
-                        <span class="diff-value" id="baseHard">--%</span>
+                        <span class="diff-value" id="accL3">--%</span>
+                    </div>
+                    <div class="diff-row">
+                        <span class="diff-label">L4</span>
+                        <div class="diff-bar-outer">
+                            <div class="diff-bar-inner" id="barL4" style="width: 0%; background: linear-gradient(90deg, #eab308, #facc15);"></div>
+                        </div>
+                        <span class="diff-value" id="accL4">--%</span>
+                    </div>
+                    <div class="diff-row">
+                        <span class="diff-label">L5</span>
+                        <div class="diff-bar-outer">
+                            <div class="diff-bar-inner" id="barL5" style="width: 0%; background: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
+                        </div>
+                        <span class="diff-value" id="accL5">--%</span>
+                    </div>
+                    <div class="diff-row">
+                        <span class="diff-label">L6-10</span>
+                        <div class="diff-bar-outer">
+                            <div class="diff-bar-inner" id="barL6plus" style="width: 0%; background: linear-gradient(90deg, #ef4444, #f87171);"></div>
+                        </div>
+                        <span class="diff-value" id="accL6plus">--%</span>
                     </div>
                 </div>
 
-                <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);">
-                    Base model: 90 total tests (30 per difficulty)
+                <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);" id="levelEvalMeta">
+                    200 total puzzles (20 per level)
                 </div>
             </div>
         </div>
@@ -693,6 +715,37 @@
                 </div>
             </div>
         </div>
+
+        <!-- L1 Generator Status Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>⚙️ L1 Data Generator</h3>
+                <span class="status-badge" id="genBadge">--</span>
+            </div>
+            <div class="card-body">
+                <div class="queue-stats" style="grid-template-columns: repeat(2, 1fr);">
+                    <div class="queue-stat">
+                        <div class="queue-value" id="genStatus">--</div>
+                        <div class="queue-label">Daemon Status</div>
+                    </div>
+                    <div class="queue-stat">
+                        <div class="queue-value" id="genLastCount">--</div>
+                        <div class="queue-label">Last Batch</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,255,255,0.02); border-radius: 6px;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Last Generation:</div>
+                    <div style="font-size: 0.85rem; margin-top: 0.25rem;" id="genLastFile">--</div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;" id="genLastTime">--</div>
+                </div>
+
+                <div class="info-box" style="margin-top: 0.75rem;">
+                    Generates 1000 L1 examples when queue drops below 2 files.
+                    Uses correct prompt+solution format (matched JSON variants).
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Footer -->
@@ -740,7 +793,15 @@
                     if (currResp.ok) curriculumState = await currResp.json();
                 } catch (e) { /* ignore */ }
 
+                // Fetch generator status
+                let generatorStatus = null;
+                try {
+                    const genResp = await fetch(`${API_BASE}/api/syllo-generator`);
+                    if (genResp.ok) generatorStatus = await genResp.json();
+                } catch (e) { /* ignore */ }
+
                 updateUI(unified, queueData, curriculumState);
+                updateGeneratorUI(generatorStatus);
 
             } catch (err) {
                 console.error('Fetch error:', err);
@@ -751,53 +812,67 @@
 
         function updateUI(unified, queueData, curriculumState) {
             const skillMetrics = unified.sources?.skill_metrics?.data;
+            const syllo10Level = skillMetrics?.syllo_10level;
 
-            // Update SYLLO data
-            if (skillMetrics) {
-                const baseData = skillMetrics.skills?.syllable?.base;
-                const trainedData = skillMetrics.skills?.syllable?.trained;
+            // Update SYLLO 10-level data
+            if (syllo10Level?.available) {
+                const overallAcc = syllo10Level.overall_accuracy ?? 0;
+                const modelId = syllo10Level.model_id || 'unknown';
+                const byLevel = syllo10Level.by_level || {};
 
-                const baseAcc = baseData?.overall_accuracy ?? 0;
-                const trainedAcc = trainedData?.overall_accuracy ?? 0;
-                const hasTrainedEval = trainedData?.available ?? false;
+                // Hero stats - use 10-level overall accuracy
+                document.getElementById('heroAccuracy').textContent = `${overallAcc.toFixed(1)}%`;
+                document.getElementById('baseAcc').textContent = `${overallAcc.toFixed(1)}%`;
+                document.getElementById('heroTrained').textContent = `${overallAcc.toFixed(1)}%`;
+                document.getElementById('trainedAcc').textContent = `${overallAcc.toFixed(1)}%`;
+                document.getElementById('trainedName').textContent = modelId;
 
-                // Hero stats
-                document.getElementById('heroAccuracy').textContent = `${baseAcc.toFixed(1)}%`;
-                document.getElementById('baseAcc').textContent = `${baseAcc.toFixed(1)}%`;
+                // No delta for now since we compare trained model to itself
+                document.getElementById('heroDelta').textContent = '--';
+                document.getElementById('heroDelta').className = 'hero-value neutral';
+                document.getElementById('noEvalWarning').style.display = 'none';
+                document.getElementById('dataBadge').textContent = 'HAS DATA';
+                document.getElementById('dataBadge').className = 'status-badge has-data';
 
-                if (hasTrainedEval) {
-                    document.getElementById('heroTrained').textContent = `${trainedAcc.toFixed(1)}%`;
-                    document.getElementById('trainedAcc').textContent = `${trainedAcc.toFixed(1)}%`;
-                    const delta = trainedAcc - baseAcc;
-                    document.getElementById('heroDelta').textContent = delta >= 0 ? `+${delta.toFixed(1)}%` : `${delta.toFixed(1)}%`;
-                    document.getElementById('heroDelta').className = delta >= 0 ? 'hero-value positive' : 'hero-value negative';
-                    document.getElementById('noEvalWarning').style.display = 'none';
-                    document.getElementById('dataBadge').textContent = 'HAS DATA';
-                    document.getElementById('dataBadge').className = 'status-badge has-data';
-                } else {
-                    document.getElementById('heroTrained').textContent = '--';
-                    document.getElementById('heroTrained').className = 'hero-value neutral';
-                    document.getElementById('trainedAcc').textContent = '--';
-                    document.getElementById('heroDelta').textContent = 'N/A';
-                    document.getElementById('heroDelta').className = 'hero-value neutral';
-                    document.getElementById('noEvalWarning').style.display = 'block';
-                    document.getElementById('dataBadge').textContent = 'NO TRAINED EVAL';
-                    document.getElementById('dataBadge').className = 'status-badge stale';
+                // 10-level bars
+                for (let i = 1; i <= 5; i++) {
+                    const levelData = byLevel[`L${i}`] || {};
+                    const acc = levelData.accuracy ?? 0;
+                    const bar = document.getElementById(`barL${i}`);
+                    const val = document.getElementById(`accL${i}`);
+                    if (bar) bar.style.width = `${acc}%`;
+                    if (val) val.textContent = `${acc.toFixed(0)}%`;
                 }
 
-                // Trained model name
-                const trainedTag = skillMetrics.trained_model?.tag || 'Not evaluated';
-                document.getElementById('trainedName').textContent = trainedTag;
-
-                // Base difficulty breakdown
-                const baseDiff = baseData?.by_difficulty || {};
-                for (const diff of ['easy', 'medium', 'hard']) {
-                    const acc = baseDiff[diff]?.accuracy ?? 0;
-                    document.getElementById(`base${capitalize(diff)}Bar`).style.width = `${acc}%`;
-                    document.getElementById(`base${capitalize(diff)}`).textContent = `${acc.toFixed(1)}%`;
+                // L6-10 combined
+                let l6plusTotal = 0, l6plusCorrect = 0;
+                for (let i = 6; i <= 10; i++) {
+                    const ld = byLevel[`L${i}`] || {};
+                    l6plusTotal += ld.total || 0;
+                    l6plusCorrect += ld.correct || 0;
                 }
+                const l6plusAcc = l6plusTotal > 0 ? (l6plusCorrect / l6plusTotal * 100) : 0;
+                document.getElementById('barL6plus').style.width = `${l6plusAcc}%`;
+                document.getElementById('accL6plus').textContent = `${l6plusAcc.toFixed(0)}%`;
 
-                // Primitives table
+                document.getElementById('levelBadge').textContent = modelId;
+                document.getElementById('levelBadge').className = 'status-badge has-data';
+                document.getElementById('levelEvalMeta').textContent =
+                    `${syllo10Level.total_puzzles || 200} puzzles · ${syllo10Level.timestamp ? formatEvalTime(syllo10Level.timestamp) : '--'}`;
+
+            } else {
+                // No 10-level data
+                document.getElementById('heroAccuracy').textContent = '--%';
+                document.getElementById('heroTrained').textContent = '--%';
+                document.getElementById('dataBadge').textContent = 'NO DATA';
+                document.getElementById('dataBadge').className = 'status-badge no-data';
+                document.getElementById('noEvalWarning').style.display = 'block';
+                document.getElementById('levelBadge').textContent = 'NO EVAL';
+                document.getElementById('levelBadge').className = 'status-badge stale';
+            }
+
+            // Primitives table
+            if (skillMetrics?.skills) {
                 updatePrimitivesTable(skillMetrics.skills);
             }
 
@@ -919,6 +994,43 @@
             if (diffMins < 60) return `${diffMins}m ago`;
             if (diffHours < 24) return `${diffHours}h ago`;
             return date.toLocaleDateString();
+        }
+
+        // ===== Generator Status Functions =====
+        function updateGeneratorUI(genData) {
+            if (!genData) {
+                document.getElementById('genStatus').textContent = '?';
+                document.getElementById('genBadge').textContent = 'UNKNOWN';
+                document.getElementById('genBadge').className = 'status-badge stale';
+                return;
+            }
+
+            // Daemon status
+            if (genData.daemon_running) {
+                document.getElementById('genStatus').textContent = '🟢 Running';
+                document.getElementById('genStatus').style.color = '#10b981';
+                document.getElementById('genBadge').textContent = 'ACTIVE';
+                document.getElementById('genBadge').className = 'status-badge has-data';
+            } else {
+                document.getElementById('genStatus').textContent = '🔴 Stopped';
+                document.getElementById('genStatus').style.color = '#ef4444';
+                document.getElementById('genBadge').textContent = 'STOPPED';
+                document.getElementById('genBadge').className = 'status-badge no-data';
+            }
+
+            // Last generation info
+            const lastGen = genData.last_generation;
+            if (lastGen) {
+                document.getElementById('genLastCount').textContent = lastGen.count?.toLocaleString() || '--';
+                document.getElementById('genLastFile').textContent = lastGen.file || '--';
+                document.getElementById('genLastTime').textContent = lastGen.timestamp
+                    ? formatEvalTime(lastGen.timestamp)
+                    : '--';
+            } else {
+                document.getElementById('genLastCount').textContent = '--';
+                document.getElementById('genLastFile').textContent = 'No generations yet';
+                document.getElementById('genLastTime').textContent = '--';
+            }
         }
 
         // ===== Queue Interactive Functions =====

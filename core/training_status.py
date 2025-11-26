@@ -664,6 +664,9 @@ class TrainingStatus:
     logit_penalty_stats: Optional[List[Dict]] = None  # Penalty hit counters
     penalty_heatmap: Optional[Dict] = None            # Aggregated penalty distribution
 
+    # NEW: Protocol conformance stats (50% emoji mode)
+    protocol_stats: Optional[Dict] = None             # Emoji/direct mode validation stats
+
     # NEW: Output length tracking
     max_golden_output_length: Optional[int] = None  # Max golden output length seen (tokens)
     max_model_output_length: Optional[int] = None   # Max model output length seen (tokens)
@@ -785,6 +788,7 @@ class TrainingStatusWriter:
         self.vram_samples = []
         self.penalty_stats_snapshot = None
         self.layer_stability_summary = None
+        self.protocol_stats_snapshot = None  # Protocol conformance (50% emoji mode)
         # Append-only log for inference previews
         self.inference_log_dir = self.status_file.parent / "logs"
         self.inference_log_dir.mkdir(parents=True, exist_ok=True)
@@ -931,6 +935,7 @@ class TrainingStatusWriter:
         queue_velocity: Optional[Dict] = None,
         logit_penalty_stats: Optional[List[Dict]] = None,
         penalty_heatmap: Optional[Dict] = None,
+        protocol_stats: Optional[Dict] = None,
     ):
         """Update basic training progress (preserves last inference data)."""
         accuracy_pct = (self.total_correct / self.total_evals * 100) if self.total_evals > 0 else 0.0
@@ -949,6 +954,8 @@ class TrainingStatusWriter:
             self.penalty_stats_snapshot = logit_penalty_stats
         if penalty_heatmap is not None:
             self.penalty_heatmap = penalty_heatmap
+        if protocol_stats is not None:
+            self.protocol_stats_snapshot = protocol_stats
 
         status = TrainingStatus(
             status="training",
@@ -1001,6 +1008,7 @@ class TrainingStatusWriter:
             throughput_vram_samples=self.vram_samples or None,
             queue_velocity=self.queue_velocity_snapshot,
             logit_penalty_stats=self.penalty_stats_snapshot,
+            protocol_stats=self.protocol_stats_snapshot,
         )
         self.write(status)
 
@@ -1150,6 +1158,7 @@ class TrainingStatusWriter:
             throughput_vram_samples=self.vram_samples or None,
             queue_velocity=self.queue_velocity_snapshot,
             logit_penalty_stats=self.penalty_stats_snapshot,
+            protocol_stats=self.protocol_stats_snapshot,
         )
         self.write(status)
 

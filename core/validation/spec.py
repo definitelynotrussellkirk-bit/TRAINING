@@ -34,6 +34,13 @@ from typing import Callable, Dict, List, Literal, Optional, Any
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# DATA LINEAGE - Validator identification for tracking
+# =============================================================================
+# Bump SPEC_VALIDATOR_VERSION when validation logic changes significantly
+VALIDATOR_NAME = "spec_validator"
+VALIDATOR_VERSION = "1.0.0"
+
 
 class SpecValidationError(Exception):
     """Raised when spec validation fails. Job should not proceed."""
@@ -279,6 +286,13 @@ class SpecValidator:
     def list_specs(self) -> List[str]:
         """List all registered spec IDs."""
         return list(self._registry.keys())
+
+    def get_lineage_info(self) -> Dict[str, str]:
+        """Return validator lineage info for tracking."""
+        return {
+            "validator_name": VALIDATOR_NAME,
+            "validator_version": VALIDATOR_VERSION,
+        }
 
 
 def extract_dataset_metadata(dataset_path: Path) -> Dict:

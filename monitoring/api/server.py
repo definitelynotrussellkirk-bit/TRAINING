@@ -90,6 +90,8 @@ def index():
             '/api/sources': 'List available data sources',
             '/api/cache/clear': 'Clear all plugin caches (POST)',
             '/api/queue': 'Get training queue status and pipeline info',
+            '/api/curriculum-state': 'Get curriculum progression state',
+            '/api/lineage': 'Get data lineage stats (per-generator/validator rejection rates)',
         },
         'machines': {
             '4090': 'Training machine (local)',
@@ -423,6 +425,105 @@ def api_curriculum_state():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/syllo-generator')
+def api_syllo_generator():
+    """
+    Get SYLLO L1 generator daemon status.
+
+    Returns last generation info and daemon status.
+    """
+    try:
+        import subprocess
+        status_file = Path('/path/to/training/status/syllo_l1_generator.json')
+        pid_file = Path('/path/to/training/.pids/syllo_l1_generator.pid')
+
+        result = {
+            'daemon_running': False,
+            'pid': None,
+            'last_generation': None
+        }
+
+        # Check if daemon is running
+        if pid_file.exists():
+            pid = pid_file.read_text().strip()
+            try:
+                # Check if process exists
+                subprocess.run(['kill', '-0', pid], check=True, capture_output=True)
+                result['daemon_running'] = True
+                result['pid'] = int(pid)
+            except subprocess.CalledProcessError:
+                pass
+
+        # Load last generation info
+        if status_file.exists():
+            with open(status_file) as f:
+                status = json.load(f)
+            result['last_generation'] = status.get('last_generation')
+            result['generator_id'] = status.get('generator_id')
+            result['generator_version'] = status.get('generator_version')
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error in /api/syllo-generator: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/lineage')
+def api_lineage():
+    """
+    Get data lineage statistics.
+
+    Returns per-generator and per-validator validation stats to answer:
+    - Which generator produces the most rejections?
+    - Which validator is most aggressive?
+    - What are the top error reasons?
+
+    Response:
+    {
+        "total_validations": 1234,
+        "last_updated": "2025-11-26T...",
+        "generators": {
+            "discrimination@1.0.0": {"total": 100, "passed": 95, "failed": 5, ...},
+            ...
+        },
+        "validators": {
+            "data_validator@1.0.0": {"total": 1000, "passed": 950, ...},
+            ...
+        },
+        "summary": {
+            "worst_generator": {"id": "...", "fail_rate": 5.0},
+            "worst_validator": {"id": "...", "fail_rate": 2.0},
+            "overall_fail_rate": 3.5
+        }
+    }
+    """
+    try:
+        lineage_file = Path('/path/to/training/status/data_lineage.json')
+        if lineage_file.exists():
+            with open(lineage_file) as f:
+                lineage = json.load(f)
+            return jsonify(lineage)
+        else:
+            # Return empty structure if no data yet
+            return jsonify({
+                'total_validations': 0,
+                'last_updated': None,
+                'generators': {},
+                'validators': {},
+                'summary': {
+                    'total_generators': 0,
+                    'total_validators': 0,
+                    'worst_generator': None,
+                    'worst_validator': None,
+                    'overall_fail_rate': 0.0
+                }
+            })
+    except Exception as e:
+        logger.error(f"Error in /api/lineage: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.errorhandler(404)
 def not_found(e):
     """Handle 404 errors"""
@@ -435,7 +536,8 @@ def not_found(e):
             '/api/sources',
             '/api/cache/clear',
             '/api/queue',
-            '/api/curriculum-state'
+            '/api/curriculum-state',
+            '/api/lineage'
         ]
     }), 404
 

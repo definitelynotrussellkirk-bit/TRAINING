@@ -39,6 +39,13 @@ except ImportError:
     def get_base_dir():
         return Path("/path/to/training")
 
+# =============================================================================
+# DATA LINEAGE - Generator identification for tracking
+# =============================================================================
+# Bump GENERATOR_VERSION when generation logic changes significantly
+GENERATOR_ID = "discrimination"
+GENERATOR_VERSION = "1.0.0"
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,6 +81,16 @@ class DiscriminationGenerator:
         self.curriculum_level = self._get_curriculum_level()
         self.levels = self._get_levels()
         self.generated_puzzles = set()  # Track to avoid duplicates
+
+    @property
+    def difficulty(self) -> str:
+        """Get difficulty string from levels for filenames/logging."""
+        if len(self.levels) == 1:
+            return f"L{self.levels[0]}"
+        elif len(self.levels) == 10:
+            return "all"
+        else:
+            return f"L{min(self.levels)}-{max(self.levels)}"
 
     def _get_curriculum_level(self) -> int:
         """Read current SYLLO level from curriculum state"""
@@ -431,7 +448,7 @@ Did the model answer correctly?"""
         return examples
 
     def save_batch(self, examples: list, priority: str = "high") -> Path:
-        """Save batch to queue"""
+        """Save batch to queue with lineage metadata."""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"discrimination_{self.difficulty}_{timestamp}.jsonl"
 
@@ -445,7 +462,34 @@ Did the model answer correctly?"""
                 f.write(json.dumps(ex) + '\n')
 
         logger.info(f"Saved {len(examples)} examples to {output_path}")
+
+        # Write lineage metadata sidecar
+        self._write_lineage_metadata(output_path, len(examples))
+
         return output_path
+
+    def _write_lineage_metadata(self, output_path: Path, example_count: int):
+        """Write .meta.json sidecar for data lineage tracking."""
+        try:
+            from core.lineage import FileLineage, write_file_lineage
+
+            lineage = FileLineage(
+                generator_id=GENERATOR_ID,
+                generator_version=GENERATOR_VERSION,
+                example_count=example_count,
+                params={
+                    "levels": self.levels,
+                    "curriculum_level": self.curriculum_level,
+                    "difficulty": self.difficulty,
+                },
+                source="monitoring/discrimination_generator.py",
+            )
+            write_file_lineage(output_path, lineage)
+            logger.info(f"Wrote lineage metadata: {output_path}.meta.json")
+        except ImportError:
+            logger.debug("core.lineage not available, skipping metadata write")
+        except Exception as e:
+            logger.warning(f"Failed to write lineage metadata: {e}")
 
     def write_status(self, generated_count: int, output_path: Path = None):
         """Write status to status/discrimination_generator.json for dashboard"""

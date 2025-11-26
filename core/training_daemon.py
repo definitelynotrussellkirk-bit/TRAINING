@@ -89,6 +89,9 @@ from daemon.snapshot_service import SnapshotService, SnapshotConfig
 from validation.validator import DataValidator, ValidationLevel
 from validation.spec import SpecValidator, SpecValidationError, DATASET_SPECS
 
+# Data lineage tracking
+from lineage_tracker import LineageTracker
+
 # Checkpoint retention (new system)
 from retention_service import RetentionService
 
@@ -278,6 +281,9 @@ class TrainingDaemon:
 
         # Data file impact tracker (Phase 4)
         self.impact_tracker = DataFileImpactTracker(self.base_dir / "status")
+
+        # Data lineage tracker (tracks validation outcomes by generator/validator)
+        self.lineage_tracker = LineageTracker(self.base_dir / "status")
 
         # Register signal handlers
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -633,6 +639,10 @@ class TrainingDaemon:
         rejected = 0
         for inbox_file in self.get_inbox_files():
             result = self.quick_validator.validate(inbox_file, ValidationLevel.QUICK)
+
+            # Record validation result for lineage tracking
+            self.lineage_tracker.record_from_result(result)
+
             if not result.should_proceed():
                 # Move to failed queue immediately
                 error_msg = "; ".join(result.errors[:3])  # First 3 errors

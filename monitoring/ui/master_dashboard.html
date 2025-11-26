@@ -191,6 +191,97 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Data Health Card (Protocol Conformance) -->
+            <div class="card card-data-health">
+                <div class="card-header">
+                    <h3>📋 Data Health</h3>
+                    <div class="status-indicator" id="dataHealthIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="metric-grid">
+                        <div class="metric-item">
+                            <span class="metric-label" data-tooltip="Percentage of examples using emoji thinking protocol (💭...🔚). Target: ~50%.">Emoji Mode</span>
+                            <span class="metric-value" id="protocolEmojiPct">--%</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label" data-tooltip="Percentage of examples with direct answers (no thinking markers). Target: ~50%.">Direct Mode</span>
+                            <span class="metric-value" id="protocolDirectPct">--%</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label" data-tooltip="Examples with thinking emoji but missing stop emoji. Should be 0.">Malformed</span>
+                            <span class="metric-value" id="protocolMalformed">--</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label" data-tooltip="Total examples checked for protocol conformance.">Checked</span>
+                            <span class="metric-value" id="protocolChecked">--</span>
+                        </div>
+                    </div>
+                    <div class="protocol-mix-bar">
+                        <div class="protocol-emoji-bar" id="protocolEmojiBar" style="width: 50%"></div>
+                        <div class="protocol-direct-bar" id="protocolDirectBar" style="width: 50%"></div>
+                    </div>
+                    <div class="protocol-legend">
+                        <span class="legend-emoji">💭 Emoji</span>
+                        <span class="legend-direct">📝 Direct</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Lineage Card (Generator/Validator Stats) -->
+            <div class="card card-lineage">
+                <div class="card-header">
+                    <h3>🔗 Data Lineage</h3>
+                    <div class="status-indicator" id="lineageIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="lineage-summary">
+                        <div class="lineage-stat">
+                            <span class="lineage-label">Total Validations</span>
+                            <span class="lineage-value" id="lineageTotalValidations">--</span>
+                        </div>
+                        <div class="lineage-stat">
+                            <span class="lineage-label">Overall Fail Rate</span>
+                            <span class="lineage-value" id="lineageOverallFailRate">--%</span>
+                        </div>
+                    </div>
+                    <div class="lineage-tables">
+                        <div class="lineage-section">
+                            <h4>Generators</h4>
+                            <table class="lineage-table" id="generatorTable">
+                                <thead>
+                                    <tr>
+                                        <th>Generator</th>
+                                        <th>Total</th>
+                                        <th>Fail %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="generatorTableBody">
+                                    <tr><td colspan="3" class="empty-row">No data yet</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="lineage-section">
+                            <h4>Validators</h4>
+                            <table class="lineage-table" id="validatorTable">
+                                <thead>
+                                    <tr>
+                                        <th>Validator</th>
+                                        <th>Total</th>
+                                        <th>Fail %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="validatorTableBody">
+                                    <tr><td colspan="3" class="empty-row">No data yet</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="lineage-worst" id="lineageWorst">
+                        <!-- Populated by JS if there's a problematic generator/validator -->
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- CENTER COLUMN: INTELLIGENCE SYSTEMS 1 (3090) -->
@@ -240,19 +331,19 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Legacy Accuracy Display -->
+                    <!-- 10-Level Accuracy Display -->
                     <div class="intel-metrics" style="margin-top: 0.5rem;">
                         <div class="intel-stat">
-                            <span class="intel-label" data-tooltip="Model accuracy on easy difficulty problems. Target: >80%.">Easy</span>
-                            <span class="intel-value intel-easy" id="curriculumEasy">--%</span>
+                            <span class="intel-label" data-tooltip="Level 1: 4 words, definitions only. Target: >80%">L1</span>
+                            <span class="intel-value intel-easy" id="curriculumL1">--%</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label" data-tooltip="Model accuracy on medium difficulty problems. Target: >70%.">Med</span>
-                            <span class="intel-value intel-medium" id="curriculumMedium">--%</span>
+                            <span class="intel-label" data-tooltip="Level 2: 4-5 words, synonyms. Target: >70%">L2</span>
+                            <span class="intel-value intel-easy" id="curriculumL2">--%</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label" data-tooltip="Model accuracy on hard difficulty problems. Target: >60%.">Hard</span>
-                            <span class="intel-value intel-hard" id="curriculumHard">--%</span>
+                            <span class="intel-label" data-tooltip="Level 3-4: 5-6 words, overlap, categories">L3-4</span>
+                            <span class="intel-value intel-medium" id="curriculumL34">--%</span>
                         </div>
                         <div class="intel-stat">
                             <span class="intel-label" data-tooltip="Training step at which this evaluation was performed.">Step</span>
@@ -378,27 +469,41 @@
                             <span class="delta-label" data-tooltip="Improvement over base model (Qwen3-0.6B untrained)">vs base</span>
                         </div>
                     </div>
-                    <div class="skill-difficulty-bars">
+                    <div class="skill-difficulty-bars skill-level-bars">
                         <div class="difficulty-row">
-                            <span class="diff-label" data-tooltip="4-5 word puzzles, unique syllables, no red herrings">Easy</span>
+                            <span class="diff-label" data-tooltip="4 words, definitions only, 0% overlap">L1</span>
                             <div class="diff-bar-container">
-                                <div class="diff-bar diff-easy" id="syllableEasyBar" style="width: 0%"></div>
+                                <div class="diff-bar diff-l1" id="syllableL1Bar" style="width: 0%"></div>
                             </div>
-                            <span class="diff-value" id="syllableEasy">--%</span>
+                            <span class="diff-value" id="syllableL1">--%</span>
                         </div>
                         <div class="difficulty-row">
-                            <span class="diff-label" data-tooltip="5-6 word puzzles, some overlap, 1-2 red herrings">Medium</span>
+                            <span class="diff-label" data-tooltip="4-5 words, definitions+synonyms">L2</span>
                             <div class="diff-bar-container">
-                                <div class="diff-bar diff-medium" id="syllableMediumBar" style="width: 0%"></div>
+                                <div class="diff-bar diff-l2" id="syllableL2Bar" style="width: 0%"></div>
                             </div>
-                            <span class="diff-value" id="syllableMedium">--%</span>
+                            <span class="diff-value" id="syllableL2">--%</span>
                         </div>
                         <div class="difficulty-row">
-                            <span class="diff-label" data-tooltip="6-8 word puzzles, high overlap, 3-5 red herrings">Hard</span>
+                            <span class="diff-label" data-tooltip="5 words, 10% overlap">L3</span>
                             <div class="diff-bar-container">
-                                <div class="diff-bar diff-hard" id="syllableHardBar" style="width: 0%"></div>
+                                <div class="diff-bar diff-l3" id="syllableL3Bar" style="width: 0%"></div>
                             </div>
-                            <span class="diff-value" id="syllableHard">--%</span>
+                            <span class="diff-value" id="syllableL3">--%</span>
+                        </div>
+                        <div class="difficulty-row">
+                            <span class="diff-label" data-tooltip="5-6 words, categories, red herrings">L4</span>
+                            <div class="diff-bar-container">
+                                <div class="diff-bar diff-l4" id="syllableL4Bar" style="width: 0%"></div>
+                            </div>
+                            <span class="diff-value" id="syllableL4">--%</span>
+                        </div>
+                        <div class="difficulty-row">
+                            <span class="diff-label" data-tooltip="6+ words, 30%+ overlap, weak hints">L5+</span>
+                            <div class="diff-bar-container">
+                                <div class="diff-bar diff-l5" id="syllableL5Bar" style="width: 0%"></div>
+                            </div>
+                            <span class="diff-value" id="syllableL5">--%</span>
                         </div>
                     </div>
                     <div class="skill-meta">

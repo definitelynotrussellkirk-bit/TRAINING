@@ -16,6 +16,13 @@ from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# DATA LINEAGE - Generator identification for tracking
+# =============================================================================
+# Bump GENERATOR_VERSION when generation logic changes significantly
+GENERATOR_ID = "syllo_local"
+GENERATOR_VERSION = "1.0.0"
+
 
 class SyllogismGenerator:
     """
@@ -125,6 +132,9 @@ class SyllogismGenerator:
             if not output_path.exists():
                 raise RuntimeError(f"Output file not created: {output_path}")
 
+            # Write lineage metadata
+            self._write_lineage_metadata(output_path, count, difficulty, seed, kwargs)
+
             return output_path
 
         except subprocess.TimeoutExpired as e:
@@ -136,6 +146,40 @@ class SyllogismGenerator:
             logger.error(f"Stdout: {e.stdout}")
             logger.error(f"Stderr: {e.stderr}")
             raise RuntimeError(f"Generation failed: {e.stderr}") from e
+
+    def _write_lineage_metadata(
+        self,
+        output_path: Path,
+        count: int,
+        difficulty: Optional[str],
+        seed: Optional[int],
+        extra_params: dict
+    ):
+        """Write .meta.json sidecar for data lineage tracking."""
+        try:
+            # Import here to avoid circular dependencies
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            from core.lineage import FileLineage, write_file_lineage
+
+            lineage = FileLineage(
+                generator_id=GENERATOR_ID,
+                generator_version=GENERATOR_VERSION,
+                example_count=count,
+                params={
+                    "difficulty": difficulty,
+                    "seed": seed,
+                    "script_path": str(self.script_path),
+                    **extra_params,
+                },
+                source="data_manager/generators/syllogism_generator.py",
+            )
+            write_file_lineage(output_path, lineage)
+            logger.info(f"Wrote lineage metadata: {output_path}.meta.json")
+        except ImportError:
+            logger.debug("core.lineage not available, skipping metadata write")
+        except Exception as e:
+            logger.warning(f"Failed to write lineage metadata: {e}")
 
     def generate_to_queue(
         self,

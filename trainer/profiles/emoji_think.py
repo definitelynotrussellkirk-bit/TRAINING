@@ -56,10 +56,25 @@ STOP_EMOJI_POOL = ["🛑", "⛔", "🚫", "❌", "🔴", "⏹️", "🔚", "✋"
 STOP_COUNT_MIN = 2
 STOP_COUNT_MAX = 4
 
+# Protocol mode ratio (50% emoji, 50% direct)
+EMOJI_MODE_RATIO = 0.5
+
 
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+def should_use_emoji_mode(example_index: int) -> bool:
+    """
+    Determine if this example should use emoji protocol or direct mode.
+
+    Uses deterministic random based on index for reproducibility.
+    Returns True for emoji mode, False for direct mode.
+
+    Target: 50% emoji mode, 50% direct mode.
+    """
+    random.seed(example_index * 7919)  # Prime multiplier for better distribution
+    return random.random() < EMOJI_MODE_RATIO
 
 def get_random_stop_emoji() -> str:
     """Select a random stop emoji from the pool."""
@@ -266,17 +281,21 @@ class EmojiThinkProfile(DataProfile):
         system_prompt: str
     ) -> dict:
         """
-        Transform example with emoji thinking contract.
+        Transform example with emoji thinking contract (50% mode).
+
+        50% of examples get emoji protocol (thinking + stop emojis).
+        50% of examples get direct answers (no emoji enforcement).
 
         Applies in order:
         1. Sanitize (remove <think> tags)
         2. Inject system prompt (if not present)
-        3. Enforce thinking requirement (random emoji, random count)
-        4. Enforce stop requirement (random emoji, random count)
+        3. Determine mode (emoji vs direct) based on index
+        4. If emoji mode: enforce thinking and stop requirements
+        5. If direct mode: leave assistant response as-is
 
         Args:
             example: Raw JSONL example
-            index: Example index (for random seed)
+            index: Example index (for random seed and mode selection)
             system_prompt: System prompt to inject
 
         Returns:
@@ -295,11 +314,14 @@ class EmojiThinkProfile(DataProfile):
             # Update existing system prompt
             messages[0]['content'] = system_prompt
 
-        # 4. Enforce thinking requirement (random pattern per example)
-        messages = self.enforce_thinking_requirement(messages, index)
+        # 4. Determine mode: 50% emoji, 50% direct
+        use_emoji = should_use_emoji_mode(index)
 
-        # 5. Enforce stop requirement (random pattern per conversation)
-        messages = self.enforce_stop_requirement(messages)
+        if use_emoji:
+            # 5a. EMOJI MODE: Apply thinking and stop requirements
+            messages = self.enforce_thinking_requirement(messages, index)
+            messages = self.enforce_stop_requirement(messages)
+        # else: 5b. DIRECT MODE: Leave assistant response as-is (no emoji enforcement)
 
         # Update example
         example['messages'] = messages
@@ -371,4 +393,6 @@ __all__ = [
     "STOP_EMOJI_POOL",
     "STOP_COUNT_MIN",
     "STOP_COUNT_MAX",
+    "EMOJI_MODE_RATIO",
+    "should_use_emoji_mode",
 ]

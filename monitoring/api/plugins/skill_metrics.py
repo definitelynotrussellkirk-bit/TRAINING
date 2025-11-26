@@ -345,7 +345,72 @@ class SkillMetricsPlugin(BasePlugin):
                     'count': len(deltas)
                 }
 
+        # Add 10-level SYLLO evaluation data
+        result['syllo_10level'] = self._load_10level_eval()
+
         return result
+
+    def _load_10level_eval(self) -> Dict[str, Any]:
+        """Load 10-level SYLLO evaluation results."""
+        try:
+            eval_path = Path('/path/to/training/status/baseline_eval_10level.json')
+            if not eval_path.exists():
+                return {'available': False}
+
+            with open(eval_path) as f:
+                data = json.load(f)
+
+            # Get the latest model's results
+            models = data.get('models', {})
+            if not models:
+                return {'available': False}
+
+            # Get the most recent model (usually checkpoint-XXXXX)
+            latest_model = None
+            latest_checkpoint = 0
+            for model_id, model_data in models.items():
+                # Extract checkpoint number
+                if 'checkpoint-' in model_id:
+                    try:
+                        ckpt_num = int(model_id.split('-')[1])
+                        if ckpt_num > latest_checkpoint:
+                            latest_checkpoint = ckpt_num
+                            latest_model = model_data
+                    except:
+                        pass
+
+            if not latest_model:
+                latest_model = list(models.values())[0]
+
+            levels = latest_model.get('levels', {})
+            by_level = {}
+            total_correct = 0
+            total_count = 0
+
+            for lvl, lvl_data in levels.items():
+                accuracy = lvl_data.get('accuracy', 0) * 100  # Convert to percent
+                correct = lvl_data.get('correct', 0)
+                total = lvl_data.get('total', 0)
+                by_level[f'L{lvl}'] = {
+                    'accuracy': round(accuracy, 1),
+                    'correct': correct,
+                    'total': total
+                }
+                total_correct += correct
+                total_count += total
+
+            overall_accuracy = (total_correct / total_count * 100) if total_count > 0 else 0
+
+            return {
+                'available': True,
+                'model_id': latest_model.get('model_id', 'unknown'),
+                'timestamp': data.get('run_timestamp'),
+                'overall_accuracy': round(overall_accuracy, 1),
+                'by_level': by_level,
+                'total_puzzles': total_count
+            }
+        except Exception as e:
+            return {'available': False, 'error': str(e)}
 
     def _categorize_skill(self, skill: str) -> str:
         """Determine category of a skill"""

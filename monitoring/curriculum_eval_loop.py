@@ -199,33 +199,130 @@ class CurriculumEvalLoop:
             return None
 
     def extract_words_from_answer(self, answer: str) -> List[str]:
-        """Extract word list from model's JSON answer format."""
+        """Extract word list from model's JSON answer format.
+
+        Handles all 12+ output variants from the SYLLO API:
+        - solutions_list, solutions_sequence, solutions_map, solutions_only
+        - solutions_text, solutions_table, solutions_markdown
+        - inventory_vector, array_bundle, report_wrapper
+        - analysis_enriched, solutions_by_letter
+        """
         if not answer:
             return []
 
         words = []
 
-        # Try to parse JSON from the response
+        # Try to parse full JSON response
         try:
-            # Find JSON in the response (might have text before/after)
-            json_match = re.search(r'\{[^{}]*"(?:letters|solutions)"[^{}]*\[.*?\][^{}]*\}', answer, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group())
-                # Handle both "letters" and "solutions" keys
-                items = data.get("letters", data.get("solutions", []))
-                for item in items:
+            data = json.loads(answer)
+
+            # solutions_list: ["1. pub + lic → PUBLIC", ...]
+            if "solutions_list" in data:
+                for s in data["solutions_list"]:
+                    match = re.search(r'[→=]\s*([A-Z]+)\s*$', s)
+                    if match:
+                        words.append(match.group(1).lower())
+                if words:
+                    return words
+
+            # sequence: [{"word": "PUBLIC", ...}]
+            if "sequence" in data:
+                for item in data["sequence"]:
+                    if isinstance(item, dict) and "word" in item:
+                        words.append(item["word"].lower())
+                if words:
+                    return words
+
+            # solutions_map: {"1": {"word": "PUBLIC"}, ...}
+            if "solutions_map" in data:
+                for k, v in data["solutions_map"].items():
+                    if isinstance(v, dict) and "word" in v:
+                        words.append(v["word"].lower())
+                if words:
+                    return words
+
+            # solutions: [{"answer": "PUBLIC"}] or [{"word": "PUBLIC"}]
+            if "solutions" in data:
+                for item in data["solutions"]:
                     if isinstance(item, dict):
-                        # Training data uses "answer", also check "word" for compatibility
                         word = item.get("answer", item.get("word", ""))
                         if word:
                             words.append(word.lower())
                 if words:
                     return words
-        except (json.JSONDecodeError, AttributeError):
+
+            # solutions_text: "1) do + ing -> DOING; 2) ..."
+            if "solutions_text" in data:
+                text = data["solutions_text"]
+                # Extract words after -> or = or →
+                matches = re.findall(r'[→=\->]\s*([A-Z]+)', text)
+                if matches:
+                    return [w.lower() for w in matches]
+
+            # solutions_table: {"headers": [...], "rows": [[syllables, word], ...]}
+            if "solutions_table" in data:
+                table = data["solutions_table"]
+                if isinstance(table, dict) and "rows" in table:
+                    for row in table["rows"]:
+                        if isinstance(row, list) and len(row) >= 2:
+                            word = row[-1]  # Word is last column
+                            if isinstance(word, str):
+                                words.append(word.lower())
+                if words:
+                    return words
+
+            # inventory_vector: {"answers": {"1": "PUBLIC", "2": "MAKING"}}
+            if "answers" in data:
+                answers = data["answers"]
+                if isinstance(answers, dict):
+                    for k, v in answers.items():
+                        if isinstance(v, str):
+                            words.append(v.lower())
+                elif isinstance(answers, list):
+                    for item in answers:
+                        if isinstance(item, dict) and "word" in item:
+                            words.append(item["word"].lower())
+                if words:
+                    return words
+
+            # report_wrapper: {"report": {"solutions": [...]}}
+            if "report" in data and isinstance(data.get("report"), dict):
+                report = data["report"]
+                if "solutions" in report:
+                    for item in report["solutions"]:
+                        if isinstance(item, dict):
+                            word = item.get("answer", item.get("word", ""))
+                            if word:
+                                words.append(word.lower())
+                if words:
+                    return words
+
+            # analysis_enriched: {"analysis": {"solutions": [...]}}
+            if "analysis" in data and isinstance(data.get("analysis"), dict):
+                analysis = data["analysis"]
+                if "solutions" in analysis:
+                    for item in analysis["solutions"]:
+                        if isinstance(item, dict):
+                            word = item.get("answer", item.get("word", ""))
+                            if word:
+                                words.append(word.lower())
+                if words:
+                    return words
+
+            # solutions_by_letter: {"A": {"word": "APPLE"}, ...} or {"A": "APPLE", ...}
+            if "solutions_by_letter" in data:
+                for letter, val in data["solutions_by_letter"].items():
+                    if isinstance(val, str):
+                        words.append(val.lower())
+                    elif isinstance(val, dict) and "word" in val:
+                        words.append(val["word"].lower())
+                if words:
+                    return words
+
+        except json.JSONDecodeError:
             pass
 
-        # Fallback: try to find words in WORD/answer format or quoted strings
-        # Look for "answer": "WORDNAME" or "word": "WORDNAME" patterns
+        # Fallback: try to find words in "word": "WORDNAME" pattern
         word_matches = re.findall(r'"(?:answer|word)":\s*"([A-Za-z]+)"', answer, re.IGNORECASE)
         if word_matches:
             return [w.lower() for w in word_matches]

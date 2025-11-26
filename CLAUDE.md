@@ -462,10 +462,17 @@ python3 tools/analysis/state_tracker.py --check
 - Submit Task: http://192.168.x.x:8766/api/tasks/submit (POST)
 - Task Types: http://192.168.x.x:8766/api/task-types
 
+**Synology NAS (192.168.x.x):**
+- Storage API: http://localhost:8081/api/storage (via unified API)
+- Storage Details: http://localhost:8081/api/storage/details
+- Credentials: `.secrets/synology.json`
+- Config: `config/storage.json`
+
 **4090 Status Files:**
 - Training: cat status/training_status.json
 - Comparisons: cat status/model_comparisons.json
 - Deployments: cat status/deployment_status.json
+- Storage: cat status/storage_status.json
 
 ---
 

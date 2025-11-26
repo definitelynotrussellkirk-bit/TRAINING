@@ -1,0 +1,59 @@
+{
+  "nas": {
+    "host": "192.168.x.x",
+    "share": "data",
+    "base_path": "llm_training",
+    "allocation_tb": 10
+  },
+  "folders": {
+    "checkpoints": {
+      "path": "checkpoints",
+      "description": "Model checkpoints from training",
+      "retention_days": 30,
+      "max_size_gb": 3000
+    },
+    "models": {
+      "path": "models",
+      "description": "Consolidated/deployed models",
+      "retention_days": null,
+      "max_size_gb": 2000
+    },
+    "backups": {
+      "path": "backups",
+      "description": "System configuration backups",
+      "retention_days": 90,
+      "max_size_gb": 500
+    },
+    "logs": {
+      "path": "logs",
+      "description": "Training logs archive",
+      "retention_days": 180,
+      "max_size_gb": 100
+    },
+    "training_data": {
+      "path": "training_data",
+      "description": "Training data archives",
+      "retention_days": null,
+      "max_size_gb": 2000
+    },
+    "snapshots": {
+      "path": "snapshots",
+      "description": "Daily system snapshots",
+      "retention_days": 14,
+      "max_size_gb": 2000
+    },
+    "exports": {
+      "path": "exports",
+      "description": "Exported models for deployment",
+      "retention_days": null,
+      "max_size_gb": 500
+    }
+  },
+  "sync_schedule": {
+    "checkpoints": "on_save",
+    "models": "on_deploy",
+    "backups": "daily",
+    "logs": "daily",
+    "snapshots": "daily"
+  }
+}

@@ -4,6 +4,44 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-11-25 - Synology NAS Storage Integration
+
+### New Storage Module
+- **New:** `monitoring/storage_manager.py` - Synology NAS manager with DSM API + SSH fallback
+- **New:** `config/storage.json` - Storage allocation config (10TB total)
+- **New:** `monitoring/api/plugins/storage.py` - Storage plugin for unified dashboard API
+
+### NAS Folder Structure (10TB Allocated)
+```
+/volume1/data/llm_training/
+├── checkpoints/     (3TB max, 30 days retention)
+├── models/          (2TB max, permanent)
+├── backups/         (500GB max, 90 days retention)
+├── logs/            (100GB max, 180 days retention)
+├── training_data/   (2TB max, permanent)
+├── snapshots/       (2TB max, 14 days retention)
+└── exports/         (500GB max, permanent)
+```
+
+### Features
+- DSM API authentication with session management
+- SSH fallback for basic disk usage
+- File upload via FileStation API
+- Status monitoring with health checks
+- Dashboard integration via `/api/storage` endpoint
+
+### Usage
+```bash
+# Check storage status
+curl http://localhost:8081/api/storage
+
+# Sync via GPU scheduler
+curl -X POST http://192.168.x.x:8766/api/tasks/submit \
+  -d '{"task_type": "storage_sync", "params": {"local_path": "...", "folder_type": "checkpoints"}}'
+```
+
+---
+
 ## 2025-11-25 - Curriculum-Based Data Generation
 
 ### Data Manager Rewrite

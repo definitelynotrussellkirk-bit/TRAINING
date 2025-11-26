@@ -31,7 +31,9 @@
     "count": 100,
     "priority": "normal",
     "threshold": 0,
-    "cooldown_sec": 180
+    "cooldown_sec": 180,
+    "host": "localhost",
+    "port": 8080
   },
   "remote_eval": {
     "enabled": true,
@@ -42,7 +44,10 @@
     "eval_dataset": "data/validation/eval_dataset.jsonl",
     "eval_interval_steps": 5000,
     "sync_checkpoints": true,
-    "metrics": ["accuracy", "loss"]
+    "metrics": [
+      "accuracy",
+      "loss"
+    ]
   },
   "curriculum": {
     "enabled": true,
@@ -54,7 +59,6 @@
     "enabled": true,
     "_comment": "Uses RetentionManager with 36h age rule and 150GB limit"
   },
-
   "_comment_refactor": "New fields for refactored architecture (2025-11-22)",
   "profile": {
     "name": "emoji_think"

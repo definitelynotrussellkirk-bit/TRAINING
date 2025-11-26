@@ -1,6 +1,6 @@
 # CLAUDE INSTRUCTIONS - LLM Training System
 
-**Last Updated:** 2025-11-25 (Code Review + Cleanup)
+**Last Updated:** 2025-11-26 (Discrimination Training Generator)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 This document contains instructions for Claude to help with training operations.
@@ -225,7 +225,45 @@ OBSERVATIONS/
 
 ---
 
-## 🆕 RECENT UPDATES (2025-11-25)
+## 🆕 RECENT UPDATES (2025-11-26)
+
+**Discrimination Training Generator** - Teaches model to identify wrong vs correct answers
+
+**What Changed (2025-11-26):**
+- Created `monitoring/discrimination_generator.py` - generates discrimination training data
+- Ratio-aware: maintains 20% discrimination to 80% direct-solve training ratio
+- Reads curriculum level from `data_manager/curriculum_state.json`
+- Writes status to `status/discrimination_generator.json`
+- Cron job: every 2 hours, up to 1500 examples per run
+
+**Training Format Contract (Task-Agnostic):**
+
+The multi-turn format works for ANY subject/skill (not SYLLO-specific):
+
+```
+# CORRECT verification (2 turns):
+User: [problem + proposed answer] "Did the model answer correctly?"
+Assistant: "CORRECT"
+
+# INCORRECT + correction (4 turns):
+User: [problem + proposed answer] "Did the model answer correctly?"
+Assistant: "INCORRECT"
+User: "What should the answer have been?"
+Assistant: [raw golden answer - no prefix, no formatting]
+```
+
+**Mix:** 60% INCORRECT+correction, 40% CORRECT verification
+
+**Run manually:**
+```bash
+# Check current ratio
+python3 monitoring/discrimination_generator.py --check-only
+
+# Generate in ratio mode (auto-calculates deficit)
+INFERENCE_ADMIN_KEY=admin123 python3 monitoring/discrimination_generator.py --ratio --max-per-run 1500
+```
+
+---
 
 **Chat Template Override** - Fix for Qwen3 `<think>` injection
 
@@ -356,14 +394,16 @@ See CHANGELOG.md for details
 **Last Verified:** 2025-11-25
 
 ### Model Status
-- **Base model:** Qwen3-0.6B (exists at `/path/to/training/models/Qwen3-0.6B/`)
+- **Base model:** Qwen3-0.6B (at `/path/to/training/models/Qwen3-0.6B/`)
   - Size: 1.5GB
   - Type: Qwen3ForCausalLM
-- **Deployed model:** checkpoint-156000 (on 3090)
-  - Location: `/path/to/models/deployed/`
-  - Auto-deployed by orchestrator
-- **Training method:** Full model fine-tuning (no LoRA)
-- **Current training:** Running at step 156945+
+- **Checkpoints:** `/path/to/training/current_model/checkpoint-NNNNNN/`
+  - Latest: checkpoint-175000
+  - Training method: Full model fine-tuning (no LoRA)
+- **3090 inference:** Load specific checkpoint via `/models/reload` API
+  - Example: `curl -X POST http://192.168.x.x:8765/models/reload -d '{"model_path":"/path/to/models/checkpoint-175000"}'`
+  - Check loaded: `curl http://192.168.x.x:8765/models/info`
+- **Current training:** Step 175000+
 
 ### Service Status (Option C Architecture)
 

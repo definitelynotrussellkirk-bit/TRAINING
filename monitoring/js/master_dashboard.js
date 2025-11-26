@@ -162,6 +162,7 @@ function updateTrainingStatus(data) {
     const source = data.sources?.training_status;
     if (!source || source.status !== 'ok') {
         setCardOffline('trainingStatusIndicator');
+        setActionHint('trainingAction', 'Training status unavailable', 'warning');
         return;
     }
 
@@ -169,7 +170,8 @@ function updateTrainingStatus(data) {
     const training = source.data;
 
     // Status
-    setText('trainingStatus', training.status || '--');
+    const status = training.status || '--';
+    setText('trainingStatus', status);
 
     // Step
     const currentStep = training.current_step || 0;
@@ -193,6 +195,18 @@ function updateTrainingStatus(data) {
     const gap = training.val_train_gap;
     setText('trainingGap', formatNum(gap, 3));
 
+    // Color gap based on threshold
+    const gapEl = document.getElementById('trainingGap');
+    if (gapEl && gap !== null && gap !== undefined) {
+        if (gap > 0.5) {
+            gapEl.style.color = 'var(--color-danger)';
+        } else if (gap > 0.3) {
+            gapEl.style.color = 'var(--color-warning)';
+        } else {
+            gapEl.style.color = 'var(--color-success)';
+        }
+    }
+
     // Accuracy
     const acc = training.accuracy_percent;
     setText('trainingAccuracy', acc !== null && acc !== undefined ? `${formatNum(acc, 1)}%` : '--');
@@ -200,6 +214,51 @@ function updateTrainingStatus(data) {
     // Tokens/sec
     const tokens = training.tokens_per_sec;
     setText('trainingTokens', formatNum(tokens, 0));
+
+    // Compute action hint based on training state
+    updateTrainingActionHint(status, gap, loss, acc);
+}
+
+/**
+ * Compute and set training action hint
+ */
+function updateTrainingActionHint(status, gap, loss, acc) {
+    let actionText = '';
+    let actionLevel = 'good';
+
+    const statusLower = (status || '').toLowerCase();
+
+    // Check training state first
+    if (statusLower === 'stopped' || statusLower === 'idle') {
+        actionText = 'Training not running. Start daemon or add data to queue.';
+        actionLevel = 'warning';
+    } else if (statusLower === 'paused') {
+        actionText = 'Training paused. Use controller to resume when ready.';
+        actionLevel = 'warning';
+    } else if (statusLower === 'training') {
+        // Training is running - check metrics
+        if (gap !== null && gap !== undefined && gap > 0.5) {
+            actionText = `Overfitting risk: val-train gap is ${gap.toFixed(2)}. Consider early stopping or more data.`;
+            actionLevel = 'critical';
+        } else if (gap !== null && gap !== undefined && gap > 0.3) {
+            actionText = `Monitor: val-train gap is ${gap.toFixed(2)}. Watch for overfitting.`;
+            actionLevel = 'warning';
+        } else if (loss !== null && loss !== undefined && loss > 2.0) {
+            actionText = `High loss (${loss.toFixed(2)}). Model still learning fundamentals.`;
+            actionLevel = 'warning';
+        } else if (acc !== null && acc !== undefined && acc < 30) {
+            actionText = `Low accuracy (${acc.toFixed(0)}%). Model needs more training.`;
+            actionLevel = 'warning';
+        } else {
+            actionText = 'Training progressing normally.';
+            actionLevel = 'good';
+        }
+    } else {
+        actionText = `Status: ${status}`;
+        actionLevel = 'neutral';
+    }
+
+    setActionHint('trainingAction', actionText, actionLevel);
 }
 
 /**
@@ -299,30 +358,100 @@ function updateRegression(data) {
     const source = data.sources?.regression_monitoring;
     if (!source || source.status !== 'ok') {
         setCardOffline('regressionIndicator');
+        setActionHint('regressionAction', 'Regression monitoring unavailable', 'warning');
         return;
     }
 
     setCardOnline('regressionIndicator');
     const regression = source.data;
     const latest = regression.latest_summary;
+    const totalRegressions = regression.total_regressions || 0;
+
+    let regressionDetected = false;
+    let lossIncrease = null;
+    let accDrop = null;
 
     if (latest) {
-        const detected = latest.regression_detected ? 'YES' : 'NO';
+        regressionDetected = latest.regression_detected;
+        lossIncrease = latest.loss_increase;
+        accDrop = latest.accuracy_drop;
+
+        const detected = regressionDetected ? 'YES' : 'NO';
         setText('regressionDetected', detected);
         document.getElementById('regressionDetected').style.color =
-            latest.regression_detected ? 'var(--color-danger)' : 'var(--color-success)';
+            regressionDetected ? 'var(--color-danger)' : 'var(--color-success)';
 
-        setText('regressionLossInc', latest.loss_increase ?
-            `${latest.loss_increase.toFixed(1)}%` : '--');
-        setText('regressionAccDrop', latest.accuracy_drop ?
-            `${latest.accuracy_drop.toFixed(1)}%` : '--');
+        setText('regressionLossInc', lossIncrease ?
+            `${lossIncrease.toFixed(1)}%` : '--');
+        setText('regressionAccDrop', accDrop ?
+            `${accDrop.toFixed(1)}%` : '--');
+
+        // Color loss increase based on severity
+        const lossIncEl = document.getElementById('regressionLossInc');
+        if (lossIncEl && lossIncrease !== null) {
+            if (lossIncrease > 15) {
+                lossIncEl.style.color = 'var(--color-danger)';
+            } else if (lossIncrease > 5) {
+                lossIncEl.style.color = 'var(--color-warning)';
+            } else {
+                lossIncEl.style.color = 'var(--text-primary)';
+            }
+        }
+
+        // Color accuracy drop based on severity
+        const accDropEl = document.getElementById('regressionAccDrop');
+        if (accDropEl && accDrop !== null) {
+            if (accDrop > 10) {
+                accDropEl.style.color = 'var(--color-danger)';
+            } else if (accDrop > 3) {
+                accDropEl.style.color = 'var(--color-warning)';
+            } else {
+                accDropEl.style.color = 'var(--text-primary)';
+            }
+        }
     } else {
         setText('regressionDetected', '--');
         setText('regressionLossInc', '--');
         setText('regressionAccDrop', '--');
     }
 
-    setText('regressionTotal', regression.total_regressions || 0);
+    setText('regressionTotal', totalRegressions);
+
+    // Compute action hint
+    updateRegressionActionHint(regressionDetected, lossIncrease, accDrop, totalRegressions);
+}
+
+/**
+ * Compute and set regression action hint
+ */
+function updateRegressionActionHint(detected, lossIncrease, accDrop, totalRegressions) {
+    let actionText = '';
+    let actionLevel = 'good';
+
+    if (detected) {
+        // Regression detected - severity based on magnitude
+        if (lossIncrease !== null && lossIncrease > 15) {
+            actionText = `Severe regression: ${lossIncrease.toFixed(1)}% loss increase. Consider rolling back checkpoint.`;
+            actionLevel = 'critical';
+        } else if (accDrop !== null && accDrop > 10) {
+            actionText = `Significant accuracy drop: ${accDrop.toFixed(1)}%. Investigate recent training data.`;
+            actionLevel = 'critical';
+        } else {
+            actionText = 'Minor regression detected. Monitor next evaluation.';
+            actionLevel = 'warning';
+        }
+    } else if (totalRegressions > 5) {
+        actionText = `${totalRegressions} total regressions this run. Training may be unstable.`;
+        actionLevel = 'warning';
+    } else if (totalRegressions > 0) {
+        actionText = `No current regression. ${totalRegressions} historical regression(s).`;
+        actionLevel = 'good';
+    } else {
+        actionText = 'No regressions detected. Model improving steadily.';
+        actionLevel = 'good';
+    }
+
+    setActionHint('regressionAction', actionText, actionLevel);
 }
 
 /**

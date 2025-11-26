@@ -1,8 +1,855 @@
 {
-  "current_skill": "syllo",
-  "current_level": 1,
-  "accuracy_history": [],
-  "progression_history": [],
+  "skills": {
+    "syllo": {
+      "current_level": 1,
+      "accuracy_history": [
+        {
+          "step": 165646,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T08:15:45.459523",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 165671,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T08:18:04.042060",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 165793,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T08:29:59.812994",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 165930,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T08:42:40.400329",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 166033,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T08:54:29.786410",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 166160,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T09:06:24.028978",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 166284,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T09:18:15.964686",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 166408,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T09:30:01.093876",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 166517,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T09:41:48.932408",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 166626,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T09:53:36.376901",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 166749,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T10:05:26.454850",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 166871,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T10:17:15.497249",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 166991,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T10:29:03.053147",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 167106,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T10:40:50.336948",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 167237,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T10:52:36.913224",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 167345,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T11:04:22.114332",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 167466,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T11:16:07.881920",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 167579,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T11:27:52.778711",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 167701,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T11:39:40.403748",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 167805,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T11:51:28.655984",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 167920,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T12:03:14.765394",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 168033,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T12:15:00.636893",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 168158,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T12:26:45.448319",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 168281,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T12:38:29.766192",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 168404,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T12:50:13.859073",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 168509,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T13:01:57.204381",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 168632,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T13:13:41.626106",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 168756,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T13:25:27.302406",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 168860,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T13:37:13.064706",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 168985,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T13:49:02.732443",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 169091,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T14:00:46.439373",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 169215,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T14:12:30.158679",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 169340,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T14:24:13.613167",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 169464,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T14:36:01.438631",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 169573,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T14:47:53.207852",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 169694,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T14:59:36.743701",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 169817,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T15:11:20.689921",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 169920,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T15:23:10.035995",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 170035,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T15:35:01.307794",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 170159,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T15:46:45.773859",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 170284,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T15:58:31.946650",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 170400,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T16:10:19.057573",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 170512,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T16:22:04.239546",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 170635,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T16:33:49.415656",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 170760,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T16:45:40.656216",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 170881,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T16:57:27.978090",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 171000,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T17:09:11.271760",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 171099,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T17:20:56.486924",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 171206,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T17:32:43.645860",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 171330,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T17:44:32.703296",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 171451,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T17:56:16.471707",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 171568,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T18:08:01.711753",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 171690,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T18:19:46.917840",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 171806,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T18:31:34.212221",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 171928,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T18:43:18.714271",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 172043,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T18:55:07.423912",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 172166,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T19:06:53.190741",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 172268,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T19:18:37.657263",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 172392,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T19:30:22.964921",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 172508,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T19:42:07.314897",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 172632,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T19:53:55.131941",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 172757,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T20:05:39.535574",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 172870,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T20:17:26.132620",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 172995,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T20:29:14.707196",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 173107,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T20:40:58.882743",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 173230,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T20:52:48.083575",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 173352,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T21:04:33.122085",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 173474,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T21:16:17.195109",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 173584,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T21:28:01.467365",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 173685,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T21:39:49.699213",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 173812,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T21:51:38.690062",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 173962,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T22:05:41.088973",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 174096,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T22:18:42.917092",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 174246,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T22:32:54.740241",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 174381,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T22:44:39.013119",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 174507,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-25T22:56:21.140584",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        }
+      ],
+      "progression_history": []
+    },
+    "binary": {
+      "current_level": 1,
+      "accuracy_history": [],
+      "progression_history": []
+    }
+  },
+  "active_skill": "syllo",
   "started_at": "2025-11-22T19:50:00.000000",
-  "_comment": "Reset to level 1 (now mixed default: easy+medium+hard) - 2025-11-22"
+  "migrated_at": "2025-11-25T05:58:43.214548",
+  "last_updated": "2025-11-25T22:56:21.141245"
 }

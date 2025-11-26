@@ -1,0 +1,1 @@
+/path/to/skills/API_SERVER_CONTRACT.md

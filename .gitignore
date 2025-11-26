@@ -56,3 +56,4 @@ test_stop_emoji.jsonl
 
 # Temp files
 =*
+.secrets/

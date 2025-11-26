@@ -1,0 +1,1 @@
+/path/to/skills/skill_binary/CURRICULUM.md

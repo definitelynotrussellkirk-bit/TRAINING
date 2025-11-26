@@ -1,0 +1,82 @@
+[
+  {
+    "id": "negation_basic",
+    "prompt": "No cats are dogs. All pets are cats. Are any pets dogs?",
+    "expected": "No",
+    "category": "negation",
+    "difficulty": "hard",
+    "notes": "Basic negation with universal quantifier"
+  },
+  {
+    "id": "double_negation",
+    "prompt": "It is not true that no birds can fly. Can some birds fly?",
+    "expected": "Yes",
+    "category": "double_negation",
+    "difficulty": "hard",
+    "notes": "Double negation resolution"
+  },
+  {
+    "id": "quantifier_scope",
+    "prompt": "All dogs bark. Some animals are dogs. Do all animals bark?",
+    "expected": "No",
+    "category": "quantifier",
+    "difficulty": "hard",
+    "notes": "Quantifier scope - 'all' vs 'some' confusion"
+  },
+  {
+    "id": "modus_tollens",
+    "prompt": "If it rains, the ground is wet. The ground is not wet. Is it raining?",
+    "expected": "No",
+    "category": "modus_tollens",
+    "difficulty": "hard",
+    "notes": "Classic modus tollens"
+  },
+  {
+    "id": "transitivity",
+    "prompt": "All A are B. All B are C. All C are D. Are all A also D?",
+    "expected": "Yes",
+    "category": "transitivity",
+    "difficulty": "hard",
+    "notes": "Multi-step transitivity"
+  },
+  {
+    "id": "contradiction_detection",
+    "prompt": "All swans are white. This swan is black. Is this consistent?",
+    "expected": "No",
+    "category": "contradiction",
+    "difficulty": "hard",
+    "notes": "Detect logical contradiction"
+  },
+  {
+    "id": "existential_trap",
+    "prompt": "Some birds can fly. Penguins are birds. Can penguins fly?",
+    "expected": "Cannot determine",
+    "category": "existential",
+    "difficulty": "hard",
+    "notes": "'Some' doesn't imply 'all' - common trap"
+  },
+  {
+    "id": "negation_chain",
+    "prompt": "No fish are mammals. No mammals are reptiles. Are any fish reptiles?",
+    "expected": "Cannot determine",
+    "category": "negation_chain",
+    "difficulty": "hard",
+    "notes": "Negation doesn't chain transitively"
+  },
+  {
+    "id": "hidden_universal",
+    "prompt": "Dogs bark. Rover is a dog. Does Rover bark?",
+    "expected": "Yes",
+    "category": "implicit_quantifier",
+    "difficulty": "hard",
+    "notes": "Implicit 'all' in generic statement"
+  },
+  {
+    "id": "vacuous_truth",
+    "prompt": "All unicorns are purple. Are there any unicorns?",
+    "expected": "Cannot determine",
+    "category": "vacuous",
+    "difficulty": "hard",
+    "notes": "Statement about empty set"
+  }
+]

@@ -183,6 +183,71 @@ The manager tracks:
 - Queue status
 - Remote GPU memory usage
 
+## Skill API Client
+
+The `skill_api_client.py` connects to singleSKILL API servers for structured training data.
+
+### Available Skills
+
+| Skill | Levels | Port | Description |
+|-------|--------|------|-------------|
+| **SYLLO** | 5 (word count 4-8) | 8080 | Syllable puzzles with hints |
+| **Binary** | 7 (magnitude) | 8090 | Emoji binary arithmetic |
+
+### Quick Start
+
+```bash
+# Check API status
+python3 data_manager/skill_api_client.py status
+
+# Generate SYLLO level 3 (6 words), 100 puzzles
+python3 data_manager/skill_api_client.py syllo --level 3 --count 100
+
+# Generate Binary level 1 (tiny numbers), 50 conversations
+python3 data_manager/skill_api_client.py binary --level 1 --count 50
+
+# Generate all levels for both skills (50 each)
+python3 data_manager/skill_api_client.py all --count 50
+```
+
+### Starting the API Servers
+
+```bash
+cd /path/to/skills
+
+# Start SYLLO API
+python3 skill_syllo_variant/api_server.py --port 8080 &
+
+# Start Binary API
+python3 skill_basic_math/api_server.py --port 8090 &
+```
+
+### Skill Level Reference
+
+**SYLLO Levels (word count):**
+- Level 1: 4 words (Beginner)
+- Level 2: 5 words (Easy)
+- Level 3: 6 words (Intermediate)
+- Level 4: 7 words (Advanced)
+- Level 5: 8 words (Expert)
+
+**Binary Levels (magnitude):**
+- Level 1: 1-10 (add, subtract)
+- Level 2: 1-20 (+ multiply)
+- Level 3: 10-100 (balanced)
+- Level 4: 10-100 (+ shifts, conversions)
+- Level 5: 100-1K
+- Level 6: 1K-10K
+- Level 7: 10K-100K
+
+### Related Docs (symlinks)
+
+- `SKILL_API_CONTRACT.md` → Full API specification
+- `BINARY_CURRICULUM.md` → Binary training curriculum
+- `BINARY_API_USAGE.md` → Binary API examples
+
+---
+
 ## Directory Structure
 
 ```
@@ -191,11 +256,16 @@ data_manager/
 ├── manager.py              # Main orchestrator
 ├── remote_client.py        # RTX 3090 client
 ├── quality_checker.py      # Test suites
+├── skill_api_client.py     # Skill API client (SYLLO + Binary)
 ├── README.md               # This file
+├── SKILL_API_CONTRACT.md   # → singleSKILL API contract (symlink)
+├── BINARY_CURRICULUM.md    # → Binary curriculum (symlink)
+├── BINARY_API_USAGE.md     # → Binary API usage (symlink)
 ├── reports/                # Quality reports
 ├── rejected/               # Rejected data for analysis
 ├── tests/                  # Unit tests
 ├── generators/             # Custom data generators
+│   └── syllogism_generator.py
 └── evaluators/             # Custom evaluators
 ```
 

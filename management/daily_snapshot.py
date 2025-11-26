@@ -17,9 +17,16 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import argparse
 
+# Use centralized path resolution for default
+try:
+    from core.paths import get_base_dir
+    _DEFAULT_BASE_DIR = get_base_dir()
+except ImportError:
+    _DEFAULT_BASE_DIR = Path(__file__).parent.parent  # Fallback: parent of management/
+
 class DailySnapshotManager:
-    def __init__(self, base_dir="/path/to/training"):
-        self.base_dir = Path(base_dir)
+    def __init__(self, base_dir=None):
+        self.base_dir = Path(base_dir) if base_dir else _DEFAULT_BASE_DIR
         self.snapshots_dir = self.base_dir / "snapshots"
         self.current_model = self.base_dir / "current_model"
 

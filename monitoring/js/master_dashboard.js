@@ -2263,7 +2263,8 @@ async function openPreview(filename) {
     document.getElementById('previewFormat').textContent = '--';
 
     try {
-        const response = await fetch(`/api/queue/preview/${encodeURIComponent(filename)}?count=10`);
+        const apiBase = CONFIG.apiUrl.replace('/api/unified', '');
+        const response = await fetch(`${apiBase}/api/queue/preview/${encodeURIComponent(filename)}?count=10`);
         const data = await response.json();
 
         if (data.error) {

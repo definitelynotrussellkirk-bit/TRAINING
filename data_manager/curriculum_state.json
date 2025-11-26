@@ -893,6 +893,28 @@
             "problems": 20,
             "correct": 0
           }
+        },
+        {
+          "step": 181603,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-26T18:28:05.937844",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
+        },
+        {
+          "step": 181634,
+          "accuracy": 0.0,
+          "level": 1,
+          "timestamp": "2025-11-26T18:38:05.983271",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0
+          }
         }
       ],
       "progression_history": []
@@ -906,5 +928,5 @@
   "active_skill": "syllo",
   "started_at": "2025-11-26T04:00:00.000000",
   "migrated_at": "2025-11-25T05:58:43.214548",
-  "last_updated": "2025-11-26T18:18:05.867563"
+  "last_updated": "2025-11-26T18:38:05.983963"
 }

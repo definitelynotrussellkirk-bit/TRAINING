@@ -1,4 +1,4 @@
-"""Guild test suite."""
+"""Pytest configuration for guild tests."""
 import sys
 from pathlib import Path
 

@@ -1,0 +1,135 @@
+# Status effect definitions
+
+effects:
+  tunnel_vision:
+    id: tunnel_vision
+    name: Tunnel Vision
+    description: Overfitting - high training accuracy, low validation accuracy
+    type: debuff
+    severity: medium
+    default_duration_steps: null
+    cure_condition: val_gap < 0.25 for 100 steps
+    effects:
+      accuracy_display_warning: true
+    rpg_name: Tunnel Vision
+    rpg_description: >
+      The hero has become too focused on familiar patterns,
+      losing sight of the broader picture.
+
+  confusion:
+    id: confusion
+    name: Confusion
+    description: Mode collapse or repeated failures
+    type: debuff
+    severity: medium
+    default_duration_steps: 500
+    cure_condition: 10 consecutive successes
+    effects:
+      xp_multiplier: 0.8
+    rpg_name: Confusion
+    rpg_description: >
+      The hero's mind is clouded, leading to erratic behavior.
+
+  curse_of_repetition:
+    id: curse_of_repetition
+    name: Curse of Repetition
+    description: Degenerate outputs with loops or garbage
+    type: debuff
+    severity: high
+    default_duration_steps: null
+    cure_condition: manual intervention
+    effects:
+      requires_attention: true
+    rpg_name: Curse of Repetition
+    rpg_description: >
+      A dark curse causing the hero to repeat words endlessly.
+
+  exhaustion:
+    id: exhaustion
+    name: Exhaustion
+    description: OOM or resource exhaustion
+    type: debuff
+    severity: high
+    default_duration_steps: null
+    cure_condition: restart with reduced load
+    effects:
+      training_blocked: true
+    rpg_name: Exhaustion
+    rpg_description: >
+      The hero has collapsed from carrying too heavy a burden.
+
+  reality_tear:
+    id: reality_tear
+    name: Reality Tear
+    description: NaN loss or training collapse
+    type: debuff
+    severity: critical
+    default_duration_steps: null
+    cure_condition: manual intervention required
+    effects:
+      training_blocked: true
+      requires_immediate_attention: true
+    rpg_name: Reality Tear
+    rpg_description: >
+      A catastrophic rift in training reality.
+
+  momentum:
+    id: momentum
+    name: Momentum
+    description: Extended win streak - bonus XP
+    type: buff
+    severity: low
+    default_duration_steps: 100
+    effects:
+      xp_multiplier: 1.25
+    rpg_name: Momentum
+    rpg_description: >
+      The hero is on a roll, gaining power with each victory.
+
+  insight:
+    id: insight
+    name: Insight
+    description: Breakthrough discovery - fast learning
+    type: buff
+    severity: medium
+    default_duration_steps: 50
+    effects:
+      xp_multiplier: 1.5
+    rpg_name: Insight
+    rpg_description: >
+      A flash of understanding illuminates the hero's path.
+
+rules:
+  - id: detect_tunnel_vision
+    effect_id: tunnel_vision
+    trigger_type: metric_threshold
+    trigger_config:
+      metric: val_train_gap
+      op: gt
+      value: 0.3
+      window: 10
+    cooldown_steps: 500
+
+  - id: detect_confusion
+    effect_id: confusion
+    trigger_type: consecutive_failures
+    trigger_config:
+      count: 5
+      result: miss
+    cooldown_steps: 200
+
+  - id: detect_nan
+    effect_id: reality_tear
+    trigger_type: metric_threshold
+    trigger_config:
+      metric: loss
+      op: is_nan
+    cooldown_steps: 0
+
+  - id: grant_momentum
+    effect_id: momentum
+    trigger_type: consecutive_successes
+    trigger_config:
+      count: 10
+      result: hit_or_crit
+    cooldown_steps: 200

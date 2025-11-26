@@ -1,0 +1,37 @@
+id: logic_weaving
+name: Logic Weaving
+description: >
+  The discipline of chaining deductions, solving puzzles, and
+  constructing valid arguments. Primary skill for SYLLO tasks.
+category: reasoning
+
+tags:
+  - reasoning
+  - deduction
+  - puzzles
+  - syllo
+
+metrics:
+  - accuracy
+  - word_accuracy
+  - json_validity
+primary_metric: accuracy
+
+accuracy_thresholds:
+  1: 0.60
+  2: 0.65
+  3: 0.70
+  4: 0.72
+  5: 0.75
+  6: 0.78
+  7: 0.80
+  8: 0.82
+  9: 0.85
+  10: 0.88
+
+xp_multiplier: 1.0
+
+rpg_name: Logic Weaving
+rpg_description: >
+  The art of weaving threads of logic into coherent tapestries of proof.
+  Masters of this discipline can untangle the most complex syllogisms.

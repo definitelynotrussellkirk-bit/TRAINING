@@ -1,0 +1,36 @@
+id: oath_binding
+name: Oath Binding
+description: >
+  The discipline of following instructions precisely and honoring
+  constraints. Essential for reliable model behavior.
+category: instruction
+
+tags:
+  - instruction
+  - constraints
+  - format
+  - compliance
+
+metrics:
+  - instruction_accuracy
+  - format_compliance
+primary_metric: instruction_accuracy
+
+accuracy_thresholds:
+  1: 0.55
+  2: 0.60
+  3: 0.65
+  4: 0.70
+  5: 0.75
+  6: 0.80
+  7: 0.85
+  8: 0.88
+  9: 0.90
+  10: 0.92
+
+xp_multiplier: 1.2
+
+rpg_name: Oath Binding
+rpg_description: >
+  The sacred art of binding oneself to constraints and honoring instructions.
+  Those who master it are trusted with the most precise tasks.

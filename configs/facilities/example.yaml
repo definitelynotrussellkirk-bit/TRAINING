@@ -1,0 +1,57 @@
+# Example facility configuration
+# Copy to local.yaml and customize for your setup
+
+facilities:
+  main_hub:
+    id: main_hub
+    name: Main Hub
+    type: hub
+    description: Central management and monitoring
+    host: localhost
+    port: 8765
+    base_path: "${GUILD_BASE_DIR:-.}"
+    paths:
+      status: status/
+      logs: logs/
+      queue: queue/
+      ui: monitoring/ui/
+    is_local: true
+    rpg_name: The Inn
+    rpg_description: Central hub where heroes rest and quests are managed
+
+  training_gpu:
+    id: training_gpu
+    name: Training GPU
+    type: battlefield
+    description: Primary training facility
+    host: localhost
+    base_path: "${GUILD_BASE_DIR:-.}"
+    paths:
+      checkpoints: current_model/
+      snapshots: snapshots/
+      models: models/
+    resources:
+      - id: gpu_0
+        type: gpu
+        properties:
+          vram_gb: 24
+          model: GPU
+    is_local: true
+    rpg_name: The Arena
+    rpg_description: Battlefield where heroes train and grow stronger
+
+  archive:
+    id: archive
+    name: Archive Storage
+    type: archive
+    description: Long-term storage
+    base_path: "${GUILD_ARCHIVE_DIR:-./archive}"
+    paths:
+      backups: backups/
+      datasets: datasets/
+      logs: logs/
+    is_local: true
+    rpg_name: The Deep Vault
+    rpg_description: Grand archive where soul anchors and ancient tomes are kept
+
+default_facility: training_gpu

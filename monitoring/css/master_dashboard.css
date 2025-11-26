@@ -2058,3 +2058,170 @@ body {
 .skill-flow-trend.improving { color: var(--color-success); }
 .skill-flow-trend.declining { color: var(--color-danger); }
 .skill-flow-trend.stable { color: var(--text-muted); }
+
+/* ===================== */
+/* File Preview Modal    */
+/* ===================== */
+.preview-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.preview-modal-content {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.preview-modal-header {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--card-border);
+    gap: 1rem;
+}
+
+.preview-modal-header h3 {
+    margin: 0;
+    flex: 1;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preview-counter {
+    font-size: 0.85rem;
+    color: var(--color-info);
+    background: rgba(79, 195, 247, 0.15);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+}
+
+.preview-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.preview-close:hover {
+    color: var(--color-danger);
+}
+
+.preview-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.preview-section {
+    margin-bottom: 1.5rem;
+}
+
+.preview-section:last-child {
+    margin-bottom: 0;
+}
+
+.preview-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.preview-content {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    padding: 1rem;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.preview-modal-footer {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--card-border);
+}
+
+.preview-nav-btn, .preview-shuffle-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--card-border);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.preview-nav-btn:hover, .preview-shuffle-btn:hover {
+    background: var(--color-info);
+    border-color: var(--color-info);
+}
+
+.preview-shuffle-btn {
+    background: rgba(79, 195, 247, 0.15);
+    border-color: var(--color-info);
+}
+
+.preview-meta {
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--card-border);
+}
+
+/* Make queue files clickable */
+.queue-file {
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.queue-file:hover {
+    background: rgba(79, 195, 247, 0.1) !important;
+}
+
+.queue-file-name {
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    transition: text-decoration-color 0.2s ease;
+}
+
+.queue-file:hover .queue-file-name {
+    text-decoration-color: var(--color-info);
+}

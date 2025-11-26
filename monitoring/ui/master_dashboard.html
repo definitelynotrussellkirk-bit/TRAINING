@@ -808,5 +808,35 @@
     </footer>
 
     <script src="/js/master_dashboard.js"></script>
+
+    <!-- File Preview Modal -->
+    <div id="previewModal" class="preview-modal" style="display: none;">
+        <div class="preview-modal-content">
+            <div class="preview-modal-header">
+                <h3 id="previewFileName">Loading...</h3>
+                <span id="previewCounter" class="preview-counter">1/5</span>
+                <button class="preview-close" onclick="closePreview()">&times;</button>
+            </div>
+            <div class="preview-modal-body">
+                <div class="preview-section">
+                    <div class="preview-label">📝 Prompt</div>
+                    <div class="preview-content" id="previewPrompt">Loading...</div>
+                </div>
+                <div class="preview-section">
+                    <div class="preview-label">✅ Golden Answer</div>
+                    <div class="preview-content" id="previewResponse">Loading...</div>
+                </div>
+            </div>
+            <div class="preview-modal-footer">
+                <button onclick="prevPreview()" class="preview-nav-btn">◀ Prev</button>
+                <button onclick="shufflePreview()" class="preview-shuffle-btn">🔀 Shuffle</button>
+                <button onclick="nextPreview()" class="preview-nav-btn">Next ▶</button>
+            </div>
+            <div class="preview-meta">
+                <span id="previewTotalExamples">-- examples</span> •
+                <span id="previewFormat">--</span>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

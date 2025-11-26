@@ -1526,10 +1526,10 @@ function renderQueueFilesMain(filter) {
     if (emptyEl) emptyEl.style.display = 'none';
 
     listEl.innerHTML = files.map(f => `
-        <div class="q-file" title="${f.name}">
+        <div class="q-file queue-file" title="Click to preview: ${f.name}" onclick="openPreview('${f.name}')">
             <div class="q-dot ${f.priority || 'normal'}"></div>
             <div class="q-info">
-                <div class="q-name">${f.name}</div>
+                <div class="q-name queue-file-name">${f.name}</div>
                 <div class="q-meta">${(f.examples || 0).toLocaleString()} ex · ${f.size_mb || '?'} MB</div>
             </div>
             <div class="q-size">${formatQueueNumber(f.examples)}</div>
@@ -2237,5 +2237,158 @@ document.addEventListener('visibilitychange', () => {
         console.log('Dashboard visible, resuming refresh');
         fetchData();
         startAutoRefresh();
+    }
+});
+
+// ===== File Preview Modal =====
+
+let previewData = null;
+let previewIndex = 0;
+let previewRotationInterval = null;
+
+/**
+ * Open the preview modal for a queue file
+ */
+async function openPreview(filename) {
+    const modal = document.getElementById('previewModal');
+    if (!modal) return;
+
+    // Show modal with loading state
+    modal.style.display = 'flex';
+    document.getElementById('previewFileName').textContent = filename;
+    document.getElementById('previewCounter').textContent = 'Loading...';
+    document.getElementById('previewPrompt').textContent = 'Loading examples...';
+    document.getElementById('previewResponse').textContent = '';
+    document.getElementById('previewTotalExamples').textContent = '-- examples';
+    document.getElementById('previewFormat').textContent = '--';
+
+    try {
+        const response = await fetch(`/api/queue/preview/${encodeURIComponent(filename)}?count=10`);
+        const data = await response.json();
+
+        if (data.error) {
+            document.getElementById('previewPrompt').textContent = `Error: ${data.error}`;
+            document.getElementById('previewResponse').textContent = '';
+            return;
+        }
+
+        previewData = data;
+        previewIndex = 0;
+
+        document.getElementById('previewTotalExamples').textContent = `${data.total_examples.toLocaleString()} examples`;
+        displayPreviewItem();
+
+        // Start auto-rotation every 5 seconds
+        startPreviewRotation();
+
+    } catch (error) {
+        document.getElementById('previewPrompt').textContent = `Fetch error: ${error.message}`;
+        document.getElementById('previewResponse').textContent = '';
+    }
+}
+
+/**
+ * Display the current preview item
+ */
+function displayPreviewItem() {
+    if (!previewData || !previewData.previews || previewData.previews.length === 0) return;
+
+    const item = previewData.previews[previewIndex];
+    document.getElementById('previewCounter').textContent = `${previewIndex + 1}/${previewData.previews.length}`;
+    document.getElementById('previewPrompt').textContent = item.prompt || '(no prompt)';
+    document.getElementById('previewResponse').textContent = item.response || '(no response)';
+    document.getElementById('previewFormat').textContent = item.format || 'unknown';
+}
+
+/**
+ * Go to next preview item
+ */
+function nextPreview() {
+    if (!previewData || !previewData.previews) return;
+    previewIndex = (previewIndex + 1) % previewData.previews.length;
+    displayPreviewItem();
+    restartPreviewRotation();
+}
+
+/**
+ * Go to previous preview item
+ */
+function prevPreview() {
+    if (!previewData || !previewData.previews) return;
+    previewIndex = (previewIndex - 1 + previewData.previews.length) % previewData.previews.length;
+    displayPreviewItem();
+    restartPreviewRotation();
+}
+
+/**
+ * Shuffle and reload previews
+ */
+async function shufflePreview() {
+    if (!previewData) return;
+    const filename = previewData.filename;
+    await openPreview(filename);
+}
+
+/**
+ * Start auto-rotation of preview items
+ */
+function startPreviewRotation() {
+    stopPreviewRotation();
+    previewRotationInterval = setInterval(() => {
+        if (previewData && previewData.previews && previewData.previews.length > 1) {
+            previewIndex = (previewIndex + 1) % previewData.previews.length;
+            displayPreviewItem();
+        }
+    }, 5000); // Rotate every 5 seconds
+}
+
+/**
+ * Stop auto-rotation
+ */
+function stopPreviewRotation() {
+    if (previewRotationInterval) {
+        clearInterval(previewRotationInterval);
+        previewRotationInterval = null;
+    }
+}
+
+/**
+ * Restart rotation (when user manually navigates)
+ */
+function restartPreviewRotation() {
+    startPreviewRotation();
+}
+
+/**
+ * Close the preview modal
+ */
+function closePreview() {
+    const modal = document.getElementById('previewModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    stopPreviewRotation();
+    previewData = null;
+    previewIndex = 0;
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closePreview();
+    }
+    // Arrow key navigation when modal is open
+    const modal = document.getElementById('previewModal');
+    if (modal && modal.style.display !== 'none') {
+        if (e.key === 'ArrowRight') nextPreview();
+        if (e.key === 'ArrowLeft') prevPreview();
+    }
+});
+
+// Close modal when clicking outside content
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('previewModal');
+    if (e.target === modal) {
+        closePreview();
     }
 });

@@ -256,6 +256,115 @@ def api_queue():
         }), 500
 
 
+@app.route('/api/queue/preview/<path:filename>')
+def api_queue_preview(filename):
+    """
+    Get random examples from a queue file for preview.
+
+    Args:
+        filename: Name of the JSONL file in the queue
+
+    Query params:
+        count: Number of examples to return (default 5, max 20)
+
+    Returns random examples with prompt and golden answer.
+    """
+    import random
+
+    try:
+        base_dir = Path('/path/to/training')
+        count = min(int(request.args.get('count', 5)), 20)
+
+        # Find the file in queue directories
+        file_path = None
+        for priority in ('high', 'normal', 'low', 'processing'):
+            candidate = base_dir / 'queue' / priority / filename
+            if candidate.exists():
+                file_path = candidate
+                break
+
+        # Also check inbox
+        if not file_path:
+            candidate = base_dir / 'inbox' / filename
+            if candidate.exists():
+                file_path = candidate
+
+        if not file_path:
+            return jsonify({
+                'error': f'File not found: {filename}',
+                'filename': filename
+            }), 404
+
+        # Read all examples
+        examples = []
+        with open(file_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        examples.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+
+        if not examples:
+            return jsonify({
+                'error': 'No valid examples in file',
+                'filename': filename,
+                'total_examples': 0
+            }), 400
+
+        # Select random examples
+        selected = random.sample(examples, min(count, len(examples)))
+
+        # Extract prompt and response for display
+        previews = []
+        for ex in selected:
+            # Handle different formats (messages array or prompt/response)
+            if 'messages' in ex:
+                messages = ex['messages']
+                # Find user message (prompt) and assistant message (response)
+                prompt = None
+                response = None
+                for msg in messages:
+                    role = msg.get('role', '')
+                    content = msg.get('content', '')
+                    if role == 'user' and not prompt:
+                        prompt = content
+                    elif role == 'assistant':
+                        response = content
+                previews.append({
+                    'prompt': prompt or '(no prompt)',
+                    'response': response or '(no response)',
+                    'format': 'messages'
+                })
+            elif 'prompt' in ex:
+                previews.append({
+                    'prompt': ex.get('prompt', '(no prompt)'),
+                    'response': ex.get('response', ex.get('completion', '(no response)')),
+                    'format': 'prompt_response'
+                })
+            else:
+                # Unknown format - show raw
+                previews.append({
+                    'prompt': str(ex)[:500],
+                    'response': '(unknown format)',
+                    'format': 'raw'
+                })
+
+        return jsonify({
+            'filename': filename,
+            'total_examples': len(examples),
+            'preview_count': len(previews),
+            'previews': previews
+        })
+
+    except Exception as e:
+        logger.error(f"Error in /api/queue/preview: {e}", exc_info=True)
+        return jsonify({
+            'error': str(e),
+            'filename': filename
+        }), 500
+
+
 @app.route('/api/curriculum-state')
 def api_curriculum_state():
     """

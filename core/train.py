@@ -87,6 +87,9 @@ from trainer.config import ConfigLoader, TrainerConfig, create_default_config
 from trainer.profiles import get_profile
 # NOTE: trainer.monitoring.TrainingStatusWriter exists but we use core/training_status.py for now (backward compat)
 
+# Import chat template override (fixes Qwen3 <think> injection conflict)
+from core.chat_templates import apply_chat_template_override
+
 # Import Data Manager for remote eval
 sys.path.insert(0, str(Path(__file__).parent.parent / "data_manager"))
 try:
@@ -757,6 +760,11 @@ class UltimateTrainer:
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
                 print("   ✓ Set pad_token = eos_token")
+
+            # Override chat template if needed (fixes Qwen3 <think> injection conflict)
+            # Must be done BEFORE formatting examples for training
+            profile_name = self.config.profile.name if self.config and self.config.profile else None
+            apply_chat_template_override(self.tokenizer, profile_name=profile_name, verbose=True)
 
             # Disable KV cache for training (saves memory)
             self.model.config.use_cache = False

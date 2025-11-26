@@ -96,6 +96,14 @@ TASK_TYPE_PRIORITIES = {
     "self_improve_cycle": Priority.NORMAL,   # Full self-improving cycle
     # Phase 6: Hard example discovery
     "expand_hard_examples": Priority.LOW,    # Discover new hard examples from failures
+    # Dashboard status tasks
+    "confidence_calibration": Priority.LOW,   # Calibrate model confidence scores
+    "curriculum_optimization": Priority.LOW,  # Optimize curriculum difficulty
+    "regression_monitoring": Priority.NORMAL, # Monitor for regressions
+    "checkpoint_sync": Priority.LOW,          # Sync checkpoints between machines
+    # Storage tasks
+    "storage_check": Priority.LOW,            # Check Synology NAS storage status
+    "storage_sync": Priority.LOW,             # Sync checkpoints to NAS
 }
 
 
@@ -242,6 +250,14 @@ class TaskExecutor:
             "self_improve_cycle": self._handle_self_improve_cycle,
             # Phase 6: Hard example discovery
             "expand_hard_examples": self._handle_expand_hard_examples,
+            # Dashboard status tasks
+            "confidence_calibration": self._handle_confidence_calibration,
+            "curriculum_optimization": self._handle_curriculum_optimization,
+            "regression_monitoring": self._handle_regression_monitoring,
+            "checkpoint_sync": self._handle_checkpoint_sync,
+            # Storage tasks
+            "storage_check": self._handle_storage_check,
+            "storage_sync": self._handle_storage_sync,
         }
 
     def register_handler(self, task_type: str, handler: Callable):
@@ -359,6 +375,9 @@ class TaskExecutor:
                 # Run test suite
                 results = daemon.run_test_suite(checkpoint_name)
 
+                # Save results to status file so dashboard can display them
+                daemon.save_results(results)
+
                 return {
                     "task": "automated_testing",
                     "total": results.get("total", 0),
@@ -447,6 +466,9 @@ class TaskExecutor:
                 if len(loop.error_cache) >= error_threshold:
                     loop.process_error_batch()
 
+                # Save status to file so dashboard can display it
+                loop.update_status()
+
                 return {
                     "task": "self_correction",
                     "files_processed": files_processed,
@@ -501,6 +523,9 @@ class TaskExecutor:
                     except Exception as e:
                         logger.warning(f"Mining {category} failed: {e}")
                         results["by_category"][category] = 0
+
+                # Save results to status file so dashboard can display them
+                miner._save_results()
 
                 return results
         except Exception as e:
@@ -980,6 +1005,232 @@ class TaskExecutor:
         except Exception as e:
             logger.error(f"Hard example expansion failed: {e}")
             return {"task": "expand_hard_examples", "error": str(e)}
+
+    def _handle_confidence_calibration(self, params: Dict) -> Dict:
+        """Run confidence calibration - measures model calibration on validation set"""
+        base_dir = params.get("base_dir", "/path/to/training")
+        num_samples = params.get("num_samples", 100)
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "confidence_calibrator",
+                f"{base_dir}/monitoring/confidence_calibrator.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                calibrator = module.ConfidenceCalibrator(
+                    base_dir=base_dir,
+                    test_samples=num_samples
+                )
+
+                # Run calibration (uses inference_url from config or default)
+                results = calibrator.run_calibration()
+
+                # Save results to status file
+                if hasattr(calibrator, '_save_results'):
+                    calibrator._save_results()
+
+                return {
+                    "task": "confidence_calibration",
+                    "samples_tested": getattr(calibrator, 'test_samples', 0),
+                    "results": results if isinstance(results, dict) else {},
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            logger.error(f"Confidence calibration failed: {e}")
+            return {"task": "confidence_calibration", "error": str(e)}
+
+    def _handle_curriculum_optimization(self, params: Dict) -> Dict:
+        """Run curriculum optimization - adjusts difficulty based on performance"""
+        base_dir = params.get("base_dir", "/path/to/training")
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "curriculum_optimizer",
+                f"{base_dir}/monitoring/curriculum_optimizer.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                optimizer = module.CurriculumOptimizer(base_dir=base_dir)
+
+                # Run optimization cycle
+                results = optimizer.optimize_curriculum()
+
+                # Save results to status file
+                if hasattr(optimizer, '_save_results'):
+                    optimizer._save_results()
+
+                return {
+                    "task": "curriculum_optimization",
+                    "results": results if isinstance(results, dict) else {},
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            logger.error(f"Curriculum optimization failed: {e}")
+            return {"task": "curriculum_optimization", "error": str(e)}
+
+    def _handle_regression_monitoring(self, params: Dict) -> Dict:
+        """Run regression monitoring - checks for performance degradation"""
+        base_dir = params.get("base_dir", "/path/to/training")
+        threshold = params.get("threshold", 0.05)  # 5% drop = regression
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "regression_detector",
+                f"{base_dir}/monitoring/regression_detector.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                detector = module.RegressionDetector(
+                    api_url=self.inference_url,
+                    base_dir=base_dir,
+                    threshold=threshold
+                )
+
+                # Run regression check
+                results = detector.check_regression()
+
+                # Save results to status file
+                if hasattr(detector, '_save_results'):
+                    detector._save_results()
+
+                return {
+                    "task": "regression_monitoring",
+                    "regression_detected": results.get("regression_detected", False),
+                    "current_accuracy": results.get("current_accuracy", 0),
+                    "baseline_accuracy": results.get("baseline_accuracy", 0),
+                    "accuracy_delta": results.get("accuracy_delta", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            logger.error(f"Regression monitoring failed: {e}")
+            return {"task": "regression_monitoring", "error": str(e)}
+
+    def _handle_checkpoint_sync(self, params: Dict) -> Dict:
+        """Run checkpoint sync - syncs checkpoints between machines"""
+        base_dir = params.get("base_dir", "/path/to/training")
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "checkpoint_sync",
+                f"{base_dir}/monitoring/checkpoint_sync_daemon.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                syncer = module.CheckpointSyncDaemon(base_dir=base_dir)
+
+                # Run sync check
+                results = syncer.check_sync_status()
+
+                # Save results to status file
+                if hasattr(syncer, '_save_status'):
+                    syncer._save_status()
+
+                return {
+                    "task": "checkpoint_sync",
+                    "in_sync": results.get("in_sync", False),
+                    "local_checkpoint": results.get("local_checkpoint", "unknown"),
+                    "remote_checkpoint": results.get("remote_checkpoint", "unknown"),
+                    "last_sync": results.get("last_sync", "never"),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            logger.error(f"Checkpoint sync failed: {e}")
+            return {"task": "checkpoint_sync", "error": str(e)}
+
+    def _handle_storage_check(self, params: Dict) -> Dict:
+        """Check Synology NAS storage status"""
+        base_dir = params.get("base_dir", "/path/to/training")
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "storage_manager",
+                f"{base_dir}/monitoring/storage_manager.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                # Load credentials
+                creds = module.load_credentials()
+                if not creds.get("password"):
+                    return {"task": "storage_check", "error": "No credentials found"}
+
+                mgr = module.StorageManager(
+                    host=creds.get("host", "192.168.x.x"),
+                    username=creds.get("username", "user"),
+                    password=creds["password"],
+                    port=creds.get("port", 5001),
+                    base_dir=base_dir
+                )
+
+                status = mgr.get_status()
+                mgr._save_status()
+
+                return {
+                    "task": "storage_check",
+                    "connected": status.get("connected", False),
+                    "host": status.get("host"),
+                    "health": status.get("health", "unknown"),
+                    "total_tb": status.get("total_capacity_tb", 0),
+                    "used_tb": status.get("used_capacity_tb", 0),
+                    "usage_percent": status.get("usage_percent", 0),
+                    "disks": len(status.get("disks", [])),
+                    "timestamp": datetime.now().isoformat()
+                }
+
+        except Exception as e:
+            logger.error(f"Storage check failed: {e}")
+            return {"task": "storage_check", "error": str(e)}
+
+    def _handle_storage_sync(self, params: Dict) -> Dict:
+        """Sync files to Synology NAS using folder types"""
+        base_dir = params.get("base_dir", "/path/to/training")
+        local_path = params.get("local_path")
+        folder_type = params.get("folder_type", "backups")  # checkpoints, models, backups, logs, etc.
+        subfolder = params.get("subfolder", "")
+
+        if not local_path:
+            return {"task": "storage_sync", "error": "local_path required"}
+
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "storage_manager",
+                f"{base_dir}/monitoring/storage_manager.py"
+            )
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                # Use the new sync_to_nas helper
+                result = module.sync_to_nas(
+                    local_path=local_path,
+                    folder_type=folder_type,
+                    subfolder=subfolder,
+                    base_dir=base_dir
+                )
+
+                return {
+                    "task": "storage_sync",
+                    "success": result.get("success", False),
+                    "local_path": local_path,
+                    "folder_type": folder_type,
+                    "remote_path": result.get("remote_path"),
+                    "error": result.get("error"),
+                    "timestamp": datetime.now().isoformat()
+                }
+
+        except Exception as e:
+            logger.error(f"Storage sync failed: {e}")
+            return {"task": "storage_sync", "error": str(e)}
 
 
 class GPUTaskScheduler:

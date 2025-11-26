@@ -30,21 +30,23 @@ class CheckpointSyncDaemon:
         self,
         remote_host: str = "192.168.x.x",
         remote_dir: str = "/path/to/training/models/current_model",
-        local_dir: str = "/home/user/TRAINING/models/current_model",
+        local_dir: str = None,
+        base_dir: str = "/path/to/training",
         interval: int = 300,  # 5 minutes
         keep_recent: int = 3,  # Keep 3 most recent checkpoints
     ):
+        self.base_dir = Path(base_dir)
         self.remote_host = remote_host
         self.remote_dir = remote_dir
-        self.local_dir = Path(local_dir)
+        self.local_dir = Path(local_dir) if local_dir else self.base_dir / "models" / "current_model"
         self.interval = interval
         self.keep_recent = keep_recent
 
         # Ensure local dir exists
         self.local_dir.mkdir(parents=True, exist_ok=True)
 
-        # Track tested checkpoints
-        self.status_file = Path("/home/user/TRAINING/status/checkpoint_sync.json")
+        # Track tested checkpoints - use base_dir for status
+        self.status_file = self.base_dir / "status" / "checkpoint_sync.json"
         self.status_file.parent.mkdir(parents=True, exist_ok=True)
 
         self.tested_checkpoints = self.load_tested_checkpoints()
@@ -54,7 +56,7 @@ class CheckpointSyncDaemon:
         tested = set()
 
         # Check curriculum optimizer results
-        curriculum_file = Path("/home/user/TRAINING/status/curriculum_optimization.json")
+        curriculum_file = self.base_dir / "status" / "curriculum_optimization.json"
         if curriculum_file.exists():
             try:
                 with open(curriculum_file) as f:
@@ -67,7 +69,7 @@ class CheckpointSyncDaemon:
                 pass
 
         # Check regression monitor results
-        regression_file = Path("/home/user/TRAINING/status/regression_monitoring.json")
+        regression_file = self.base_dir / "status" / "regression_monitoring.json"
         if regression_file.exists():
             try:
                 with open(regression_file) as f:
@@ -236,6 +238,69 @@ class CheckpointSyncDaemon:
 
         with open(self.status_file, 'w') as f:
             json.dump(status, f, indent=2)
+
+    def _save_status(self):
+        """Alias for save_status() - called by GPU scheduler"""
+        remote = self.get_remote_checkpoints()
+        local = self.get_local_checkpoints()
+        self.save_status(local[0] if local else None, remote)
+
+    def check_sync_status(self) -> Dict:
+        """
+        Check sync status between local and remote checkpoints.
+        Called by GPU scheduler.
+
+        Returns:
+            Dict with sync status
+        """
+        logger.info("Checking checkpoint sync status...")
+
+        # Refresh tested checkpoints
+        self.tested_checkpoints = self.load_tested_checkpoints()
+
+        # Get checkpoint lists
+        remote_checkpoints = self.get_remote_checkpoints()
+        local_checkpoints = self.get_local_checkpoints()
+
+        # Check if in sync
+        in_sync = False
+        if remote_checkpoints and local_checkpoints:
+            # In sync if latest remote is also local
+            in_sync = remote_checkpoints[0] in local_checkpoints
+
+        # Find what needs syncing
+        need_sync = [
+            step for step in remote_checkpoints
+            if step not in local_checkpoints
+        ][:5]  # Top 5 missing
+
+        result = {
+            "in_sync": in_sync,
+            "local_checkpoint": f"checkpoint-{local_checkpoints[0]}" if local_checkpoints else "none",
+            "remote_checkpoint": f"checkpoint-{remote_checkpoints[0]}" if remote_checkpoints else "none",
+            "local_count": len(local_checkpoints),
+            "remote_count": len(remote_checkpoints),
+            "need_sync": need_sync,
+            "last_sync": datetime.now().isoformat(),
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Optionally sync if needed
+        if need_sync:
+            selected = self.select_best_checkpoint(remote_checkpoints, local_checkpoints)
+            if selected:
+                logger.info(f"Syncing checkpoint-{selected}...")
+                if self.sync_checkpoint(selected):
+                    result["synced"] = selected
+                    result["in_sync"] = True
+
+        # Save status
+        self.save_status(
+            result.get("synced"),
+            remote_checkpoints
+        )
+
+        return result
 
     def run_iteration(self):
         """Run one sync iteration"""

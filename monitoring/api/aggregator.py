@@ -22,6 +22,10 @@ from .plugins.model_comparison import ModelComparisonPlugin
 from .plugins.confidence import ConfidencePlugin
 from .plugins.testing import TestingPlugin
 from .plugins.self_correction import SelfCorrectionPlugin
+from .plugins.skill_metrics import SkillMetricsPlugin
+from .plugins.training_analytics import TrainingAnalyticsPlugin
+from .plugins.system_health import SystemHealthPlugin
+from .plugins.retention import RetentionPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +103,26 @@ class DataAggregator:
 
             self.registry.register(SelfCorrectionPlugin(
                 config=self.config.get('self_correction', {})
+            ))
+
+            # Skill metrics (local + remote baselines)
+            self.registry.register(SkillMetricsPlugin(
+                config=self.config.get('skill_metrics', {})
+            ))
+
+            # Training analytics (layer drift, parameter stability) - from 3090
+            self.registry.register(TrainingAnalyticsPlugin(
+                config=self.config.get('training_analytics', {})
+            ))
+
+            # System health (meta-monitor across all machines)
+            self.registry.register(SystemHealthPlugin(
+                config=self.config.get('system_health', {})
+            ))
+
+            # Retention status (checkpoint/snapshot storage)
+            self.registry.register(RetentionPlugin(
+                config=self.config.get('retention', {})
             ))
 
             logger.info(f"Registered {len(self.registry.plugins)} default plugins")

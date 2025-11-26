@@ -7,12 +7,24 @@ Creates high-value training data from errors via automated correction
 import json
 import requests
 import time
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 from collections import defaultdict
 import logging
 import re
+
+# Add parent to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+try:
+    from core.paths import get_base_dir, get_remote_api_url
+except ImportError:
+    def get_base_dir():
+        return Path("/path/to/training")
+    def get_remote_api_url():
+        return "http://192.168.x.x:8765"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,13 +45,13 @@ class SelfCorrectionLoop:
 
     def __init__(
         self,
-        api_url: str = "http://192.168.x.x:8765",
-        base_dir: str = "/path/to/training",
+        api_url: str = None,
+        base_dir: str = None,
         batch_size: int = 100,
         error_threshold: int = 50  # Min errors before analysis
     ):
-        self.api_url = api_url
-        self.base_dir = Path(base_dir)
+        self.api_url = api_url or get_remote_api_url()
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
         self.batch_size = batch_size
         self.error_threshold = error_threshold
 

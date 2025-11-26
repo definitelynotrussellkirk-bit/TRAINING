@@ -13,6 +13,8 @@ import sys
 import os
 import json
 import math
+from pathlib import Path
+from datetime import datetime
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -56,6 +58,7 @@ def index():
             '/api/health': 'Get health status of all plugins',
             '/api/sources': 'List available data sources',
             '/api/cache/clear': 'Clear all plugin caches (POST)',
+            '/api/queue': 'Get training queue status and pipeline info',
         },
         'machines': {
             '4090': 'Training machine (local)',
@@ -178,6 +181,108 @@ def api_cache_clear():
         }), 500
 
 
+@app.route('/api/queue')
+def api_queue():
+    """
+    Get training queue status.
+
+    Returns queue depth, pending examples, and recent batch info.
+    Used by SYLLO dashboard for pipeline status.
+    """
+    try:
+        base_dir = Path('/path/to/training')
+        queue_dir = base_dir / 'queue'
+
+        # Count files in each priority queue
+        files = []
+        total_examples = 0
+
+        for priority in ('high', 'normal', 'low'):
+            priority_dir = queue_dir / priority
+            if priority_dir.exists():
+                for f in priority_dir.glob('*.jsonl'):
+                    # Count lines (examples) in file
+                    try:
+                        with open(f, 'r') as fh:
+                            line_count = sum(1 for _ in fh)
+                        files.append({
+                            'name': f.name,
+                            'priority': priority,
+                            'examples': line_count,
+                            'size_mb': round(f.stat().st_size / (1024 * 1024), 2),
+                            'modified': datetime.fromtimestamp(f.stat().st_mtime).isoformat()
+                        })
+                        total_examples += line_count
+                    except Exception:
+                        files.append({
+                            'name': f.name,
+                            'priority': priority,
+                            'examples': 0,
+                            'error': 'Could not read file'
+                        })
+
+        # Get recently completed files
+        recent = []
+        recently_completed = queue_dir / 'recently_completed'
+        if recently_completed.exists():
+            for f in sorted(recently_completed.glob('*.jsonl'),
+                           key=lambda x: x.stat().st_mtime, reverse=True)[:10]:
+                recent.append({
+                    'name': f.name,
+                    'completed': datetime.fromtimestamp(f.stat().st_mtime).isoformat()
+                })
+
+        # Check inbox
+        inbox_dir = base_dir / 'inbox'
+        inbox_files = list(inbox_dir.glob('*.jsonl')) if inbox_dir.exists() else []
+
+        return jsonify({
+            'total_files': len(files),
+            'total_examples': total_examples,
+            'files': sorted(files, key=lambda x: (
+                {'high': 0, 'normal': 1, 'low': 2}.get(x.get('priority', 'normal'), 1),
+                x.get('modified', '')
+            )),
+            'recent': recent,
+            'inbox_count': len(inbox_files),
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error in /api/queue: {e}", exc_info=True)
+        return jsonify({
+            'error': str(e),
+            'total_files': 0,
+            'total_examples': 0
+        }), 500
+
+
+@app.route('/api/curriculum-state')
+def api_curriculum_state():
+    """
+    Get curriculum state directly from curriculum_state.json.
+
+    Returns current level, active skill, and progression history.
+    """
+    try:
+        state_file = Path('/path/to/training/data_manager/curriculum_state.json')
+        if state_file.exists():
+            with open(state_file) as f:
+                state = json.load(f)
+            return jsonify(state)
+        else:
+            return jsonify({
+                'error': 'Curriculum state file not found',
+                'skills': {
+                    'syllo': {'current_level': 1, 'accuracy_history': []},
+                    'binary': {'current_level': 1, 'accuracy_history': []}
+                },
+                'active_skill': 'syllo'
+            })
+    except Exception as e:
+        logger.error(f"Error in /api/curriculum-state: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.errorhandler(404)
 def not_found(e):
     """Handle 404 errors"""
@@ -188,7 +293,9 @@ def not_found(e):
             '/api/unified',
             '/api/health',
             '/api/sources',
-            '/api/cache/clear'
+            '/api/cache/clear',
+            '/api/queue',
+            '/api/curriculum-state'
         ]
     }), 404
 

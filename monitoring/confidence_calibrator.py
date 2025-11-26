@@ -75,6 +75,32 @@ class ConfidenceCalibrator:
         with open(self.results_file, 'w') as f:
             json.dump(self.results, f, indent=2)
 
+    def run_calibration(self) -> Dict:
+        """
+        Run a single calibration cycle on the latest checkpoint.
+        Called by GPU scheduler.
+
+        Returns:
+            Dict with calibration results
+        """
+        self.load_test_data()
+        if not self.test_examples:
+            return {"error": "No test examples found"}
+
+        checkpoint_info = self.get_latest_checkpoint()
+        if not checkpoint_info:
+            return {"error": "No checkpoint found"}
+
+        step, checkpoint_path = checkpoint_info
+        result = self.calibrate_checkpoint(checkpoint_path, step)
+
+        if result:
+            self.results["calibrations"].append(result)
+            self._save_results()
+            return result
+
+        return {"error": "Calibration failed"}
+
     def load_test_data(self):
         test_files = list(self.test_data_dir.glob("*.jsonl"))
         self.test_examples = []

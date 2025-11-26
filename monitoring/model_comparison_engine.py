@@ -24,12 +24,26 @@ Use cases:
 import torch
 import json
 import time
+import sys
 import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import numpy as np
+
+# Add parent to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+try:
+    from core.paths import get_base_dir, get_checkpoints_dir, get_status_dir
+except ImportError:
+    def get_base_dir():
+        return Path("/path/to/training")
+    def get_checkpoints_dir():
+        return get_base_dir() / "models" / "current_model"
+    def get_status_dir():
+        return get_base_dir() / "status"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,7 +59,7 @@ class ModelComparisonEngine:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         checkpoint_dir: str = None,
         test_data_dir: str = None,
         comparison_interval: int = 600,  # 10 minutes
@@ -56,15 +70,15 @@ class ModelComparisonEngine:
         Initialize model comparison engine.
 
         Args:
-            base_dir: Base training directory
+            base_dir: Base training directory (auto-detected if not specified)
             checkpoint_dir: Directory to monitor for checkpoints
             test_data_dir: Test data directory
             comparison_interval: Seconds between comparisons
             test_samples: Samples to test per model
             min_checkpoints_for_comparison: Min checkpoints needed
         """
-        self.base_dir = Path(base_dir)
-        self.checkpoint_dir = Path(checkpoint_dir or self.base_dir / "models" / "current_model")
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
+        self.checkpoint_dir = Path(checkpoint_dir) if checkpoint_dir else get_checkpoints_dir()
         self.test_data_dir = Path(test_data_dir or self.base_dir / "data" / "validation")
         self.comparison_interval = comparison_interval
         self.test_samples = test_samples
@@ -181,7 +195,20 @@ class ModelComparisonEngine:
             with torch.no_grad():
                 for example in test_sample:
                     try:
+                        # Handle both "text" and "messages" formats
                         text = example.get("text", "")
+                        if not text and "messages" in example:
+                            # Convert messages to text using chat template
+                            try:
+                                text = tokenizer.apply_chat_template(
+                                    example["messages"],
+                                    tokenize=False,
+                                    add_generation_prompt=False
+                                )
+                            except Exception:
+                                # Fallback: concatenate message content
+                                text = " ".join(m.get("content", "") for m in example["messages"])
+
                         if not text:
                             continue
 

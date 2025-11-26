@@ -115,6 +115,52 @@ class CurriculumOptimizer:
             json.dump(self.results, f, indent=2)
         logger.info(f"Results saved to {self.results_file}")
 
+    def optimize_curriculum(self) -> Dict:
+        """
+        Run a single optimization cycle on the latest checkpoint.
+        Called by GPU scheduler.
+
+        Returns:
+            Dict with optimization results and recommendations
+        """
+        # Load validation sets if not loaded
+        if not any(self.validation_sets.values()):
+            self.load_validation_sets()
+
+        if not any(self.validation_sets.values()):
+            return {"error": "No validation sets found"}
+
+        # Get latest checkpoint
+        checkpoint_info = self.get_latest_checkpoint()
+        if not checkpoint_info:
+            return {"error": "No checkpoint found"}
+
+        step, checkpoint_path = checkpoint_info
+
+        # Evaluate checkpoint
+        eval_results = self.evaluate_checkpoint(checkpoint_path, step)
+        if not eval_results:
+            return {"error": "Evaluation failed"}
+
+        # Store results
+        self.results["evaluations"].append(eval_results)
+
+        # Generate recommendation if we have enough data
+        recommendation = None
+        if len(self.results["evaluations"]) >= 3:
+            recommendation = self.generate_recommendation()
+            if recommendation:
+                self.results["recommendations"].append(recommendation)
+
+        self._save_results()
+
+        return {
+            "step": step,
+            "evaluation": eval_results,
+            "recommendation": recommendation,
+            "total_evaluations": len(self.results["evaluations"])
+        }
+
     def load_validation_sets(self):
         """
         Load validation datasets for each difficulty level.

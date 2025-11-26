@@ -22,11 +22,25 @@ import time
 import logging
 import random
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 from collections import defaultdict
 import requests
+
+# Add parent to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+try:
+    from core.paths import get_base_dir, get_status_dir, get_remote_api_url
+except ImportError:
+    def get_base_dir():
+        return Path("/path/to/training")
+    def get_status_dir():
+        return get_base_dir() / "status"
+    def get_remote_api_url():
+        return "http://192.168.x.x:8765"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,23 +52,30 @@ logger = logging.getLogger(__name__)
 class SelfCorrectionImpactMonitor:
     """
     Measures impact of self-correction by re-testing error patterns.
+
+    Enhanced to track:
+    - Individual correction batch effectiveness
+    - Correlation between corrections applied and error rate changes
+    - "Did this correction help?" score per batch
     """
 
     def __init__(
         self,
-        api_url: str = "http://192.168.x.x:8765",
-        base_dir: str = "/path/to/training",
+        api_url: str = None,
+        base_dir: str = None,
         samples_per_pattern: int = 10,
         check_interval: int = 3600  # 1 hour default
     ):
-        self.api_url = api_url
-        self.base_dir = Path(base_dir)
+        self.api_url = api_url or get_remote_api_url()
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
         self.samples_per_pattern = samples_per_pattern
         self.check_interval = check_interval
 
         # Paths
         self.patterns_dir = self.base_dir / "logs" / "error_patterns"
         self.status_file = self.base_dir / "status" / "self_correction_impact.json"
+        self.self_correction_status = self.base_dir / "status" / "self_correction.json"
+        self.corrections_dir = self.base_dir / "queue" / "corrections"
 
         # State
         self.status = self._load_status()
@@ -70,6 +91,8 @@ class SelfCorrectionImpactMonitor:
         return {
             "measurements": [],
             "pattern_history": {},  # pattern_type -> [error_rates over time]
+            "batch_effectiveness": [],  # tracks whether each correction batch helped
+            "correction_batches_tracked": [],  # correction runs we've tracked
             "last_updated": None
         }
 
@@ -79,6 +102,232 @@ class SelfCorrectionImpactMonitor:
         self.status_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.status_file, 'w') as f:
             json.dump(self.status, f, indent=2)
+
+    def get_correction_runs(self) -> List[Dict]:
+        """Load correction runs from self_correction.json"""
+        if not self.self_correction_status.exists():
+            return []
+
+        try:
+            with open(self.self_correction_status) as f:
+                data = json.load(f)
+            return data.get("correction_runs", [])
+        except Exception as e:
+            logger.warning(f"Could not load correction runs: {e}")
+            return []
+
+    def get_new_correction_batches(self) -> List[Dict]:
+        """Find correction batches we haven't tracked yet"""
+        correction_runs = self.get_correction_runs()
+        tracked_timestamps = set(self.status.get("correction_batches_tracked", []))
+
+        new_batches = []
+        for run in correction_runs:
+            timestamp = run.get("timestamp")
+            if timestamp and timestamp not in tracked_timestamps:
+                # Get error patterns from this batch
+                patterns = run.get("error_patterns", [])
+                new_batches.append({
+                    "timestamp": timestamp,
+                    "corrections_generated": run.get("corrections_generated", 0),
+                    "errors_captured": run.get("errors_captured", 0),
+                    "error_types": [p.get("type") for p in patterns if p.get("type")]
+                })
+
+        return new_batches
+
+    def correlate_batch_with_improvement(
+        self,
+        batch: Dict,
+        pre_measurement: Optional[Dict],
+        post_measurement: Optional[Dict]
+    ) -> Dict:
+        """
+        Correlate a correction batch with observed error rate changes.
+
+        Returns effectiveness assessment:
+        - improved: error rates decreased for targeted patterns
+        - neutral: no significant change
+        - regressed: error rates increased
+        """
+        if not pre_measurement or not post_measurement:
+            return {
+                "batch_timestamp": batch.get("timestamp"),
+                "effectiveness": "unknown",
+                "reason": "insufficient measurements"
+            }
+
+        pre_results = {r["error_type"]: r["error_rate"] for r in pre_measurement.get("results", [])}
+        post_results = {r["error_type"]: r["error_rate"] for r in post_measurement.get("results", [])}
+
+        # Check error types this batch targeted
+        targeted_types = batch.get("error_types", [])
+
+        improvements = 0
+        regressions = 0
+        total_delta = 0.0
+        compared = 0
+
+        for error_type in targeted_types:
+            if error_type in pre_results and error_type in post_results:
+                pre_rate = pre_results[error_type]
+                post_rate = post_results[error_type]
+                delta = post_rate - pre_rate
+
+                total_delta += delta
+                compared += 1
+
+                if delta < -0.05:  # 5% improvement threshold
+                    improvements += 1
+                elif delta > 0.05:  # 5% regression threshold
+                    regressions += 1
+
+        if compared == 0:
+            effectiveness = "unknown"
+            reason = "no comparable patterns"
+        elif improvements > regressions:
+            effectiveness = "improved"
+            reason = f"{improvements} patterns improved, {regressions} regressed"
+        elif regressions > improvements:
+            effectiveness = "regressed"
+            reason = f"{improvements} patterns improved, {regressions} regressed"
+        else:
+            effectiveness = "neutral"
+            reason = f"no significant change ({compared} patterns compared)"
+
+        avg_delta = total_delta / compared if compared > 0 else 0
+
+        return {
+            "batch_timestamp": batch.get("timestamp"),
+            "corrections_generated": batch.get("corrections_generated", 0),
+            "error_types_targeted": targeted_types,
+            "patterns_compared": compared,
+            "improvements": improvements,
+            "regressions": regressions,
+            "avg_error_delta": round(avg_delta, 4),
+            "effectiveness": effectiveness,
+            "reason": reason,
+            "assessed_at": datetime.now().isoformat()
+        }
+
+    def assess_new_batches(self) -> List[Dict]:
+        """
+        Assess effectiveness of new correction batches.
+        Links correction batches to error rate changes.
+        """
+        new_batches = self.get_new_correction_batches()
+        if not new_batches:
+            return []
+
+        measurements = self.status.get("measurements", [])
+        if len(measurements) < 2:
+            logger.info("Need at least 2 measurements to assess batch effectiveness")
+            return []
+
+        assessments = []
+
+        for batch in new_batches:
+            batch_time = batch.get("timestamp")
+            if not batch_time:
+                continue
+
+            # Find measurements before and after this batch
+            pre_measurement = None
+            post_measurement = None
+
+            for m in measurements:
+                m_time = m.get("timestamp")
+                if m_time:
+                    if m_time < batch_time:
+                        pre_measurement = m
+                    elif m_time >= batch_time and post_measurement is None:
+                        post_measurement = m
+
+            assessment = self.correlate_batch_with_improvement(
+                batch, pre_measurement, post_measurement
+            )
+            assessments.append(assessment)
+
+            # Mark as tracked
+            if batch_time not in self.status["correction_batches_tracked"]:
+                self.status["correction_batches_tracked"].append(batch_time)
+
+            # Store effectiveness
+            self.status["batch_effectiveness"].append(assessment)
+
+            # Keep only last 50 assessments
+            if len(self.status["batch_effectiveness"]) > 50:
+                self.status["batch_effectiveness"] = self.status["batch_effectiveness"][-50:]
+
+            logger.info(f"Batch {batch_time}: {assessment['effectiveness']} "
+                       f"({assessment['reason']})")
+
+        self._save_status()
+        return assessments
+
+    def get_effectiveness_summary(self) -> Dict:
+        """Get overall effectiveness summary of self-correction system"""
+        assessments = self.status.get("batch_effectiveness", [])
+
+        if not assessments:
+            return {
+                "total_batches_assessed": 0,
+                "effectiveness_score": None,
+                "verdict": "no data"
+            }
+
+        improved = sum(1 for a in assessments if a.get("effectiveness") == "improved")
+        regressed = sum(1 for a in assessments if a.get("effectiveness") == "regressed")
+        neutral = sum(1 for a in assessments if a.get("effectiveness") == "neutral")
+        unknown = sum(1 for a in assessments if a.get("effectiveness") == "unknown")
+
+        total = len(assessments)
+        known = improved + regressed + neutral
+
+        # Calculate effectiveness score (0-100)
+        if known > 0:
+            # Score: improved=100, neutral=50, regressed=0
+            score = ((improved * 100) + (neutral * 50) + (regressed * 0)) / known
+        else:
+            score = None
+
+        # Verdict
+        if score is None:
+            verdict = "insufficient data"
+        elif score >= 70:
+            verdict = "highly effective"
+        elif score >= 50:
+            verdict = "moderately effective"
+        elif score >= 30:
+            verdict = "marginally effective"
+        else:
+            verdict = "ineffective - review approach"
+
+        return {
+            "total_batches_assessed": total,
+            "improved": improved,
+            "neutral": neutral,
+            "regressed": regressed,
+            "unknown": unknown,
+            "effectiveness_score": round(score, 1) if score else None,
+            "verdict": verdict,
+            "recent_trend": self._get_recent_trend(assessments[-5:]) if assessments else None
+        }
+
+    def _get_recent_trend(self, recent: List[Dict]) -> str:
+        """Get trend from recent assessments"""
+        if not recent:
+            return "no data"
+
+        improved = sum(1 for a in recent if a.get("effectiveness") == "improved")
+        regressed = sum(1 for a in recent if a.get("effectiveness") == "regressed")
+
+        if improved > regressed:
+            return "improving"
+        elif regressed > improved:
+            return "declining"
+        else:
+            return "stable"
 
     def load_error_patterns(self) -> Dict[str, List[Dict]]:
         """
@@ -271,6 +520,14 @@ class SelfCorrectionImpactMonitor:
         logger.info(f"Impact measurement complete: {len(results)} patterns tested")
         self._log_summary(measurement["summary"])
 
+        # Also assess any new correction batches
+        new_assessments = self.assess_new_batches()
+        if new_assessments:
+            logger.info(f"Assessed {len(new_assessments)} new correction batches")
+            effectiveness = self.get_effectiveness_summary()
+            logger.info(f"Overall effectiveness: {effectiveness['verdict']} "
+                       f"(score: {effectiveness['effectiveness_score']})")
+
         return measurement
 
     def _get_checkpoint_info(self) -> Dict:
@@ -379,8 +636,28 @@ class SelfCorrectionImpactMonitor:
                     prev = history[-2]['error_rate']
                     curr = history[-1]['error_rate']
                     delta = curr - prev
-                    trend = "↓" if delta < -0.01 else ("↑" if delta > 0.01 else "→")
-                    print(f"  {trend} {pattern_type[:40]}: {prev:.1%} → {curr:.1%}")
+                    trend = "\u2193" if delta < -0.01 else ("\u2191" if delta > 0.01 else "\u2192")
+                    print(f"  {trend} {pattern_type[:40]}: {prev:.1%} \u2192 {curr:.1%}")
+
+        # Show batch effectiveness summary (NEW)
+        effectiveness = self.get_effectiveness_summary()
+        print("\n" + "-" * 60)
+        print("CORRECTION BATCH EFFECTIVENESS:")
+        print("-" * 60)
+        print(f"  Batches assessed: {effectiveness['total_batches_assessed']}")
+
+        if effectiveness['total_batches_assessed'] > 0:
+            print(f"  Improved:  {effectiveness['improved']}")
+            print(f"  Neutral:   {effectiveness['neutral']}")
+            print(f"  Regressed: {effectiveness['regressed']}")
+            print(f"  Unknown:   {effectiveness['unknown']}")
+            if effectiveness['effectiveness_score'] is not None:
+                print(f"\n  Effectiveness Score: {effectiveness['effectiveness_score']}/100")
+            print(f"  Verdict: {effectiveness['verdict'].upper()}")
+            if effectiveness.get('recent_trend'):
+                print(f"  Recent Trend: {effectiveness['recent_trend']}")
+        else:
+            print("  No batches assessed yet - need more measurements")
 
         print("=" * 60 + "\n")
 
@@ -389,13 +666,17 @@ def main():
     """Main entry point"""
     import argparse
 
+    # Get defaults from paths module
+    default_api = get_remote_api_url()
+    default_base = str(get_base_dir())
+
     parser = argparse.ArgumentParser(
         description="Self-Correction Impact Monitor - tracks if corrections reduce errors"
     )
-    parser.add_argument('--api-url', default='http://192.168.x.x:8765',
-                       help='API URL for 3090')
-    parser.add_argument('--base-dir', default='/path/to/training',
-                       help='Base directory')
+    parser.add_argument('--api-url', default=None,
+                       help=f'API URL for 3090 (default: {default_api})')
+    parser.add_argument('--base-dir', default=None,
+                       help=f'Base directory (default: auto-detected)')
     parser.add_argument('--interval', type=int, default=3600,
                        help='Check interval in seconds (default: 3600 = 1 hour)')
     parser.add_argument('--samples', type=int, default=10,
@@ -404,22 +685,37 @@ def main():
                        help='Run once and exit')
     parser.add_argument('--status', action='store_true',
                        help='Print status and exit')
+    parser.add_argument('--assess-batches', action='store_true',
+                       help='Assess new correction batches and show effectiveness')
 
     args = parser.parse_args()
 
     monitor = SelfCorrectionImpactMonitor(
-        api_url=args.api_url,
-        base_dir=args.base_dir,
+        api_url=args.api_url,  # Will use get_remote_api_url() if None
+        base_dir=args.base_dir,  # Will use get_base_dir() if None
         samples_per_pattern=args.samples,
         check_interval=args.interval
     )
 
     if args.status:
         monitor.print_status()
+    elif args.assess_batches:
+        # Just assess batches without running full measurement
+        assessments = monitor.assess_new_batches()
+        effectiveness = monitor.get_effectiveness_summary()
+        print(json.dumps({
+            "new_assessments": len(assessments),
+            "effectiveness": effectiveness
+        }, indent=2))
     elif args.once:
         result = monitor.measure_impact()
         if result:
-            print(json.dumps(result["summary"], indent=2))
+            summary = result["summary"]
+            effectiveness = monitor.get_effectiveness_summary()
+            print(json.dumps({
+                "measurement_summary": summary,
+                "effectiveness": effectiveness
+            }, indent=2))
     else:
         monitor.run_continuous()
 

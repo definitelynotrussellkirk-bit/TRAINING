@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYLLO Skill Dashboard</title>
+    <link rel="stylesheet" href="/css/master_dashboard.css">
+    <style>
+        .syllo-header {
+            background: linear-gradient(135deg, #1a1f29 0%, #2d1f3d 100%);
+            padding: 1.5rem 2rem;
+            border-bottom: 2px solid #a855f7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .syllo-title-block {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .syllo-icon { font-size: 2.5rem; }
+
+        .syllo-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .syllo-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .back-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.05);
+            transition: all 0.2s;
+        }
+
+        .back-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-primary);
+        }
+
+        .syllo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.25rem;
+            padding: 1.25rem;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 1400px) {
+            .syllo-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        @media (max-width: 900px) {
+            .syllo-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-badge.no-data { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .status-badge.has-data { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .status-badge.stale { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+        /* Hero card spans 2 columns */
+        .hero-card {
+            grid-column: span 2;
+            background: linear-gradient(135deg, #1a1f29 0%, #1f2937 100%);
+            border: 2px solid #a855f7;
+        }
+
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            padding: 1rem;
+        }
+
+        .hero-stat { text-align: center; }
+
+        .hero-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #a855f7;
+        }
+        .hero-value.positive { color: #10b981; }
+        .hero-value.negative { color: #ef4444; }
+        .hero-value.neutral { color: #64748b; }
+
+        .hero-label {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Comparison box */
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1rem;
+            align-items: center;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .model-box {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+        .model-box.base { border-color: #64748b; }
+        .model-box.trained { border-color: #a855f7; }
+
+        .model-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        .model-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: 0.25rem 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .model-accuracy {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .model-box.base .model-accuracy { color: #64748b; }
+        .model-box.trained .model-accuracy { color: #a855f7; }
+
+        .vs-badge {
+            background: rgba(168, 85, 247, 0.2);
+            color: #a855f7;
+            padding: 0.5rem;
+            border-radius: 50%;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        /* Difficulty bars */
+        .diff-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            padding: 0.5rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+        }
+
+        .diff-label { width: 70px; font-weight: 600; font-size: 0.85rem; }
+
+        .diff-bar-outer {
+            flex: 1;
+            height: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .diff-bar-inner {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .diff-bar-inner.easy { background: linear-gradient(90deg, #10b981, #34d399); }
+        .diff-bar-inner.medium { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .diff-bar-inner.hard { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+        .diff-value { width: 55px; text-align: right; font-weight: 700; font-size: 0.95rem; }
+        .diff-delta { width: 60px; text-align: right; font-size: 0.8rem; color: var(--text-muted); }
+        .diff-delta.positive { color: #10b981; }
+        .diff-delta.negative { color: #ef4444; }
+
+        /* Curriculum card */
+        .curriculum-level {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: rgba(168, 85, 247, 0.1);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .level-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #a855f7;
+        }
+
+        .level-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .level-description {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* Queue stats */
+        .queue-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .queue-stat {
+            background: rgba(255,255,255,0.03);
+            border-radius: 6px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+
+        .queue-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .queue-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .empty-state-text { font-size: 0.85rem; }
+
+        /* Primitive results table */
+        .primitives-table {
+            width: 100%;
+            font-size: 0.8rem;
+        }
+
+        .primitives-table th {
+            text-align: left;
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .primitives-table td {
+            padding: 0.4rem 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .primitives-table tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .prim-name { font-family: monospace; }
+        .prim-acc { text-align: right; font-weight: 600; }
+        .prim-delta { text-align: right; font-size: 0.75rem; }
+        .prim-delta.positive { color: #10b981; }
+        .prim-delta.negative { color: #ef4444; }
+
+        /* Update footer */
+        .update-footer {
+            text-align: center;
+            padding: 1rem;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        /* Queue tabs */
+        .queue-tab {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 0.4rem 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+        .queue-tab:hover {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+        }
+        .queue-tab.active {
+            background: rgba(168, 85, 247, 0.2);
+            border-color: #a855f7;
+            color: #a855f7;
+        }
+        .queue-tab span {
+            background: rgba(0,0,0,0.3);
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            margin-left: 0.25rem;
+        }
+
+        /* Queue file item */
+        .queue-file {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 0.75rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+            margin-bottom: 0.4rem;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+        .queue-file:hover {
+            background: rgba(255,255,255,0.04);
+            border-color: var(--border-color);
+        }
+        .queue-file .priority-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .queue-file .priority-dot.high { background: #ef4444; }
+        .queue-file .priority-dot.normal { background: #f59e0b; }
+        .queue-file .priority-dot.low { background: #10b981; }
+        .queue-file .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .queue-file .file-name {
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .queue-file .file-meta {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+        .queue-file .file-size {
+            font-size: 0.75rem;
+            color: #a855f7;
+            font-weight: 600;
+            text-align: right;
+            min-width: 70px;
+        }
+
+        /* Info box */
+        .info-box {
+            background: rgba(79, 195, 247, 0.1);
+            border: 1px solid rgba(79, 195, 247, 0.3);
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-size: 0.8rem;
+            color: #4fc3f7;
+        }
+
+        .warning-box {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-size: 0.8rem;
+            color: #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="syllo-header">
+        <div class="syllo-title-block">
+            <span class="syllo-icon">🧩</span>
+            <div>
+                <h1 class="syllo-title">SYLLO Skill Dashboard</h1>
+                <p class="syllo-subtitle">Syllable puzzle solving - curriculum progress and evaluation metrics</p>
+            </div>
+        </div>
+        <a href="/ui/master_dashboard.html" class="back-link">
+            <span>←</span> Back to Master Dashboard
+        </a>
+    </header>
+
+    <!-- MAIN GRID -->
+    <div class="syllo-grid">
+        <!-- Hero Stats Card -->
+        <div class="card hero-card">
+            <div class="card-header">
+                <h3>📊 SYLLO Performance</h3>
+                <span class="status-badge" id="dataBadge">Loading...</span>
+            </div>
+            <div class="card-body">
+                <div class="hero-stats">
+                    <div class="hero-stat">
+                        <div class="hero-value" id="heroAccuracy">--%</div>
+                        <div class="hero-label">Base Model</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-value" id="heroTrained">--%</div>
+                        <div class="hero-label">Trained Model</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-value" id="heroDelta">--</div>
+                        <div class="hero-label">Improvement</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-value" id="heroLevel">--</div>
+                        <div class="hero-label">Curriculum Level</div>
+                    </div>
+                </div>
+
+                <div class="comparison-grid">
+                    <div class="model-box base">
+                        <div class="model-label">Base Model</div>
+                        <div class="model-name">Qwen3-0.6B</div>
+                        <div class="model-accuracy" id="baseAcc">--%</div>
+                    </div>
+                    <span class="vs-badge">VS</span>
+                    <div class="model-box trained">
+                        <div class="model-label">Trained</div>
+                        <div class="model-name" id="trainedName">--</div>
+                        <div class="model-accuracy" id="trainedAcc">--%</div>
+                    </div>
+                </div>
+
+                <div id="noEvalWarning" class="warning-box" style="margin-top: 1rem; display: none;">
+                    ⚠️ No SYLLO evaluation for trained model yet. Run baseline evaluation to see progress.
+                </div>
+            </div>
+        </div>
+
+        <!-- Curriculum Status Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📚 Curriculum Status</h3>
+            </div>
+            <div class="card-body">
+                <div class="curriculum-level">
+                    <div>
+                        <div class="level-number" id="currLevel">--</div>
+                    </div>
+                    <div>
+                        <div class="level-label">Current Level</div>
+                        <div class="level-description" id="currLevelDesc">--</div>
+                    </div>
+                </div>
+
+                <div class="queue-stats" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="queue-stat">
+                        <div class="queue-value" id="currSkill">--</div>
+                        <div class="queue-label">Active Skill</div>
+                    </div>
+                    <div class="queue-stat">
+                        <div class="queue-value" id="currAccuracy">--%</div>
+                        <div class="queue-label">Recent Accuracy</div>
+                    </div>
+                    <div class="queue-stat">
+                        <div class="queue-value" id="currProgress">--/3</div>
+                        <div class="queue-label">Evals at Level</div>
+                    </div>
+                </div>
+
+                <!-- Progression bar -->
+                <div style="margin-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
+                        <span>Progress to Level Up</span>
+                        <span id="currProgressPct">0%</span>
+                    </div>
+                    <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                        <div id="currProgressBar" style="height: 100%; background: linear-gradient(90deg, #a855f7, #ec4899); width: 0%; transition: width 0.5s;"></div>
+                    </div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">
+                        Need 80% avg over 3 evals to advance
+                    </div>
+                </div>
+
+                <!-- Recent evaluations -->
+                <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Recent Evaluations:</div>
+                    <div id="recentEvals" style="font-size: 0.75rem; max-height: 100px; overflow-y: auto;">
+                        --
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Difficulty Breakdown Card (Base Model) -->
+        <div class="card">
+            <div class="card-header">
+                <h3>🎯 Base Model by Difficulty</h3>
+            </div>
+            <div class="card-body">
+                <div id="baseDiffContainer">
+                    <div class="diff-row">
+                        <span class="diff-label">Easy</span>
+                        <div class="diff-bar-outer">
+                            <div class="diff-bar-inner easy" id="baseEasyBar" style="width: 0%"></div>
+                        </div>
+                        <span class="diff-value" id="baseEasy">--%</span>
+                    </div>
+                    <div class="diff-row">
+                        <span class="diff-label">Medium</span>
+                        <div class="diff-bar-outer">
+                            <div class="diff-bar-inner medium" id="baseMediumBar" style="width: 0%"></div>
+                        </div>
+                        <span class="diff-value" id="baseMedium">--%</span>
+                    </div>
+                    <div class="diff-row">
+                        <span class="diff-label">Hard</span>
+                        <div class="diff-bar-outer">
+                            <div class="diff-bar-inner hard" id="baseHardBar" style="width: 0%"></div>
+                        </div>
+                        <span class="diff-value" id="baseHard">--%</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);">
+                    Base model: 90 total tests (30 per difficulty)
+                </div>
+            </div>
+        </div>
+
+        <!-- Training Queue Card (Interactive) -->
+        <div class="card" style="grid-column: span 2;">
+            <div class="card-header">
+                <h3>📦 Training Queue</h3>
+                <button onclick="refreshQueue()" style="background: rgba(168,85,247,0.2); border: 1px solid #a855f7; color: #a855f7; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">↻ Refresh</button>
+            </div>
+            <div class="card-body">
+                <!-- Summary Stats -->
+                <div class="queue-stats" style="grid-template-columns: repeat(4, 1fr);">
+                    <div class="queue-stat">
+                        <div class="queue-value" id="queueFiles">--</div>
+                        <div class="queue-label">Total Files</div>
+                    </div>
+                    <div class="queue-stat">
+                        <div class="queue-value" id="queueExamples">--</div>
+                        <div class="queue-label">Total Examples</div>
+                    </div>
+                    <div class="queue-stat">
+                        <div class="queue-value" id="queueInbox">--</div>
+                        <div class="queue-label">In Inbox</div>
+                    </div>
+                    <div class="queue-stat">
+                        <div class="queue-value" id="queueRecent">--</div>
+                        <div class="queue-label">Recently Done</div>
+                    </div>
+                </div>
+
+                <!-- Priority Tabs -->
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                    <button class="queue-tab active" data-priority="all" onclick="filterQueue('all')">All</button>
+                    <button class="queue-tab" data-priority="high" onclick="filterQueue('high')">🔴 High <span id="countHigh">0</span></button>
+                    <button class="queue-tab" data-priority="normal" onclick="filterQueue('normal')">🟡 Normal <span id="countNormal">0</span></button>
+                    <button class="queue-tab" data-priority="low" onclick="filterQueue('low')">🟢 Low <span id="countLow">0</span></button>
+                </div>
+
+                <!-- Empty State -->
+                <div id="queueEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">📭</div>
+                    <div class="empty-state-text">Queue is empty - data generation will create new batches</div>
+                </div>
+
+                <!-- File List -->
+                <div id="queueList" style="margin-top: 0.75rem; max-height: 300px; overflow-y: auto;">
+                    <div style="text-align: center; color: var(--text-muted); padding: 1rem;">Loading...</div>
+                </div>
+
+                <!-- Recently Completed -->
+                <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Recently Completed:</div>
+                    <div id="recentlyCompleted" style="font-size: 0.75rem; color: var(--text-secondary); max-height: 80px; overflow-y: auto;">
+                        --
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transfer Learning Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>🧬 Primitive Transfer Results</h3>
+                <span class="status-badge has-data" id="primBadge">-- skills</span>
+            </div>
+            <div class="card-body">
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                    How SYLLO training affects other reasoning skills
+                </p>
+
+                <div style="max-height: 280px; overflow-y: auto;">
+                    <table class="primitives-table">
+                        <thead>
+                            <tr>
+                                <th>Skill</th>
+                                <th style="text-align: right;">Base</th>
+                                <th style="text-align: right;">Trained</th>
+                                <th style="text-align: right;">Δ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="primitivesBody">
+                            <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SYLLO Level Guide Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📖 SYLLO Curriculum Levels</h3>
+            </div>
+            <div class="card-body">
+                <div style="font-size: 0.8rem;">
+                    <div class="diff-row" style="opacity: 1;" id="level1Row">
+                        <span class="diff-label">Level 1</span>
+                        <span style="flex: 1; color: var(--text-secondary);">4 words, unique syllables</span>
+                    </div>
+                    <div class="diff-row" style="opacity: 0.6;" id="level2Row">
+                        <span class="diff-label">Level 2</span>
+                        <span style="flex: 1; color: var(--text-secondary);">5 words, some overlap</span>
+                    </div>
+                    <div class="diff-row" style="opacity: 0.6;" id="level3Row">
+                        <span class="diff-label">Level 3</span>
+                        <span style="flex: 1; color: var(--text-secondary);">6 words, 1 red herring</span>
+                    </div>
+                    <div class="diff-row" style="opacity: 0.6;" id="level4Row">
+                        <span class="diff-label">Level 4</span>
+                        <span style="flex: 1; color: var(--text-secondary);">7 words, 2 red herrings</span>
+                    </div>
+                    <div class="diff-row" style="opacity: 0.6;" id="level5Row">
+                        <span class="diff-label">Level 5</span>
+                        <span style="flex: 1; color: var(--text-secondary);">8 words, high overlap, 3 red herrings</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="update-footer">
+        Last updated: <span id="lastUpdate">--</span> |
+        Auto-refresh: 30s |
+        <a href="http://localhost:8081/api/unified" target="_blank" style="color: #a855f7;">View Raw API</a>
+    </div>
+
+    <script>
+        // Curriculum level descriptions
+        const LEVEL_DESCRIPTIONS = {
+            1: '4 words, unique syllables',
+            2: '5 words, some syllable overlap',
+            3: '6 words, 1 red herring',
+            4: '7 words, 2 red herrings',
+            5: '8 words, high overlap, 3 red herrings'
+        };
+
+        // API base URL - use port 8081 where Flask API runs
+        const API_BASE = 'http://localhost:8081';
+
+        async function fetchData() {
+            try {
+                // Fetch unified API
+                const unifiedResp = await fetch(`${API_BASE}/api/unified`);
+                const unified = await unifiedResp.json();
+
+                // Fetch queue status
+                let queueData = null;
+                try {
+                    const queueResp = await fetch(`${API_BASE}/api/queue`);
+                    if (queueResp.ok) queueData = await queueResp.json();
+                } catch (e) { console.log('Queue API unavailable'); }
+
+                // Fetch curriculum state directly
+                let curriculumState = null;
+                try {
+                    const currResp = await fetch(`${API_BASE}/api/curriculum-state`);
+                    if (currResp.ok) curriculumState = await currResp.json();
+                } catch (e) { /* ignore */ }
+
+                updateUI(unified, queueData, curriculumState);
+
+            } catch (err) {
+                console.error('Fetch error:', err);
+                document.getElementById('dataBadge').textContent = 'ERROR';
+                document.getElementById('dataBadge').className = 'status-badge no-data';
+            }
+        }
+
+        function updateUI(unified, queueData, curriculumState) {
+            const skillMetrics = unified.sources?.skill_metrics?.data;
+
+            // Update SYLLO data
+            if (skillMetrics) {
+                const baseData = skillMetrics.skills?.syllable?.base;
+                const trainedData = skillMetrics.skills?.syllable?.trained;
+
+                const baseAcc = baseData?.overall_accuracy ?? 0;
+                const trainedAcc = trainedData?.overall_accuracy ?? 0;
+                const hasTrainedEval = trainedData?.available ?? false;
+
+                // Hero stats
+                document.getElementById('heroAccuracy').textContent = `${baseAcc.toFixed(1)}%`;
+                document.getElementById('baseAcc').textContent = `${baseAcc.toFixed(1)}%`;
+
+                if (hasTrainedEval) {
+                    document.getElementById('heroTrained').textContent = `${trainedAcc.toFixed(1)}%`;
+                    document.getElementById('trainedAcc').textContent = `${trainedAcc.toFixed(1)}%`;
+                    const delta = trainedAcc - baseAcc;
+                    document.getElementById('heroDelta').textContent = delta >= 0 ? `+${delta.toFixed(1)}%` : `${delta.toFixed(1)}%`;
+                    document.getElementById('heroDelta').className = delta >= 0 ? 'hero-value positive' : 'hero-value negative';
+                    document.getElementById('noEvalWarning').style.display = 'none';
+                    document.getElementById('dataBadge').textContent = 'HAS DATA';
+                    document.getElementById('dataBadge').className = 'status-badge has-data';
+                } else {
+                    document.getElementById('heroTrained').textContent = '--';
+                    document.getElementById('heroTrained').className = 'hero-value neutral';
+                    document.getElementById('trainedAcc').textContent = '--';
+                    document.getElementById('heroDelta').textContent = 'N/A';
+                    document.getElementById('heroDelta').className = 'hero-value neutral';
+                    document.getElementById('noEvalWarning').style.display = 'block';
+                    document.getElementById('dataBadge').textContent = 'NO TRAINED EVAL';
+                    document.getElementById('dataBadge').className = 'status-badge stale';
+                }
+
+                // Trained model name
+                const trainedTag = skillMetrics.trained_model?.tag || 'Not evaluated';
+                document.getElementById('trainedName').textContent = trainedTag;
+
+                // Base difficulty breakdown
+                const baseDiff = baseData?.by_difficulty || {};
+                for (const diff of ['easy', 'medium', 'hard']) {
+                    const acc = baseDiff[diff]?.accuracy ?? 0;
+                    document.getElementById(`base${capitalize(diff)}Bar`).style.width = `${acc}%`;
+                    document.getElementById(`base${capitalize(diff)}`).textContent = `${acc.toFixed(1)}%`;
+                }
+
+                // Primitives table
+                updatePrimitivesTable(skillMetrics.skills);
+            }
+
+            // Update curriculum
+            const currData = curriculumState || unified.sources?.curriculum_optimization?.data;
+            if (currData?.skills?.syllo) {
+                const syllo = currData.skills.syllo;
+                const level = syllo.current_level || 1;
+                const history = syllo.accuracy_history || [];
+
+                document.getElementById('currLevel').textContent = level;
+                document.getElementById('heroLevel').textContent = level;
+                document.getElementById('currLevelDesc').textContent = LEVEL_DESCRIPTIONS[level] || '';
+                document.getElementById('currSkill').textContent = currData.active_skill?.toUpperCase() || 'SYLLO';
+
+                // Filter history to current level
+                const levelHistory = history.filter(h => h.level === level);
+                const evalCount = levelHistory.length;
+
+                // Calculate recent accuracy (last 3 at this level)
+                const recentEvals = levelHistory.slice(-3);
+                const avgAccuracy = recentEvals.length > 0
+                    ? recentEvals.reduce((sum, h) => sum + (h.accuracy || 0), 0) / recentEvals.length
+                    : 0;
+
+                document.getElementById('currAccuracy').textContent = `${(avgAccuracy * 100).toFixed(0)}%`;
+                document.getElementById('currProgress').textContent = `${Math.min(evalCount, 3)}/3`;
+
+                // Progress bar - based on avg accuracy toward 80% threshold
+                const progressPct = Math.min(100, (avgAccuracy / 0.8) * 100);
+                document.getElementById('currProgressBar').style.width = `${progressPct}%`;
+                document.getElementById('currProgressPct').textContent = `${progressPct.toFixed(0)}%`;
+
+                // Color the progress bar based on accuracy
+                const bar = document.getElementById('currProgressBar');
+                if (avgAccuracy >= 0.8) {
+                    bar.style.background = 'linear-gradient(90deg, #10b981, #34d399)'; // green
+                } else if (avgAccuracy >= 0.5) {
+                    bar.style.background = 'linear-gradient(90deg, #f59e0b, #fbbf24)'; // yellow
+                } else {
+                    bar.style.background = 'linear-gradient(90deg, #a855f7, #ec4899)'; // purple
+                }
+
+                // Recent evaluations list
+                if (history.length > 0) {
+                    const recentHtml = history.slice(-5).reverse().map(h => {
+                        const acc = ((h.accuracy || 0) * 100).toFixed(0);
+                        const time = formatEvalTime(h.timestamp);
+                        const color = h.accuracy >= 0.8 ? '#10b981' : h.accuracy >= 0.5 ? '#f59e0b' : '#ef4444';
+                        return `<div style="display: flex; justify-content: space-between; padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <span>Level ${h.level} @ step ${h.step || '?'}</span>
+                            <span style="color: ${color}; font-weight: 600;">${acc}%</span>
+                            <span style="color: var(--text-muted);">${time}</span>
+                        </div>`;
+                    }).join('');
+                    document.getElementById('recentEvals').innerHTML = recentHtml;
+                } else {
+                    document.getElementById('recentEvals').textContent = 'No evaluations yet';
+                }
+
+                // Highlight current level row
+                for (let i = 1; i <= 5; i++) {
+                    const row = document.getElementById(`level${i}Row`);
+                    if (row) row.style.opacity = i === level ? '1' : '0.5';
+                }
+            }
+
+            // Update queue with interactive features
+            updateQueueUI(queueData);
+
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        }
+
+        function updatePrimitivesTable(skills) {
+            if (!skills) return;
+
+            // Filter to primitives (not syllable/binary which are trained skills)
+            const primitives = Object.entries(skills)
+                .filter(([name, data]) => !['syllable', 'binary'].includes(name))
+                .map(([name, data]) => ({
+                    name,
+                    base: data.base?.overall_accuracy ?? 0,
+                    trained: data.trained?.overall_accuracy ?? 0,
+                    delta: (data.trained?.overall_accuracy ?? 0) - (data.base?.overall_accuracy ?? 0)
+                }))
+                .sort((a, b) => b.delta - a.delta);
+
+            document.getElementById('primBadge').textContent = `${primitives.length} skills`;
+
+            if (primitives.length === 0) {
+                document.getElementById('primitivesBody').innerHTML =
+                    '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No primitive data</td></tr>';
+                return;
+            }
+
+            document.getElementById('primitivesBody').innerHTML = primitives.map(p => `
+                <tr>
+                    <td class="prim-name">${p.name}</td>
+                    <td class="prim-acc">${p.base.toFixed(0)}%</td>
+                    <td class="prim-acc">${p.trained.toFixed(0)}%</td>
+                    <td class="prim-delta ${p.delta > 0 ? 'positive' : p.delta < 0 ? 'negative' : ''}">${p.delta > 0 ? '+' : ''}${p.delta.toFixed(0)}%</td>
+                </tr>
+            `).join('');
+        }
+
+        function capitalize(s) {
+            return s.charAt(0).toUpperCase() + s.slice(1);
+        }
+
+        function formatEvalTime(isoString) {
+            if (!isoString) return '--';
+            const date = new Date(isoString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+
+            if (diffMins < 1) return 'just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            return date.toLocaleDateString();
+        }
+
+        // ===== Queue Interactive Functions =====
+        let allQueueFiles = [];
+        let currentFilter = 'all';
+
+        function updateQueueUI(queueData) {
+            if (!queueData) {
+                document.getElementById('queueFiles').textContent = '?';
+                document.getElementById('queueExamples').textContent = '?';
+                document.getElementById('queueInbox').textContent = '?';
+                document.getElementById('queueRecent').textContent = '?';
+                return;
+            }
+
+            allQueueFiles = queueData.files || [];
+            const totalFiles = queueData.total_files || 0;
+            const totalExamples = queueData.total_examples || 0;
+            const inboxCount = queueData.inbox_count || 0;
+            const recentCount = (queueData.recent || []).length;
+
+            // Update summary stats
+            document.getElementById('queueFiles').textContent = totalFiles;
+            document.getElementById('queueExamples').textContent = totalExamples.toLocaleString();
+            document.getElementById('queueInbox').textContent = inboxCount;
+            document.getElementById('queueRecent').textContent = recentCount;
+
+            // Count by priority
+            const counts = { high: 0, normal: 0, low: 0 };
+            allQueueFiles.forEach(f => {
+                const p = f.priority || 'normal';
+                if (counts[p] !== undefined) counts[p]++;
+            });
+            document.getElementById('countHigh').textContent = counts.high;
+            document.getElementById('countNormal').textContent = counts.normal;
+            document.getElementById('countLow').textContent = counts.low;
+
+            // Render file list
+            renderQueueFiles(currentFilter);
+
+            // Render recently completed
+            const recent = queueData.recent || [];
+            if (recent.length > 0) {
+                document.getElementById('recentlyCompleted').innerHTML = recent.map(r => `
+                    <div style="display: flex; justify-content: space-between; padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <span style="font-family: monospace;">${r.name}</span>
+                        <span style="color: var(--text-muted);">${formatTime(r.completed)}</span>
+                    </div>
+                `).join('');
+            } else {
+                document.getElementById('recentlyCompleted').textContent = 'No recently completed files';
+            }
+        }
+
+        function renderQueueFiles(filter) {
+            const files = filter === 'all'
+                ? allQueueFiles
+                : allQueueFiles.filter(f => f.priority === filter);
+
+            if (files.length === 0) {
+                document.getElementById('queueEmpty').style.display = 'block';
+                document.getElementById('queueList').innerHTML = '';
+                return;
+            }
+
+            document.getElementById('queueEmpty').style.display = 'none';
+            document.getElementById('queueList').innerHTML = files.map(f => `
+                <div class="queue-file" title="${f.name}">
+                    <div class="priority-dot ${f.priority || 'normal'}"></div>
+                    <div class="file-info">
+                        <div class="file-name">${f.name}</div>
+                        <div class="file-meta">${(f.examples || 0).toLocaleString()} examples · ${f.size_mb || '?'} MB · ${formatTime(f.modified)}</div>
+                    </div>
+                    <div class="file-size">${formatExamples(f.examples)}</div>
+                </div>
+            `).join('');
+        }
+
+        function filterQueue(priority) {
+            currentFilter = priority;
+            // Update tab styles
+            document.querySelectorAll('.queue-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.priority === priority);
+            });
+            renderQueueFiles(priority);
+        }
+
+        async function refreshQueue() {
+            try {
+                const queueResp = await fetch(`${API_BASE}/api/queue`);
+                if (queueResp.ok) {
+                    const queueData = await queueResp.json();
+                    updateQueueUI(queueData);
+                }
+            } catch (e) {
+                console.error('Queue refresh failed:', e);
+            }
+        }
+
+        function formatTime(isoString) {
+            if (!isoString) return '--';
+            const date = new Date(isoString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+
+            if (diffMins < 1) return 'just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            return date.toLocaleDateString();
+        }
+
+        function formatExamples(n) {
+            if (!n) return '--';
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+            return n.toString();
+        }
+
+        // Initial fetch
+        fetchData();
+
+        // Auto-refresh
+        setInterval(fetchData, 30000);
+    </script>
+</body>
+</html>

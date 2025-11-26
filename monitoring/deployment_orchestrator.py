@@ -29,6 +29,16 @@ from typing import Optional, Dict, Any
 ADMIN_KEY = os.environ.get("INFERENCE_ADMIN_KEY", "")
 READ_KEY = os.environ.get("INFERENCE_READ_KEY", "")
 
+# Remote cleanup configuration
+REMOTE_MODELS_DIR = "/path/to/models"
+PROTECTED_MODEL_DIRS = {"deployed", "Qwen3-0.6B"}  # Never delete these
+CLEANUP_PATHS = [
+    # (path, description)
+    ("/home/user/trained_adapter", "old adapter files"),
+    ("/path/to/backup_server_backup_*.tar.gz", "old backup archives"),
+    ("/path/to/backup_status_backup_*.tar.gz", "old status backups"),
+]
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -315,6 +325,113 @@ class DeploymentOrchestrator:
             logger.error(f"❌ Verification error: {e}")
             return False
 
+    def cleanup_remote_models(self, dry_run: bool = False) -> Dict[str, Any]:
+        """
+        Clean up old model directories and files on the remote 3090.
+
+        Removes:
+        - Old model directories in ~/llm/models/ (except protected ones)
+        - Old backup archives
+        - Old adapter files
+
+        Returns:
+            Summary dict with cleanup results
+        """
+        logger.info("🧹 Running remote cleanup on 3090...")
+
+        results = {
+            "models_deleted": [],
+            "files_deleted": [],
+            "bytes_freed": 0,
+            "errors": []
+        }
+
+        # Step 1: Find and remove old model directories
+        try:
+            # List all directories in models folder
+            cmd = f"ssh {self.remote_host} 'ls -1 {REMOTE_MODELS_DIR}/ 2>/dev/null'"
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
+
+            if result.returncode == 0:
+                dirs = [d.strip() for d in result.stdout.strip().split('\n') if d.strip()]
+
+                for dir_name in dirs:
+                    if dir_name in PROTECTED_MODEL_DIRS:
+                        logger.debug(f"Protected: {dir_name}")
+                        continue
+
+                    dir_path = f"{REMOTE_MODELS_DIR}/{dir_name}"
+
+                    # Get size before deletion
+                    size_cmd = f"ssh {self.remote_host} 'du -sb {dir_path} 2>/dev/null | cut -f1'"
+                    size_result = subprocess.run(size_cmd, shell=True, capture_output=True, text=True, timeout=30)
+                    size_bytes = int(size_result.stdout.strip()) if size_result.returncode == 0 and size_result.stdout.strip() else 0
+
+                    if dry_run:
+                        logger.info(f"  Would delete: {dir_name} ({size_bytes / (1024**3):.1f}GB)")
+                        results["models_deleted"].append({"name": dir_name, "size_bytes": size_bytes})
+                        results["bytes_freed"] += size_bytes
+                    else:
+                        logger.info(f"  Deleting: {dir_name} ({size_bytes / (1024**3):.1f}GB)")
+                        del_cmd = f"ssh {self.remote_host} 'rm -rf {dir_path}'"
+                        del_result = subprocess.run(del_cmd, shell=True, capture_output=True, text=True, timeout=300)
+
+                        if del_result.returncode == 0:
+                            results["models_deleted"].append({"name": dir_name, "size_bytes": size_bytes})
+                            results["bytes_freed"] += size_bytes
+                        else:
+                            results["errors"].append(f"Failed to delete {dir_name}: {del_result.stderr}")
+        except Exception as e:
+            results["errors"].append(f"Model cleanup error: {e}")
+
+        # Step 2: Clean up other known paths
+        for path_pattern, description in CLEANUP_PATHS:
+            try:
+                # Check if path/pattern exists
+                check_cmd = f"ssh {self.remote_host} 'ls -d {path_pattern} 2>/dev/null'"
+                check_result = subprocess.run(check_cmd, shell=True, capture_output=True, text=True, timeout=30)
+
+                if check_result.returncode == 0 and check_result.stdout.strip():
+                    paths = check_result.stdout.strip().split('\n')
+
+                    for path in paths:
+                        path = path.strip()
+                        if not path:
+                            continue
+
+                        # Get size
+                        size_cmd = f"ssh {self.remote_host} 'du -sb {path} 2>/dev/null | cut -f1'"
+                        size_result = subprocess.run(size_cmd, shell=True, capture_output=True, text=True, timeout=30)
+                        size_bytes = int(size_result.stdout.strip()) if size_result.returncode == 0 and size_result.stdout.strip() else 0
+
+                        if dry_run:
+                            logger.info(f"  Would delete: {path} - {description} ({size_bytes / (1024**3):.1f}GB)")
+                            results["files_deleted"].append({"path": path, "description": description, "size_bytes": size_bytes})
+                            results["bytes_freed"] += size_bytes
+                        else:
+                            logger.info(f"  Deleting: {path} - {description} ({size_bytes / (1024**3):.1f}GB)")
+                            del_cmd = f"ssh {self.remote_host} 'rm -rf {path}'"
+                            del_result = subprocess.run(del_cmd, shell=True, capture_output=True, text=True, timeout=300)
+
+                            if del_result.returncode == 0:
+                                results["files_deleted"].append({"path": path, "description": description, "size_bytes": size_bytes})
+                                results["bytes_freed"] += size_bytes
+                            else:
+                                results["errors"].append(f"Failed to delete {path}: {del_result.stderr}")
+            except Exception as e:
+                results["errors"].append(f"Cleanup error for {path_pattern}: {e}")
+
+        # Summary
+        total_gb = results["bytes_freed"] / (1024**3)
+        mode = "Would free" if dry_run else "Freed"
+        logger.info(f"🧹 Cleanup complete: {mode} {total_gb:.1f}GB")
+
+        if results["errors"]:
+            for err in results["errors"]:
+                logger.warning(f"  ⚠️  {err}")
+
+        return results
+
     def log_deployment(self, record: Dict[str, Any]):
         """Append deployment record to log file"""
         history = []
@@ -414,6 +531,11 @@ class DeploymentOrchestrator:
         logger.info(f"✅ DEPLOYMENT SUCCESSFUL: {deployment_id}")
         logger.info("="*80)
 
+        # Step 4: Cleanup old models on remote
+        logger.info("Running post-deployment cleanup...")
+        cleanup_results = self.cleanup_remote_models(dry_run=False)
+        record['cleanup'] = cleanup_results
+
         return True
 
     def run_continuous(self):
@@ -475,6 +597,12 @@ if __name__ == "__main__":
     parser.add_argument('--interval', type=int, default=600,
                        help="Check interval in seconds (default: 600)")
 
+    # Cleanup options
+    parser.add_argument('--cleanup', action='store_true',
+                       help="Run remote cleanup only (no deployment)")
+    parser.add_argument('--cleanup-dry-run', action='store_true',
+                       help="Show what would be cleaned up (no deletion)")
+
     args = parser.parse_args()
 
     orchestrator = DeploymentOrchestrator(
@@ -484,4 +612,14 @@ if __name__ == "__main__":
         check_interval=args.interval
     )
 
-    orchestrator.run_continuous()
+    if args.cleanup or args.cleanup_dry_run:
+        # Run cleanup only
+        results = orchestrator.cleanup_remote_models(dry_run=args.cleanup_dry_run)
+        print(f"\nCleanup {'preview' if args.cleanup_dry_run else 'complete'}:")
+        print(f"  Models deleted: {len(results['models_deleted'])}")
+        print(f"  Files deleted: {len(results['files_deleted'])}")
+        print(f"  Space freed: {results['bytes_freed'] / (1024**3):.1f}GB")
+        if results['errors']:
+            print(f"  Errors: {len(results['errors'])}")
+    else:
+        orchestrator.run_continuous()

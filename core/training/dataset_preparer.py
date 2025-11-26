@@ -53,7 +53,9 @@ class DatasetConfig:
         seed: Random seed for reproducibility (default: None = random)
     """
     dataset_path: str
-    system_prompt: str = "You are a helpful assistant."
+    # Default from core.prompts (single source of truth)
+    # Literal here to avoid circular import; should match core.prompts.BASE_PROMPT
+    system_prompt: str = "You are happy. You enjoy helping others."
     validation_split: float = 0.05
     max_val_size: int = 100
     fixed_validation_path: Optional[str] = None

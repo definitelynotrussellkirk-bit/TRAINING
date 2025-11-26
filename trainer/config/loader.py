@@ -352,7 +352,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--profile',
         type=str,
-        choices=['emoji_think', 'regime3', 'plain_sft'],
+        choices=['emoji_think', 'regime3'],
         help='Data profile to use'
     )
 

@@ -271,11 +271,11 @@ class TrainingStatusWriter:
             name = entry.get("name")
             if not name:
                 continue
-                stats = bucket.setdefault(name, {"count": 0, "cumulative_delta": 0.0})
-                stats["count"] += 1
-                delta = entry.get("delta")
-                if isinstance(delta, (int, float)):
-                    stats["cumulative_delta"] += abs(delta)
+            stats = bucket.setdefault(name, {"count": 0, "cumulative_delta": 0.0})
+            stats["count"] += 1
+            delta = entry.get("delta")
+            if isinstance(delta, (int, float)):
+                stats["cumulative_delta"] += abs(delta)
         self._append_pattern_layer_history(pattern_id, layer_summary)
 
     def _append_pattern_layer_history(self, pattern_id: str, layer_summary: Dict):

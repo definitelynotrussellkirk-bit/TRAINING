@@ -984,7 +984,9 @@ class TrainingDaemon:
         args.epochs = 1  # ALWAYS 1 EPOCH (daemon trains 1 epoch per file)
         args.skip_validation = True  # Assume data is pre-validated
         args.yes = True  # No prompts
-        args.system_prompt = "You are a helpful assistant."
+        # Import base prompt from single source of truth
+        from core.prompts import BASE_PROMPT
+        args.system_prompt = BASE_PROMPT
 
         # Control/routing params (not hyperparams, needed by trainer logic)
         args.warmup_steps = self.config.get("warmup_steps", 100)

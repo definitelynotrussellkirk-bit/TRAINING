@@ -29,6 +29,10 @@ import json
 import random
 import time
 import sys
+import logging
+
+# Set up module logger
+logger = logging.getLogger(__name__)
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

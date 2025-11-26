@@ -20,6 +20,9 @@ from transformers import LogitsProcessorList
 
 from trainer.profiles.base import DataProfile
 
+# Import base prompt (single source of truth)
+from core.prompts import BASE_PROMPT_TEMPLATE
+
 # Import logit penalty builders from core
 from core.logit_penalty import (
     build_think_penalty_processor,
@@ -353,9 +356,9 @@ class EmojiThinkProfile(DataProfile):
         Get system prompt template for emoji think profile.
 
         Returns:
-            System prompt with {date} placeholder
+            System prompt with {date} placeholder (from core.prompts)
         """
-        return "Current date: {date}. Respond naturally and concisely."
+        return BASE_PROMPT_TEMPLATE
 
 
 # ============================================================================

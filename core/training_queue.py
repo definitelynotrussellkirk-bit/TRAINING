@@ -64,10 +64,12 @@ Usage:
 
 import json
 import shutil
+import fcntl
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 from datetime import datetime
 import logging
+from contextlib import contextmanager
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -175,17 +177,36 @@ class TrainingQueue:
         # Queue metadata
         self.metadata_file = self.queue_dir / "queue_metadata.json"
 
+    @contextmanager
+    def _metadata_lock(self):
+        """Context manager for exclusive access to metadata file.
+
+        Uses fcntl.flock() for cross-process file locking to prevent
+        race conditions when daemon and CLI access metadata simultaneously.
+        """
+        lock_file = self.queue_dir / ".metadata.lock"
+        lock_file.touch(exist_ok=True)
+
+        with open(lock_file, 'r') as f:
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                yield
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
     def _get_metadata(self) -> Dict:
-        """Load queue metadata"""
-        if self.metadata_file.exists():
-            with open(self.metadata_file) as f:
-                return json.load(f)
-        return {"processed": [], "skipped": [], "failed": []}
+        """Load queue metadata (with file locking)"""
+        with self._metadata_lock():
+            if self.metadata_file.exists():
+                with open(self.metadata_file) as f:
+                    return json.load(f)
+            return {"processed": [], "skipped": [], "failed": []}
 
     def _save_metadata(self, metadata: Dict):
-        """Save queue metadata"""
-        with open(self.metadata_file, 'w') as f:
-            json.dump(metadata, f, indent=2)
+        """Save queue metadata (with file locking)"""
+        with self._metadata_lock():
+            with open(self.metadata_file, 'w') as f:
+                json.dump(metadata, f, indent=2)
 
     def scan_inbox(self) -> List[Path]:
         """

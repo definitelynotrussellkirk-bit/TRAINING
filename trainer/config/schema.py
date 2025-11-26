@@ -80,8 +80,10 @@ class MonitoringConfig:
     validation_split: float = 0.05           # % of data for validation
     validation_max_samples: int = 500        # Max samples in validation set
 
-    # System prompt
-    system_prompt_base: str = "Current date: {date}. Respond naturally and concisely."
+    # System prompt (default from core.prompts - single source of truth)
+    # Import at module level would cause circular import, so we use the literal here
+    # but it should match core.prompts.BASE_PROMPT_TEMPLATE
+    system_prompt_base: str = "Today is {date}. You are happy. You enjoy helping others."
 
     # Feature toggles
     enable_pattern_tracking: bool = True

@@ -842,10 +842,11 @@ class UltimateTrainer:
 
             # Priority: profile > CLI arg > default
             if self.profile and hasattr(self.profile, 'get_system_prompt_template'):
-                # Profile provides template with {current_date} placeholder
+                # Profile provides template with {date} or {current_date} placeholder
                 base_prompt = self.profile.get_system_prompt_template()
                 current_date = datetime.now().strftime('%Y-%m-%d')
-                enforced_system_prompt = base_prompt.replace("{current_date}", current_date)
+                # Support both placeholder formats
+                enforced_system_prompt = base_prompt.replace("{date}", current_date).replace("{current_date}", current_date)
                 print(f"   Using system prompt from profile: {self.profile.__class__.__name__}")
             elif hasattr(self.args, 'system_prompt') and self.args.system_prompt:
                 # Use CLI arg with date prefix
@@ -853,9 +854,9 @@ class UltimateTrainer:
                 enforced_system_prompt = f"Today is {datetime.now().strftime('%Y-%m-%d')}. {base_prompt}"
                 print(f"   Using system prompt from CLI arg")
             else:
-                # Fallback to default
-                base_prompt = "You are a helpful assistant."
-                enforced_system_prompt = f"Today is {datetime.now().strftime('%Y-%m-%d')}. {base_prompt}"
+                # Fallback to default (from single source of truth)
+                from core.prompts import format_system_prompt
+                enforced_system_prompt = format_system_prompt()
                 print(f"   Using default system prompt")
 
             self.enforced_system_prompt = enforced_system_prompt

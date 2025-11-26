@@ -59,7 +59,7 @@ curl -X POST http://192.168.x.x:8766/api/tasks/submit \
 - `data_manager/manager.py` - Rewritten to use skill APIs + curriculum
 - `data_manager/skill_api_client.py` - Client for singleSKILL APIs
 - `data_manager/curriculum_manager.py` - Difficulty progression logic
-- `config.json` - Updated `auto_generate` section (count: 100, removed remote host/port)
+- `config.json` - Updated `auto_generate` section (count: 100, switched from remote 192.168.x.x to local skill APIs: host: "localhost", port: 8080)
 
 ### Generated File Naming
 - Old: `syllo_autogen_TIMESTAMP_countN.jsonl`

@@ -96,20 +96,45 @@ issues = data_validator.validate_file(file_path, level='QUICK')  # Raises on bad
 
 ## Configuration
 
-Primary config: `config.json`
+Primary config: `config.json` (source of truth for all training parameters)
 
+**Structure:**
 ```json
 {
-  "model_name": "qwen2.5_0.5b",
+  "model_name": "qwen3_0.6b",
   "model_path": "/path/to/training/models/Qwen3-0.6B",
-  "batch_size": 19,
-  "learning_rate": 0.0002,
-  "max_length": 4096,
-  "schema_id": "chat_sft_v1"    // Optional, defaults to chat_sft_v1
+  "profile": {"name": "emoji_think"},
+  "hyperparams": {
+    "fp_precision": "bf16",
+    "max_length": 2048,
+    "batch_size": 1,
+    "gradient_accumulation": 16,
+    "learning_rate": 0.0004
+  },
+  "auto_generate": {
+    "enabled": true,
+    "host": "localhost",
+    "port": 8080
+  },
+  "locked": {
+    "base_model": "Qwen/Qwen3-0.6B",
+    "model_architecture": "Qwen3ForCausalLM"
+  }
 }
 ```
 
 See `trainer/config/schema.py` for full TrainerConfig dataclass.
+
+## Ports Reference
+
+| Port | Host | Service | Description |
+|------|------|---------|-------------|
+| 8080 | 4090 | Live Monitor UI | Training metrics dashboard |
+| 8080 | 4090 | SYLLO Skill API | Local skill API for curriculum data |
+| 8081 | 4090 | Unified Monitoring API | Aggregated metrics via plugins |
+| 8090 | 4090 | Binary Skill API | Local skill API for binary math |
+| 8765 | 3090 | Inference Server | Primary model inference |
+| 8766 | 3090 | GPU Task Scheduler | Task queue coordinator |
 
 ## Module Contracts
 
@@ -128,6 +153,21 @@ Switch via config.json:
 ```json
 {"profile": {"name": "emoji_think"}}
 ```
+
+## Thinking Tokens / Chat Templates
+
+Qwen3 models ship with a chat template that auto-injects `<think></think>` tags around all assistant content. This conflicts with custom thinking paradigms like `emoji_think`.
+
+**Solution:** `core/chat_templates.py` detects and overrides Qwen3's template:
+
+1. After tokenizer loads, detects `<think>` injection pattern in template
+2. If `emoji_think` or `regime3` profile is active, replaces with clean ChatML template
+3. Training data formatted WITHOUT `<think></think>` blocks
+4. Logit penalties in profiles further suppress `<think>` token generation
+
+**Result:** Training uses only the emoji thinking paradigm (💭...🔚) without competing systems.
+
+See `core/chat_templates.py` for implementation and `trainer/profiles/emoji_think.py` for logit penalties.
 
 ## Data Generation (Curriculum-Based)
 

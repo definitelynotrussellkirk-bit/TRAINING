@@ -4,9 +4,11 @@
 
 ## Architecture Overview
 
-This system is designed as a **training-only module**:
-- **This machine:** Training, checkpoint management, monitoring training metrics
-- **Remote RTX 3090:** All inference, generation, evaluation, and testing
+This system is designed as a **training-focused module**:
+- **This machine (4090):** Training, checkpoint management, monitoring, local skill APIs (8080/8090)
+- **Remote RTX 3090:** Primary inference server (port 8765), evaluation, checkpoint testing
+
+**Note:** Local skill APIs on 8080/8090 generate training data via curriculum system. The 3090 handles user-facing inference and model evaluation.
 
 ### Core Components
 
@@ -72,15 +74,15 @@ This system is designed as a **training-only module**:
 
 ### Configuration
 
-Active config: `config.json`
+Active config: `config.json` (source of truth for all training parameters)
 
-Key settings:
+Key settings (see `config.json` and `trainer/config/schema.py` for current values):
 - `batch_size`: Training batch size (adjust based on VRAM)
-- `learning_rate`: 2e-4 (default)
-- `max_length`: 4096 tokens (max sequence length)
+- `learning_rate`: Learning rate (check `hyperparams.learning_rate`)
+- `max_length`: Max tokens per example (check `hyperparams.max_length`)
 - `eval_steps`: Validation frequency
 - `save_steps`: Checkpoint frequency
-- `poll_interval`: Inbox polling frequency (seconds)
+- `profile.name`: Data transformation profile (`emoji_think`, `regime3`)
 
 ### Monitoring
 

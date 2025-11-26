@@ -32,7 +32,7 @@ Orientation for LLM/code agents working in this TRAINING repo. Two-GPU split: **
 - Format: OpenAI-style chat JSONL. Spec gate in daemon via `core/validation/spec.py` (schema ids: `chat_sft_v1`, `syllo_v1`, `completion_v1`). Content gate via `core/validation/validator.py` (QUICK/STANDARD/DEEP).
 - DatasetPreparer enforces base prompt from `core/prompts.py` (`Today is {date}. You are happy. You enjoy helping others.`). Profiles may extend but must preserve the base prompt.
 - Validation sets: use `data/validation/val_{easy,medium,hard}_200.jsonl` for quick checks; transfer/skill baselines pull from `data/validation/{benchmarks,binary,primitives}/`.
-- Auto-generation: daemon can request data via DataManager (remote host 192.168.x.x) and supports format variety through `skill_syllo_variant` when available.
+- Auto-generation: daemon requests data via DataManager using local skill APIs (localhost:8080 syllo, localhost:8090 binary) with curriculum-based difficulty.
 
 ## Monitoring & Analytics
 - Aggregator plugins (default): training_status, curriculum, gpu_4090, gpu_3090, adversarial, checkpoint_sync, regression, model_comparison, confidence, testing, self_correction, **skill_metrics** (local+remote baselines), **training_analytics** (layer drift/parameter stability/data-file impact via SSH to 3090).
@@ -48,4 +48,5 @@ Orientation for LLM/code agents working in this TRAINING repo. Two-GPU split: **
 ## Safety / Runtime Guardrails
 - Do **not** delete or overwrite `current_model/`, `models/Qwen3-0.6B/`, `status/`, or `status/baselines/`.
 - Keep runtime artifacts (`inbox/`, `queue/`, `logs/`, `status/`, `control/`, `test_results/`) out of git.
-- Inference runs on 3090 at `http://192.168.x.x:8765` (auth expected); training box should not host inference loads.
+- Primary inference runs on 3090 at `http://192.168.x.x:8765` (auth expected).
+- Local skill APIs (8080/8090) are allowed for data generation; do not deploy general user-facing inference on training box.

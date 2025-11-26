@@ -49,11 +49,12 @@ cp -r models/Qwen3-0.6B/* models/current_model/
 cat config.json
 ```
 
-Key settings:
-- `batch_size`: 19 (adjust if OOM errors occur)
-- `max_length`: 4096 (max tokens per example)
-- `eval_steps`: 50 (validation frequency)
+Key settings (values from `config.json`):
+- `batch_size`: 1 (with gradient_accumulation: 16)
+- `max_length`: 2048 (max tokens per example)
+- `eval_steps`: 500 (validation frequency)
 - `save_steps`: 1000 (checkpoint frequency)
+- `profile.name`: "emoji_think" (data transformation profile)
 
 ## Basic Usage
 
@@ -65,11 +66,10 @@ scripts/start_all.sh
 ```
 
 This launches:
-1. Auto disk manager (monitors disk space)
-2. Training daemon (watches inbox/, processes queue)
+1. Training daemon (watches inbox/, processes queue)
+2. Auto disk manager (monitors disk space)
 3. Live monitor (web UI on port 8080)
-4. Memory stats API (port 8081)
-5. Enhanced monitor (port 8082)
+4. Unified monitoring API (port 8081) - aggregates all system metrics
 
 ### Verify Services Running
 
@@ -339,5 +339,5 @@ python3 management/consolidate_model.py --description "..."
 
 **Key URLs:**
 - Main UI: http://localhost:8080/live_monitor_ui_v2.html
-- Memory API: http://localhost:8081/api/memory_stats
+- Unified API: http://localhost:8081/api/unified
 - Status JSON: http://localhost:8080/status/training_status.json

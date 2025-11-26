@@ -227,6 +227,18 @@ OBSERVATIONS/
 
 ## 🆕 RECENT UPDATES (2025-11-25)
 
+**Chat Template Override** - Fix for Qwen3 `<think>` injection
+
+**What Changed (2025-11-25 - Chat Template Fix):**
+- Created `core/chat_templates.py` - Overrides Qwen3's auto-`<think>` injection
+- Qwen3 models inject `<think></think>` around all assistant content by default
+- This conflicted with our emoji_think paradigm (💭...🔚)
+- New module detects Qwen3 template and replaces with clean ChatML
+- Training now uses only emoji thinking without competing systems
+- See ARCHITECTURE.md "Thinking Tokens / Chat Templates" section
+
+---
+
 **GPU Task Scheduler** - Central coordinator for 3090 GPU workloads
 
 **What Changed (2025-11-25 - GPU Scheduler):**
@@ -367,22 +379,28 @@ See CHANGELOG.md for details
 - ✅ Auto-reload: Enabled via /models/reload endpoint
 
 ### Configuration (`config.json`)
+
+See `config.json` for current values. Key structure:
 ```json
 {
-  "model_name": "qwen2.5_0.5b",
-  "model_path": "/path/to/training/models/Qwen3-0.6B",
-  "batch_size": 19,
-  "learning_rate": 0.0002,
-  "eval_steps": 50,
-  "save_steps": 1000,
-  "max_length": 4096,
-  "poll_interval": 30,
-  "schema_id": "chat_sft_v1"
+  "model_name": "qwen3_0.6b",
+  "profile": {"name": "emoji_think"},
+  "hyperparams": {
+    "max_length": 2048,
+    "batch_size": 1,
+    "gradient_accumulation": 16,
+    "learning_rate": 0.0004,
+    "fp_precision": "bf16"
+  },
+  "auto_generate": {
+    "enabled": true,
+    "host": "localhost",
+    "port": 8080
+  }
 }
 ```
 
-**Note:** `schema_id` is optional. If not specified, defaults to `chat_sft_v1`.
-Available schemas: `chat_sft_v1`, `syllo_v1`, `completion_v1`
+**Note:** `config.json` is the source of truth. See `trainer/config/schema.py` for full TrainerConfig.
 
 ### Disk Space
 - **Available:** 731GB / 1.8TB (58% used)

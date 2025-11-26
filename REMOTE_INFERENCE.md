@@ -594,7 +594,7 @@ sudo systemctl stop llm-api
 **Connection:**
 ```bash
 ssh user@xxx.xxx.88.149
-# Password: Bullshit1!
+# Use SSH key or credentials from ~/.ssh/config
 ```
 
 **Direct commands:**

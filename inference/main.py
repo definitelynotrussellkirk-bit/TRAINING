@@ -259,82 +259,70 @@ async def get_active_model():
 
 @app.get("/models/info", dependencies=[Depends(require_read)])
 async def get_model_info():
-    """Get currently loaded model information (read)"""
+    """Get info about all loaded models in the pool"""
     try:
-        from inference_worker import get_worker
-        worker = get_worker()
-
-        if worker.model is None:
-            return {
-                "loaded": False,
-                "model_id": None,
-                "checkpoint_step": None,
-                "loaded_at": None,
-                "vram_usage_gb": 0
-            }
-
-        # Extract checkpoint step from model_id if available
-        checkpoint_step = None
-        if worker.loaded_model_id and "step" in worker.loaded_model_id:
-            try:
-                checkpoint_step = int(worker.loaded_model_id.split("step")[1].split("-")[0])
-            except:
-                pass
-
-        # Get VRAM usage
+        from inference_worker import get_pool
         import torch
+
+        pool = get_pool()
+        pool_status = pool.get_pool_status()
+
+        # Get total VRAM usage
         vram_gb = round(torch.cuda.memory_allocated(0) / 1e9, 2) if torch.cuda.is_available() else 0
 
         return {
-            "loaded": True,
-            "model_id": worker.loaded_model_id,
-            "checkpoint_step": checkpoint_step,
-            "loaded_from": str(worker.model_path / worker.loaded_model_id) if worker.loaded_model_id else None,
-            "loaded_at": getattr(worker, 'model_loaded_at', None),
-            "vram_usage_gb": vram_gb
+            "loaded": pool_status["loaded_count"] > 0,
+            "loaded_count": pool_status["loaded_count"],
+            "max_models": pool_status["max_models"],
+            "total_vram_mb": pool_status["total_vram_mb"],
+            "vram_usage_gb": vram_gb,
+            "models": pool_status["models"]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get model info: {str(e)}")
 
+class ReloadRequest(BaseModel):
+    model_path: str  # Full path to checkpoint, e.g. /path/to/models/checkpoint-175000
+
 @app.post("/models/reload", dependencies=[Depends(require_admin)])
-async def reload_model():
-    """Force reload of deployed model (admin only)"""
+async def reload_model(req: ReloadRequest):
+    """
+    Load a specific checkpoint by path into the model pool.
+    Now uses multi-model pool - model will be added alongside existing models.
+    """
     try:
-        from inference_worker import get_worker
+        from inference_worker import get_pool
         import torch
 
-        worker = get_worker()
+        pool = get_pool()
+        model_path = Path(req.model_path)
 
-        # Check if deployed model exists
-        deployed_path = MODELS_DIR / "deployed"
-        if not deployed_path.exists() or not (deployed_path / "config.json").exists():
+        # Validate path
+        if not model_path.exists():
             raise HTTPException(
                 status_code=404,
-                detail="No deployed model found. Deploy a checkpoint to models/deployed/ first."
+                detail=f"Model path not found: {req.model_path}"
+            )
+        if not (model_path / "config.json").exists():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid model directory (no config.json): {req.model_path}"
             )
 
-        # Unload current model
-        if worker.model is not None:
-            del worker.model
-            del worker.tokenizer
-            worker.model = None
-            worker.tokenizer = None
-            worker.loaded_model_id = None
-            torch.cuda.empty_cache()
+        # Extract model_id from path (e.g., "checkpoint-175000" from full path)
+        model_id = model_path.name
 
-        # Load deployed model
-        worker.load_model("deployed")
+        # Load into pool (will evict LRU if at capacity)
+        success = pool.load_model(model_id, path=str(model_path))
 
-        # Record load time
-        worker.model_loaded_at = datetime.now().isoformat()
+        if not success:
+            raise HTTPException(status_code=500, detail=f"Failed to load model: {model_id}")
 
         # Extract checkpoint step if available
         checkpoint_step = None
         try:
-            # Try to read from checkpoint metadata
-            if (deployed_path / "trainer_state.json").exists():
-                import json
-                with open(deployed_path / "trainer_state.json") as f:
+            if (model_path / "trainer_state.json").exists():
+                with open(model_path / "trainer_state.json") as f:
                     state = json.load(f)
                     checkpoint_step = state.get("global_step")
         except:
@@ -345,11 +333,12 @@ async def reload_model():
 
         return {
             "status": "reloaded",
-            "model_id": "deployed",
+            "model_id": model_id,
             "checkpoint_step": checkpoint_step,
-            "loaded_from": str(deployed_path),
-            "loaded_at": worker.model_loaded_at,
-            "vram_usage_gb": vram_gb
+            "loaded_from": str(model_path),
+            "loaded_at": pool.pool[model_id].loaded_at if model_id in pool.pool else None,
+            "vram_usage_gb": vram_gb,
+            "pool": pool.get_pool_status()
         }
 
     except HTTPException:
@@ -659,67 +648,102 @@ async def set_power_profile(profile: str):
 
 # ===== OpenAI-Compatible Endpoints =====
 class ChatCompletionRequest(BaseModel):
-    model: str = "Qwen3-0.6B"
+    model: str  # REQUIRED - no default, must specify explicitly
     messages: List[Dict[str, str]]
     temperature: float = 0.7
     top_p: float = 0.9
     max_tokens: int = 256
     stream: bool = False
 
+
+# ===== Model Pool Endpoints =====
+@app.get("/models/pool", dependencies=[Depends(require_read)])
+async def get_pool_status():
+    """Get status of all models in the pool"""
+    from inference_worker import get_pool
+    pool = get_pool()
+    return pool.get_pool_status()
+
+
+@app.post("/models/pool/load", dependencies=[Depends(require_admin)])
+async def pool_load_model(model_id: str, path: Optional[str] = None):
+    """Load a model into the pool"""
+    from inference_worker import get_pool
+    pool = get_pool()
+
+    success = pool.load_model(model_id, path=path)
+    if not success:
+        raise HTTPException(status_code=400, detail=f"Failed to load model: {model_id}")
+
+    return {
+        "status": "loaded",
+        "model_id": model_id,
+        "pool": pool.get_pool_status()
+    }
+
+
+@app.post("/models/pool/unload", dependencies=[Depends(require_admin)])
+async def pool_unload_model(model_id: str):
+    """Unload a model from the pool"""
+    from inference_worker import get_pool
+    pool = get_pool()
+
+    success = pool.unload_model(model_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Model not in pool: {model_id}")
+
+    return {
+        "status": "unloaded",
+        "model_id": model_id,
+        "pool": pool.get_pool_status()
+    }
+
+
 @app.post("/v1/chat/completions", dependencies=[Depends(require_read)])
 async def chat_completions(req: ChatCompletionRequest):
-    """OpenAI-compatible chat completions endpoint (read access)"""
-    # Convert messages to prompt
-    prompt = ""
-    for msg in req.messages:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        if role == "system":
-            prompt += f"System: {content}\n"
-        elif role == "user":
-            prompt += f"User: {content}\n"
-        elif role == "assistant":
-            prompt += f"Assistant: {content}\n"
-    prompt += "Assistant:"
+    """
+    OpenAI-compatible chat completions endpoint.
 
-    # Queue inference job
+    IMPORTANT: 'model' field is REQUIRED - you must specify which model to use.
+    Response always includes actual model_id used for tracking.
+    """
     job_id = f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        INSERT INTO jobs (id, type, model_id, config, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        job_id,
-        "inference",
-        req.model,
-        json.dumps({"prompt": prompt, "max_tokens": req.max_tokens, "temperature": req.temperature, "top_p": req.top_p}),
-        "pending",
-        datetime.now().isoformat()
-    ))
-    conn.commit()
-    conn.close()
-
-    # Load model and run inference
+    # Use model pool - does NOT auto-load, model must already be in pool
     try:
-        from inference_worker import get_worker
-        worker = get_worker()
-        worker.load_model(req.model)
+        from inference_worker import get_pool
+        pool = get_pool()
 
-        result = worker.generate(
-            prompt=prompt,
+        # Check if model is loaded
+        if not pool.is_loaded(req.model):
+            available = list(pool.pool.keys())
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model '{req.model}' not loaded. Available: {available}. "
+                       f"Use /models/pool/load to load it first."
+            )
+
+        # Pass messages directly - pool.generate will use tokenizer's chat template
+        result = pool.generate(
+            model_id=req.model,
+            prompt="",  # Not used when messages provided
+            messages=req.messages,  # Use proper chat template
             max_tokens=req.max_tokens,
             temperature=req.temperature,
             top_p=req.top_p,
             repetition_penalty=1.1
         )
 
+        # Check for errors from pool
+        if 'error' in result:
+            raise HTTPException(status_code=500, detail=result['error'])
+
         return {
             "id": job_id,
             "object": "chat.completion",
             "created": int(datetime.now().timestamp()),
-            "model": req.model,
+            "model": result["model_id"],  # Actual model used
+            "model_path": result.get("model_path"),  # Full path for tracking
             "choices": [{
                 "index": 0,
                 "message": {
@@ -734,8 +758,9 @@ async def chat_completions(req: ChatCompletionRequest):
                 "total_tokens": result["total_tokens"]
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        # Return error response
         return {
             "id": job_id,
             "object": "chat.completion",

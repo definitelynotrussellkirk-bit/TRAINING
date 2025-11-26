@@ -20,6 +20,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import re
 import sys
 import time
@@ -56,12 +57,21 @@ class CurriculumEvalLoop:
         inference_port: int = 8765,
         problems_per_eval: int = 20,
         interval: int = 600,  # 10 minutes
+        model: str = None,  # Model ID to use (None = auto-detect)
     ):
         self.base_dir = Path(base_dir)
         self.syllo_url = f"http://{syllo_host}:{syllo_port}"
         self.inference_url = f"http://{inference_host}:{inference_port}"
         self.problems_per_eval = problems_per_eval
         self.interval = interval
+
+        # API key for inference server (from environment or secrets file)
+        self.api_key = os.environ.get("INFERENCE_API_KEY", "admin123")
+
+        # Model name - use provided model or auto-detect from inference server
+        # DYNAMIC: Model IDs like "checkpoint-177000", "Qwen3-0.6B-base" come from 3090 /models/info
+        self.model_name = model if model else self._get_current_model()
+        self._model_was_specified = model is not None  # Track if user specified model
 
         # Load config
         config_path = self.base_dir / "config.json"
@@ -74,6 +84,20 @@ class CurriculumEvalLoop:
         # Status file
         self.status_file = self.base_dir / "status" / "curriculum_eval.json"
         self.status_file.parent.mkdir(parents=True, exist_ok=True)
+
+    def _get_current_model(self) -> str:
+        """Get currently loaded model from inference server"""
+        try:
+            resp = requests.get(f"{self.inference_url}/models/info", timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                model = data.get("model_name", data.get("loaded_model", "current"))
+                logger.info(f"Detected model from inference server: {model}")
+                return model
+        except Exception as e:
+            logger.debug(f"Could not query model info: {e}")
+        # Fallback to environment or default
+        return os.environ.get("INFERENCE_MODEL", "current")
 
     def check_services(self) -> Tuple[bool, str]:
         """Check if required services are running."""
@@ -109,16 +133,15 @@ class CurriculumEvalLoop:
 
     def generate_test_problems(self, skill: str, level_config: Dict) -> List[Dict]:
         """Generate test problems for the current level."""
-        word_count = level_config.get("word_count", 4)
+        # Pass level directly to API - it handles word_count mapping
+        level = level_config.get("level", 1)
 
         try:
             response = requests.post(
                 f"{self.syllo_url}/generate",
                 json={
                     "count": self.problems_per_eval,
-                    "word_count": word_count,
-                    "min_words": word_count,
-                    "max_words": word_count,
+                    "level": level,  # API maps level to word_count internally
                 },
                 timeout=30
             )
@@ -129,51 +152,32 @@ class CurriculumEvalLoop:
             logger.error(f"Failed to generate problems: {e}")
             return []
 
-    def format_puzzle_prompt(self, puzzle: Dict) -> str:
-        """Format a puzzle into a prompt matching the ACTUAL training data format (JSON output)."""
-        rules = puzzle.get("rules", {})
-        words = puzzle.get("words", [])
-        syllable_bank = puzzle.get("syllable_bank", [])
-        word_count = rules.get("word_count", len(words))
-        puzzle_id = puzzle.get("puzzle_id", "eval_001")
+    def format_puzzle_prompt(self, puzzle: Dict, puzzle_index: int = 1) -> str:
+        """
+        Get the prompt for a puzzle.
 
-        # Build prompt to match actual training data format
-        prompt_lines = [
-            f"SYLLO Puzzle {puzzle_id}",
-            "You must recover every hidden word by assigning syllable tiles to definitions.",
-            f"Difficulty: Easy (level 1 evaluation).",
-            "Rules:",
-            f"- {word_count} target words.",
-            "- Each word lists its syllable count via blank slots.",
-            "- Return your answers as JSON with keys `solutions` and `inventory_check`.",
-            "",
-            "Word slots:"
-        ]
+        The SYLLO API now returns `prompt` directly in the correct training
+        format. Just use it.
+        """
+        # The API now returns the prompt directly
+        prompt = puzzle.get("prompt")
+        if prompt:
+            return prompt
 
-        # Add word clues with blanks
-        for i, word in enumerate(words, 1):
-            hint = word.get("definition", word.get("hint", ""))
-            syllables = word.get("syllables", [])
-            syllable_count = len(syllables) if syllables else 3
-            blanks = " ".join(["___"] * syllable_count)
-            prompt_lines.append(f"{i}. {blanks} — {hint}")
-
-        # Add syllable bank
-        prompt_lines.extend([
-            "",
-            f"Syllable bank: {syllable_bank}",
-            "",
-            "Return valid JSON:"
-        ])
-
-        return "\n".join(prompt_lines)
+        # Fallback: API doesn't have new format yet - raise error
+        raise ValueError(
+            f"SYLLO API response missing 'prompt' field. "
+            f"Make sure the SYLLO API (singleSKILL) is updated."
+        )
 
     def get_model_answer(self, prompt: str) -> Optional[str]:
         """Get model's answer via inference server."""
         try:
             response = requests.post(
                 f"{self.inference_url}/v1/chat/completions",
+                headers={"X-API-Key": self.api_key},
                 json={
+                    "model": self.model_name,
                     "messages": [
                         {"role": "user", "content": prompt}
                     ],
@@ -210,16 +214,19 @@ class CurriculumEvalLoop:
                 # Handle both "letters" and "solutions" keys
                 items = data.get("letters", data.get("solutions", []))
                 for item in items:
-                    if isinstance(item, dict) and "word" in item:
-                        words.append(item["word"].lower())
+                    if isinstance(item, dict):
+                        # Training data uses "answer", also check "word" for compatibility
+                        word = item.get("answer", item.get("word", ""))
+                        if word:
+                            words.append(word.lower())
                 if words:
                     return words
         except (json.JSONDecodeError, AttributeError):
             pass
 
-        # Fallback: try to find words in WORD format or quoted strings
-        # Look for "word": "WORDNAME" patterns
-        word_matches = re.findall(r'"word":\s*"([A-Za-z]+)"', answer, re.IGNORECASE)
+        # Fallback: try to find words in WORD/answer format or quoted strings
+        # Look for "answer": "WORDNAME" or "word": "WORDNAME" patterns
+        word_matches = re.findall(r'"(?:answer|word)":\s*"([A-Za-z]+)"', answer, re.IGNORECASE)
         if word_matches:
             return [w.lower() for w in word_matches]
 
@@ -288,7 +295,7 @@ class CurriculumEvalLoop:
         total = len(puzzles)
 
         for i, puzzle in enumerate(puzzles, 1):
-            prompt = self.format_puzzle_prompt(puzzle)
+            prompt = self.format_puzzle_prompt(puzzle, puzzle_index=i)
             answer = self.get_model_answer(prompt)
 
             is_correct, partial = self.check_answer(puzzle, answer)
@@ -357,6 +364,9 @@ class CurriculumEvalLoop:
             "advanced": advanced,
             "new_level": new_level,
             "timestamp": datetime.now().isoformat(),
+            # DYNAMIC: model_id comes from --model arg or auto-detected from 3090
+            "model": self.model_name,
+            "model_specified": self._model_was_specified,  # True if user explicitly chose model
             "results": results
         }
 
@@ -378,6 +388,8 @@ class CurriculumEvalLoop:
         logger.info("="*60)
         logger.info(f"SYLLO API: {self.syllo_url}")
         logger.info(f"Inference: {self.inference_url}")
+        # DYNAMIC: Model ID comes from --model arg or auto-detected
+        logger.info(f"Model: {self.model_name} {'(specified)' if self._model_was_specified else '(auto-detected)'}")
         logger.info(f"Problems per eval: {self.problems_per_eval}")
         logger.info(f"Interval: {self.interval}s ({self.interval/60:.1f} min)")
         logger.info("="*60)
@@ -493,6 +505,9 @@ def main():
                         help="Evaluation interval in seconds (default: 600 = 10 min)")
     parser.add_argument("--once", action="store_true",
                         help="Run once and exit (no loop)")
+    parser.add_argument("--model", type=str, default=None,
+                        help="Model ID to use (e.g., 'checkpoint-177000', 'Qwen3-0.6B-base'). "
+                             "If not specified, auto-detects from inference server.")
     parser.add_argument("--use-scheduler", action="store_true",
                         help="Submit tasks to GPU Task Scheduler instead of running directly")
     parser.add_argument("--scheduler-url", default="http://192.168.x.x:8766",
@@ -514,6 +529,7 @@ def main():
         inference_port=args.inference_port,
         problems_per_eval=args.problems,
         interval=args.interval,
+        model=args.model,  # DYNAMIC: Model ID like "checkpoint-177000" or "Qwen3-0.6B-base"
     )
 
     if args.once:

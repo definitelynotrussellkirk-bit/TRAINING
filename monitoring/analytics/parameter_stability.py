@@ -161,10 +161,27 @@ class ParameterStabilityMonitor:
             if checkpoints:
                 return checkpoints[0]
 
-        # Try deployed model on 3090
-        deployed = Path.home() / "llm" / "models" / "deployed"
-        if deployed.exists():
-            return deployed
+        # Try current_model directory
+        current_model = self.base_dir / "current_model"
+        if current_model.exists():
+            checkpoints = sorted(
+                current_model.glob("checkpoint-*"),
+                key=lambda p: self._extract_step_from_path(p) or 0,
+                reverse=True
+            )
+            if checkpoints:
+                return checkpoints[0]
+
+        # Try models on 3090 - look for checkpoint-* directories, NOT "deployed"
+        models_dir = Path.home() / "llm" / "models"
+        if models_dir.exists():
+            checkpoints = sorted(
+                models_dir.glob("checkpoint-*"),
+                key=lambda p: self._extract_step_from_path(p) or 0,
+                reverse=True
+            )
+            if checkpoints:
+                return checkpoints[0]
 
         return None
 

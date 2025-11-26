@@ -27,6 +27,7 @@ from .plugins.training_analytics import TrainingAnalyticsPlugin
 from .plugins.system_health import SystemHealthPlugin
 from .plugins.retention import RetentionPlugin
 from .plugins.scheduler import SchedulerPlugin
+from .plugins.inference_model import InferenceModelPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,11 @@ class DataAggregator:
             # GPU Task Scheduler (3090 port 8766)
             self.registry.register(SchedulerPlugin(
                 config=self.config.get('scheduler', {})
+            ))
+
+            # Currently loaded inference model (3090 port 8765)
+            self.registry.register(InferenceModelPlugin(
+                config=self.config.get('inference_model', {})
             ))
 
             logger.info(f"Registered {len(self.registry.plugins)} default plugins")

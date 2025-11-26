@@ -135,20 +135,40 @@ class LayerDriftMonitor:
 
     def _find_latest_checkpoint(self) -> Optional[Path]:
         """Find the most recent checkpoint in the checkpoints directory."""
+        # Try local checkpoints dir first
         checkpoints_dir = self.base_dir / "checkpoints"
-        if not checkpoints_dir.exists():
-            # Try models/deployed on 3090
-            deployed = Path.home() / "llm" / "models" / "deployed"
-            if deployed.exists():
-                return deployed
-            return None
+        if checkpoints_dir.exists():
+            checkpoints = sorted(
+                checkpoints_dir.glob("checkpoint-*"),
+                key=lambda p: self._extract_step_from_path(p) or 0,
+                reverse=True
+            )
+            if checkpoints:
+                return checkpoints[0]
 
-        checkpoints = sorted(
-            checkpoints_dir.glob("checkpoint-*"),
-            key=lambda p: self._extract_step_from_path(p) or 0,
-            reverse=True
-        )
-        return checkpoints[0] if checkpoints else None
+        # Try current_model directory
+        current_model = self.base_dir / "current_model"
+        if current_model.exists():
+            checkpoints = sorted(
+                current_model.glob("checkpoint-*"),
+                key=lambda p: self._extract_step_from_path(p) or 0,
+                reverse=True
+            )
+            if checkpoints:
+                return checkpoints[0]
+
+        # Try models on 3090 - look for checkpoint-* directories, NOT "deployed"
+        models_dir = Path.home() / "llm" / "models"
+        if models_dir.exists():
+            checkpoints = sorted(
+                models_dir.glob("checkpoint-*"),
+                key=lambda p: self._extract_step_from_path(p) or 0,
+                reverse=True
+            )
+            if checkpoints:
+                return checkpoints[0]
+
+        return None
 
     def _load_state_dict(self, path: Path) -> Dict[str, torch.Tensor]:
         """

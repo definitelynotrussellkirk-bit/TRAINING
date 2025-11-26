@@ -39,6 +39,7 @@ except ImportError:
     def get_base_dir():
         return Path("/path/to/training")
 
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -55,10 +56,9 @@ TARGET_RATIO = 0.20  # 20% discrimination to SYLLO ratio
 MAX_PER_RUN = 1500   # Max examples per cron run (~1 hour @ 27/min)
 MIN_PER_RUN = 50     # Minimum to generate even if caught up
 
-# Current curriculum level (EASY = levels 1-2)
-EASY_LEVELS = [1, 2]
-MEDIUM_LEVELS = [3, 4]
-HARD_LEVELS = [5]
+# 10-level system (signal degradation model)
+# Level 1-10: progressively harder via word count, vocab rarity, overlap, red herrings
+ALL_LEVELS = list(range(1, 11))
 
 # File patterns
 SYLLO_PATTERNS = ['auto_gen_*.jsonl', 'syllo_*.jsonl', 'train_SYLLO_*.jsonl']
@@ -68,9 +68,9 @@ DISCRIM_PATTERNS = ['discrimination_*.jsonl']
 class DiscriminationGenerator:
     """Generate discrimination + correction training data"""
 
-    def __init__(self, base_dir: Path = None, difficulty: str = "auto"):
+    def __init__(self, base_dir: Path = None, level: str = "auto"):
         self.base_dir = base_dir or get_base_dir()
-        self.difficulty = difficulty
+        self.level_arg = level  # "auto" or numeric like "5" or "1-3" or "all"
         self.curriculum_level = self._get_curriculum_level()
         self.levels = self._get_levels()
         self.generated_puzzles = set()  # Track to avoid duplicates
@@ -82,7 +82,8 @@ class DiscriminationGenerator:
             if state_file.exists():
                 with open(state_file) as f:
                     state = json.load(f)
-                    level = state.get('syllo', {}).get('current_level', 1)
+                    # State structure: {"skills": {"syllo": {"current_level": N}}}
+                    level = state.get('skills', {}).get('syllo', {}).get('current_level', 1)
                     logger.info(f"Read curriculum level from state: {level}")
                     return level
         except Exception as e:
@@ -90,18 +91,34 @@ class DiscriminationGenerator:
         return 1  # Default to level 1
 
     def _get_levels(self):
-        """Get SYLLO levels based on difficulty or curriculum"""
-        if self.difficulty == "auto":
+        """Get SYLLO levels based on level argument or curriculum"""
+        if self.level_arg == "auto":
             # Use curriculum level directly
             logger.info(f"Using curriculum level: {self.curriculum_level}")
             return [self.curriculum_level]
-        elif self.difficulty == "easy":
-            return EASY_LEVELS
-        elif self.difficulty == "medium":
-            return MEDIUM_LEVELS
-        elif self.difficulty == "hard":
-            return HARD_LEVELS
+        elif self.level_arg == "all":
+            logger.info("Using all levels 1-10")
+            return ALL_LEVELS
+        elif "-" in str(self.level_arg):
+            # Range like "1-3" or "4-7"
+            try:
+                start, end = map(int, self.level_arg.split("-"))
+                levels = list(range(start, end + 1))
+                logger.info(f"Using level range: {levels}")
+                return levels
+            except ValueError:
+                logger.warning(f"Invalid level range '{self.level_arg}', using curriculum level")
+                return [self.curriculum_level]
         else:
+            # Single level like "5"
+            try:
+                level = int(self.level_arg)
+                if 1 <= level <= 10:
+                    logger.info(f"Using level: {level}")
+                    return [level]
+            except ValueError:
+                pass
+            logger.warning(f"Invalid level '{self.level_arg}', using curriculum level")
             return [self.curriculum_level]
 
     def _count_lines_in_files(self, patterns: list, dirs: list) -> int:
@@ -229,36 +246,49 @@ class DiscriminationGenerator:
             logger.error(f"Failed to generate puzzle: {e}")
         return None
 
-    def format_puzzle_prompt(self, puzzle: dict) -> str:
-        """Format puzzle into prompt"""
+    def format_puzzle_prompt(self, puzzle: dict, puzzle_index: int = 1) -> str:
+        """
+        Get the prompt for a puzzle.
+
+        The SYLLO API now returns `prompt` directly in the correct training
+        format. Just use it.
+        """
         p = puzzle['puzzle']
 
-        prompt = f"""Solve this syllable puzzle. Fill in the blanks using the syllable bank.
+        # The API now returns the prompt directly
+        prompt = p.get("prompt")
+        if prompt:
+            return prompt
 
-Syllable Bank: {', '.join(p['syllable_bank'])}
+        # Fallback: API doesn't have new format yet - raise error
+        raise ValueError(
+            f"SYLLO API response missing 'prompt' field. "
+            f"Make sure the SYLLO API (singleSKILL) is updated."
+        )
 
-Words to form:
-"""
-        for i, word in enumerate(p['words'], 1):
-            slots = ' '.join(word['slots'])
-            hint = word.get('definition', word.get('hint_type', 'hint'))
-            prompt += f"{i}. {hint} → {slots}\n"
-
-        prompt += "\nProvide your answer in this format:\n"
-        prompt += "1. WORD (syllables used)\n"
-        prompt += "2. WORD (syllables used)\n"
-        prompt += "etc.\n\nAnswer:"
-
-        return prompt
+    def _get_current_model(self) -> str:
+        """Get currently loaded model from inference server"""
+        try:
+            resp = requests.get(f"{INFERENCE_API}/models/info", timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                model = data.get("model_name", data.get("loaded_model", "current"))
+                logger.debug(f"Using model from inference server: {model}")
+                return model
+        except Exception as e:
+            logger.debug(f"Could not query model info: {e}")
+        # Fallback to environment or default
+        return os.environ.get("INFERENCE_MODEL", "current")
 
     def get_model_response(self, prompt: str, max_tokens: int = 150) -> str:
-        """Get model's response"""
+        """Get model's response using currently loaded checkpoint"""
         try:
+            model = self._get_current_model()
             resp = requests.post(
                 f"{INFERENCE_API}/v1/chat/completions",
                 headers={"X-API-Key": API_KEY},
                 json={
-                    "model": "checkpoint-175000",
+                    "model": model,
                     "messages": [{"role": "user", "content": prompt}],
                     "max_tokens": max_tokens,
                     "temperature": 0.3
@@ -468,8 +498,8 @@ Did the model answer correctly?"""
 def main():
     parser = argparse.ArgumentParser(description="Generate discrimination training data")
     parser.add_argument('--count', type=int, default=20, help='Number of examples to generate (fixed mode)')
-    parser.add_argument('--difficulty', choices=['auto', 'easy', 'medium', 'hard'], default='auto',
-                       help='Difficulty level (auto=read from curriculum state)')
+    parser.add_argument('--level', default='auto',
+                       help='Level: auto (curriculum), 1-10, range (e.g. 1-3), or all')
     parser.add_argument('--priority', choices=['high', 'normal', 'low'], default='high',
                        help='Queue priority')
     parser.add_argument('--base-dir', default='/path/to/training',
@@ -485,7 +515,7 @@ def main():
 
     generator = DiscriminationGenerator(
         base_dir=Path(args.base_dir),
-        difficulty=args.difficulty
+        level=args.level
     )
 
     if args.check_only:

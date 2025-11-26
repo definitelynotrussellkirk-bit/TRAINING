@@ -649,26 +649,46 @@
                 <h3>📖 SYLLO Curriculum Levels</h3>
             </div>
             <div class="card-body">
-                <div style="font-size: 0.8rem;">
+                <div style="font-size: 0.75rem;">
                     <div class="diff-row" style="opacity: 1;" id="level1Row">
-                        <span class="diff-label">Level 1</span>
-                        <span style="flex: 1; color: var(--text-secondary);">4 words, unique syllables</span>
+                        <span class="diff-label">L1</span>
+                        <span style="flex: 1; color: var(--text-secondary);">4w, strong hints only</span>
                     </div>
                     <div class="diff-row" style="opacity: 0.6;" id="level2Row">
-                        <span class="diff-label">Level 2</span>
-                        <span style="flex: 1; color: var(--text-secondary);">5 words, some overlap</span>
+                        <span class="diff-label">L2</span>
+                        <span style="flex: 1; color: var(--text-secondary);">5w, definitions+synonyms</span>
                     </div>
                     <div class="diff-row" style="opacity: 0.6;" id="level3Row">
-                        <span class="diff-label">Level 3</span>
-                        <span style="flex: 1; color: var(--text-secondary);">6 words, 1 red herring</span>
+                        <span class="diff-label">L3</span>
+                        <span style="flex: 1; color: var(--text-secondary);">5w, 10% overlap</span>
                     </div>
                     <div class="diff-row" style="opacity: 0.6;" id="level4Row">
-                        <span class="diff-label">Level 4</span>
-                        <span style="flex: 1; color: var(--text-secondary);">7 words, 2 red herrings</span>
+                        <span class="diff-label">L4</span>
+                        <span style="flex: 1; color: var(--text-secondary);">6w, medium hints unlock</span>
                     </div>
                     <div class="diff-row" style="opacity: 0.6;" id="level5Row">
-                        <span class="diff-label">Level 5</span>
-                        <span style="flex: 1; color: var(--text-secondary);">8 words, high overlap, 3 red herrings</span>
+                        <span class="diff-label">L5</span>
+                        <span style="flex: 1; color: var(--text-secondary);">6w, 30% overlap, 2 RH</span>
+                    </div>
+                    <div class="diff-row" style="opacity: 0.6;" id="level6Row">
+                        <span class="diff-label">L6</span>
+                        <span style="flex: 1; color: var(--text-secondary);">7w, medium dominant</span>
+                    </div>
+                    <div class="diff-row" style="opacity: 0.6;" id="level7Row">
+                        <span class="diff-label">L7</span>
+                        <span style="flex: 1; color: var(--text-secondary);">7w, weak hints unlock</span>
+                    </div>
+                    <div class="diff-row" style="opacity: 0.6;" id="level8Row">
+                        <span class="diff-label">L8</span>
+                        <span style="flex: 1; color: var(--text-secondary);">8w, 60% overlap, 4 RH</span>
+                    </div>
+                    <div class="diff-row" style="opacity: 0.6;" id="level9Row">
+                        <span class="diff-label">L9</span>
+                        <span style="flex: 1; color: var(--text-secondary);">9w, minimal hints</span>
+                    </div>
+                    <div class="diff-row" style="opacity: 0.6;" id="level10Row">
+                        <span class="diff-label">L10</span>
+                        <span style="flex: 1; color: var(--text-secondary);">10w, any signal (mastery)</span>
                     </div>
                 </div>
             </div>
@@ -683,13 +703,18 @@
     </div>
 
     <script>
-        // Curriculum level descriptions
+        // Curriculum level descriptions (10-level signal degradation model)
         const LEVEL_DESCRIPTIONS = {
-            1: '4 words, unique syllables',
-            2: '5 words, some syllable overlap',
-            3: '6 words, 1 red herring',
-            4: '7 words, 2 red herrings',
-            5: '8 words, high overlap, 3 red herrings'
+            1: '4w, strong hints only',
+            2: '5w, definitions+synonyms',
+            3: '5w, 10% overlap',
+            4: '6w, medium hints unlock',
+            5: '6w, 30% overlap, 2 RH',
+            6: '7w, medium dominant',
+            7: '7w, weak hints unlock',
+            8: '8w, 60% overlap, 4 RH',
+            9: '9w, minimal hints',
+            10: '10w, any signal (mastery)'
         };
 
         // API base URL - use port 8081 where Flask API runs
@@ -833,8 +858,8 @@
                     document.getElementById('recentEvals').textContent = 'No evaluations yet';
                 }
 
-                // Highlight current level row
-                for (let i = 1; i <= 5; i++) {
+                // Highlight current level row (10-level system)
+                for (let i = 1; i <= 10; i++) {
                     const row = document.getElementById(`level${i}Row`);
                     if (row) row.style.opacity = i === level ? '1' : '0.5';
                 }

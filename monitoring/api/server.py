@@ -7,7 +7,7 @@ Provides unified access to all monitoring data sources through a
 single REST API endpoint.
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 import logging
 import sys
 import os
@@ -44,6 +44,37 @@ aggregator = DataAggregator()
 
 logger.info("Unified Monitoring API Server initialized")
 logger.info(f"Registered {len(aggregator.registry.plugins)} plugins")
+
+# Static file directories
+MONITORING_DIR = Path(__file__).parent.parent
+UI_DIR = MONITORING_DIR / 'ui'
+CSS_DIR = MONITORING_DIR / 'css'
+JS_DIR = MONITORING_DIR / 'js'
+
+
+# Static file routes for dashboard UI
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    """Serve CSS files"""
+    return send_from_directory(CSS_DIR, filename)
+
+
+@app.route('/js/<path:filename>')
+def serve_js(filename):
+    """Serve JavaScript files"""
+    return send_from_directory(JS_DIR, filename)
+
+
+@app.route('/ui/<path:filename>')
+def serve_ui(filename):
+    """Serve UI HTML files"""
+    return send_from_directory(UI_DIR, filename)
+
+
+@app.route('/<path:filename>.html')
+def serve_html(filename):
+    """Serve HTML files from root path"""
+    return send_from_directory(UI_DIR, f'{filename}.html')
 
 
 @app.route('/')

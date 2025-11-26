@@ -76,7 +76,7 @@ The server uses `~/llm/` for data storage:
 
 ```
 ~/llm/
-├── models/          # Model weights (Qwen3-0.6B, deployed/, etc.)
+├── models/          # Model weights (Qwen3-0.6B, checkpoint-NNNNNN/, etc.)
 ├── data/            # Training/eval data
 ├── checkpoints/     # Checkpoint storage
 ├── datasets/        # Dataset files
@@ -110,7 +110,7 @@ python main.py
 | `/health` | GET | - | System health and GPU status |
 | `/models` | GET | Read | List registered models |
 | `/models/info` | GET | Read | Currently loaded model info |
-| `/models/reload` | POST | Admin | Force reload deployed model |
+| `/models/reload` | POST | Admin | Load specific checkpoint by path |
 | `/models/register` | POST | Admin | Register new model |
 | `/models/set_active` | POST | Admin | Set active model |
 | `/v1/chat/completions` | POST | Read | OpenAI-compatible chat API |
@@ -120,13 +120,25 @@ python main.py
 | `/jobs` | GET | Admin | List job queue |
 | `/config` | GET | Admin | Server configuration |
 
-## Deployment Flow
+## Loading a Checkpoint
 
-1. 4090 trains model, saves checkpoints
-2. `deployment_orchestrator.py` (on 4090) syncs best checkpoint to 3090
-3. Files go to `~/llm/models/deployed/`
-4. Call `/models/reload` to load new model
-5. Server serves inference from deployed model
+1. Sync checkpoint from 4090 to 3090:
+   ```bash
+   rsync -av /path/to/training/current_model/checkpoint-175000/ user@xxx.xxx.88.149:~/llm/models/checkpoint-175000/
+   ```
+2. Load checkpoint on 3090:
+   ```bash
+   curl -X POST http://192.168.x.x:8765/models/reload \
+     -H "Content-Type: application/json" \
+     -d '{"model_path":"/path/to/models/checkpoint-175000"}'
+   ```
+3. Verify:
+   ```bash
+   curl http://192.168.x.x:8765/models/info
+   # Should show: "loaded_from": "/path/to/models/checkpoint-175000"
+   ```
+
+**Always use explicit checkpoint names (checkpoint-NNNNNN), never generic "deployed" folder.**
 
 ## Port
 

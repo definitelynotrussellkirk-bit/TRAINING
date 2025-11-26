@@ -31,7 +31,7 @@ READ_KEY = os.environ.get("INFERENCE_READ_KEY", "")
 
 # Remote cleanup configuration
 REMOTE_MODELS_DIR = "/path/to/models"
-PROTECTED_MODEL_DIRS = {"deployed", "Qwen3-0.6B"}  # Never delete these
+PROTECTED_MODEL_DIRS = {"Qwen3-0.6B"}  # Never delete base model
 CLEANUP_PATHS = [
     # (path, description)
     ("/home/user/trained_adapter", "old adapter files"),
@@ -187,15 +187,16 @@ class DeploymentOrchestrator:
 
     def rsync_checkpoint(self, ckpt_info: Dict[str, Any]) -> tuple[bool, float]:
         """
-        rsync checkpoint to 3090 models/deployed/
+        rsync checkpoint to 3090 models/checkpoint-NNNNNN/ (preserves checkpoint name)
 
         Returns:
             (success: bool, duration: float)
         """
         local_path = ckpt_info['checkpoint_path']
-        remote_target = f"{self.remote_host}:/path/to/models/deployed/"
+        checkpoint_name = ckpt_info['checkpoint_name']  # e.g., checkpoint-175000
+        remote_target = f"{self.remote_host}:/path/to/models/{checkpoint_name}/"
 
-        logger.info(f"📦 Syncing {ckpt_info['checkpoint_name']} to 3090...")
+        logger.info(f"📦 Syncing {checkpoint_name} to 3090 as models/{checkpoint_name}/...")
 
         cmd = [
             "rsync",
@@ -236,7 +237,7 @@ class DeploymentOrchestrator:
 
     def reload_remote_model(self, ckpt_info: Dict[str, Any]) -> tuple[bool, Optional[Dict]]:
         """
-        Call 3090 /models/reload API
+        Call 3090 /models/reload API with explicit checkpoint path
 
         Requires INFERENCE_ADMIN_KEY environment variable.
 
@@ -244,22 +245,27 @@ class DeploymentOrchestrator:
             (success: bool, response: Optional[Dict])
         """
         url = f"{self.remote_api_url}/models/reload"
+        checkpoint_name = ckpt_info['checkpoint_name']
+        model_path = f"/path/to/models/{checkpoint_name}"
 
-        logger.info("🔄 Triggering model reload on 3090...")
+        logger.info(f"🔄 Loading {checkpoint_name} on 3090...")
 
         # Build headers with admin API key
-        headers = {}
+        headers = {"Content-Type": "application/json"}
         if ADMIN_KEY:
             headers['X-API-Key'] = ADMIN_KEY
         else:
             logger.warning("⚠️  INFERENCE_ADMIN_KEY not set - reload may fail")
 
+        # Send model_path in request body
+        payload = {"model_path": model_path}
+
         try:
-            response = requests.post(url, headers=headers, timeout=60)
+            response = requests.post(url, headers=headers, json=payload, timeout=60)
             response.raise_for_status()
 
             result = response.json()
-            logger.info(f"✅ Model reloaded: {result.get('model_id', 'unknown')}")
+            logger.info(f"✅ Loaded {result.get('model_id', checkpoint_name)} from {result.get('loaded_from', model_path)}")
 
             return True, result
 
@@ -307,15 +313,16 @@ class DeploymentOrchestrator:
             actual_step = info.get('checkpoint_step')
 
             if actual_step == expected_step:
-                logger.info(f"✅ Verified: step {expected_step}")
+                logger.info(f"✅ Verified: step {expected_step}, model_id={info.get('model_id')}")
                 return True
             elif actual_step is None:
-                # Step not extractable, check that model_id is "deployed"
-                if info.get('model_id') == 'deployed':
-                    logger.warning("⚠️  Step not extractable, but model_id is 'deployed' - assuming success")
+                # Step not extractable, check model_id looks like a checkpoint
+                model_id = info.get('model_id', '')
+                if model_id.startswith('checkpoint-') or model_id == f'checkpoint-{expected_step}':
+                    logger.warning(f"⚠️  Step not extractable, but model_id={model_id} - assuming success")
                     return True
                 else:
-                    logger.error(f"❌ Model ID is {info.get('model_id')}, not 'deployed'")
+                    logger.error(f"❌ Model ID is {model_id}, expected checkpoint-{expected_step}")
                     return False
             else:
                 logger.error(f"❌ Step mismatch: expected {expected_step}, got {actual_step}")

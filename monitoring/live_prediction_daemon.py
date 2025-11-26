@@ -17,6 +17,7 @@ Features:
 import json
 import time
 import sys
+import os
 import argparse
 import logging
 from pathlib import Path
@@ -47,6 +48,10 @@ class LivePredictionDaemon:
         self.count = count
         self.max_tokens = max_tokens
         self.temperature = temperature
+
+        # API authentication and model
+        self.api_key = os.environ.get("INFERENCE_API_KEY", "admin123")
+        self.model_name = os.environ.get("INFERENCE_MODEL", "checkpoint-175000")
 
         # Storage
         self.status_dir = self.base_dir / "status"
@@ -134,7 +139,7 @@ class LivePredictionDaemon:
         """
         try:
             payload = {
-                "model": "Qwen3-0.6B",
+                "model": self.model_name,
                 "messages": [
                     {"role": "user", "content": prompt}
                 ],
@@ -142,10 +147,15 @@ class LivePredictionDaemon:
                 "max_tokens": self.max_tokens
             }
 
+            headers = {
+                'Content-Type': 'application/json',
+                'X-API-Key': self.api_key
+            }
+
             req = request.Request(
                 f"{self.remote_api_url}/v1/chat/completions",
                 data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'},
+                headers=headers,
                 method='POST'
             )
 

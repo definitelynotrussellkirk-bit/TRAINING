@@ -6,7 +6,7 @@ Integrates with singleSKILL API servers to generate training data
 at appropriate difficulty levels based on model performance.
 
 Skills supported:
-- SYLLO: 5 levels (word count 4-8)
+- SYLLO: 10 levels (signal degradation model)
 - Binary: 7 levels (magnitude ranges)
 
 Progression: Advance when accuracy >= threshold over N evaluations
@@ -21,19 +21,25 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
-# Skill definitions matching API server levels
+# Skill definitions matching API server levels (10-level system)
 # All levels require 80% accuracy to advance
+# Advanced difficulty adds: Zipf filtering, syllable overlap, red herrings
 SKILL_LEVELS = {
     "syllo": {
         "name": "SYLLO Puzzles",
-        "total_levels": 5,
+        "total_levels": 10,
         "api_port": 8080,
         "levels": [
-            {"level": 1, "name": "Beginner", "word_count": 4, "threshold": 0.80},
-            {"level": 2, "name": "Easy", "word_count": 5, "threshold": 0.80},
-            {"level": 3, "name": "Intermediate", "word_count": 6, "threshold": 0.80},
-            {"level": 4, "name": "Advanced", "word_count": 7, "threshold": 0.80},
-            {"level": 5, "name": "Expert", "word_count": 8, "threshold": None},  # Mastered
+            {"level": 1, "name": "Beginner", "word_count": 4, "threshold": 0.80, "overlap": 0.0, "red_herrings": 0},
+            {"level": 2, "name": "Easy", "word_count": 5, "threshold": 0.80, "overlap": 0.0, "red_herrings": 0},
+            {"level": 3, "name": "Novice", "word_count": 5, "threshold": 0.80, "overlap": 0.1, "red_herrings": 0},
+            {"level": 4, "name": "Learning", "word_count": 6, "threshold": 0.80, "overlap": 0.2, "red_herrings": 1},
+            {"level": 5, "name": "Intermediate", "word_count": 6, "threshold": 0.80, "overlap": 0.3, "red_herrings": 2},
+            {"level": 6, "name": "Competent", "word_count": 7, "threshold": 0.80, "overlap": 0.4, "red_herrings": 2},
+            {"level": 7, "name": "Proficient", "word_count": 7, "threshold": 0.80, "overlap": 0.5, "red_herrings": 3},
+            {"level": 8, "name": "Advanced", "word_count": 8, "threshold": 0.80, "overlap": 0.6, "red_herrings": 4},
+            {"level": 9, "name": "Expert", "word_count": 9, "threshold": 0.80, "overlap": 0.7, "red_herrings": 5},
+            {"level": 10, "name": "Master", "word_count": 10, "threshold": None, "overlap": 0.8, "red_herrings": 6},  # Mastered
         ]
     },
     "binary": {

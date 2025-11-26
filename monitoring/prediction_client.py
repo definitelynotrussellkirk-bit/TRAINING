@@ -79,7 +79,7 @@ class PredictionClient:
     def chat(
         self,
         messages: List[Dict[str, str]],
-        model: str = "deployed",
+        model: Optional[str] = None,
         temperature: float = 0.1,
         max_tokens: int = 2048,
         **kwargs
@@ -89,7 +89,7 @@ class PredictionClient:
 
         Args:
             messages: List of message dicts with 'role' and 'content'
-            model: Model to use
+            model: Model to use (if None, queries /models/info for currently loaded model)
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
             **kwargs: Additional parameters
@@ -105,6 +105,14 @@ class PredictionClient:
             }
         """
         url = f"{self.base_url}/v1/chat/completions"
+
+        # If model not specified, get currently loaded model
+        if model is None:
+            try:
+                info = self.get_model_info()
+                model = info.get('model_id', 'unknown')
+            except Exception:
+                model = "unknown"
 
         payload = {
             "model": model,
@@ -132,11 +140,14 @@ class PredictionClient:
         url = f"{self.base_url}/models/info"
         return self._request_with_retry("GET", url)
 
-    def reload_model(self) -> Dict[str, Any]:
+    def reload_model(self, model_path: str) -> Dict[str, Any]:
         """
-        Trigger model reload from deployed checkpoint.
+        Load a specific checkpoint by path.
 
         Requires admin API key (INFERENCE_ADMIN_KEY).
+
+        Args:
+            model_path: Full path to checkpoint, e.g. /path/to/models/checkpoint-175000
 
         Returns:
             {
@@ -149,7 +160,8 @@ class PredictionClient:
             }
         """
         url = f"{self.base_url}/models/reload"
-        return self._request_with_retry("POST", url, require_admin=True)
+        payload = {"model_path": model_path}
+        return self._request_with_retry("POST", url, json=payload, require_admin=True)
 
     def health_check(self) -> bool:
         """

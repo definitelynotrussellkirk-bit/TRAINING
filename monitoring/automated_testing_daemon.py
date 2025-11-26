@@ -6,6 +6,7 @@ Provides real-time quality metrics and regression detection
 
 import json
 import time
+import os
 import requests
 from pathlib import Path
 from datetime import datetime
@@ -30,11 +31,19 @@ class AutomatedTestingDaemon:
         base_dir: str = "/path/to/training",
         api_url: str = "http://192.168.x.x:8765",
         interval: int = 600,  # 10 minutes
-        validation_file: str = None
+        validation_file: str = None,
+        model: str = None,  # Model ID to use (None = auto-detect or use env var)
     ):
         self.base_dir = Path(base_dir)
         self.api_url = api_url
         self.interval = interval
+
+        # API authentication and model
+        self.api_key = os.environ.get("INFERENCE_API_KEY", "admin123")
+        # DYNAMIC: Model ID comes from --model arg, env var, or needs to be detected
+        # Examples: "checkpoint-177000", "Qwen3-0.6B-base"
+        self.model_name = model or os.environ.get("INFERENCE_MODEL") or self._get_current_model()
+        self._model_was_specified = model is not None
 
         # Load validation data
         if validation_file is None:
@@ -53,6 +62,24 @@ class AutomatedTestingDaemon:
         # Ensure output dirs exist
         self.status_file.parent.mkdir(parents=True, exist_ok=True)
         self.history_file.parent.mkdir(parents=True, exist_ok=True)
+
+    def _get_current_model(self) -> str:
+        """Get currently loaded model from inference server"""
+        try:
+            resp = requests.get(
+                f"{self.api_url}/models/info",
+                headers={"X-API-Key": self.api_key},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                # Get first model from pool
+                models = data.get("models", [])
+                if models:
+                    return models[0].get("model_id", "unknown")
+        except Exception as e:
+            logger.debug(f"Could not query model info: {e}")
+        return "unknown"
 
     def load_validation_suite(self, validation_dir: Path) -> List[Dict]:
         """Load fixed validation dataset"""
@@ -117,8 +144,9 @@ class AutomatedTestingDaemon:
         try:
             response = requests.post(
                 f"{self.api_url}/v1/chat/completions",
+                headers={"X-API-Key": self.api_key},
                 json={
-                    "model": "Qwen3-0.6B",
+                    "model": self.model_name,
                     "messages": [
                         {"role": "user", "content": prompt}
                     ],
@@ -311,6 +339,9 @@ class AutomatedTestingDaemon:
         status = {
             'last_test': results['timestamp'],
             'checkpoint': results['checkpoint'],
+            # DYNAMIC: Model ID used for testing (from --model arg or auto-detected)
+            'model': self.model_name,
+            'model_specified': self._model_was_specified,
             'accuracy': results['accuracy'],
             'total_examples': results['total'],
             'correct': results['correct'],
@@ -343,6 +374,8 @@ class AutomatedTestingDaemon:
         logger.info(f"Validation examples: {len(self.validation_data)}")
         logger.info(f"Check interval: {self.interval}s")
         logger.info(f"API URL: {self.api_url}")
+        # DYNAMIC: Model ID comes from --model arg or auto-detected
+        logger.info(f"Model: {self.model_name} {'(specified)' if self._model_was_specified else '(auto-detected)'}")
         logger.info("=" * 80)
 
         last_checkpoint = None
@@ -457,6 +490,9 @@ def main():
                        help='Check interval (seconds)')
     parser.add_argument('--validation-file', type=str,
                        help='Path to validation dataset')
+    parser.add_argument('--model', type=str, default=None,
+                       help="Model ID to use (e.g., 'checkpoint-177000', 'Qwen3-0.6B-base'). "
+                            "If not specified, uses INFERENCE_MODEL env var or auto-detects.")
     parser.add_argument('--use-scheduler', action='store_true',
                        help='Submit tasks to GPU Task Scheduler instead of running directly')
     parser.add_argument('--scheduler-url', default='http://192.168.x.x:8766',
@@ -474,7 +510,8 @@ def main():
         base_dir=args.base_dir,
         api_url=args.api_url,
         interval=args.interval,
-        validation_file=args.validation_file
+        validation_file=args.validation_file,
+        model=args.model,  # DYNAMIC: Model ID like "checkpoint-177000" or "Qwen3-0.6B-base"
     )
 
     # Run continuously

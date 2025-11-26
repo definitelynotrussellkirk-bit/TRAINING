@@ -61,7 +61,7 @@
   },
   "_comment_refactor": "New fields for refactored architecture (2025-11-22)",
   "profile": {
-    "name": "emoji_think"
+    "name": "none"
   },
   "hyperparams": {
     "fp_precision": "bf16",

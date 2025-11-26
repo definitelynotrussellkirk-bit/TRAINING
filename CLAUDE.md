@@ -1,6 +1,6 @@
 # CLAUDE INSTRUCTIONS - LLM Training System
 
-**Last Updated:** 2025-11-26 (Discrimination Training Generator)
+**Last Updated:** 2025-11-26 (10-Level SYLLO System + Static File Serving)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 This document contains instructions for Claude to help with training operations.
@@ -227,9 +227,34 @@ OBSERVATIONS/
 
 ## 🆕 RECENT UPDATES (2025-11-26)
 
+**10-Level SYLLO Signal Degradation System** - Replaces old 5-level system
+
+**What Changed (2025-11-26 - 10-Level Migration):**
+- SYLLO now has 10 levels with progressive signal degradation (hint quality degrades)
+- Level 1: Strong hints only (definitions) - solvable by structure
+- Level 10: Any hint type (may just be "starts with X") - mastery level
+- Removed "easy/medium/hard" terminology - now uses L1-L10
+- Updated files:
+  - `monitoring/api/plugins/curriculum.py` - max_level: 5→10
+  - `monitoring/data_generation_automation.py` - levels: 5→10
+  - `data_manager/curriculum_manager.py` - 10-level SKILL_LEVELS config
+  - `monitoring/discrimination_generator.py` - `--level auto/1-10/1-3/all` syntax
+  - `monitoring/ui/syllo_dashboard.html` - shows L1-L10 with descriptions
+  - `monitoring/ui/master_dashboard.html` - L1/10 display
+  - `monitoring/api/server.py` - added static file serving for dashboards
+
+**Dashboard URLs (now working):**
+- http://localhost:8081/master_dashboard.html
+- http://localhost:8081/syllo_dashboard.html
+
+**10-Level Eval Set Generated:**
+- `data/validation/syllo_10level/` - 200 examples (20 per level)
+
+---
+
 **Discrimination Training Generator** - Teaches model to identify wrong vs correct answers
 
-**What Changed (2025-11-26):**
+**What Changed (2025-11-26 - Earlier):**
 - Created `monitoring/discrimination_generator.py` - generates discrimination training data
 - Ratio-aware: maintains 20% discrimination to 80% direct-solve training ratio
 - Reads curriculum level from `data_manager/curriculum_state.json`

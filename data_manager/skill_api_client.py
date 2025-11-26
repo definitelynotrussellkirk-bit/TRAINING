@@ -90,37 +90,30 @@ class SkillAPIClient:
         return r.json()
 
 
-def syllo_to_training_format(puzzle: Dict[str, Any]) -> Dict[str, Any]:
+def syllo_to_training_format(puzzle: Dict[str, Any], puzzle_index: int = 1) -> Dict[str, Any]:
     """
     Convert SYLLO puzzle to training messages format.
 
-    The puzzle contains:
-    - words: list of word specs with hints
-    - syllable_bank: shuffled syllables
-    - solution: formatted answer
-    - format_instruction: how to format the answer
+    The SYLLO API now returns `prompt` and `solution` directly in the
+    correct training format (matching the 1M+ training examples).
+
+    Just use them directly - no local formatting needed.
     """
-    # Build user prompt
-    words_section = []
-    for i, w in enumerate(puzzle["words"], 1):
-        slots = " ".join(w["slots"])
-        words_section.append(f"{i}. {w['definition']}: {slots}")
+    # The API now returns these fields directly
+    user_content = puzzle.get("prompt")
+    assistant_content = puzzle.get("solution")
 
-    syllable_bank = ", ".join(puzzle["syllable_bank"])
+    # Fallback if API doesn't have new fields (shouldn't happen)
+    if not user_content or not assistant_content:
+        raise ValueError(
+            f"SYLLO API response missing prompt/solution fields. "
+            f"Make sure the SYLLO API (singleSKILL) is updated."
+        )
 
-    user_content = f"""Syllable Puzzle
-
-Fill in the blanks using syllables from the bank. Each syllable is used exactly once.
-
-Words to complete:
-{chr(10).join(words_section)}
-
-Syllable Bank: [{syllable_bank}]
-
-{puzzle.get('format_instruction', 'List each word with its syllables.')}"""
-
-    # Build assistant response (the solution)
-    assistant_content = puzzle["solution"]
+    # Extract metadata
+    puzzle_id = puzzle.get("puzzle_id", f"syllo_api_{puzzle_index:05d}")
+    rules = puzzle.get("rules", {})
+    word_count = rules.get("word_count", len(puzzle.get("words", [])))
 
     return {
         "messages": [
@@ -129,9 +122,9 @@ Syllable Bank: [{syllable_bank}]
         ],
         "metadata": {
             "skill": "syllo",
-            "puzzle_id": puzzle.get("puzzle_id"),
-            "word_count": puzzle["rules"]["word_count"],
-            "format": puzzle.get("solution_format", "unknown")
+            "puzzle_id": puzzle_id,
+            "word_count": word_count,
+            "output_variant": puzzle.get("output_variant", "unknown"),
         }
     }
 
@@ -192,8 +185,8 @@ def generate_skill_data(
     training_examples = []
 
     if skill == "syllo":
-        for puzzle in response.get("puzzles", []):
-            training_examples.append(syllo_to_training_format(puzzle))
+        for i, puzzle in enumerate(response.get("puzzles", []), 1):
+            training_examples.append(syllo_to_training_format(puzzle, puzzle_index=i))
     elif skill == "binary":
         for conv in response.get("conversations", []):
             training_examples.append(binary_to_training_format(conv))

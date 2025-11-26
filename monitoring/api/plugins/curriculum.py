@@ -110,7 +110,7 @@ class CurriculumPlugin(RemoteFilePlugin):
 
             data_flow['skills'][skill_name] = {
                 'current_level': current_level,
-                'max_level': 5 if skill_name == 'syllo' else 7,
+                'max_level': 10 if skill_name == 'syllo' else 7,
                 'eval_count': len(history),
                 'recent_accuracy': round(avg_recent * 100, 1),
                 'progress_to_next': round(progress_pct, 1),

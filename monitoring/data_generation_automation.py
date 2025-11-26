@@ -6,7 +6,7 @@ Auto-generates training data based on queue status.
 Supports multiple skills via HTTP API with level-based difficulty.
 
 Supported Skills:
-- SYLLO: Word puzzle generation (5 levels)
+- SYLLO: Word puzzle generation (10 levels with signal degradation)
 - Binary Arithmetic: Binary math problems (7 levels)
 """
 
@@ -27,8 +27,8 @@ SKILLS = {
         'name': 'SYLLO Word Puzzles',
         'api_url': 'http://localhost:8080',
         'api_host': 'localhost',  # For local generation
-        'levels': 5,
-        'default_level': 3,  # Intermediate
+        'levels': 10,  # 10-level signal degradation system
+        'default_level': 5,  # Intermediate (middle of 10 levels)
         'weight': 0.7,  # 70% of generated data
     },
     'binary': {

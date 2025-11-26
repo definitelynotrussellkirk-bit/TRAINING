@@ -5,6 +5,7 @@ Creates high-value training data from errors via automated correction
 """
 
 import json
+import os
 import requests
 import time
 import sys
@@ -48,12 +49,18 @@ class SelfCorrectionLoop:
         api_url: str = None,
         base_dir: str = None,
         batch_size: int = 100,
-        error_threshold: int = 50  # Min errors before analysis
+        error_threshold: int = 50,  # Min errors before analysis
+        model: str = None,  # Model ID to use (None = auto-detect)
     ):
         self.api_url = api_url or get_remote_api_url()
         self.base_dir = Path(base_dir) if base_dir else get_base_dir()
         self.batch_size = batch_size
         self.error_threshold = error_threshold
+
+        # DYNAMIC: Model ID comes from --model arg or auto-detected from 3090
+        # Examples: "checkpoint-177000", "Qwen3-0.6B-base"
+        self.model_id = model  # Will auto-detect in call_api if None
+        self._model_was_specified = model is not None
 
         # State tracking
         self.error_cache = []
@@ -125,8 +132,13 @@ class SelfCorrectionLoop:
                 })
 
         # Create run record
+        # Determine which model was used (may have been auto-detected during run)
+        model_used = self.model_id or self.get_active_model() or "unknown"
         run_record = {
             "timestamp": datetime.now().isoformat(),
+            # DYNAMIC: Model ID used for testing (from --model arg or auto-detected)
+            "model": model_used,
+            "model_specified": self._model_was_specified,
             "errors_captured": self.stats["incorrect"],
             "corrections_generated": self.stats["corrections_generated"],
             "error_patterns": error_patterns,
@@ -143,18 +155,44 @@ class SelfCorrectionLoop:
         self._save_status()
         logger.info(f"Status updated: {self.status_file}")
 
+    def get_active_model(self) -> Optional[str]:
+        """Get first available model from the pool"""
+        try:
+            response = requests.get(
+                f"{self.api_url}/models/pool",
+                headers={"X-API-Key": os.environ.get("INFERENCE_ADMIN_KEY", "admin123")},
+                timeout=10
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("models"):
+                    return data["models"][0]["model_id"]
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to get active model: {e}")
+            return None
+
     def call_api(
         self,
         prompt: str,
         max_tokens: int = 500,
-        temperature: float = 0.1
+        temperature: float = 0.1,
+        model_id: Optional[str] = None
     ) -> Dict:
         """Call 3090 API for inference"""
+        # Use instance model_id, then parameter, then auto-detect
+        # DYNAMIC: Model ID like "checkpoint-177000" or "Qwen3-0.6B-base"
+        if model_id is None:
+            model_id = self.model_id or self.get_active_model()
+            if model_id is None:
+                return {"error": "No model loaded in pool"}
+
         try:
             response = requests.post(
                 f"{self.api_url}/v1/chat/completions",
+                headers={"X-API-Key": os.environ.get("INFERENCE_ADMIN_KEY", "admin123")},
                 json={
-                    "model": "Qwen3-0.6B",
+                    "model": model_id,
                     "messages": [
                         {"role": "user", "content": prompt}
                     ],
@@ -627,6 +665,9 @@ def main():
                        help='Check interval for continuous mode (seconds)')
     parser.add_argument('--error-threshold', type=int, default=50,
                        help='Min errors before analysis')
+    parser.add_argument('--model', type=str, default=None,
+                       help="Model ID to use (e.g., 'checkpoint-177000', 'Qwen3-0.6B-base'). "
+                            "If not specified, auto-detects from inference server.")
     parser.add_argument('--use-scheduler', action='store_true',
                        help='Submit tasks to GPU Task Scheduler instead of running directly')
     parser.add_argument('--scheduler-url', default='http://192.168.x.x:8766',
@@ -643,7 +684,8 @@ def main():
     loop = SelfCorrectionLoop(
         api_url=args.api_url,
         base_dir=args.base_dir,
-        error_threshold=args.error_threshold
+        error_threshold=args.error_threshold,
+        model=args.model,  # DYNAMIC: Model ID like "checkpoint-177000" or "Qwen3-0.6B-base"
     )
 
     if args.file:

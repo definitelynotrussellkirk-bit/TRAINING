@@ -324,19 +324,22 @@ function updateGPU3090(data) {
 }
 
 /**
- * Update curriculum optimization card
+ * Update curriculum optimization card + data flow
  */
 function updateCurriculum(data) {
     const source = data.sources?.curriculum_optimization;
     if (!source || source.status !== 'ok') {
         setCardOffline('curriculumIndicator');
+        setActionHint('curriculumAction', 'Curriculum data unavailable', 'warning');
         return;
     }
 
     setCardOnline('curriculumIndicator');
     const curriculum = source.data;
     const latest = curriculum.latest_summary;
+    const dataFlow = curriculum.data_flow;
 
+    // Update legacy accuracy display
     if (latest) {
         const acc = latest.accuracies || {};
         setText('curriculumEasy', acc.easy ? `${(acc.easy * 100).toFixed(0)}%` : '--');
@@ -349,6 +352,115 @@ function updateCurriculum(data) {
         setText('curriculumHard', '--');
         setText('curriculumStep', '--');
     }
+
+    // Update data flow display
+    if (dataFlow && dataFlow.available) {
+        updateSkillFlowCard('syllo', dataFlow.skills?.syllo);
+        updateSkillFlowCard('binary', dataFlow.skills?.binary);
+        updateCurriculumActionHint(dataFlow);
+    } else {
+        setActionHint('curriculumAction', 'Data flow not initialized', 'warning');
+    }
+}
+
+/**
+ * Update a skill flow card with data
+ */
+function updateSkillFlowCard(skillName, skillData) {
+    const prefix = skillName === 'syllo' ? 'syllo' : 'binary';
+    const cardEl = document.getElementById(`${prefix}FlowCard`);
+
+    if (!skillData) {
+        if (cardEl) cardEl.classList.add('inactive');
+        return;
+    }
+
+    // Update level
+    setText(`${prefix}FlowLevel`, `L${skillData.current_level}/${skillData.max_level}`);
+
+    // Update progress bar
+    const progressEl = document.getElementById(`${prefix}FlowProgress`);
+    if (progressEl) {
+        progressEl.style.width = `${skillData.progress_to_next || 0}%`;
+    }
+
+    // Update accuracy
+    setText(`${prefix}FlowAcc`, `${skillData.recent_accuracy || 0}%`);
+
+    // Update trend
+    const trendEl = document.getElementById(`${prefix}FlowTrend`);
+    if (trendEl) {
+        const trend = skillData.trend || 'stable';
+        trendEl.className = `skill-flow-trend ${trend}`;
+        if (trend === 'improving') {
+            trendEl.textContent = '↑';
+        } else if (trend === 'declining') {
+            trendEl.textContent = '↓';
+        } else {
+            trendEl.textContent = '→';
+        }
+    }
+
+    // Update eval count
+    setText(`${prefix}FlowEvals`, `${skillData.eval_count || 0} evals`);
+
+    // Mark active if has evals
+    if (cardEl) {
+        if (skillData.eval_count > 0) {
+            cardEl.classList.remove('inactive');
+            cardEl.classList.add('active');
+        } else {
+            cardEl.classList.add('inactive');
+            cardEl.classList.remove('active');
+        }
+    }
+}
+
+/**
+ * Compute and set curriculum action hint
+ */
+function updateCurriculumActionHint(dataFlow) {
+    let actionText = '';
+    let actionLevel = 'good';
+
+    const syllo = dataFlow.skills?.syllo;
+    const binary = dataFlow.skills?.binary;
+
+    // Check SYLLO status (primary skill)
+    if (syllo) {
+        const acc = syllo.recent_accuracy || 0;
+        const progress = syllo.progress_to_next || 0;
+        const level = syllo.current_level || 1;
+        const evalCount = syllo.eval_count || 0;
+
+        if (evalCount === 0) {
+            actionText = 'SYLLO curriculum starting. Awaiting first evaluation.';
+            actionLevel = 'warning';
+        } else if (acc === 0 && evalCount > 10) {
+            actionText = `SYLLO stuck at 0% after ${evalCount} evals. Check model or data format.`;
+            actionLevel = 'critical';
+        } else if (acc < 20 && evalCount > 5) {
+            actionText = `SYLLO accuracy low (${acc}%). Model struggling with L${level}.`;
+            actionLevel = 'warning';
+        } else if (progress >= 80) {
+            actionText = `SYLLO ready to advance! ${progress}% progress to L${level + 1}.`;
+            actionLevel = 'good';
+        } else if (syllo.trend === 'improving') {
+            actionText = `SYLLO improving. ${progress}% to L${level + 1}.`;
+            actionLevel = 'good';
+        } else if (syllo.trend === 'declining') {
+            actionText = `SYLLO declining. Check recent training data.`;
+            actionLevel = 'warning';
+        } else {
+            actionText = `SYLLO L${level}: ${acc}% accuracy, ${progress}% to advance.`;
+            actionLevel = 'good';
+        }
+    } else {
+        actionText = 'Curriculum not initialized.';
+        actionLevel = 'warning';
+    }
+
+    setActionHint('curriculumAction', actionText, actionLevel);
 }
 
 /**

@@ -203,21 +203,55 @@
             <!-- Curriculum Optimization Card -->
             <div class="card card-intelligence">
                 <div class="card-header">
-                    <h3>📚 Curriculum Optimization</h3>
+                    <h3>📚 Curriculum & Data Flow</h3>
                     <div class="status-indicator" id="curriculumIndicator">●</div>
                 </div>
                 <div class="card-body">
-                    <div class="intel-metrics">
+                    <!-- Data Flow Section -->
+                    <div class="data-flow-section">
+                        <div class="data-flow-skills">
+                            <div class="skill-flow" id="sylloFlowCard">
+                                <div class="skill-flow-header">
+                                    <span class="skill-flow-name">🧩 SYLLO</span>
+                                    <span class="skill-flow-level" id="sylloFlowLevel">L1/5</span>
+                                </div>
+                                <div class="skill-flow-bar">
+                                    <div class="skill-flow-progress" id="sylloFlowProgress" style="width: 0%"></div>
+                                </div>
+                                <div class="skill-flow-meta">
+                                    <span id="sylloFlowAcc">0%</span>
+                                    <span class="skill-flow-trend" id="sylloFlowTrend">→</span>
+                                    <span id="sylloFlowEvals">0 evals</span>
+                                </div>
+                            </div>
+                            <div class="skill-flow inactive" id="binaryFlowCard">
+                                <div class="skill-flow-header">
+                                    <span class="skill-flow-name">⓪① BINARY</span>
+                                    <span class="skill-flow-level" id="binaryFlowLevel">L1/7</span>
+                                </div>
+                                <div class="skill-flow-bar">
+                                    <div class="skill-flow-progress" id="binaryFlowProgress" style="width: 0%"></div>
+                                </div>
+                                <div class="skill-flow-meta">
+                                    <span id="binaryFlowAcc">0%</span>
+                                    <span class="skill-flow-trend" id="binaryFlowTrend">→</span>
+                                    <span id="binaryFlowEvals">0 evals</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Legacy Accuracy Display -->
+                    <div class="intel-metrics" style="margin-top: 0.5rem;">
                         <div class="intel-stat">
-                            <span class="intel-label" data-tooltip="Model accuracy on easy difficulty problems. Target: >80%. Green = good performance.">Easy Accuracy</span>
+                            <span class="intel-label" data-tooltip="Model accuracy on easy difficulty problems. Target: >80%.">Easy</span>
                             <span class="intel-value intel-easy" id="curriculumEasy">--%</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label" data-tooltip="Model accuracy on medium difficulty problems. Target: >70%. Yellow = acceptable.">Medium Accuracy</span>
+                            <span class="intel-label" data-tooltip="Model accuracy on medium difficulty problems. Target: >70%.">Med</span>
                             <span class="intel-value intel-medium" id="curriculumMedium">--%</span>
                         </div>
                         <div class="intel-stat">
-                            <span class="intel-label" data-tooltip="Model accuracy on hard difficulty problems. Target: >60%. Red = challenging.">Hard Accuracy</span>
+                            <span class="intel-label" data-tooltip="Model accuracy on hard difficulty problems. Target: >60%.">Hard</span>
                             <span class="intel-value intel-hard" id="curriculumHard">--%</span>
                         </div>
                         <div class="intel-stat">
@@ -225,6 +259,7 @@
                             <span class="intel-value" id="curriculumStep">--</span>
                         </div>
                     </div>
+                    <div class="action-hint" id="curriculumAction">Loading curriculum data...</div>
                 </div>
             </div>
 

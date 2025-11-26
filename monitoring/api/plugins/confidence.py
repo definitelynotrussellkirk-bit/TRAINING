@@ -21,7 +21,7 @@ class ConfidencePlugin(RemoteFilePlugin):
         ssh_host = (config or {}).get('ssh_host', '192.168.x.x')
         remote_path = (config or {}).get(
             'remote_path',
-            '/home/user/TRAINING/status/confidence_calibration.json'
+            '/path/to/training/status/confidence_calibration.json'
         )
 
         # Cache for 10 minutes (data updates every 10 min)

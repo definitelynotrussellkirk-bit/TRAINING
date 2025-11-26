@@ -21,7 +21,7 @@ class AdversarialPlugin(RemoteFilePlugin):
         ssh_host = (config or {}).get('ssh_host', '192.168.x.x')
         remote_path = (config or {}).get(
             'remote_path',
-            '/home/user/TRAINING/status/adversarial_mining.json'
+            '/path/to/training/status/adversarial_mining.json'
         )
 
         # Cache for 5 minutes (data updates every 5 min)
@@ -62,11 +62,12 @@ class AdversarialPlugin(RemoteFilePlugin):
             }
 
             # Categorize adversarial examples
+            # Note: backend writes 'avg_confidence', we normalize to 'avg_loss' for frontend
             categories = latest.get('categories', {})
             for cat_name, cat_data in categories.items():
                 summary['categories'][cat_name] = {
                     'count': cat_data.get('count', 0),
-                    'avg_loss': cat_data.get('average_loss', 0.0)
+                    'avg_loss': cat_data.get('avg_confidence', cat_data.get('average_loss', 0.0))
                 }
 
             data['latest_summary'] = summary

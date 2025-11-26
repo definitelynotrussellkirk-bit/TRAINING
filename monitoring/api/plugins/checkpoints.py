@@ -21,7 +21,7 @@ class CheckpointSyncPlugin(RemoteFilePlugin):
         ssh_host = (config or {}).get('ssh_host', '192.168.x.x')
         remote_path = (config or {}).get(
             'remote_path',
-            '/home/user/TRAINING/status/checkpoint_sync.json'
+            '/path/to/training/status/checkpoint_sync.json'
         )
 
         # Cache for 5 minutes (data updates every 5 min)

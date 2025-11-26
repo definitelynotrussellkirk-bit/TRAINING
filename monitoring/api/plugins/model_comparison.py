@@ -21,7 +21,7 @@ class ModelComparisonPlugin(RemoteFilePlugin):
         ssh_host = (config or {}).get('ssh_host', '192.168.x.x')
         remote_path = (config or {}).get(
             'remote_path',
-            '/home/user/TRAINING/status/model_comparisons.json'
+            '/path/to/training/status/model_comparisons.json'
         )
 
         # Cache for 10 minutes (data updates every 10 min)
@@ -55,19 +55,20 @@ class ModelComparisonPlugin(RemoteFilePlugin):
         if 'comparisons' in data and len(data['comparisons']) > 0:
             latest = data['comparisons'][-1]
 
-            # Get top 3 models
-            ranked = latest.get('ranked_checkpoints', [])[:3]
+            # Get ranking (actual key in JSON is 'ranking', not 'ranked_checkpoints')
+            ranked = latest.get('ranking', [])[:3]
+            best = latest.get('best_checkpoint', {})
 
             summary = {
                 'timestamp': latest.get('timestamp'),
-                'total_compared': len(latest.get('ranked_checkpoints', [])),
-                'best_checkpoint': ranked[0].get('checkpoint') if ranked else None,
-                'best_score': ranked[0].get('composite_score') if ranked else 0.0,
+                'total_compared': latest.get('num_checkpoints', len(ranked)),
+                'best_checkpoint': f"checkpoint-{best.get('step')}" if best.get('step') else None,
+                'best_score': best.get('score', 0.0),
                 'top_3': [
                     {
-                        'checkpoint': r.get('checkpoint'),
-                        'score': r.get('composite_score'),
-                        'rank': i + 1
+                        'checkpoint': f"checkpoint-{r.get('step')}",
+                        'score': r.get('score', 0.0),
+                        'rank': r.get('rank', i + 1)
                     }
                     for i, r in enumerate(ranked)
                 ]

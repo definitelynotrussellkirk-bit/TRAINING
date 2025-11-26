@@ -21,7 +21,7 @@ class RegressionPlugin(RemoteFilePlugin):
         ssh_host = (config or {}).get('ssh_host', '192.168.x.x')
         remote_path = (config or {}).get(
             'remote_path',
-            '/home/user/TRAINING/status/regression_monitoring.json'
+            '/path/to/training/status/regression_monitoring.json'
         )
 
         # Cache for 5 minutes (data updates every 5 min)

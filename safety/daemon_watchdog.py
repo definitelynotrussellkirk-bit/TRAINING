@@ -24,8 +24,14 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
+# Use centralized path resolution instead of hard-coded paths
+try:
+    from core.paths import get_base_dir
+    BASE_DIR = get_base_dir()
+except ImportError:
+    BASE_DIR = Path(__file__).parent.parent  # Fallback: parent of safety/
+
 # Configuration
-BASE_DIR = Path("/path/to/training")
 PID_FILE = BASE_DIR / ".daemon.pid"
 STATUS_FILE = BASE_DIR / "status" / "training_status.json"
 LOG_FILE = BASE_DIR / "logs" / "watchdog.log"

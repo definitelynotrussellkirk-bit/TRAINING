@@ -20,7 +20,13 @@ from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 
-BASE_DIR = Path("/path/to/training")
+# Use centralized path resolution instead of hard-coded paths
+try:
+    from core.paths import get_base_dir
+    BASE_DIR = get_base_dir()
+except ImportError:
+    BASE_DIR = Path(__file__).parent.parent  # Fallback: parent of safety/
+
 LOGS_DIR = BASE_DIR / "logs"
 CRASH_HISTORY_FILE = BASE_DIR / ".crash_history.json"
 

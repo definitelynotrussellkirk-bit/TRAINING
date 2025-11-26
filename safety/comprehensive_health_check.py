@@ -28,7 +28,13 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-BASE_DIR = Path("/path/to/training")
+# Use centralized path resolution instead of hard-coded paths
+try:
+    from core.paths import get_base_dir
+    BASE_DIR = get_base_dir()
+except ImportError:
+    BASE_DIR = Path(__file__).parent.parent  # Fallback: parent of safety/
+
 CONFIG_FILE = BASE_DIR / "config.json"
 STATUS_FILE = BASE_DIR / "status" / "training_status.json"
 PID_FILE = BASE_DIR / ".daemon.pid"

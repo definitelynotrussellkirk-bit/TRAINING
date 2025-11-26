@@ -66,6 +66,11 @@ async function fetchData() {
         updateLayerDrift(data);
         updateParameterStability(data);
 
+        // NEW: Update scheduler, retention, data impact cards
+        updateScheduler(data);
+        updateRetention(data);
+        updateDataImpact(data);
+
         // Update error cards based on system health
         updateErrorCards(data);
 
@@ -1777,6 +1782,206 @@ function scrollToErrorCard(machine, processName) {
         // No error card (daemon might be running) - just close dropdown
         toggleDaemonDropdown();
     }
+}
+
+// ================================
+// NEW: Scheduler Card Update
+// ================================
+function updateScheduler(data) {
+    const scheduler = data.sources?.scheduler?.data || {};
+    const indicator = document.getElementById('schedulerIndicator');
+
+    if (!scheduler.available) {
+        indicator.style.color = 'var(--text-muted)';
+        setActionHint('schedulerAction', 'Scheduler not responding', 'critical');
+        return;
+    }
+
+    // Update metrics
+    document.getElementById('schedulerQueue').textContent = scheduler.queue_length || 0;
+    document.getElementById('schedulerActiveTask').textContent = scheduler.active_task || 'idle';
+    document.getElementById('schedulerGpuUtil').textContent = `${Math.round(scheduler.gpu_utilization || 0)}%`;
+    document.getElementById('schedulerCompleted').textContent = scheduler.tasks_completed || 0;
+
+    // Update utilization band status
+    const bandEl = document.getElementById('schedulerBandStatus');
+    const util = scheduler.gpu_utilization || 0;
+    const queueLen = scheduler.queue_length || 0;
+
+    bandEl.className = 'scheduler-band';
+    let bandText = '';
+    let actionLevel = 'good';
+    let actionText = 'Operating normally (20-80% GPU utilization)';
+
+    if (util >= 20 && util <= 80) {
+        bandEl.classList.add('band-good');
+        bandText = `In target band (${Math.round(util)}%)`;
+        indicator.style.color = 'var(--color-success)';
+    } else if (util < 20 && queueLen > 0) {
+        bandEl.classList.add('band-warning');
+        bandText = `Underutilized (${Math.round(util)}%)`;
+        actionLevel = 'warning';
+        actionText = 'GPU underutilized with tasks queued. Check scheduler logs.';
+        indicator.style.color = 'var(--color-warning)';
+    } else if (util > 80) {
+        bandEl.classList.add('band-warning');
+        bandText = `High utilization (${Math.round(util)}%)`;
+        actionLevel = 'warning';
+        actionText = 'GPU near saturation. Queue processing may slow.';
+        indicator.style.color = 'var(--color-warning)';
+    } else {
+        bandEl.classList.add('band-good');
+        bandText = `Idle (${Math.round(util)}%)`;
+        indicator.style.color = 'var(--color-success)';
+    }
+
+    // Check for failures
+    if (scheduler.tasks_failed > 0) {
+        actionLevel = 'warning';
+        actionText = `${scheduler.tasks_failed} failed task(s). Check logs.`;
+    }
+
+    bandEl.querySelector('.band-text').textContent = bandText;
+    setActionHint('schedulerAction', actionText, actionLevel);
+}
+
+// ================================
+// NEW: Retention Card Update
+// ================================
+function updateRetention(data) {
+    const retention = data.sources?.retention?.data || {};
+    const indicator = document.getElementById('retentionIndicator');
+
+    if (!retention.total_size_gb && retention.total_size_gb !== 0) {
+        indicator.style.color = 'var(--text-muted)';
+        setActionHint('retentionAction', 'Retention data unavailable', 'warning');
+        return;
+    }
+
+    const usagePct = retention.usage_pct || 0;
+    const totalGb = retention.total_size_gb || 0;
+    const limitGb = retention.limit_gb || 150;
+    const checkpoints = retention.checkpoints?.count || 0;
+    const snapshots = retention.snapshots?.count || 0;
+
+    // Update metrics
+    document.getElementById('retentionUsage').textContent = `${Math.round(usagePct)}%`;
+    document.getElementById('retentionCheckpoints').textContent = checkpoints;
+    document.getElementById('retentionSnapshots').textContent = snapshots;
+
+    // Update bar
+    const bar = document.getElementById('retentionBar');
+    bar.style.width = `${Math.min(usagePct, 100)}%`;
+
+    // Color bar based on usage
+    if (usagePct >= 90) {
+        bar.style.background = 'var(--color-danger)';
+    } else if (usagePct >= 80) {
+        bar.style.background = 'var(--color-warning)';
+    } else {
+        bar.style.background = 'linear-gradient(90deg, var(--color-success), var(--color-warning))';
+    }
+
+    document.getElementById('retentionBarLabel').textContent = `${totalGb.toFixed(1)} / ${limitGb} GB`;
+
+    // Update warnings
+    const warningsEl = document.getElementById('retentionWarnings');
+    const warnings = retention.warnings || [];
+    warningsEl.innerHTML = warnings.map(w => `<div class="warning-item">${w}</div>`).join('');
+
+    // Set indicator and action hint
+    let actionText = 'Storage healthy';
+    let actionLevel = 'good';
+
+    if (usagePct >= 95) {
+        indicator.style.color = 'var(--color-danger)';
+        actionLevel = 'critical';
+        actionText = 'Storage critical! Cleanup needed immediately.';
+    } else if (usagePct >= 80) {
+        indicator.style.color = 'var(--color-warning)';
+        actionLevel = 'warning';
+        actionText = 'Storage getting full. Consider cleanup or NAS sync.';
+    } else {
+        indicator.style.color = 'var(--color-success)';
+    }
+
+    setActionHint('retentionAction', actionText, actionLevel);
+}
+
+// ================================
+// NEW: Data Impact Card Update
+// ================================
+function updateDataImpact(data) {
+    const analytics = data.sources?.training_analytics?.data || {};
+    const indicator = document.getElementById('dataImpactIndicator');
+    const fileImpact = analytics.data_file_impact || {};
+
+    if (!fileImpact.available) {
+        indicator.style.color = 'var(--text-muted)';
+        document.getElementById('positiveImpactFiles').innerHTML = '<li class="impact-loading">No data available</li>';
+        document.getElementById('negativeImpactFiles').innerHTML = '<li class="impact-loading">No data available</li>';
+        setActionHint('dataImpactAction', 'Data impact analysis not running', 'warning');
+        return;
+    }
+
+    indicator.style.color = 'var(--color-success)';
+
+    const recentImpacts = fileImpact.recent_impacts || [];
+
+    // Sort by impact score
+    const sorted = [...recentImpacts].sort((a, b) => (b.impact_score || 0) - (a.impact_score || 0));
+
+    // Top 5 positive (highest positive impact)
+    const positive = sorted.filter(f => (f.impact_score || 0) > 0).slice(0, 5);
+    // Top 5 negative (most negative impact)
+    const negative = sorted.filter(f => (f.impact_score || 0) < 0).slice(-5).reverse();
+
+    const positiveEl = document.getElementById('positiveImpactFiles');
+    const negativeEl = document.getElementById('negativeImpactFiles');
+
+    if (positive.length > 0) {
+        positiveEl.innerHTML = positive.map(f => {
+            const name = f.filename || 'unknown';
+            const shortName = name.length > 25 ? name.slice(0, 22) + '...' : name;
+            const score = (f.impact_score || 0).toFixed(3);
+            return `<li title="${name}">${shortName} (+${score})</li>`;
+        }).join('');
+    } else {
+        positiveEl.innerHTML = '<li class="impact-loading">No positive files</li>';
+    }
+
+    if (negative.length > 0) {
+        negativeEl.innerHTML = negative.map(f => {
+            const name = f.filename || 'unknown';
+            const shortName = name.length > 25 ? name.slice(0, 22) + '...' : name;
+            const score = (f.impact_score || 0).toFixed(3);
+            return `<li title="${name}">${shortName} (${score})</li>`;
+        }).join('');
+    } else {
+        negativeEl.innerHTML = '<li class="impact-loading">No negative files</li>';
+    }
+
+    // Action hint
+    if (negative.length > 0) {
+        setActionHint('dataImpactAction', `${negative.length} file(s) have negative impact. Consider removing or re-labeling.`, 'warning');
+    } else {
+        setActionHint('dataImpactAction', 'All analyzed files have neutral or positive impact.', 'good');
+    }
+}
+
+// ================================
+// Helper: Set action hint with level
+// ================================
+function setActionHint(elementId, text, level = 'neutral') {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+
+    el.textContent = text;
+    el.className = 'action-hint';
+
+    if (level === 'good') el.classList.add('action-good');
+    else if (level === 'warning') el.classList.add('action-warning');
+    else if (level === 'critical') el.classList.add('action-critical');
 }
 
 // Initialize on load

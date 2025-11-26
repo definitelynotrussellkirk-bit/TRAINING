@@ -659,6 +659,97 @@
                     </div>
                 </div>
             </div>
+
+            <!-- GPU Task Scheduler Card -->
+            <div class="card card-scheduler">
+                <div class="card-header">
+                    <h3>🎛️ GPU Task Scheduler</h3>
+                    <div class="status-indicator" id="schedulerIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="scheduler-metrics">
+                        <div class="scheduler-stat">
+                            <span class="scheduler-label" data-tooltip="Tasks waiting in queue. Higher = busier scheduler.">Queue</span>
+                            <span class="scheduler-value" id="schedulerQueue">--</span>
+                        </div>
+                        <div class="scheduler-stat">
+                            <span class="scheduler-label" data-tooltip="Currently executing task type (eval, test, adversarial, etc.)">Active Task</span>
+                            <span class="scheduler-value" id="schedulerActiveTask">--</span>
+                        </div>
+                        <div class="scheduler-stat">
+                            <span class="scheduler-label" data-tooltip="GPU utilization. Target: 20-80%. Red if outside band.">GPU Util</span>
+                            <span class="scheduler-value" id="schedulerGpuUtil">--%</span>
+                        </div>
+                        <div class="scheduler-stat">
+                            <span class="scheduler-label" data-tooltip="Tasks completed since scheduler started.">Completed</span>
+                            <span class="scheduler-value" id="schedulerCompleted">--</span>
+                        </div>
+                    </div>
+                    <div class="scheduler-band" id="schedulerBandStatus">
+                        <span class="band-indicator"></span>
+                        <span class="band-text">Loading...</span>
+                    </div>
+                    <div class="action-hint" id="schedulerAction">Loading scheduler status...</div>
+                </div>
+            </div>
+
+            <!-- Storage & Retention Card -->
+            <div class="card card-retention">
+                <div class="card-header">
+                    <h3>💾 Storage & Retention</h3>
+                    <div class="status-indicator" id="retentionIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <div class="retention-metrics">
+                        <div class="retention-stat">
+                            <span class="retention-label" data-tooltip="Disk usage for checkpoints. Warning at >80%.">Usage</span>
+                            <span class="retention-value" id="retentionUsage">--%</span>
+                        </div>
+                        <div class="retention-stat">
+                            <span class="retention-label" data-tooltip="Number of checkpoints stored locally.">Checkpoints</span>
+                            <span class="retention-value" id="retentionCheckpoints">--</span>
+                        </div>
+                        <div class="retention-stat">
+                            <span class="retention-label" data-tooltip="Number of daily snapshots stored.">Snapshots</span>
+                            <span class="retention-value" id="retentionSnapshots">--</span>
+                        </div>
+                    </div>
+                    <div class="retention-bar-container">
+                        <div class="retention-bar" id="retentionBar"></div>
+                        <span class="retention-bar-label" id="retentionBarLabel">-- / -- GB</span>
+                    </div>
+                    <div class="retention-warnings" id="retentionWarnings">
+                        <!-- Warnings will be inserted here -->
+                    </div>
+                    <div class="action-hint" id="retentionAction">Loading retention status...</div>
+                </div>
+            </div>
+
+            <!-- Data File Impact Card -->
+            <div class="card card-data-impact">
+                <div class="card-header">
+                    <h3>📊 Data File Impact</h3>
+                    <div class="status-indicator" id="dataImpactIndicator">●</div>
+                </div>
+                <div class="card-body">
+                    <p class="card-subtitle">Which training files help vs hurt?</p>
+                    <div class="impact-columns">
+                        <div class="impact-column impact-positive">
+                            <h4>✅ Top Positive</h4>
+                            <ul id="positiveImpactFiles">
+                                <li class="impact-loading">Loading...</li>
+                            </ul>
+                        </div>
+                        <div class="impact-column impact-negative">
+                            <h4>❌ Top Negative</h4>
+                            <ul id="negativeImpactFiles">
+                                <li class="impact-loading">Loading...</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="action-hint" id="dataImpactAction">Analyzing data file impact...</div>
+                </div>
+            </div>
         </div>
     </div>
 

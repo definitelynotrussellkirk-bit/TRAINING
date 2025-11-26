@@ -1780,3 +1780,201 @@ body {
         min-width: 280px;
     }
 }
+
+/* ===================== */
+/* NEW: Scheduler Card   */
+/* ===================== */
+.card-scheduler .scheduler-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.scheduler-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.scheduler-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.scheduler-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.scheduler-band {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.scheduler-band .band-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-warning);
+}
+
+.scheduler-band.band-good .band-indicator { background: var(--color-success); }
+.scheduler-band.band-warning .band-indicator { background: var(--color-warning); }
+.scheduler-band.band-critical .band-indicator { background: var(--color-danger); }
+
+.scheduler-band .band-text {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* ===================== */
+/* NEW: Retention Card   */
+/* ===================== */
+.card-retention .retention-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.retention-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    text-align: center;
+}
+
+.retention-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.retention-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.retention-bar-container {
+    position: relative;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+}
+
+.retention-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-success), var(--color-warning));
+    transition: width 0.3s ease;
+}
+
+.retention-bar-label {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    text-shadow: 0 0 4px rgba(0,0,0,0.8);
+}
+
+.retention-warnings {
+    max-height: 60px;
+    overflow-y: auto;
+    margin-bottom: 0.5rem;
+}
+
+.retention-warnings .warning-item {
+    font-size: 0.75rem;
+    color: var(--color-warning);
+    padding: 0.25rem 0;
+}
+
+/* ===================== */
+/* NEW: Data Impact Card */
+/* ===================== */
+.card-data-impact .card-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.impact-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.impact-column h4 {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.impact-column ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.75rem;
+}
+
+.impact-column ul li {
+    padding: 0.2rem 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.impact-positive ul li { color: var(--color-success); }
+.impact-negative ul li { color: var(--color-danger); }
+
+.impact-loading {
+    color: var(--text-muted) !important;
+    font-style: italic;
+}
+
+/* ===================== */
+/* NEW: Action Hints     */
+/* ===================== */
+.action-hint {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-secondary);
+    border-left: 3px solid var(--border-color);
+}
+
+.action-hint.action-good {
+    background: rgba(16, 185, 129, 0.1);
+    border-left-color: var(--color-success);
+    color: var(--color-success);
+}
+
+.action-hint.action-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-left-color: var(--color-warning);
+    color: var(--color-warning);
+}
+
+.action-hint.action-critical {
+    background: rgba(239, 68, 68, 0.1);
+    border-left-color: var(--color-danger);
+    color: var(--color-danger);
+}
+
+/* Warning states for metric values */
+.metric-warning { color: var(--color-warning) !important; }
+.metric-critical { color: var(--color-danger) !important; font-weight: bold; }
+.metric-good { color: var(--color-success) !important; }

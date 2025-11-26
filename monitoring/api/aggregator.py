@@ -26,6 +26,7 @@ from .plugins.skill_metrics import SkillMetricsPlugin
 from .plugins.training_analytics import TrainingAnalyticsPlugin
 from .plugins.system_health import SystemHealthPlugin
 from .plugins.retention import RetentionPlugin
+from .plugins.scheduler import SchedulerPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,11 @@ class DataAggregator:
             # Retention status (checkpoint/snapshot storage)
             self.registry.register(RetentionPlugin(
                 config=self.config.get('retention', {})
+            ))
+
+            # GPU Task Scheduler (3090 port 8766)
+            self.registry.register(SchedulerPlugin(
+                config=self.config.get('scheduler', {})
             ))
 
             logger.info(f"Registered {len(self.registry.plugins)} default plugins")

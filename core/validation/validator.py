@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Bump DATA_VALIDATOR_VERSION when validation logic changes significantly
 VALIDATOR_NAME = "data_validator"
-VALIDATOR_VERSION = "1.0.0"
+VALIDATOR_VERSION = "1.1.0"  # 2025-11-26: Added 6 new validators
 
 # =============================================================================
 # PROTOCOL CONSTANTS (Single Source of Truth)
@@ -357,6 +357,38 @@ class DataValidator:
             warnings.extend(protocol_result.warnings)
             stats["protocol_stats"] = protocol_result.stats
 
+            # === NEW VALIDATORS (2025-11-26) ===
+
+            # Repetition detection (pathological loops)
+            repetition_result = self._check_repetition(examples)
+            warnings.extend(repetition_result.warnings)
+            stats["repetition_stats"] = repetition_result.stats
+
+            # Degenerate content (empty/whitespace/too-short)
+            degenerate_result = self._check_degenerate_content(examples)
+            warnings.extend(degenerate_result.warnings)
+            stats["degenerate_stats"] = degenerate_result.stats
+
+            # JSON validity (for structured output tasks)
+            json_result = self._check_json_validity(examples)
+            warnings.extend(json_result.warnings)
+            stats["json_stats"] = json_result.stats
+
+            # Encoding issues (mojibake, control chars)
+            encoding_result = self._check_encoding(examples)
+            warnings.extend(encoding_result.warnings)
+            stats["encoding_stats"] = encoding_result.stats
+
+            # Conversation flow (turn structure)
+            flow_result = self._check_conversation_flow(examples)
+            warnings.extend(flow_result.warnings)
+            stats["flow_stats"] = flow_result.stats
+
+            # Content length ratios
+            ratio_result = self._check_content_ratio(examples)
+            warnings.extend(ratio_result.warnings)
+            stats["ratio_stats"] = ratio_result.stats
+
         except Exception as e:
             warnings.append(f"Content check failed: {e}")
 
@@ -567,6 +599,534 @@ class DataValidator:
             if isinstance(content, str):
                 parts.append(content)
         return "\n".join(parts)
+
+    # =========================================================================
+    # NEW VALIDATORS (2025-11-26)
+    # =========================================================================
+
+    def _check_repetition(self, examples: List[Dict]) -> ValidationResult:
+        """
+        Detect pathological repetition patterns in assistant responses.
+
+        Common LLM failure mode: generating the same phrase/sentence repeatedly.
+        Examples:
+        - "The answer is X. The answer is X. The answer is X."
+        - Same word repeated 10+ times in a row
+        - Sentence loops
+
+        Args:
+            examples: List of parsed example dicts
+
+        Returns:
+            ValidationResult with repetition stats
+        """
+        import re
+        warnings = []
+        stats = {
+            "repetition_checked": 0,
+            "repetition_found": 0,
+            "repetition_examples": [],
+        }
+
+        # Patterns to detect
+        # 1. Same word repeated 5+ times: "yes yes yes yes yes"
+        word_repeat_pattern = re.compile(r'\b(\w+)(?:\s+\1){4,}\b', re.IGNORECASE)
+        # 2. Same phrase (3+ words) repeated 3+ times
+        phrase_repeat_pattern = re.compile(r'(\b\w+(?:\s+\w+){2,5}\b)(?:.*?\1){2,}', re.IGNORECASE | re.DOTALL)
+        # 3. Same sentence repeated (ends with punctuation)
+        sentence_repeat_pattern = re.compile(r'([^.!?]{10,}[.!?])(?:\s*\1){1,}', re.IGNORECASE)
+
+        for idx, example in enumerate(examples):
+            messages = example.get("messages", [])
+
+            for msg in messages:
+                if msg.get("role") != "assistant":
+                    continue
+
+                content = msg.get("content", "")
+                if not content or len(content) < 20:
+                    continue
+
+                stats["repetition_checked"] += 1
+                issues = []
+
+                # Check word repetition
+                word_matches = word_repeat_pattern.findall(content)
+                if word_matches:
+                    issues.append(f"word_repeat: '{word_matches[0]}' repeated 5+ times")
+
+                # Check sentence repetition
+                sentence_matches = sentence_repeat_pattern.findall(content)
+                if sentence_matches:
+                    preview = sentence_matches[0][:50]
+                    issues.append(f"sentence_repeat: '{preview}...'")
+
+                # Check for very high character repetition ratio
+                if len(content) > 50:
+                    char_counts = {}
+                    for c in content.lower():
+                        if c.isalpha():
+                            char_counts[c] = char_counts.get(c, 0) + 1
+                    if char_counts:
+                        max_ratio = max(char_counts.values()) / sum(char_counts.values())
+                        if max_ratio > 0.4:  # Single char > 40% of all letters
+                            top_char = max(char_counts, key=char_counts.get)
+                            issues.append(f"char_dominance: '{top_char}' is {max_ratio*100:.0f}% of text")
+
+                if issues:
+                    stats["repetition_found"] += 1
+                    if len(stats["repetition_examples"]) < 5:
+                        stats["repetition_examples"].append({
+                            "idx": idx,
+                            "issues": issues,
+                            "preview": content[:100]
+                        })
+
+        if stats["repetition_found"] > 0:
+            pct = stats["repetition_found"] / max(stats["repetition_checked"], 1) * 100
+            warnings.append(
+                f"REPETITION DETECTED: {stats['repetition_found']}/{stats['repetition_checked']} "
+                f"({pct:.1f}%) assistant responses have repetitive patterns"
+            )
+
+        return ValidationResult(valid=True, warnings=warnings, stats=stats)
+
+    def _check_degenerate_content(self, examples: List[Dict]) -> ValidationResult:
+        """
+        Detect empty, whitespace-only, or degenerate content.
+
+        Catches:
+        - Empty assistant responses
+        - Whitespace-only responses
+        - Extremely short responses (< 5 chars)
+        - Only punctuation/symbols
+
+        Args:
+            examples: List of parsed example dicts
+
+        Returns:
+            ValidationResult with degenerate content stats
+        """
+        warnings = []
+        stats = {
+            "degenerate_checked": 0,
+            "empty_responses": 0,
+            "whitespace_only": 0,
+            "too_short": 0,
+            "punctuation_only": 0,
+            "degenerate_examples": [],
+        }
+
+        MIN_RESPONSE_LENGTH = 5
+
+        for idx, example in enumerate(examples):
+            messages = example.get("messages", [])
+
+            for msg in messages:
+                if msg.get("role") != "assistant":
+                    continue
+
+                content = msg.get("content", "")
+                stats["degenerate_checked"] += 1
+                issue = None
+
+                # Check empty
+                if content is None or content == "":
+                    stats["empty_responses"] += 1
+                    issue = "empty_response"
+                # Check whitespace only
+                elif content.strip() == "":
+                    stats["whitespace_only"] += 1
+                    issue = "whitespace_only"
+                # Check too short
+                elif len(content.strip()) < MIN_RESPONSE_LENGTH:
+                    stats["too_short"] += 1
+                    issue = f"too_short ({len(content.strip())} chars)"
+                # Check punctuation/symbol only
+                elif not any(c.isalnum() for c in content):
+                    stats["punctuation_only"] += 1
+                    issue = "punctuation_only"
+
+                if issue and len(stats["degenerate_examples"]) < 5:
+                    stats["degenerate_examples"].append({
+                        "idx": idx,
+                        "issue": issue,
+                        "content": repr(content[:50])
+                    })
+
+        total_issues = (
+            stats["empty_responses"] +
+            stats["whitespace_only"] +
+            stats["too_short"] +
+            stats["punctuation_only"]
+        )
+
+        if total_issues > 0:
+            pct = total_issues / max(stats["degenerate_checked"], 1) * 100
+            warnings.append(
+                f"DEGENERATE CONTENT: {total_issues}/{stats['degenerate_checked']} "
+                f"({pct:.1f}%) responses are empty/too-short/invalid"
+            )
+            breakdown = []
+            if stats["empty_responses"]:
+                breakdown.append(f"{stats['empty_responses']} empty")
+            if stats["whitespace_only"]:
+                breakdown.append(f"{stats['whitespace_only']} whitespace-only")
+            if stats["too_short"]:
+                breakdown.append(f"{stats['too_short']} too-short")
+            if stats["punctuation_only"]:
+                breakdown.append(f"{stats['punctuation_only']} punctuation-only")
+            warnings.append(f"  Breakdown: {', '.join(breakdown)}")
+
+        return ValidationResult(valid=True, warnings=warnings, stats=stats)
+
+    def _check_json_validity(self, examples: List[Dict]) -> ValidationResult:
+        """
+        Validate JSON structure in assistant responses that appear to be JSON.
+
+        For SYLLO and other structured-output tasks, the assistant often returns
+        JSON. This validator checks that JSON-like responses actually parse.
+
+        Checks:
+        - Responses starting with { or [ should be valid JSON
+        - Common JSON errors (trailing commas, single quotes, unquoted keys)
+
+        Args:
+            examples: List of parsed example dicts
+
+        Returns:
+            ValidationResult with JSON validity stats
+        """
+        warnings = []
+        stats = {
+            "json_checked": 0,
+            "json_valid": 0,
+            "json_invalid": 0,
+            "json_errors": [],
+        }
+
+        for idx, example in enumerate(examples):
+            messages = example.get("messages", [])
+
+            for msg in messages:
+                if msg.get("role") != "assistant":
+                    continue
+
+                content = msg.get("content", "").strip()
+                if not content:
+                    continue
+
+                # Check if response looks like JSON (starts with { or [)
+                if not (content.startswith('{') or content.startswith('[')):
+                    continue
+
+                stats["json_checked"] += 1
+
+                try:
+                    json.loads(content)
+                    stats["json_valid"] += 1
+                except json.JSONDecodeError as e:
+                    stats["json_invalid"] += 1
+                    if len(stats["json_errors"]) < 5:
+                        # Try to identify common issues
+                        error_hint = str(e)
+                        if "Expecting property name" in error_hint:
+                            error_hint = "trailing comma or unquoted key"
+                        elif "single quotes" in content:
+                            error_hint = "single quotes instead of double"
+
+                        stats["json_errors"].append({
+                            "idx": idx,
+                            "error": error_hint[:100],
+                            "preview": content[:80]
+                        })
+
+        if stats["json_invalid"] > 0:
+            pct = stats["json_invalid"] / max(stats["json_checked"], 1) * 100
+            warnings.append(
+                f"INVALID JSON: {stats['json_invalid']}/{stats['json_checked']} "
+                f"({pct:.1f}%) JSON-like responses fail to parse"
+            )
+            for err in stats["json_errors"][:3]:
+                warnings.append(f"  Example: {err['error']}")
+
+        return ValidationResult(valid=True, warnings=warnings, stats=stats)
+
+    def _check_encoding(self, examples: List[Dict]) -> ValidationResult:
+        """
+        Detect encoding issues and problematic unicode.
+
+        Catches:
+        - Mojibake (encoding corruption like "Ã©" instead of "é")
+        - Unexpected control characters
+        - Null bytes
+        - Excessive unusual unicode that may cause tokenization issues
+
+        Args:
+            examples: List of parsed example dicts
+
+        Returns:
+            ValidationResult with encoding issue stats
+        """
+        import unicodedata
+        warnings = []
+        stats = {
+            "encoding_checked": 0,
+            "mojibake_found": 0,
+            "control_chars_found": 0,
+            "null_bytes_found": 0,
+            "encoding_examples": [],
+        }
+
+        # Common mojibake patterns (UTF-8 interpreted as Latin-1)
+        mojibake_patterns = [
+            'Ã©', 'Ã¨', 'Ã ', 'Ã¢', 'Ã®', 'Ã´', 'Ã»',  # French accents
+            'Ã¼', 'Ã¶', 'Ã¤', 'ÃŸ',  # German
+            'â€™', 'â€œ', 'â€', 'â€"', 'â€˜',  # Smart quotes as mojibake
+            'Â', 'Ã',  # Common corruption markers
+            '\ufffd',  # Replacement character (encoding failed)
+        ]
+
+        for idx, example in enumerate(examples):
+            messages = example.get("messages", [])
+
+            for msg in messages:
+                content = msg.get("content", "")
+                if not content:
+                    continue
+
+                stats["encoding_checked"] += 1
+                issues = []
+
+                # Check for mojibake
+                for pattern in mojibake_patterns:
+                    if pattern in content:
+                        issues.append(f"mojibake: '{pattern}'")
+                        stats["mojibake_found"] += 1
+                        break
+
+                # Check for null bytes
+                if '\x00' in content:
+                    issues.append("null_byte")
+                    stats["null_bytes_found"] += 1
+
+                # Check for control characters (except common whitespace)
+                allowed_controls = {'\n', '\r', '\t'}
+                for i, char in enumerate(content[:500]):  # Check first 500 chars
+                    if unicodedata.category(char) == 'Cc' and char not in allowed_controls:
+                        issues.append(f"control_char: U+{ord(char):04X}")
+                        stats["control_chars_found"] += 1
+                        break
+
+                if issues and len(stats["encoding_examples"]) < 5:
+                    stats["encoding_examples"].append({
+                        "idx": idx,
+                        "role": msg.get("role"),
+                        "issues": issues[:3],
+                        "preview": repr(content[:50])
+                    })
+
+        total_issues = (
+            stats["mojibake_found"] +
+            stats["control_chars_found"] +
+            stats["null_bytes_found"]
+        )
+
+        if total_issues > 0:
+            warnings.append(
+                f"ENCODING ISSUES: {total_issues} problems found "
+                f"(mojibake: {stats['mojibake_found']}, "
+                f"control: {stats['control_chars_found']}, "
+                f"null: {stats['null_bytes_found']})"
+            )
+
+        return ValidationResult(valid=True, warnings=warnings, stats=stats)
+
+    def _check_conversation_flow(self, examples: List[Dict]) -> ValidationResult:
+        """
+        Validate conversation turn structure.
+
+        Ensures:
+        - Conversations have proper user→assistant alternation
+        - No orphaned assistant responses (assistant without preceding user)
+        - No doubled roles (user→user without assistant)
+        - System message only at start (if present)
+
+        Args:
+            examples: List of parsed example dicts
+
+        Returns:
+            ValidationResult with conversation flow stats
+        """
+        warnings = []
+        stats = {
+            "flow_checked": 0,
+            "flow_valid": 0,
+            "orphaned_assistant": 0,
+            "doubled_roles": 0,
+            "system_misplaced": 0,
+            "no_assistant": 0,
+            "flow_examples": [],
+        }
+
+        for idx, example in enumerate(examples):
+            messages = example.get("messages", [])
+            if not messages:
+                continue
+
+            stats["flow_checked"] += 1
+            issues = []
+
+            roles = [m.get("role") for m in messages]
+
+            # Check system message placement
+            for i, role in enumerate(roles):
+                if role == "system" and i > 0:
+                    issues.append("system_not_first")
+                    stats["system_misplaced"] += 1
+                    break
+
+            # Filter to just user/assistant for flow analysis
+            conversation_roles = [r for r in roles if r in ("user", "assistant")]
+
+            if not conversation_roles:
+                continue
+
+            # Check for assistant without user
+            if conversation_roles[0] == "assistant":
+                issues.append("orphaned_assistant_start")
+                stats["orphaned_assistant"] += 1
+
+            # Check for doubled roles
+            for i in range(1, len(conversation_roles)):
+                if conversation_roles[i] == conversation_roles[i-1]:
+                    issues.append(f"doubled_{conversation_roles[i]}")
+                    stats["doubled_roles"] += 1
+                    break
+
+            # Check for no assistant response
+            if "assistant" not in conversation_roles:
+                issues.append("no_assistant_response")
+                stats["no_assistant"] += 1
+
+            if issues:
+                if len(stats["flow_examples"]) < 5:
+                    stats["flow_examples"].append({
+                        "idx": idx,
+                        "issues": issues,
+                        "roles": roles[:5]
+                    })
+            else:
+                stats["flow_valid"] += 1
+
+        total_issues = (
+            stats["orphaned_assistant"] +
+            stats["doubled_roles"] +
+            stats["system_misplaced"] +
+            stats["no_assistant"]
+        )
+
+        if total_issues > 0:
+            valid_pct = stats["flow_valid"] / max(stats["flow_checked"], 1) * 100
+            warnings.append(
+                f"CONVERSATION FLOW: {total_issues} issues found "
+                f"({valid_pct:.1f}% valid)"
+            )
+            breakdown = []
+            if stats["orphaned_assistant"]:
+                breakdown.append(f"{stats['orphaned_assistant']} orphaned")
+            if stats["doubled_roles"]:
+                breakdown.append(f"{stats['doubled_roles']} doubled")
+            if stats["system_misplaced"]:
+                breakdown.append(f"{stats['system_misplaced']} system-misplaced")
+            if stats["no_assistant"]:
+                breakdown.append(f"{stats['no_assistant']} no-assistant")
+            warnings.append(f"  Breakdown: {', '.join(breakdown)}")
+
+        return ValidationResult(valid=True, warnings=warnings, stats=stats)
+
+    def _check_content_ratio(self, examples: List[Dict]) -> ValidationResult:
+        """
+        Check prompt/response length ratios for imbalanced examples.
+
+        Flags:
+        - Very long prompts with tiny responses (possible truncation)
+        - Very short prompts with massive responses (possible generation issues)
+        - Extreme imbalances that suggest data quality problems
+
+        Args:
+            examples: List of parsed example dicts
+
+        Returns:
+            ValidationResult with ratio stats
+        """
+        warnings = []
+        stats = {
+            "ratio_checked": 0,
+            "prompt_heavy": 0,  # Long prompt, short response
+            "response_heavy": 0,  # Short prompt, long response
+            "balanced": 0,
+            "ratio_examples": [],
+        }
+
+        # Thresholds
+        PROMPT_HEAVY_RATIO = 20  # Prompt 20x longer than response
+        RESPONSE_HEAVY_RATIO = 50  # Response 50x longer than prompt
+        MIN_RESPONSE_FOR_RATIO = 10  # Don't flag very short responses separately
+
+        for idx, example in enumerate(examples):
+            messages = example.get("messages", [])
+
+            # Collect all user and assistant content
+            user_len = 0
+            assistant_len = 0
+            for msg in messages:
+                role = msg.get("role")
+                content = msg.get("content", "")
+                if role == "user":
+                    user_len += len(content)
+                elif role == "assistant":
+                    assistant_len += len(content)
+
+            if user_len == 0 or assistant_len == 0:
+                continue
+
+            stats["ratio_checked"] += 1
+            issue = None
+
+            ratio = user_len / assistant_len
+
+            if ratio > PROMPT_HEAVY_RATIO and assistant_len > MIN_RESPONSE_FOR_RATIO:
+                stats["prompt_heavy"] += 1
+                issue = f"prompt_heavy: {user_len}:{assistant_len} ({ratio:.1f}x)"
+            elif ratio < 1/RESPONSE_HEAVY_RATIO:
+                stats["response_heavy"] += 1
+                issue = f"response_heavy: {user_len}:{assistant_len} ({1/ratio:.1f}x)"
+            else:
+                stats["balanced"] += 1
+
+            if issue and len(stats["ratio_examples"]) < 5:
+                stats["ratio_examples"].append({
+                    "idx": idx,
+                    "issue": issue,
+                    "user_len": user_len,
+                    "assistant_len": assistant_len
+                })
+
+        total_issues = stats["prompt_heavy"] + stats["response_heavy"]
+
+        if total_issues > 0:
+            pct = total_issues / max(stats["ratio_checked"], 1) * 100
+            warnings.append(
+                f"IMBALANCED RATIOS: {total_issues}/{stats['ratio_checked']} "
+                f"({pct:.1f}%) examples have extreme prompt/response ratios"
+            )
+            if stats["prompt_heavy"]:
+                warnings.append(f"  {stats['prompt_heavy']} prompt-heavy (long prompt, short response)")
+            if stats["response_heavy"]:
+                warnings.append(f"  {stats['response_heavy']} response-heavy (short prompt, long response)")
+
+        return ValidationResult(valid=True, warnings=warnings, stats=stats)
 
 
 if __name__ == "__main__":

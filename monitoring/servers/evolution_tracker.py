@@ -223,10 +223,12 @@ class EvolutionTracker:
             pad_token_id=tokenizer.pad_token_id
         )
 
-        # Decode
-        generated = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        # Extract just the new tokens (remove prompt)
-        model_output = generated[len(prompt):].strip()
+        # Decode only the generated tokens (not the prompt)
+        prompt_length = len(inputs['input_ids'][0])
+        model_output = tokenizer.decode(
+            outputs[0][prompt_length:],
+            skip_special_tokens=True
+        ).strip()
 
         # Calculate simple loss (negative log likelihood approximation)
         # For actual loss, we'd need to run forward pass

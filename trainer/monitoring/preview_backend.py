@@ -167,12 +167,12 @@ class LocalPreviewBackend:
 
             generation_time = time.time() - start_time
 
-            # Decode output
-            generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-            # Remove prompt from output
-            if generated_text.startswith(prompt):
-                generated_text = generated_text[len(prompt):]
+            # Decode only the generated tokens (not the prompt)
+            prompt_length = len(inputs.input_ids[0])
+            generated_text = self.tokenizer.decode(
+                outputs[0][prompt_length:],
+                skip_special_tokens=True
+            )
 
             # Calculate metrics
             tokens_generated = len(outputs[0]) - len(inputs.input_ids[0])

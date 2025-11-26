@@ -216,9 +216,12 @@ class ModelPool:
                 pad_token_id=entry.tokenizer.eos_token_id
             )
 
-        # Decode
-        full_text = entry.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        generated_text = full_text[len(prompt):]  # Remove prompt
+        # Decode only the generated tokens (not the prompt)
+        prompt_length = len(inputs['input_ids'][0])
+        generated_text = entry.tokenizer.decode(
+            outputs[0][prompt_length:],
+            skip_special_tokens=True
+        )
 
         return {
             'generated_text': generated_text,

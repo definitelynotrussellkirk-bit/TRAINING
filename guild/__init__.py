@@ -14,5 +14,21 @@ The Guild framework provides:
 
 __version__ = "0.1.0"
 
-# Populated as modules are created
-__all__ = []
+# Facility resolution (core functionality)
+from guild.facilities.resolver import (
+    init_resolver,
+    resolve,
+    get_facility,
+    set_current_facility,
+    get_resolver,
+    reset_resolver,
+)
+
+__all__ = [
+    "init_resolver",
+    "resolve",
+    "get_facility",
+    "set_current_facility",
+    "get_resolver",
+    "reset_resolver",
+]

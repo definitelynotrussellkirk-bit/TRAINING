@@ -3,62 +3,70 @@
 Central path configuration for the training system.
 
 This module provides path utilities that:
-1. Support environment variable overrides (TRAINING_BASE_DIR)
-2. Auto-detect repository root when not configured
-3. Provide consistent paths across all modules
+1. Use Guild facility resolver when available
+2. Support environment variable overrides (TRAINING_BASE_DIR, GUILD_BASE_DIR)
+3. Auto-detect repository root when not configured
+4. Provide consistent paths across all modules
 
 Usage:
-    from core.paths import get_base_dir, get_models_dir
+    from core.paths import get_base_dir, get_models_dir, resolve_path
 
-    base = get_base_dir()  # Auto-detects or uses $TRAINING_BASE_DIR
+    base = get_base_dir()  # Auto-detects or uses guild resolver
     models = get_models_dir()  # base / "models"
+    path = resolve_path("@checkpoints")  # Guild facility shorthand
 """
 
 import os
+import sys
 import logging
 from pathlib import Path
 from functools import lru_cache
+from typing import Optional
+
+# Ensure project root is in sys.path for guild imports
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 logger = logging.getLogger(__name__)
 
 # Track whether we've logged the resolution (to avoid spam)
 _resolution_logged = False
+_guild_available: Optional[bool] = None
 
 
-@lru_cache(maxsize=1)
-def get_base_dir() -> Path:
-    """
-    Get the base training directory.
+def _check_guild_available() -> bool:
+    """Check if guild resolver is available and configured."""
+    global _guild_available
+    if _guild_available is not None:
+        return _guild_available
 
-    Resolution order:
-    1. TRAINING_BASE_DIR environment variable (if set and exists)
-    2. Auto-detect by searching for CLAUDE.md from current file location
-    3. Fallback to common locations
+    try:
+        from guild.facilities.resolver import init_resolver, get_resolver
+        try:
+            init_resolver()
+            _guild_available = True
+        except FileNotFoundError:
+            _guild_available = False
+    except ImportError:
+        _guild_available = False
 
-    The resolution method is logged once at INFO level for debugging.
+    return _guild_available
 
-    Returns:
-        Path to the base training directory
 
-    Raises:
-        RuntimeError: If base directory cannot be determined
-    """
+def _detect_base_dir_legacy() -> Path:
+    """Legacy base directory detection."""
     global _resolution_logged
 
     # Check environment variable first
-    if "TRAINING_BASE_DIR" in os.environ:
-        path = Path(os.environ["TRAINING_BASE_DIR"])
+    env_path = os.environ.get("GUILD_BASE_DIR") or os.environ.get("TRAINING_BASE_DIR")
+    if env_path:
+        path = Path(env_path)
         if path.exists():
             if not _resolution_logged:
-                logger.info(f"Base dir from $TRAINING_BASE_DIR: {path}")
+                logger.info(f"Base dir from environment: {path}")
                 _resolution_logged = True
             return path
-        # If env var is set but doesn't exist, warn but continue to auto-detect
-        import warnings
-        warnings.warn(
-            f"TRAINING_BASE_DIR={path} does not exist, auto-detecting",
-            RuntimeWarning
-        )
 
     # Auto-detect by looking for CLAUDE.md
     current = Path(__file__).resolve().parent
@@ -84,12 +92,89 @@ def get_base_dir() -> Path:
                 _resolution_logged = True
             return fallback
 
-    raise RuntimeError(
-        "Could not determine base directory. "
-        "Set TRAINING_BASE_DIR environment variable or run from repository."
-    )
+    # Ultimate fallback: current working directory
+    if not _resolution_logged:
+        logger.warning(f"Base dir fallback to cwd: {Path.cwd()}")
+        _resolution_logged = True
+    return Path.cwd()
 
 
+@lru_cache(maxsize=1)
+def get_base_dir() -> Path:
+    """
+    Get the base training directory.
+
+    Resolution order:
+    1. Guild facility resolver (if configured)
+    2. GUILD_BASE_DIR or TRAINING_BASE_DIR environment variable
+    3. Auto-detect by searching for CLAUDE.md from current file location
+    4. Fallback to common locations
+
+    Returns:
+        Path to the base training directory
+    """
+    global _resolution_logged
+
+    # Try guild resolver first
+    if _check_guild_available():
+        try:
+            from guild.facilities.resolver import get_resolver
+            resolver = get_resolver()
+            facility = resolver.get_facility(resolver.current_facility_id)
+            base_path = Path(os.path.expandvars(facility.base_path)).expanduser()
+            if not _resolution_logged:
+                logger.info(f"Base dir from guild resolver ({facility.id}): {base_path}")
+                _resolution_logged = True
+            return base_path
+        except Exception as e:
+            logger.debug(f"Guild resolver failed, using legacy: {e}")
+
+    # Fall back to legacy detection
+    return _detect_base_dir_legacy()
+
+
+def resolve_path(path_spec: str) -> Path:
+    """
+    Resolve a path specification.
+
+    Supports:
+    - facility:id:path - Guild facility paths
+    - @path - Current facility shorthand
+    - ~/path - Home expansion
+    - /absolute - Unchanged
+    - relative - Relative to base_dir
+
+    Args:
+        path_spec: Path specification to resolve
+
+    Returns:
+        Resolved Path object
+    """
+    if path_spec.startswith("facility:") or path_spec.startswith("@"):
+        if _check_guild_available():
+            try:
+                from guild.facilities.resolver import resolve
+                return resolve(path_spec)
+            except Exception as e:
+                logger.debug(f"Guild resolve failed for {path_spec}: {e}")
+
+        # Can't resolve guild paths without guild
+        if path_spec.startswith("@"):
+            # Strip @ and treat as relative to base
+            return get_base_dir() / path_spec[1:].split("/")[0]
+        raise ValueError(f"Guild resolver not available for: {path_spec}")
+
+    if path_spec.startswith("~"):
+        return Path(path_spec).expanduser()
+
+    if path_spec.startswith("/"):
+        return Path(path_spec)
+
+    # Relative path - resolve relative to base_dir
+    return get_base_dir() / path_spec
+
+
+# Convenience functions
 def get_models_dir() -> Path:
     """Get the models directory (base/models)."""
     return get_base_dir() / "models"
@@ -140,6 +225,26 @@ def get_backups_dir() -> Path:
     return get_base_dir() / "backups"
 
 
+def get_pids_dir() -> Path:
+    """Get the PID files directory (base/.pids)."""
+    return get_base_dir() / ".pids"
+
+
+def get_checkpoints_dir() -> Path:
+    """Get the checkpoints directory (base/current_model)."""
+    return get_base_dir() / "current_model"
+
+
+def get_snapshots_dir() -> Path:
+    """Get the snapshots directory (base/backups/snapshots)."""
+    return get_base_dir() / "backups" / "snapshots"
+
+
+def get_test_results_dir() -> Path:
+    """Get the test results directory (base/test_results)."""
+    return get_base_dir() / "test_results"
+
+
 # Remote server paths (3090)
 REMOTE_HOST = os.environ.get("INFERENCE_HOST", "192.168.x.x")
 REMOTE_PORT = int(os.environ.get("INFERENCE_PORT", "8765"))
@@ -157,29 +262,15 @@ def get_scheduler_api_url() -> str:
     return f"http://{REMOTE_HOST}:{REMOTE_SCHEDULER_PORT}"
 
 
-def get_pids_dir() -> Path:
-    """Get the PID files directory (base/.pids)."""
-    return get_base_dir() / ".pids"
-
-
-def get_checkpoints_dir() -> Path:
-    """Get the checkpoints directory (base/models/current_model)."""
-    return get_base_dir() / "models" / "current_model"
-
-
-def get_snapshots_dir() -> Path:
-    """Get the snapshots directory (base/backups/snapshots)."""
-    return get_base_dir() / "backups" / "snapshots"
-
-
-def get_test_results_dir() -> Path:
-    """Get the test results directory (base/test_results)."""
-    return get_base_dir() / "test_results"
-
-
 if __name__ == "__main__":
+    # Reset caching to get fresh results in test mode
+    _guild_available = None
+    _resolution_logged = False
+    get_base_dir.cache_clear()
+
     # Quick test
     print("Path Configuration:")
+    print(f"  Guild available: {_check_guild_available()}")
     print(f"  Base dir: {get_base_dir()}")
     print(f"  Models: {get_models_dir()}")
     print(f"  Current model: {get_current_model_dir()}")
@@ -196,3 +287,7 @@ if __name__ == "__main__":
     print(f"  Host: {REMOTE_HOST}")
     print(f"  Remote API: {get_remote_api_url()}")
     print(f"  Scheduler API: {get_scheduler_api_url()}")
+    print(f"\nPath Resolution:")
+    print(f"  resolve_path('status'): {resolve_path('status')}")
+    print(f"  resolve_path('~/test'): {resolve_path('~/test')}")
+    print(f"  resolve_path('/absolute'): {resolve_path('/absolute')}")

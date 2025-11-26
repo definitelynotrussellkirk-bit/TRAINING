@@ -1,0 +1,1 @@
+"""Guild API endpoints."""

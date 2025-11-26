@@ -1,7 +1,7 @@
 {
   "status": "training",
-  "last_update": "2025-11-26T06:23:43.641193",
-  "current_file": "auto_gen_20251125_172112_count50000.jsonl",
+  "last_update": "2025-11-26T18:18:49.435365",
+  "current_file": "train_syllo_level1_100_20251126_181819.jsonl",
   "paused_at": "2025-11-21T05:13:38.792400",
   "reason": "Recovered from crash"
 }

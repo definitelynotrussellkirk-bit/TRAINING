@@ -1,0 +1,1 @@
+"""Hero type definitions."""

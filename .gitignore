@@ -58,3 +58,18 @@ test_stop_emoji.jsonl
 =*
 .secrets/
 test_results/
+
+# Guild local configs (user-specific, not committed)
+configs/facilities/local.yaml
+configs/**/*.local.yaml
+*.local.yaml
+
+# Guild runtime state
+status/hero_state.json
+status/run_*.json
+status/incidents/
+status/quests/
+
+# Consistency reports (generated)
+status/world_consistency_report.md
+status/lore_suggestions.md

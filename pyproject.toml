@@ -45,6 +45,11 @@ inference = [
     "uvicorn>=0.23",
     "pydantic>=2.0",
 ]
+# Guild framework dependencies
+guild = [
+    "pyyaml>=6.0",
+    "jsonschema>=4.0",
+]
 # Development dependencies
 dev = [
     "pytest>=7.0",
@@ -79,6 +84,8 @@ include = [
     "inference*",
     "safety*",
     "tools*",
+    "guild*",
+    "views*",
 ]
 exclude = [
     "tests*",
@@ -161,4 +168,4 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "trainer", "management", "monitoring", "inference", "safety", "tools"]
+known-first-party = ["core", "trainer", "management", "monitoring", "inference", "safety", "tools", "guild", "views"]

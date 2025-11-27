@@ -115,6 +115,56 @@ NPCs who provide specialized training quests to the Quest Master.
 
 ---
 
+## Passives (General Abilities)
+
+**Passives** = Innate abilities that work in the background, regardless of active training. The hero's general capabilities measured against the base model.
+
+*"Transfer learning" in ML terms = "Passives" in Guild terms*
+
+### Passive Categories
+
+| Passive | Description | Examples |
+|---------|-------------|----------|
+| **Logic** | Boolean reasoning, deduction | AND, OR, XOR gates |
+| **Counting** | Enumeration, frequency | Letter count, vowel count, digit count |
+| **Conversion** | Format transformation | Decimal↔Hex, Binary↔Decimal, Roman numerals |
+| **String Craft** | Text manipulation | Reverse, palindrome, first N chars |
+| **Arithmetic** | Basic number sense | Digit sum, even/odd, modulo, comparison |
+| **Sequence** | Pattern recognition | Next in sequence, alphabetical order |
+| **Memory** | Fact retention, recall | bAbI tasks (20 types) |
+| **Reasoning** | Multi-step logic | BIG-Bench tasks |
+
+### Passive Drift
+
+**Passive Drift** = How passives change compared to base model
+- **Positive Drift** (+) = Training improved general abilities
+- **Neutral Drift** (=) = No change from base
+- **Negative Drift** (-) = Training hurt general abilities (catastrophic forgetting)
+
+**Drift Check** = Compare hero to base on passives
+- "Run a drift check" = run baseline comparison
+- "Drift report" = results of passive comparison
+
+### Phrases
+
+| Phrase | Meaning |
+|--------|---------|
+| "Check passives" | Run transfer baseline tests |
+| "Logic passive is strong" | High accuracy on boolean tasks |
+| "Negative drift on counting" | Counting ability decreased vs base |
+| "Passives are stable" | No catastrophic forgetting |
+| "Base passive" | Original ability (from base model) |
+| "Current passive" | Trained model's ability |
+
+### Why Track Passives?
+
+1. **Detect forgetting** - Training shouldn't break existing abilities
+2. **Measure transfer** - Does SYLLO training help logic passives?
+3. **Balance training** - Don't over-specialize at cost of generality
+4. **Compare checkpoints** - Which checkpoint has best passive balance?
+
+---
+
 ## Combat & Trials
 
 **Combat Trials** = Automated testing / validation
@@ -199,6 +249,9 @@ NPCs who provide specialized training quests to the Quest Master.
 | "Open the Guild Hall" | Open dashboard |
 | "Arena results" | Evaluation metrics |
 | "Treasury status" | Disk space check |
+| "Check passives" | Run transfer baseline tests |
+| "How's the drift?" | Compare to base model |
+| "Passives are stable" | No catastrophic forgetting |
 
 ---
 
@@ -215,11 +268,22 @@ Guild Hall (Dashboard)
 │   └── Lineage Records
 │
 ├── The Arena (3090 - Evaluation)
-│   ├── Skill Progression
+│   ├── Skill Progression (Trained Skills)
 │   ├── Combat Trials
 │   ├── Tournament Rankings
 │   ├── Quest Dispatcher
 │   └── Arena Power
+│
+├── Passives (General Abilities)
+│   ├── Logic (boolean ops)
+│   ├── Counting (enumeration)
+│   ├── Conversion (format)
+│   ├── String Craft (text)
+│   ├── Arithmetic (numbers)
+│   ├── Sequence (patterns)
+│   ├── Memory (bAbI)
+│   ├── Reasoning (BIG-Bench)
+│   └── Drift Report (vs base)
 │
 ├── Quest Master (Data Generation)
 │   ├── Sy (Syllable Trainer)

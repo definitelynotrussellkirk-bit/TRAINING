@@ -213,6 +213,32 @@ from guild.combat import (
     select_stance,
 )
 
+# Consistency checking
+from guild.consistency import (
+    # Rule types
+    RuleCategory,
+    RuleSeverity,
+    RuleViolation,
+    ConsistencyRule,
+    RuleBuilder,
+    # Checker
+    CheckResult,
+    ConsistencyChecker,
+    init_consistency_checker,
+    get_consistency_checker,
+    reset_consistency_checker,
+    check_entity,
+    check_all,
+    # Built-in rules
+    get_hero_rules,
+    get_quest_rules,
+    get_run_rules,
+    get_incident_rules,
+    get_skill_rules,
+    get_all_rules,
+    get_rules_by_entity,
+)
+
 __all__ = [
     # Facilities
     "init_resolver",
@@ -372,4 +398,26 @@ __all__ = [
     "get_stance_manager",
     "reset_stance_manager",
     "select_stance",
+    # Consistency - rule types
+    "RuleCategory",
+    "RuleSeverity",
+    "RuleViolation",
+    "ConsistencyRule",
+    "RuleBuilder",
+    # Consistency - checker
+    "CheckResult",
+    "ConsistencyChecker",
+    "init_consistency_checker",
+    "get_consistency_checker",
+    "reset_consistency_checker",
+    "check_entity",
+    "check_all",
+    # Consistency - built-in rules
+    "get_hero_rules",
+    "get_quest_rules",
+    "get_run_rules",
+    "get_incident_rules",
+    "get_skill_rules",
+    "get_all_rules",
+    "get_rules_by_entity",
 ]

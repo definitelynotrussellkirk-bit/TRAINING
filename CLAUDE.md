@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-11-27 (Checkpoint Ledger + Distributed Architecture)
+**Last Updated:** 2025-11-27 (Quests Page + VRAM Calculator + Scheduler UI)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 ---
@@ -34,10 +34,12 @@ DROP QUEST → DIO BATTLES → GAIN XP → LEVEL UP → UNLOCK SKILLS → REPEAT
 | Location | URL | Purpose |
 |----------|-----|---------|
 | **Tavern** | http://localhost:8888 | Main game UI - DIO, battles, stats |
+| **Quests** | http://localhost:8888/quests | Quest board - manage training queue |
 | **Oracle** | http://localhost:8888/oracle | Talk to DIO - chat with any checkpoint |
 | **Vault** | http://localhost:8888/vault | Browse checkpoints, zones, assets |
-| Guild Hall | http://localhost:8081/guildhall.html | Skill progression dashboard |
-| Watchtower | http://localhost:8081/master_dashboard.html | Full monitoring |
+| **Settings** | http://localhost:8888/settings | Config, VRAM calc, scheduler |
+| **Scheduler** | http://localhost:8888/scheduler | Curriculum scheduling |
+| Guild Hall | http://localhost:8888/guild | Skill progression dashboard |
 | VaultKeeper API | http://localhost:8767/api/stats | Asset & Ledger API |
 
 ### Start Playing
@@ -153,7 +155,7 @@ The Tavern displays data. To feel like a **complete game**, we need:
 - [ ] **Start Quest** - Drop files in inbox from the UI
 - [ ] **Pause/Resume Battle** - Control training from Tavern
 - [ ] **Promote Champion** - Deploy best checkpoint from UI
-- [ ] **View Quest Board** - See pending quests, priorities
+- [x] **View Quest Board** - See pending quests, priorities ✅ `/quests`
 
 ### Phase 2: More Game Feel
 - [ ] **Notifications** - "Quest complete!", "Level up!", "New champion!"
@@ -167,13 +169,28 @@ The Tavern displays data. To feel like a **complete game**, we need:
 - [ ] **Battle Animations** - Visual feedback during training
 
 ### Phase 4: Full Control
-- [ ] **Armory Screen** - Edit config.json from UI
+- [x] **Armory Screen** - Edit config.json from UI ✅ `/settings` + VRAM calc
 - [ ] **Vault Browser** - Browse/delete/export checkpoints
-- [ ] **Guild Management** - Adjust curriculum, skill priorities
+- [x] **Guild Management** - Adjust curriculum, skill priorities ✅ `/settings` scheduler
 
 ---
 
 ## 📦 RECENT UPDATES
+
+**Tavern UI Expansion (2025-11-27 Late)**
+- ✅ **Quests Page** (`/quests`) - Full quest board with queue management
+  - View queued/processing/completed/failed quests
+  - Change priority, delete, retry failed quests
+  - Auto-refresh every 10 seconds
+- ✅ **VRAM Calculator** (`/settings`) - Estimate GPU memory usage
+  - Based on batch size, max length, precision, gradient checkpointing
+  - GPU presets (RTX 4090/3090/4080/4070)
+  - Visual breakdown: model weights, optimizer, gradients, activations
+- ✅ **Scheduler in Settings** (`/settings`) - Full curriculum scheduler integration
+  - Quick presets (8 options)
+  - Strategy selection (equal, focus, weighted, catch-up)
+  - Per-skill enable/disable, priority, weight
+  - Next decision preview
 
 **Checkpoint Ledger & Distributed Architecture (2025-11-27)**
 - ✅ **Checkpoint Ledger** (`core/checkpoint_ledger.py`) - Single source of truth for checkpoint stats
@@ -963,685 +980,41 @@ guild/skills/
 └── state_manager.py # Runtime state tracking
 ```
 
----
-
-## 🆕 RECENT UPDATES (2025-11-27)
-
-**Skill System Abstraction** - YAML configs are now the single source of truth
-
-**What Changed (2025-11-27):**
-- Removed hardcoded `SKILL_REGISTRY` from `guild/skills/loader.py`
-- Added `SkillDisplay` (icon, color, short_name), `SkillAPI` (url, endpoints), `SkillEval` (samples_per_level)
-- `get_trainer()` now reads API URL from YAML config
-- Skills: SY (50 levels), BIN (30 levels)
-- To add a skill: just create `configs/skills/{id}.yaml`
 
 ---
 
-## 🆕 PREVIOUS UPDATES (2025-11-26)
+## 🎯 CURRENT STATE
 
-**Data Lineage System** - Track generator/validator provenance for all training data
+**Training:** Step ~182000 | **Latest Checkpoint:** ~181800
 
-**What Changed (2025-11-26 - Data Lineage):**
-- Every generator now has `GENERATOR_ID` and `GENERATOR_VERSION` constants
-- Every validator now has `VALIDATOR_NAME` and `VALIDATOR_VERSION` constants
-- Generators write `.meta.json` sidecar files alongside training JSONL
-- `LineageTracker` aggregates rejection stats to `status/data_lineage.json`
-- New `/api/lineage` endpoint serves lineage stats
-- New "Data Lineage" dashboard card shows per-generator/validator fail rates
+### Key Services
 
-**Key Files Created:**
-- `core/lineage.py` - Generator registry + FileLineage dataclass + sidecar I/O
-- `core/lineage_tracker.py` - LineageTracker aggregation class
+| Service | Port | Location |
+|---------|------|----------|
+| Tavern UI | 8888 | 4090 |
+| VaultKeeper | 8767 | 4090 |
+| Inference | 8765 | 3090 |
+| GPU Scheduler | 8766 | 3090 |
 
-**Files Modified for Versioning:**
-- `monitoring/discrimination_generator.py` - `GENERATOR_ID="discrimination"`, `GENERATOR_VERSION="1.0.0"`
-- `data_manager/generators/syllogism_generator.py` - `GENERATOR_ID="syllo_local"`, `GENERATOR_VERSION="1.0.0"`
-- `core/validation/validator.py` - `VALIDATOR_NAME="data_validator"`, `VALIDATOR_VERSION="1.0.0"`
-- `core/validation/spec.py` - `VALIDATOR_NAME="spec_validator"`, `VALIDATOR_VERSION="1.0.0"`
-- `core/training_daemon.py` - Integrated LineageTracker
-- `monitoring/api/server.py` - Added `/api/lineage` endpoint
-- `monitoring/ui/master_dashboard.html` - Added Data Lineage card
-- `monitoring/css/master_dashboard.css` - Lineage card styles
-- `monitoring/js/master_dashboard.js` - `fetchDataLineage()` + `updateDataLineage()`
+### Quick Commands
 
-**Generator Registry (in `core/lineage.py`):**
-```python
-GENERATOR_REGISTRY = {
-    "discrimination": {"version": "1.0.0", "source": "monitoring/discrimination_generator.py"},
-    "syllo_local": {"version": "1.0.0", "source": "data_manager/generators/syllogism_generator.py"},
-    "syllo_api": {"version": "1.0.0", "source": "singleSKILL SYLLO API"},
-    "curriculum": {"version": "1.0.0", "source": "data_manager/curriculum_manager.py"},
-    "manual": {"version": "1.0.0", "source": "human"},
-}
-```
-
-**How to Bump Versions:**
-When changing generator/validator logic significantly, increment the version:
-```python
-# In monitoring/discrimination_generator.py
-GENERATOR_VERSION = "1.1.0"  # Was "1.0.0"
-```
-
-**API Endpoint:**
 ```bash
-curl http://localhost:8081/api/lineage | jq .
-```
+# Check health
+curl http://localhost:8888/health
+curl http://localhost:8767/api/stats
 
-**Dashboard:** http://localhost:8081/master_dashboard.html (Data Lineage card in left column)
+# Control training
+python3 core/training_controller.py status|pause|resume|stop
 
----
-
-**50% Protocol Mode + Data Health Dashboard** - Emoji protocol enforcement now 50/50
-
-**What Changed (2025-11-26 - Protocol Layer):**
-- **50% Emoji Mode**: Half of training examples use emoji thinking (💭...🔚), half are direct answers
-- Deterministic split based on example index (reproducible)
-- Protocol validation in `core/validation/validator.py` (runs at DEEP level)
-- EmojiThinkProfile in `trainer/profiles/emoji_think.py` now conditionally applies markers
-- Training status tracks `protocol_stats` (emoji_mode_pct, direct_mode_pct, malformed)
-- New "Data Health" card on master dashboard shows protocol conformance
-
-**Protocol Validation Rules:**
-```
-EMOJI MODE (valid): thinking emoji at start AND stop emoji at end
-DIRECT MODE (valid): NO thinking emoji at start (stop emoji optional)
-MALFORMED (error):   thinking emoji at start WITHOUT stop emoji at end
-```
-
-**Constants (single source of truth in validator.py):**
-- `THINKING_EMOJIS`: 🤔, 💭, 🧠, 💡, 🎯, 🔍, 🤨, 🧐, ⚡, ✨
-- `STOP_EMOJIS`: 🛑, ⛔, 🚫, ❌, 🔴, ⏹️, 🔚, ✋, 🚦, 🛡️
-- Stop count: 2-4 repetitions
-
-**Files Modified:**
-- `core/validation/validator.py` - Protocol constants + `_check_protocol()` method
-- `trainer/profiles/emoji_think.py` - `should_use_emoji_mode()` + 50% mode in `transform_example()`
-- `core/training_status.py` - Added `protocol_stats` field to TrainingStatus
-- `monitoring/ui/master_dashboard.html` - Added Data Health card
-- `monitoring/css/master_dashboard.css` - Styles for protocol mix bar
-- `monitoring/js/master_dashboard.js` - `updateDataHealth()` function
-
----
-
-**10-Level SYLLO Signal Degradation System** - Replaces old 5-level system
-
-**What Changed (2025-11-26 - 10-Level Migration):**
-- SYLLO now has 10 levels with progressive signal degradation (hint quality degrades)
-- Level 1: Strong hints only (definitions) - solvable by structure
-- Level 10: Any hint type (may just be "starts with X") - mastery level
-- Removed "easy/medium/hard" terminology - now uses L1-L10
-- Updated files:
-  - `monitoring/api/plugins/curriculum.py` - max_level: 5→10
-  - `monitoring/data_generation_automation.py` - levels: 5→10
-  - `data_manager/curriculum_manager.py` - 10-level SKILL_LEVELS config
-  - `monitoring/discrimination_generator.py` - `--level auto/1-10/1-3/all` syntax
-  - `monitoring/ui/syllo_dashboard.html` - shows L1-L10 with descriptions
-  - `monitoring/ui/master_dashboard.html` - L1/10 display
-  - `monitoring/api/server.py` - added static file serving for dashboards
-
-**Dashboard URLs (now working):**
-- http://localhost:8081/master_dashboard.html
-- http://localhost:8081/syllo_dashboard.html
-
-**10-Level Eval Set Generated:**
-- `data/validation/syllo_10level/` - 200 examples (20 per level)
-
----
-
-**Discrimination Training Generator** - Teaches model to identify wrong vs correct answers
-
-**What Changed (2025-11-26 - Earlier):**
-- Created `monitoring/discrimination_generator.py` - generates discrimination training data
-- Ratio-aware: maintains 20% discrimination to 80% direct-solve training ratio
-- Reads curriculum level from `data_manager/curriculum_state.json`
-- Writes status to `status/discrimination_generator.json`
-- Cron job: every 2 hours, up to 1500 examples per run
-
-**Training Format Contract (Task-Agnostic):**
-
-The multi-turn format works for ANY subject/skill (not SYLLO-specific):
-
-```
-# CORRECT verification (2 turns):
-User: [problem + proposed answer] "Did the model answer correctly?"
-Assistant: "CORRECT"
-
-# INCORRECT + correction (4 turns):
-User: [problem + proposed answer] "Did the model answer correctly?"
-Assistant: "INCORRECT"
-User: "What should the answer have been?"
-Assistant: [raw golden answer - no prefix, no formatting]
-```
-
-**Mix:** 60% INCORRECT+correction, 40% CORRECT verification
-
-**Run manually:**
-```bash
-# Check current ratio
-python3 monitoring/discrimination_generator.py --check-only
-
-# Generate in ratio mode (auto-calculates deficit)
-INFERENCE_ADMIN_KEY=admin123 python3 monitoring/discrimination_generator.py --ratio --max-per-run 1500
-```
-
----
-
-**Chat Template Override** - Fix for Qwen3 `<think>` injection
-
-**What Changed (2025-11-25 - Chat Template Fix):**
-- Created `core/chat_templates.py` - Overrides Qwen3's auto-`<think>` injection
-- Qwen3 models inject `<think></think>` around all assistant content by default
-- This conflicted with our emoji_think paradigm (💭...🔚)
-- New module detects Qwen3 template and replaces with clean ChatML
-- Training now uses only emoji thinking without competing systems
-- See ARCHITECTURE.md "Thinking Tokens / Chat Templates" section
-
----
-
-**GPU Task Scheduler** - Central coordinator for 3090 GPU workloads
-
-**What Changed (2025-11-25 - GPU Scheduler):**
-- Created `monitoring/gpu_task_scheduler.py` - central daemon coordinating all GPU tasks
-- Created `monitoring/task_client.py` - client library for task submission
-- Updated daemons with `--use-scheduler` flag: curriculum_eval, self_correction, automated_testing
-- Scheduler monitors GPU utilization and dispatches tasks from priority queue
-- Target: maintain 20-80% GPU utilization, auto-dispatch idle tasks when under 20%
-- 11 task types: curriculum_eval, self_correction, automated_test, adversarial_mine, etc.
-- API on port 8766: `/api/health`, `/api/tasks/submit`, `/api/metrics`
-
-**Start GPU Scheduler (on 3090):**
-```bash
-nohup python3 /path/to/training/monitoring/gpu_task_scheduler.py --port 8766 > logs/gpu_scheduler.log 2>&1 &
-```
-
-**Previous (2025-11-25 - Curriculum Integration):**
-- DataManager rewritten to use `SkillAPIClient` instead of remote GPU (3090)
-- Now connects to local singleSKILL APIs: SYLLO (8080), Binary (8090)
-- Integrated `CurriculumManager` for adaptive difficulty progression
-- **SYLLO-only** for now - master SYLLO before introducing Binary
-- Files named: `train_SKILL_levelN_COUNT_TIMESTAMP.jsonl`
-- Config updated: `auto_generate.count: 100` (was 100000)
-- State file: `data_manager/curriculum_state.json` (tracks levels, history)
-
-**Curriculum System:**
-- SY: 50 levels (signal degradation - hints weaken at higher levels)
-- BIN: 30 levels (bit width progression - 2-bit to 32-bit)
-- Progression: 80% accuracy over 3 evaluations to advance
-
-**Requirement:** Skill APIs must be running:
-```bash
-# SY API (port 8080)
-cd /path/to/skills && python3 skill_syllo_variant/api_server.py --port 8080
-
-# BIN API (port 8090)
-cd /path/to/skills && python3 skill_binary/api_server.py --port 8090
-```
-
-**Previous (2025-11-25 - Code Review):**
-- Verified adversarial miner supports `messages[]` format (lines 193-229 `extract_prompt_and_expected()`)
-- Verified adversarial miner has plugin-compatible fields: `total_examples_mined`, `categories` (lines 377-402)
-- Verified self-correction loop writes `status/self_correction.json` with correct schema (lines 61, 93-132)
-- Archived stale task specs (TASK010, 012, 013) that described already-implemented features
-- TASK011 (self-correction impact monitor) remains valid as future work ("did it help?" tracking)
-- Only real gap: no mechanism to track if corrections improve error rates over time
-
-**Previous (2025-11-24) - Code Cleanup Session:**
-- Fixed pyproject.toml: Moved GPU deps (torch, transformers) to `[training]` optional extra
-  - `pip install -e .` now lightweight (CI-friendly)
-  - `pip install -e ".[training]"` for full GPU training
-- **NEW: Two-layer validation architecture**
-  - Layer 1: SpecValidator (outer gate) - denies unknown schemas
-  - Layer 2: DataValidator (content) - QUICK/STANDARD/DEEP checks
-- Added SpecValidator with deny-by-default schema validation
-  - Jobs MUST map to a known spec (or use default: chat_sft_v1)
-  - Registry: `DATASET_SPECS` in `core/validation/spec.py`
-  - Known specs: `chat_sft_v1`, `syllo_v1`, `completion_v1`
-- Integrated DataValidator into daemon: QUICK validation on inbox files
-  - Files with schema errors rejected before entering queue
-  - Comprehensive validation still runs before training
-- Added answer leakage detection to DataValidator (DEEP level)
-  - Detects full answer in prompt, answer previews, composition patterns
-- Added resolution logging to paths.py (debug visibility)
-- Documented BackgroundWorker timeout limitation (not enforced)
-- Added deprecation notice to core/validator.py (use core/validation/validator.py)
-- Added pytest markers: `slow`, `gpu`, `integration` for CI filtering
-  - CI can run: `pytest -m "not slow and not gpu"`
-- Added inference auth tests (tests/test_inference_auth.py) - 14 tests, all passing
-
-**What Changed (Session 2 - Refactoring):**
-- TASK004: Extracted ModelLoader, DatasetPreparer, MonitoringBundle from UltimateTrainer
-- TASK005: Extracted PIDManager, FileWatcher, SnapshotService, BackgroundWorker from daemon
-- TASK006: Added paths.py with get_base_dir() for path auto-detection
-- TASK007: Created pyproject.toml - package now installable
-- TASK008: Created DataValidator module (core/validation/validator.py)
-- TASK009: Created BackgroundWorker for non-blocking heavy tasks
-
-**What Changed (Session 1 - Auth & Tests):**
-- TASK001: API authentication for inference server
-- TASK002: Test infrastructure cleanup (pytest.ini, conftest.py)
-- TASK003: RetentionManager wired into daemon
-
-**Previous Update (2025-11-22):**
-**Production Integration Complete** - trainer/ modules now in core/train.py (commit: 5cdebe4)
-
-**What's New:**
-- ConfigLoader integrated - single TrainerConfig from args + config.json
-- Profiles active - emoji_think & regime3 available via config
-- Precision unified - model load + training use same precision (bf16/fp16/fp32)
-- System prompt fixed - uses `--system-prompt` CLI arg
-- 100% backward compatible - falls back to legacy if needed
-
-**Quick Start:**
-```bash
-# Edit config.json to switch profiles
-{"profile": {"name": "regime3"}}  # or "emoji_think"
-
-# Run training (automatically uses profile + config)
-python3 core/train.py --dataset data.jsonl --model qwen3 --output outputs
-```
-
-**Refactor Timeline:**
-- Steps 1-5: Created trainer/ architecture (6 git tags)
-- Step 6: Production integration (this update)
-- Result: ~3,400 lines → 14 modules, fully tested, in production
-
-**Key Files:**
-- `trainer/config/` - ConfigLoader, TrainerConfig schema
-- `trainer/profiles/` - emoji_think, regime3 data profiles
-- `core/train.py` - Production script (now uses trainer/ modules)
-
-See CHANGELOG.md for details
-
----
-
-## 🎯 CURRENT SYSTEM STATE
-
-**Last Verified:** 2025-11-25
-
-### Model Status
-- **Base model:** Qwen3-0.6B (at `/path/to/training/models/Qwen3-0.6B/`)
-  - Size: 1.5GB
-  - Type: Qwen3ForCausalLM
-- **Checkpoints:** `/path/to/training/current_model/checkpoint-NNNNNN/`
-  - Latest: checkpoint-175000
-  - Training method: Full model fine-tuning (no LoRA)
-- **3090 inference:** Load specific checkpoint via `/models/reload` API
-  - Example: `curl -X POST http://192.168.x.x:8765/models/reload -d '{"model_path":"/path/to/models/checkpoint-175000"}'`
-  - Check loaded: `curl http://192.168.x.x:8765/models/info`
-- **Current training:** Step 175000+
-
-### Service Status (Option C Architecture)
-
-**4090 (Training Machine):**
-- ✅ Training daemon: Running
-- ✅ model_comparison_engine: Running (PID in .pids/model_comparison.pid)
-- ✅ deployment_orchestrator: Running (PID in .pids/deployment_orchestrator.pid)
-- ✅ Disk manager: Running
-
-**3090 (Inference Server):**
-- ✅ Inference API: Running (port 8765)
-- ✅ Model loaded: checkpoint-156000 (1.2GB VRAM)
-- ✅ Auto-reload: Enabled via /models/reload endpoint
-
-### Configuration (`config.json`)
-
-See `config.json` for current values. Key structure:
-```json
-{
-  "model_name": "qwen3_0.6b",
-  "profile": {"name": "emoji_think"},
-  "hyperparams": {
-    "max_length": 2048,
-    "batch_size": 1,
-    "gradient_accumulation": 16,
-    "learning_rate": 0.0004,
-    "fp_precision": "bf16"
-  },
-  "auto_generate": {
-    "enabled": true,
-    "host": "localhost",
-    "port": 8080
-  }
-}
-```
-
-**Note:** `config.json` is the source of truth. See `trainer/config/schema.py` for full TrainerConfig.
-
-### Disk Space
-- **Available:** 731GB / 1.8TB (58% used)
-- **Status:** Healthy
-
----
-
-## ⚡ QUICK OPERATIONS
-
-### Start All Services (4090)
-```bash
-cd /path/to/training
-
-# Start VaultKeeper server (NEW - asset registry)
-nohup python3 vault/server.py --port 8767 > logs/vault_keeper.log 2>&1 &
-echo $! > .pids/vault_keeper.pid
-
-# Start monitoring daemons
-nohup python3 monitoring/model_comparison_engine.py --base-dir . --interval 600 > logs/model_comparison.log 2>&1 &
-echo $! > .pids/model_comparison.pid
-
-nohup python3 monitoring/deployment_orchestrator.py --base-dir . --interval 600 > logs/deployment_orchestrator.log 2>&1 &
-echo $! > .pids/deployment_orchestrator.pid
-
-# Start training daemon (if not already running)
-ps aux | grep training_daemon | grep -v grep || \
-nohup python3 core/training_daemon.py --base-dir . > logs/training_output.log 2>&1 &
-```
-
-### Check System Status
-```bash
-# Check 4090 daemons
-ps aux | grep -E 'model_comparison|deployment_orchestrator|training_daemon|vault/server' | grep python
-
-# Check VaultKeeper
-curl http://localhost:8767/health | jq .
-curl http://localhost:8767/api/stats | jq .
-
-# Check 3090 server
-curl http://192.168.x.x:8765/health | jq .
-curl http://192.168.x.x:8765/models/info | jq .
-
-# Check deployment status
-cat status/deployment_status.json | jq '.[0]'
-```
-
-### Control Training
-```bash
-# Check status
-python3 core/training_controller.py status
-
-# Pause/resume/stop
-python3 core/training_controller.py pause
-python3 core/training_controller.py resume
-python3 core/training_controller.py stop
-```
-
-### Queue Management
-```bash
-# Add file to queue
-python3 core/training_queue.py add mydata.jsonl --priority high
-
-# Check queue status
+# Queue management
 python3 core/training_queue.py status
-python3 core/training_queue.py list
-```
-
-### Health Check
-```bash
-scripts/check_health.sh
-python3 safety/comprehensive_health_check.py
-python3 tools/analysis/state_tracker.py --check
-```
-
-### Important URLs
-
-**3090 Inference Server:**
-- Health: http://192.168.x.x:8765/health
-- Model Info: http://192.168.x.x:8765/models/info
-- Chat Completions: http://192.168.x.x:8765/v1/chat/completions (POST)
-
-**3090 GPU Task Scheduler:**
-- Health: http://192.168.x.x:8766/api/health
-- Metrics: http://192.168.x.x:8766/api/metrics
-- Submit Task: http://192.168.x.x:8766/api/tasks/submit (POST)
-- Task Types: http://192.168.x.x:8766/api/task-types
-
-**4090 VaultKeeper (NEW):**
-- Health: http://localhost:8767/health
-- Stats: http://localhost:8767/api/stats
-- Locate Asset: http://localhost:8767/api/locate/{asset_id}
-- List Checkpoints: http://localhost:8767/api/checkpoints
-- Search: http://localhost:8767/api/search?type=checkpoint
-
-**Synology NAS (192.168.x.x):**
-- Storage API: http://localhost:8081/api/storage (via unified API)
-- Storage Details: http://localhost:8081/api/storage/details
-- Credentials: `.secrets/synology.json`
-- Config: `config/storage.json`
-
-**4090 Status Files:**
-- Training: cat status/training_status.json
-- Comparisons: cat status/model_comparisons.json
-- Deployments: cat status/deployment_status.json
-- Storage: cat status/storage_status.json
-
----
-
-## 🔧 COMMON ISSUES
-
-### Training Daemon Not Running
-```bash
-# Check if running
-ps aux | grep training_daemon | grep -v grep
-
-# Restart if needed
-cd /path/to/training
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
-```
-
-### OOM (Out of Memory) Crashes
-**Symptoms:** Training crashes with CUDA OOM error
-
-**Common causes:**
-1. Batch size too high for available VRAM
-2. Multiple daemon processes running (check with `ps aux`)
-3. Eval step inference not clearing cache
-4. Model too large for GPU
-
-**Actions:**
-```bash
-# Check for multiple processes
-ps aux | grep "python3.*training_daemon" | grep -v grep
-
-# Kill all if multiple found
-pkill -f training_daemon
-sleep 3
-
-# Reduce batch size
-python3 tools/config/edit_config.py batch_size 16
-
-# Restart daemon
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
-```
-
-### Stuck Files in Queue
-**Check:**
-```bash
-ls -lh queue/processing/
-ls -lh queue/failed/
-```
-
-**Clear:**
-```bash
-# Move back to normal queue (ask user first!)
-mv queue/processing/* queue/normal/
-mv queue/failed/* queue/normal/
-```
-
----
-
-## 📊 VALIDATION & METRICS
-
-### Check Training Status
-```bash
-cat status/training_status.json | jq '{
-  step: .current_step,
-  train_loss: .loss,
-  val_loss: .validation_loss,
-  gap: .val_train_gap
-}'
-```
-
-### Interpret Metrics
-- **Train/Val Gap:**
-  - < 0.3: Generalizing well
-  - 0.3 - 0.5: Monitor closely
-  - > 0.5: Possible overfitting
-
-### Validate Data
-```bash
-python3 tools/data/validate_data.py --file my_data.jsonl
 ```
 
 ---
 
 ## 📝 NOTES FOR CLAUDE
 
-### System History
-- System reorganized 2025-11-22 (99 Python files → organized into 6 categories)
-- All old documentation deleted (16 .md files removed)
-- Fresh start - trust code as ground truth, not old docs
-
-### Current State
-1. ✅ Automated deployment working (Option C complete)
-2. ✅ Training running normally (step 156945+)
-3. ✅ 3090 serving trained model automatically
-4. Next: Monitor system stability over 24 hours
-
-### When in Doubt
 1. Run health check: `python3 safety/comprehensive_health_check.py`
-2. Check system state: `python3 tools/analysis/state_tracker.py --check`
-3. **ASK USER** before making changes
-4. **ASK USER** before creating new documentation
-
----
-
-## 🔄 UPDATE LOG
-
-**2025-11-24 (Option C Architecture):**
-- ✅ Enhanced 3090 server with /models/info and /models/reload
-- ✅ Created deployment_orchestrator.py (automated deployment)
-- ✅ Created prediction_client.py (standardized API client)
-- ✅ Moved monitoring to 4090 (comparison, orchestration)
-- ✅ Achieved automated deployment: < 15 min from checkpoint to serving
-- ✅ 3090 now serves trained model (was serving base model)
-- ✅ Complete system operational and tested
-- 📝 Documentation: OPTION_C_MIGRATION_STATUS.md
-
-**2025-11-22 (Late - Refactor Complete):**
-- ✅ Completed full 5-step refactor (~3 hours)
-- ✅ Created trainer/ module with 3-layer architecture
-- ✅ Extracted config system (8 dataclasses, type-safe)
-- ✅ Extracted emoji_think profile (emoji patterns + stop signals)
-- ✅ Created regime3 profile (symbolic reasoning) ⭐ NEW
-- ✅ Extracted monitoring system (callbacks + status writer)
-- ✅ Created TrainerEngine API (proof-of-concept)
-- ✅ 13/13 tests passing, 100% backward compatible
-- ✅ All pushed to GitHub with 6 git tags
-- **Production ready:** Can use new modules today or continue with core/train.py
-
-**2025-11-22 (Morning - Reorganization):**
-- Reorganized entire codebase (99 Python files → 6 categories)
-- Created 7 canonical documentation files
-- Removed all old documentation (96+ files)
-- Updated CLAUDE.md to reflect new structure
-- **Architecture decision:** Pure training module - all inference on remote RTX 3090
-- Added REMOTE_INFERENCE.md for remote server operations
-- System state: Fresh start, daemon not running, 3 files stuck in queue
-
----
-
-## 🤖 AUTONOMOUS SYSTEMS (Updated 2025-11-25)
-
-**Central GPU Task Scheduler + Coordinated Daemons**
-
-### RTX 3090 - GPU Task Scheduler (NEW)
-
-**Central Coordinator** - `monitoring/gpu_task_scheduler.py` (port 8766)
-- Monitors GPU utilization in real-time (target: 20-80%)
-- Priority queue: CRITICAL(0) → HIGH(1) → NORMAL(2) → LOW(3) → IDLE(4)
-- Auto-dispatches idle tasks when utilization < 20%
-- 11 task types available
-- API: http://192.168.x.x:8766/api/
-
-**Scheduler-Managed Daemons** (submit tasks to scheduler):
-
-1. **Self-Correction Loop** - `--use-scheduler` flag
-   - Validates data, captures errors, generates corrections
-   - Interval: 300s
-   - Task type: `self_correction`
-
-2. **Automated Testing Daemon** - `--use-scheduler` flag
-   - Runs validation suite against checkpoints
-   - Interval: 600s
-   - Task type: `automated_test`
-
-3. **Curriculum Eval Loop** - `--use-scheduler` flag
-   - Tests model against curriculum problems
-   - Task type: `curriculum_eval`
-
-**Direct Daemons** (run independently):
-
-4. **Inference Server** - `inference_server.py` (port 8765)
-   - Serves model for all inference requests
-   - Always running
-
-5. **Model Comparison Engine** - `model_comparison_engine.py`
-   - Ranks checkpoints by composite score
-   - Runs every 10 minutes
-
-### RTX 4090 Systems
-
-6. **Training Daemon** - `core/training_daemon.py`
-   - File watcher + training orchestrator
-   - Always running
-
-7. **Deployment Orchestrator** - `deployment_orchestrator.py`
-   - Auto-deploys best checkpoint to 3090
-   - Runs every 10 minutes
-
-8. **VaultKeeper Server** - `vault/server.py` (port 8767) **(NEW)**
-   - Central asset registry
-   - Tracks all checkpoints, models, data across devices
-   - Remote devices query this to locate/fetch assets
-   - Always running
-
-### Start All Systems
-
-```bash
-# 4090 - Start VaultKeeper first (asset registry)
-nohup python3 vault/server.py --port 8767 > logs/vault_keeper.log 2>&1 &
-
-# 4090 - Start local daemons
-nohup python3 monitoring/deployment_orchestrator.py --base-dir . --interval 600 > logs/deployment_orchestrator.log 2>&1 &
-
-# 3090 - Start scheduler first
-ssh 192.168.x.x "nohup python3 /path/to/training/monitoring/gpu_task_scheduler.py --port 8766 > logs/gpu_scheduler.log 2>&1 &"
-
-# 3090 - Start scheduler-aware daemons
-ssh 192.168.x.x "nohup python3 /path/to/training/monitoring/self_correction_loop.py --continuous --use-scheduler --interval 300 --base-dir /path/to/training > logs/self_correction.log 2>&1 &"
-ssh 192.168.x.x "nohup python3 /path/to/training/monitoring/automated_testing_daemon.py --use-scheduler --interval 600 --base-dir /path/to/training > logs/automated_testing.log 2>&1 &"
-```
-
-### Verify Systems
-
-```bash
-# Check scheduler health
-curl http://192.168.x.x:8766/api/health | jq .
-
-# Check scheduler metrics
-curl http://192.168.x.x:8766/api/metrics | jq .
-
-# Check 3090 processes
-ssh 192.168.x.x "ps aux | grep python3 | grep -E 'gpu_task|self_correction|automated_testing|inference' | grep -v grep"
-
-# Check 4090 processes
-ps aux | grep python3 | grep -E 'training_daemon|deployment_orchestrator' | grep -v grep
-```
-
-### System Outputs
-
-Status files in `status/`:
-- `self_correction.json` - Correction runs, error patterns
-- `automated_testing.json` - Validation results
-- `model_comparisons.json` - Checkpoint rankings
-- `deployment_status.json` - Latest deployments
-
+2. **ASK USER** before making changes
+3. **ASK USER** before creating new documentation
+4. Trust code as ground truth, not old docs

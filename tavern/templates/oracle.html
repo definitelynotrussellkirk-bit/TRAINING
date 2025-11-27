@@ -432,16 +432,31 @@
                     return;
                 }
 
-                list.innerHTML = data.checkpoints.map(cp => `
-                    <div class="checkpoint-item" data-step="${cp.step}" data-name="${cp.canonical_name}">
-                        <div class="step">Step ${cp.step.toLocaleString()}</div>
-                        <div class="stats">
-                            Loss: ${cp.train_loss ? cp.train_loss.toFixed(4) : '?'}
-                            ${cp.age_hours ? `| ${cp.age_hours}h ago` : ''}
+                list.innerHTML = data.checkpoints.map(cp => {
+                    if (cp.is_base) {
+                        return `
+                            <div class="checkpoint-item base-model" data-step="0" data-name="${cp.canonical_name}" data-path="${cp.path}">
+                                <div class="step">🏛️ ${cp.display_name || 'Base Model'}</div>
+                                <div class="stats">
+                                    ${cp.size_gb ? cp.size_gb + ' GB' : ''}
+                                    ${cp.hidden_size ? `| ${cp.hidden_size}d` : ''}
+                                    ${cp.num_layers ? `| ${cp.num_layers}L` : ''}
+                                </div>
+                                <span class="skill-badge" style="background: var(--text-muted);">Untrained</span>
+                            </div>
+                        `;
+                    }
+                    return `
+                        <div class="checkpoint-item" data-step="${cp.step}" data-name="${cp.canonical_name}">
+                            <div class="step">Step ${cp.step.toLocaleString()}</div>
+                            <div class="stats">
+                                Loss: ${cp.train_loss ? cp.train_loss.toFixed(4) : '?'}
+                                ${cp.age_hours ? `| ${cp.age_hours}h ago` : ''}
+                            </div>
+                            ${cp.skill_name ? `<span class="skill-badge">${cp.skill_name} L${cp.skill_level || '?'}</span>` : ''}
                         </div>
-                        ${cp.skill_name ? `<span class="skill-badge">${cp.skill_name} L${cp.skill_level || '?'}</span>` : ''}
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
 
                 // Click handlers
                 $$('.checkpoint-item').forEach(item => {

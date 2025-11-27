@@ -1,0 +1,81 @@
+{
+  "model_name": "qwen3_0.6b",
+  "model_display_name": "PURE BASE - Qwen3-0.6B (2025-11-22)",
+  "model_path": "/path/to/training/models/Qwen3-0.6B",
+  "current_model_dir": "/path/to/training/current_model",
+  "batch_size": 1,
+  "gradient_accumulation": 16,
+  "learning_rate": 0.0004,
+  "warmup_steps": 100,
+  "epochs": 1,
+  "load_in_4bit": false,
+  "log_steps": 200,
+  "eval_steps": 500,
+  "num_eval_samples": 2,
+  "save_steps": 10000,
+  "poll_interval": 30,
+  "snapshot_time": "03:00",
+  "max_length": 2048,
+  "base_model": "/path/to/training/models/Qwen3-0.6B",
+  "eval_max_tokens": 4096,
+  "eval_timeout_seconds": 120,
+  "self_correction": {
+    "enabled": true,
+    "auto_queue": true,
+    "max_examples": 200,
+    "generation_interval": null
+  },
+  "auto_generate": {
+    "enabled": true,
+    "_comment": "Quest Master maintains at least min_queue_depth items on Quest Board",
+    "count": 100,
+    "priority": "normal",
+    "threshold": 0,
+    "cooldown_sec": 180,
+    "host": "localhost",
+    "port": 8080,
+    "min_queue_depth": 2
+  },
+  "remote_eval": {
+    "enabled": true,
+    "host": "192.168.x.x",
+    "port": 8765,
+    "remote_user": "user",
+    "remote_models_dir": "/path/to/models",
+    "eval_dataset": "data/validation/eval_dataset.jsonl",
+    "eval_interval_steps": 5000,
+    "sync_checkpoints": true,
+    "metrics": [
+      "accuracy",
+      "loss"
+    ]
+  },
+  "curriculum": {
+    "enabled": true,
+    "target_accuracy": 0.75,
+    "current_skill": "syllo",
+    "progression_mode": "automatic"
+  },
+  "retention": {
+    "enabled": true,
+    "_comment": "Uses RetentionManager with 36h age rule and 150GB limit"
+  },
+  "_comment_refactor": "New fields for refactored architecture (2025-11-22)",
+  "profile": {
+    "name": "none"
+  },
+  "hyperparams": {
+    "fp_precision": "bf16",
+    "max_length": 2048,
+    "batch_size": 1,
+    "gradient_accumulation": 16,
+    "learning_rate": 0.0004,
+    "use_gradient_checkpointing": true
+  },
+  "locked": {
+    "base_model": "Qwen/Qwen3-0.6B",
+    "model_architecture": "Qwen3ForCausalLM",
+    "max_context_length": 4096,
+    "vocab_size": 151936
+  }
+}

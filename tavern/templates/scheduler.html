@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curriculum Scheduler - Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/game.css">
+    <style>
+        .scheduler-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .scheduler-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .scheduler-header h1 {
+            color: var(--accent);
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .scheduler-header .subtitle {
+            color: var(--text-muted);
+        }
+
+        /* Strategy Section */
+        .section {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            color: var(--accent);
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Preset Cards */
+        .presets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .preset-card {
+            padding: 15px;
+            background: var(--bg);
+            border: 2px solid var(--card-border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-card:hover {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .preset-card.active {
+            border-color: var(--success);
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        .preset-card .preset-name {
+            font-weight: bold;
+            color: var(--text);
+            margin-bottom: 5px;
+        }
+
+        .preset-card .preset-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .preset-card .preset-strategy {
+            font-size: 0.75rem;
+            color: var(--accent);
+            margin-top: 5px;
+        }
+
+        /* Skills Config */
+        .skills-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .skill-row {
+            display: grid;
+            grid-template-columns: 60px 1fr 100px 100px 100px;
+            gap: 15px;
+            align-items: center;
+            padding: 15px;
+            background: var(--bg);
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+        }
+
+        .skill-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .skill-toggle input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent);
+        }
+
+        .skill-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .skill-name {
+            font-weight: bold;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .skill-level {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .skill-input {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .skill-input label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .skill-input input, .skill-input select {
+            padding: 8px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            color: var(--text);
+            width: 100%;
+        }
+
+        /* Strategy Select */
+        .strategy-select {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .strategy-option {
+            padding: 10px 20px;
+            border: 2px solid var(--card-border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg);
+        }
+
+        .strategy-option:hover {
+            border-color: var(--accent);
+        }
+
+        .strategy-option.selected {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.2);
+        }
+
+        .strategy-option .name {
+            font-weight: bold;
+            color: var(--text);
+        }
+
+        .strategy-option .desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Next Decision Preview */
+        .next-decision {
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2));
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .next-decision .label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .next-decision .decision {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .next-decision .reason {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 10px;
+        }
+
+        /* Actions */
+        .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background: var(--card-bg);
+            color: var(--text);
+            border: 1px solid var(--card-border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg);
+        }
+
+        /* Status message */
+        .status-message {
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status-message.success {
+            display: block;
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4CAF50;
+            color: #4CAF50;
+        }
+
+        .status-message.error {
+            display: block;
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            color: #f44336;
+        }
+
+        /* Responsive */
+        @media (max-width: 800px) {
+            .skill-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">Realm of Training</a>
+        <div class="nav-links">
+            <a href="/">Game</a>
+            <a href="/vault">Vault</a>
+            <a href="/oracle">Oracle</a>
+            <a href="/scheduler" class="active">Scheduler</a>
+            <a href="/settings">Settings</a>
+        </div>
+    </nav>
+
+    <div class="scheduler-container">
+        <div class="scheduler-header">
+            <h1>Curriculum Scheduler</h1>
+            <p class="subtitle">Configure how DIO trains across skills</p>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <!-- Quick Presets -->
+        <div class="section">
+            <h2>Quick Presets</h2>
+            <div class="presets-grid" id="presetsGrid">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+
+        <!-- Next Decision Preview -->
+        <div class="section">
+            <h2>Next Training Batch</h2>
+            <div class="next-decision" id="nextDecision">
+                <div class="label">If queue is empty, will generate:</div>
+                <div class="decision" id="decisionText">Loading...</div>
+                <div class="reason" id="decisionReason"></div>
+            </div>
+        </div>
+
+        <!-- Strategy Selection -->
+        <div class="section">
+            <h2>Strategy</h2>
+            <div class="strategy-select" id="strategySelect">
+                <div class="strategy-option" data-strategy="equal">
+                    <div class="name">Equal</div>
+                    <div class="desc">Alternate between skills</div>
+                </div>
+                <div class="strategy-option" data-strategy="focus">
+                    <div class="name">Focus</div>
+                    <div class="desc">Complete one skill first</div>
+                </div>
+                <div class="strategy-option" data-strategy="weighted">
+                    <div class="name">Weighted</div>
+                    <div class="desc">Train by ratio</div>
+                </div>
+                <div class="strategy-option" data-strategy="lowest_first">
+                    <div class="name">Catch Up</div>
+                    <div class="desc">Focus on lowest level</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Skills Configuration -->
+        <div class="section">
+            <h2>Skills</h2>
+            <div class="skills-list" id="skillsList">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="loadStatus()">Reset</button>
+            <button class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
+        </div>
+    </div>
+
+    <script>
+        let currentStatus = null;
+
+        async function loadStatus() {
+            try {
+                const response = await fetch('/api/scheduler');
+                currentStatus = await response.json();
+                renderStatus(currentStatus);
+            } catch (error) {
+                showMessage('error', 'Failed to load scheduler status');
+            }
+        }
+
+        async function loadPresets() {
+            try {
+                const response = await fetch('/api/scheduler/presets');
+                const data = await response.json();
+                renderPresets(data.presets || []);
+            } catch (error) {
+                console.error('Failed to load presets:', error);
+            }
+        }
+
+        function renderStatus(status) {
+            // Update strategy selection
+            document.querySelectorAll('.strategy-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.strategy === status.strategy);
+            });
+
+            // Update next decision
+            if (status.next_decision) {
+                const d = status.next_decision;
+                document.getElementById('decisionText').textContent =
+                    `${d.skill_id.toUpperCase()} Level ${d.level} × ${d.count}`;
+                document.getElementById('decisionReason').textContent = d.reason;
+            }
+
+            // Update skills list
+            const skillsList = document.getElementById('skillsList');
+            skillsList.innerHTML = status.skills.map(skill => `
+                <div class="skill-row">
+                    <div class="skill-toggle">
+                        <input type="checkbox" id="skill_${skill.id}_enabled"
+                               ${skill.enabled ? 'checked' : ''}
+                               onchange="updateSkill('${skill.id}', 'enabled', this.checked)">
+                    </div>
+                    <div class="skill-info">
+                        <div class="skill-name">
+                            ${skill.id === 'sy' ? '🧩' : '🔢'} ${skill.id.toUpperCase()}
+                        </div>
+                        <div class="skill-level">
+                            Level ${skill.current_level} / ${skill.max_level}
+                            ${skill.current_level >= skill.max_level ? '✅ Mastered' : ''}
+                        </div>
+                    </div>
+                    <div class="skill-input">
+                        <label>Priority</label>
+                        <input type="number" min="1" max="99" value="${skill.priority}"
+                               onchange="updateSkill('${skill.id}', 'priority', parseInt(this.value))">
+                    </div>
+                    <div class="skill-input">
+                        <label>Weight</label>
+                        <input type="number" min="0" max="10" step="0.5" value="${skill.weight}"
+                               onchange="updateSkill('${skill.id}', 'weight', parseFloat(this.value))">
+                    </div>
+                    <div class="skill-input">
+                        <label>Generated</label>
+                        <div style="padding: 8px; color: var(--text-muted);">
+                            ${skill.examples_generated.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderPresets(presets) {
+            const grid = document.getElementById('presetsGrid');
+            grid.innerHTML = presets.map(preset => `
+                <div class="preset-card" onclick="applyPreset('${preset.id}')">
+                    <div class="preset-name">${preset.id.replace(/_/g, ' ').toUpperCase()}</div>
+                    <div class="preset-desc">${preset.description}</div>
+                    ${preset.strategy ? `<div class="preset-strategy">Strategy: ${preset.strategy}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function updateSkill(skillId, field, value) {
+            // Update local state
+            const skill = currentStatus.skills.find(s => s.id === skillId);
+            if (skill) {
+                skill[field] = value;
+            }
+        }
+
+        async function applyPreset(presetId) {
+            try {
+                const response = await fetch('/api/scheduler/preset', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({preset: presetId})
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('success', `Applied preset: ${presetId}`);
+                    currentStatus = data.status;
+                    renderStatus(currentStatus);
+                } else {
+                    showMessage('error', data.error || 'Failed to apply preset');
+                }
+            } catch (error) {
+                showMessage('error', 'Failed to apply preset');
+            }
+        }
+
+        async function saveConfig() {
+            try {
+                // Build config from current state
+                const config = {
+                    strategy: document.querySelector('.strategy-option.selected')?.dataset.strategy || 'equal',
+                    skills: {}
+                };
+
+                currentStatus.skills.forEach(skill => {
+                    config.skills[skill.id] = {
+                        enabled: skill.enabled,
+                        priority: skill.priority,
+                        weight: skill.weight,
+                    };
+                });
+
+                const response = await fetch('/api/scheduler/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('success', 'Configuration saved');
+                    loadStatus(); // Refresh
+                } else {
+                    showMessage('error', data.error || 'Failed to save');
+                }
+            } catch (error) {
+                showMessage('error', 'Failed to save configuration');
+            }
+        }
+
+        function showMessage(type, text) {
+            const el = document.getElementById('statusMessage');
+            el.className = `status-message ${type}`;
+            el.textContent = text;
+            setTimeout(() => el.className = 'status-message', 3000);
+        }
+
+        // Strategy selection
+        document.querySelectorAll('.strategy-option').forEach(el => {
+            el.addEventListener('click', () => {
+                document.querySelectorAll('.strategy-option').forEach(e => e.classList.remove('selected'));
+                el.classList.add('selected');
+            });
+        });
+
+        // Initialize
+        loadStatus();
+        loadPresets();
+    </script>
+</body>
+</html>

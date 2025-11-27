@@ -54,6 +54,35 @@ from core.passives import (
 )
 
 
+def to_chat_problem(prompt: str, expected: str, metadata: dict = None) -> dict:
+    """Convert prompt/expected to chat messages format."""
+    problem = {
+        "messages": [
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": expected},
+        ]
+    }
+    if metadata:
+        problem["metadata"] = metadata
+    return problem
+
+
+def extract_prompt_expected(problem: dict) -> tuple:
+    """Extract prompt and expected from either format.
+
+    Handles:
+    - Chat format: {"messages": [{"role": "user", ...}, {"role": "assistant", ...}]}
+    - Legacy format: {"prompt": ..., "expected": ...}
+    """
+    if "messages" in problem:
+        messages = problem["messages"]
+        prompt = next((m["content"] for m in messages if m.get("role") == "user"), "")
+        expected = next((m["content"] for m in messages if m.get("role") == "assistant"), "")
+        return prompt, expected
+    else:
+        return problem.get("prompt", ""), problem.get("expected", "")
+
+
 class EvalRunner:
     """
     Runs evaluations against checkpoints.
@@ -74,6 +103,33 @@ class EvalRunner:
 
         # Load validation sets
         self.validation_dir = self.base_dir / "data" / "validation"
+
+        # Load API key for inference server
+        self.api_key = self._load_api_key()
+
+        # Track currently loaded model
+        self._current_model_id: Optional[str] = None
+
+    def _load_api_key(self) -> Optional[str]:
+        """Load inference API key from secrets file or environment."""
+        import os
+
+        # Try environment variable first
+        key = os.environ.get("INFERENCE_ADMIN_KEY", "")
+        if key:
+            return key
+
+        # Try secrets file
+        secrets_file = self.base_dir / ".secrets" / "inference.json"
+        if secrets_file.exists():
+            try:
+                with open(secrets_file) as f:
+                    secrets = json.load(f)
+                return secrets.get("admin_key", "")
+            except Exception as e:
+                logger.warning(f"Failed to load inference secrets: {e}")
+
+        return None
 
     def run_skill_evaluation(self, checkpoint_step: int, skill: str, level: int) -> Optional[EvalRecord]:
         """
@@ -123,8 +179,7 @@ class EvalRunner:
         results = []
 
         for i, problem in enumerate(problems):
-            prompt = problem.get("prompt", "")
-            expected = problem.get("expected", "")
+            prompt, expected = extract_prompt_expected(problem)
 
             # Get model response
             response = self._get_model_response(prompt)
@@ -228,8 +283,7 @@ class EvalRunner:
         results = []
 
         for i, problem in enumerate(problems):
-            prompt = problem.get("prompt", "")
-            expected = problem.get("expected", "")
+            prompt, expected = extract_prompt_expected(problem)
 
             response = self._get_model_response(prompt)
             if response is None:
@@ -298,8 +352,7 @@ class EvalRunner:
         correct = 0
         results = []
         for i, problem in enumerate(problems):
-            prompt = problem.get("prompt", "")
-            expected = problem.get("expected", "")
+            prompt, expected = extract_prompt_expected(problem)
             response = self._get_model_response(prompt)
 
             if response is None:
@@ -331,6 +384,11 @@ class EvalRunner:
     def _load_checkpoint(self, checkpoint_step: int) -> bool:
         """Load checkpoint on inference server using Ledger as source of truth."""
         import requests
+        import subprocess
+
+        # Remote server config (3090)
+        remote_host = "192.168.x.x"
+        remote_models_dir = "/path/to/models"
 
         # Use the Checkpoint Ledger to find the path (single source of truth!)
         try:
@@ -342,9 +400,9 @@ class EvalRunner:
                 logger.error(f"Checkpoint {checkpoint_step} not in ledger")
                 return False
 
-            checkpoint_path = record.path
-            if not Path(checkpoint_path).exists():
-                logger.error(f"Checkpoint path from ledger doesn't exist: {checkpoint_path}")
+            local_path = record.path
+            if not Path(local_path).exists():
+                logger.error(f"Checkpoint path from ledger doesn't exist: {local_path}")
                 return False
 
             logger.info(f"Loading {record.canonical_name} from ledger")
@@ -357,15 +415,61 @@ class EvalRunner:
             if not checkpoint_dirs:
                 logger.error(f"Checkpoint directory not found for step {checkpoint_step}")
                 return False
-            checkpoint_path = str(checkpoint_dirs[0])
+            local_path = str(checkpoint_dirs[0])
 
+        # Remote path uses simple name (checkpoint-{step})
+        checkpoint_name = f"checkpoint-{checkpoint_step}"
+        remote_path = f"{remote_models_dir}/{checkpoint_name}"
+
+        # Check if checkpoint exists on remote, if not sync it
         try:
+            check_result = subprocess.run(
+                ["ssh", remote_host, f"test -d {remote_path} && echo exists"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            checkpoint_exists = "exists" in check_result.stdout
+        except Exception as e:
+            logger.warning(f"Failed to check remote checkpoint: {e}")
+            checkpoint_exists = False
+
+        if not checkpoint_exists:
+            logger.info(f"Syncing checkpoint-{checkpoint_step} to {remote_host}...")
+            try:
+                sync_cmd = [
+                    "rsync", "-avz", "--delete", "--checksum",
+                    str(local_path) + "/",
+                    f"{remote_host}:{remote_path}/"
+                ]
+                sync_result = subprocess.run(
+                    sync_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minute timeout for sync
+                )
+                if sync_result.returncode != 0:
+                    logger.error(f"Sync failed: {sync_result.stderr}")
+                    return False
+                logger.info(f"Sync completed for checkpoint-{checkpoint_step}")
+            except Exception as e:
+                logger.error(f"Sync error: {e}")
+                return False
+
+        # Load checkpoint on inference server using remote path
+        try:
+            headers = {}
+            if self.api_key:
+                headers["X-API-Key"] = self.api_key
+
             response = requests.post(
                 f"{self.inference_url}/models/reload",
-                json={"model_path": checkpoint_path},
+                json={"model_path": remote_path},
+                headers=headers,
                 timeout=120,
             )
             if response.status_code == 200:
+                self._current_model_id = checkpoint_name
                 logger.info(f"Loaded checkpoint-{checkpoint_step}")
                 return True
             else:
@@ -379,15 +483,24 @@ class EvalRunner:
         """Get response from inference server."""
         import requests
 
+        if not self._current_model_id:
+            logger.error("No model loaded")
+            return None
+
         try:
+            headers = {}
+            if self.api_key:
+                headers["X-API-Key"] = self.api_key
+
             response = requests.post(
                 f"{self.inference_url}/v1/chat/completions",
                 json={
-                    "model": "current",
+                    "model": self._current_model_id,
                     "messages": [{"role": "user", "content": prompt}],
                     "max_tokens": 512,
                     "temperature": 0,  # Deterministic for evaluation
                 },
+                headers=headers,
                 timeout=60,
             )
 
@@ -479,10 +592,11 @@ class EvalRunner:
                     result = a - b
                 else:
                     result = a * b
-                problems.append({
-                    "prompt": f"Calculate: {a} {op} {b} = ?",
-                    "expected": str(result),
-                })
+                problems.append(to_chat_problem(
+                    f"Calculate: {a} {op} {b} = ?",
+                    str(result),
+                    {"passive": passive_id}
+                ))
 
         elif passive_id == "instruction_following":
             # Simple instruction following
@@ -494,7 +608,7 @@ class EvalRunner:
                 ("What is the opposite of hot?", "cold"),
             ]
             for prompt, expected in instructions[:count]:
-                problems.append({"prompt": prompt, "expected": expected})
+                problems.append(to_chat_problem(prompt, expected, {"passive": passive_id}))
 
         elif passive_id == "common_sense":
             # Common sense questions
@@ -506,7 +620,7 @@ class EvalRunner:
                 ("Which is the largest ocean? A) Atlantic B) Indian C) Pacific D) Arctic", "C"),
             ]
             for prompt, expected in questions[:count]:
-                problems.append({"prompt": prompt, "expected": expected})
+                problems.append(to_chat_problem(prompt, expected, {"passive": passive_id}))
 
         elif passive_id == "word_problems":
             word_problems = [
@@ -517,7 +631,7 @@ class EvalRunner:
                 ("There are 24 hours in a day. How many hours in 2 days?", "48"),
             ]
             for prompt, expected in word_problems[:count]:
-                problems.append({"prompt": prompt, "expected": expected})
+                problems.append(to_chat_problem(prompt, expected, {"passive": passive_id}))
 
         elif passive_id == "text_completion":
             completions = [
@@ -528,7 +642,7 @@ class EvalRunner:
                 ("The opposite of up is ___", "down"),
             ]
             for prompt, expected in completions[:count]:
-                problems.append({"prompt": prompt, "expected": expected})
+                problems.append(to_chat_problem(prompt, expected, {"passive": passive_id}))
 
         return problems
 

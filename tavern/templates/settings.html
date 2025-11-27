@@ -318,6 +318,351 @@
         .defaults-status.error {
             color: var(--color-danger);
         }
+
+        /* Scheduler Styles */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .preset-card {
+            padding: 0.75rem;
+            background: var(--bg-dark);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .preset-card:hover {
+            border-color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .preset-card.active {
+            border-color: var(--color-success);
+            background: rgba(76, 175, 80, 0.15);
+        }
+
+        .preset-card .preset-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .preset-card .preset-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .strategy-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+        }
+
+        .strategy-card {
+            padding: 1rem;
+            background: var(--bg-dark);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .strategy-card:hover {
+            border-color: var(--color-gold);
+        }
+
+        .strategy-card.selected {
+            border-color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.2);
+        }
+
+        .strategy-card .strategy-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .strategy-card .strategy-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .skill-configs {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .skill-config-card {
+            display: grid;
+            grid-template-columns: 50px 1fr repeat(3, 90px);
+            gap: 1rem;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .skill-config-card.disabled {
+            opacity: 0.5;
+        }
+
+        .skill-toggle-box {
+            display: flex;
+            justify-content: center;
+        }
+
+        .skill-info-box {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .skill-info-box .skill-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .skill-info-box .skill-level-info {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .skill-info-box .skill-level-info .mastered {
+            color: var(--color-success);
+        }
+
+        .skill-input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .skill-input-group label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+        }
+
+        .skill-input-group input {
+            padding: 0.4rem 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            width: 100%;
+        }
+
+        .next-decision-box {
+            padding: 1.25rem;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(59, 130, 246, 0.15));
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border-gold);
+        }
+
+        .next-decision-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .next-decision-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-gold);
+            font-family: var(--font-display);
+        }
+
+        .next-decision-reason {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        @media (max-width: 800px) {
+            .strategy-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .skill-config-card {
+                grid-template-columns: 1fr;
+                gap: 0.75rem;
+            }
+        }
+
+        /* VRAM Calculator Styles */
+        .vram-calculator {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-top: 1rem;
+        }
+
+        .vram-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .vram-header h4 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .vram-total {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+
+        .vram-total.safe {
+            color: var(--color-success);
+        }
+
+        .vram-total.warning {
+            color: var(--color-warning);
+        }
+
+        .vram-total.danger {
+            color: var(--color-danger);
+        }
+
+        .vram-bar-container {
+            background: var(--bg-dark);
+            border-radius: 8px;
+            height: 24px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .vram-bar {
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+        }
+
+        .vram-segment {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .vram-segment.model { background: #3B82F6; }
+        .vram-segment.optimizer { background: #8B5CF6; }
+        .vram-segment.gradients { background: #EC4899; }
+        .vram-segment.activations { background: #F59E0B; }
+
+        .vram-gpu-limit {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--color-danger);
+            z-index: 10;
+        }
+
+        .vram-gpu-label {
+            position: absolute;
+            top: -18px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            transform: translateX(-50%);
+        }
+
+        .vram-breakdown {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .vram-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .vram-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .vram-dot.model { background: #3B82F6; }
+        .vram-dot.optimizer { background: #8B5CF6; }
+        .vram-dot.gradients { background: #EC4899; }
+        .vram-dot.activations { background: #F59E0B; }
+
+        .vram-item-label {
+            color: var(--text-muted);
+            flex: 1;
+        }
+
+        .vram-item-value {
+            font-family: var(--font-mono);
+            color: var(--text-primary);
+        }
+
+        .vram-gpu-select {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .vram-gpu-btn {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.8rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .vram-gpu-btn:hover {
+            border-color: var(--color-gold);
+        }
+
+        .vram-gpu-btn.active {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: var(--color-gold);
+            color: var(--text-primary);
+        }
+
+        .vram-tip {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            background: var(--bg-dark);
+            border-radius: 4px;
+        }
+
+        .vram-tip strong {
+            color: var(--color-gold);
+        }
     </style>
 </head>
 <body>
@@ -430,6 +775,59 @@
                         </div>
                         <div class="settings-toggle" id="use_gradient_checkpointing" onclick="toggleSetting(this)"></div>
                     </div>
+
+                    <!-- VRAM Calculator -->
+                    <div class="vram-calculator" id="vramCalculator">
+                        <div class="vram-header">
+                            <h4>📊 Estimated VRAM Usage</h4>
+                            <div class="vram-total" id="vramTotal">-- GB</div>
+                        </div>
+
+                        <div class="vram-bar-container">
+                            <div class="vram-bar" id="vramBar">
+                                <div class="vram-segment model" id="vramModel"></div>
+                                <div class="vram-segment optimizer" id="vramOptimizer"></div>
+                                <div class="vram-segment gradients" id="vramGradients"></div>
+                                <div class="vram-segment activations" id="vramActivations"></div>
+                            </div>
+                            <div class="vram-gpu-limit" id="vramLimit" style="left: 100%;">
+                                <span class="vram-gpu-label" id="vramLimitLabel">24GB</span>
+                            </div>
+                        </div>
+
+                        <div class="vram-breakdown">
+                            <div class="vram-item">
+                                <div class="vram-dot model"></div>
+                                <span class="vram-item-label">Model Weights</span>
+                                <span class="vram-item-value" id="vramModelVal">--</span>
+                            </div>
+                            <div class="vram-item">
+                                <div class="vram-dot optimizer"></div>
+                                <span class="vram-item-label">Optimizer States</span>
+                                <span class="vram-item-value" id="vramOptimizerVal">--</span>
+                            </div>
+                            <div class="vram-item">
+                                <div class="vram-dot gradients"></div>
+                                <span class="vram-item-label">Gradients</span>
+                                <span class="vram-item-value" id="vramGradientsVal">--</span>
+                            </div>
+                            <div class="vram-item">
+                                <div class="vram-dot activations"></div>
+                                <span class="vram-item-label">Activations</span>
+                                <span class="vram-item-value" id="vramActivationsVal">--</span>
+                            </div>
+                        </div>
+
+                        <div class="vram-gpu-select">
+                            <span style="color: var(--text-muted); font-size: 0.8rem; margin-right: 0.5rem;">GPU:</span>
+                            <button class="vram-gpu-btn active" data-vram="24" onclick="setGpuVram(24)">RTX 4090 (24GB)</button>
+                            <button class="vram-gpu-btn" data-vram="24" onclick="setGpuVram(24)">RTX 3090 (24GB)</button>
+                            <button class="vram-gpu-btn" data-vram="16" onclick="setGpuVram(16)">RTX 4080 (16GB)</button>
+                            <button class="vram-gpu-btn" data-vram="12" onclick="setGpuVram(12)">RTX 4070 (12GB)</button>
+                        </div>
+
+                        <div class="vram-tip" id="vramTip"></div>
+                    </div>
                 </div>
 
                 <div class="settings-group">
@@ -530,41 +928,92 @@
 
             <!-- CURRICULUM SECTION -->
             <section class="settings-section" id="section-curriculum">
-                <h2>📚 Curriculum</h2>
+                <h2>📚 Curriculum & Scheduler</h2>
 
+                <!-- Quick Presets -->
+                <div class="settings-group">
+                    <h3>Quick Presets</h3>
+                    <div class="preset-grid" id="schedulerPresets">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+
+                <!-- Next Decision Preview -->
+                <div class="settings-group">
+                    <h3>Next Training Batch</h3>
+                    <div class="next-decision-box" id="nextDecisionBox">
+                        <div class="next-decision-label">If queue is empty, will generate:</div>
+                        <div class="next-decision-value" id="nextDecisionValue">Loading...</div>
+                        <div class="next-decision-reason" id="nextDecisionReason"></div>
+                    </div>
+                </div>
+
+                <!-- Strategy Selection -->
+                <div class="settings-group">
+                    <h3>Scheduling Strategy</h3>
+                    <div class="strategy-grid" id="strategyGrid">
+                        <div class="strategy-card" data-strategy="equal">
+                            <div class="strategy-name">Equal</div>
+                            <div class="strategy-desc">Alternate between skills</div>
+                        </div>
+                        <div class="strategy-card" data-strategy="focus">
+                            <div class="strategy-name">Focus</div>
+                            <div class="strategy-desc">Complete one skill first</div>
+                        </div>
+                        <div class="strategy-card" data-strategy="weighted">
+                            <div class="strategy-name">Weighted</div>
+                            <div class="strategy-desc">Train by ratio</div>
+                        </div>
+                        <div class="strategy-card" data-strategy="lowest_first">
+                            <div class="strategy-name">Catch Up</div>
+                            <div class="strategy-desc">Focus on lowest level</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Per-Skill Configuration -->
+                <div class="settings-group">
+                    <h3>Skill Configuration</h3>
+                    <div class="skill-configs" id="skillConfigs">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+
+                <!-- Progression Settings -->
                 <div class="settings-group">
                     <h3>Progression</h3>
 
                     <div class="settings-row">
-                        <div class="settings-label">Enabled</div>
+                        <div class="settings-label">Auto-Progression</div>
                         <div class="settings-toggle" id="curriculum_enabled" onclick="toggleSetting(this)"></div>
                     </div>
 
                     <div class="settings-row">
                         <div class="settings-label">
                             Target Accuracy
-                            <small>Required to level up</small>
+                            <small>Required to level up (80% = 0.8)</small>
                         </div>
-                        <input type="number" class="settings-input" id="curriculum_target" min="0.5" max="1.0" step="0.05" value="0.75">
+                        <input type="number" class="settings-input" id="curriculum_target" min="0.5" max="1.0" step="0.05" value="0.80">
                     </div>
 
                     <div class="settings-row">
-                        <div class="settings-label">Current Skill</div>
-                        <select class="settings-select" id="curriculum_skill">
-                            <option value="binary">Binary (BIN)</option>
-                            <option value="syllo">Syllacrostic (SY)</option>
-                        </select>
+                        <div class="settings-label">
+                            Advancement Evals
+                            <small>Consecutive passes needed</small>
+                        </div>
+                        <input type="number" class="settings-input" id="advancement_evals" min="1" max="10" value="3">
                     </div>
 
                     <div class="settings-row">
-                        <div class="settings-label">Progression Mode</div>
-                        <select class="settings-select" id="curriculum_mode">
-                            <option value="automatic">Automatic</option>
-                            <option value="manual">Manual</option>
-                        </select>
+                        <div class="settings-label">
+                            Batch Size
+                            <small>Examples per generation</small>
+                        </div>
+                        <input type="number" class="settings-input" id="scheduler_batch_size" min="10" max="500" value="100">
                     </div>
                 </div>
 
+                <!-- Retention Settings -->
                 <div class="settings-group">
                     <h3>Retention</h3>
 
@@ -700,7 +1149,7 @@
             <span class="nav-icon">🏰</span>
             <span class="nav-label">Guild</span>
         </button>
-        <button class="nav-btn" data-view="quests">
+        <button class="nav-btn" onclick="window.location.href='/quests'">
             <span class="nav-icon">📜</span>
             <span class="nav-label">Quests</span>
         </button>
@@ -803,9 +1252,7 @@
 
             // Curriculum
             setToggle('#curriculum_enabled', config.curriculum?.enabled);
-            $('#curriculum_target').value = config.curriculum?.target_accuracy || 0.75;
-            $('#curriculum_skill').value = config.curriculum?.current_skill || 'binary';
-            $('#curriculum_mode').value = config.curriculum?.progression_mode || 'automatic';
+            $('#curriculum_target').value = config.curriculum?.target_accuracy || 0.80;
 
             // Retention
             setToggle('#retention_enabled', config.retention?.enabled);
@@ -913,8 +1360,6 @@
             config.curriculum = config.curriculum || {};
             config.curriculum.enabled = getToggle('#curriculum_enabled');
             config.curriculum.target_accuracy = parseFloat($('#curriculum_target').value);
-            config.curriculum.current_skill = $('#curriculum_skill').value;
-            config.curriculum.progression_mode = $('#curriculum_mode').value;
 
             // Retention
             config.retention = config.retention || {};
@@ -1032,8 +1477,380 @@
             }
         }
 
+        // ============================================
+        // VRAM CALCULATOR
+        // ============================================
+
+        // Model specs for Qwen3-0.6B
+        const MODEL_PARAMS = 620_000_000;  // ~620M parameters
+        const HIDDEN_DIM = 1024;
+        const NUM_LAYERS = 28;
+        const NUM_HEADS = 16;
+
+        let selectedGpuVram = 24;  // GB
+
+        function calculateVram() {
+            const batchSize = parseInt($('#batch_size')?.value) || 1;
+            const maxLength = parseInt($('#max_length')?.value) || 2048;
+            const precision = $('#fp_precision')?.value || 'bf16';
+            const gradCheckpoint = $('#use_gradient_checkpointing')?.classList.contains('active') || false;
+
+            // Bytes per parameter based on precision
+            const bytesPerParam = {
+                'bf16': 2,
+                'fp16': 2,
+                'fp32': 4
+            }[precision] || 2;
+
+            // 1. Model Weights (in bytes)
+            const modelWeights = MODEL_PARAMS * bytesPerParam;
+
+            // 2. Optimizer States (AdamW: momentum + variance, always fp32)
+            const optimizerStates = MODEL_PARAMS * 4 * 2;  // 2 states × 4 bytes each
+
+            // 3. Gradients (same precision as model)
+            const gradients = MODEL_PARAMS * bytesPerParam;
+
+            // 4. Activations (the complex part)
+            // Simplified formula: batch × seq × hidden × layers × factor
+            // Factor accounts for attention scores, intermediate activations, etc.
+            let activationFactor = 34;  // Empirical factor for transformer training
+            if (gradCheckpoint) {
+                // Gradient checkpointing reduces activation memory by ~sqrt(layers)
+                activationFactor = activationFactor / Math.sqrt(NUM_LAYERS);
+            }
+            const activations = batchSize * maxLength * HIDDEN_DIM * NUM_LAYERS * bytesPerParam * activationFactor / NUM_LAYERS;
+
+            // Convert to GB
+            const toGB = (bytes) => bytes / (1024 ** 3);
+
+            const modelGB = toGB(modelWeights);
+            const optimizerGB = toGB(optimizerStates);
+            const gradientsGB = toGB(gradients);
+            const activationsGB = toGB(activations);
+            const totalGB = modelGB + optimizerGB + gradientsGB + activationsGB;
+
+            // Update UI
+            updateVramUI({
+                model: modelGB,
+                optimizer: optimizerGB,
+                gradients: gradientsGB,
+                activations: activationsGB,
+                total: totalGB
+            });
+        }
+
+        function updateVramUI(vram) {
+            const total = vram.total;
+            const maxDisplay = Math.max(selectedGpuVram * 1.2, total * 1.1);
+
+            // Update total display
+            const totalEl = $('#vramTotal');
+            totalEl.textContent = `${total.toFixed(1)} GB`;
+            totalEl.className = 'vram-total';
+            if (total <= selectedGpuVram * 0.7) {
+                totalEl.classList.add('safe');
+            } else if (total <= selectedGpuVram * 0.9) {
+                totalEl.classList.add('warning');
+            } else {
+                totalEl.classList.add('danger');
+            }
+
+            // Update bar segments
+            const pct = (val) => `${(val / maxDisplay * 100).toFixed(1)}%`;
+            $('#vramModel').style.width = pct(vram.model);
+            $('#vramOptimizer').style.width = pct(vram.optimizer);
+            $('#vramGradients').style.width = pct(vram.gradients);
+            $('#vramActivations').style.width = pct(vram.activations);
+
+            // Update GPU limit marker
+            const limitPct = (selectedGpuVram / maxDisplay * 100);
+            $('#vramLimit').style.left = `${limitPct}%`;
+            $('#vramLimitLabel').textContent = `${selectedGpuVram}GB`;
+
+            // Update breakdown values
+            setText('#vramModelVal', `${vram.model.toFixed(2)} GB`);
+            setText('#vramOptimizerVal', `${vram.optimizer.toFixed(2)} GB`);
+            setText('#vramGradientsVal', `${vram.gradients.toFixed(2)} GB`);
+            setText('#vramActivationsVal', `${vram.activations.toFixed(2)} GB`);
+
+            // Update tip
+            updateVramTip(vram.total);
+        }
+
+        function updateVramTip(totalGB) {
+            const tipEl = $('#vramTip');
+            const headroom = selectedGpuVram - totalGB;
+            const gradCheckpoint = $('#use_gradient_checkpointing')?.classList.contains('active');
+            const batchSize = parseInt($('#batch_size')?.value) || 1;
+
+            if (totalGB > selectedGpuVram) {
+                const suggestions = [];
+                if (!gradCheckpoint) suggestions.push('enable gradient checkpointing');
+                if (batchSize > 1) suggestions.push('reduce batch size');
+                suggestions.push('reduce max length');
+
+                tipEl.innerHTML = `<strong>⚠️ Over limit!</strong> Try: ${suggestions.join(', ')}`;
+            } else if (headroom < 2) {
+                tipEl.innerHTML = `<strong>⚡ Tight fit.</strong> Leave ~2GB headroom for CUDA kernels and peaks.`;
+            } else if (headroom > 8 && batchSize < 4) {
+                tipEl.innerHTML = `<strong>💡 Room to spare.</strong> Consider increasing batch size for faster training.`;
+            } else {
+                tipEl.innerHTML = `<strong>✓ Good fit.</strong> ~${headroom.toFixed(1)}GB headroom available.`;
+            }
+        }
+
+        function setGpuVram(vram) {
+            selectedGpuVram = vram;
+            $$('.vram-gpu-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.vram) === vram && btn.textContent.includes(vram + 'GB'));
+            });
+            // Re-highlight the clicked one specifically
+            event.target.classList.add('active');
+            calculateVram();
+        }
+
+        // Hook VRAM calculation to input changes
+        function hookVramCalculator() {
+            ['batch_size', 'max_length', 'fp_precision'].forEach(id => {
+                const el = $(`#${id}`);
+                if (el) {
+                    el.addEventListener('input', calculateVram);
+                    el.addEventListener('change', calculateVram);
+                }
+            });
+
+            // Also recalculate when gradient checkpointing is toggled
+            const origToggle = window.toggleSetting;
+            window.toggleSetting = function(el) {
+                origToggle(el);
+                if (el.id === 'use_gradient_checkpointing') {
+                    calculateVram();
+                }
+            };
+        }
+
+        // ============================================
+        // SCHEDULER FUNCTIONALITY
+        // ============================================
+
+        let schedulerStatus = null;
+        let schedulerPresets = [];
+
+        async function loadScheduler() {
+            try {
+                // Load status and presets in parallel
+                const [statusRes, presetsRes] = await Promise.all([
+                    fetch('/api/scheduler'),
+                    fetch('/api/scheduler/presets')
+                ]);
+
+                schedulerStatus = await statusRes.json();
+                const presetsData = await presetsRes.json();
+                schedulerPresets = presetsData.presets || [];
+
+                renderSchedulerUI();
+            } catch (error) {
+                console.error('Failed to load scheduler:', error);
+            }
+        }
+
+        function renderSchedulerUI() {
+            renderPresets();
+            renderStrategy();
+            renderSkillConfigs();
+            renderNextDecision();
+        }
+
+        function renderPresets() {
+            const container = $('#schedulerPresets');
+            if (!container || !schedulerPresets.length) return;
+
+            container.innerHTML = schedulerPresets.map(preset => `
+                <div class="preset-card" data-preset="${preset.id}" onclick="applyPreset('${preset.id}')">
+                    <div class="preset-name">${formatPresetName(preset.id)}</div>
+                    <div class="preset-desc">${preset.description || ''}</div>
+                </div>
+            `).join('');
+        }
+
+        function formatPresetName(id) {
+            return id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        function renderStrategy() {
+            if (!schedulerStatus) return;
+
+            $$('.strategy-card').forEach(card => {
+                card.classList.toggle('selected', card.dataset.strategy === schedulerStatus.strategy);
+            });
+
+            // Add click handlers
+            $$('.strategy-card').forEach(card => {
+                card.onclick = () => {
+                    $$('.strategy-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    checkForChanges();
+                };
+            });
+        }
+
+        function renderSkillConfigs() {
+            const container = $('#skillConfigs');
+            if (!container || !schedulerStatus?.skills) return;
+
+            const icons = { sy: '🧩', bin: '🔢' };
+
+            container.innerHTML = schedulerStatus.skills.map(skill => `
+                <div class="skill-config-card ${skill.enabled ? '' : 'disabled'}" data-skill="${skill.id}">
+                    <div class="skill-toggle-box">
+                        <div class="settings-toggle ${skill.enabled ? 'active' : ''}"
+                             id="skill_${skill.id}_enabled"
+                             onclick="toggleSkillEnabled('${skill.id}', this)"></div>
+                    </div>
+                    <div class="skill-info-box">
+                        <div class="skill-name">
+                            ${icons[skill.id] || '⚡'} ${skill.id.toUpperCase()}
+                        </div>
+                        <div class="skill-level-info">
+                            Level ${skill.current_level} / ${skill.max_level}
+                            ${skill.current_level >= skill.max_level ? '<span class="mastered">✓ Mastered</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="skill-input-group">
+                        <label>Priority</label>
+                        <input type="number" min="1" max="99" value="${skill.priority}"
+                               id="skill_${skill.id}_priority"
+                               onchange="checkForChanges()">
+                    </div>
+                    <div class="skill-input-group">
+                        <label>Weight</label>
+                        <input type="number" min="0" max="10" step="0.5" value="${skill.weight}"
+                               id="skill_${skill.id}_weight"
+                               onchange="checkForChanges()">
+                    </div>
+                    <div class="skill-input-group">
+                        <label>Generated</label>
+                        <input type="text" value="${skill.examples_generated.toLocaleString()}" disabled
+                               style="color: var(--text-muted);">
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleSkillEnabled(skillId, el) {
+            el.classList.toggle('active');
+            const card = el.closest('.skill-config-card');
+            card.classList.toggle('disabled', !el.classList.contains('active'));
+            checkForChanges();
+        }
+
+        function renderNextDecision() {
+            if (!schedulerStatus?.next_decision) return;
+
+            const d = schedulerStatus.next_decision;
+            setText('#nextDecisionValue', `${d.skill_id.toUpperCase()} Level ${d.level} × ${d.count}`);
+            setText('#nextDecisionReason', d.reason);
+        }
+
+        async function applyPreset(presetId) {
+            try {
+                const response = await fetch('/api/scheduler/preset', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({preset: presetId})
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    schedulerStatus = data.status;
+                    renderSchedulerUI();
+
+                    // Mark preset as active
+                    $$('.preset-card').forEach(card => {
+                        card.classList.toggle('active', card.dataset.preset === presetId);
+                    });
+
+                    // Show brief confirmation
+                    showSchedulerMessage('success', `Applied: ${formatPresetName(presetId)}`);
+                } else {
+                    showSchedulerMessage('error', data.error || 'Failed to apply preset');
+                }
+            } catch (error) {
+                showSchedulerMessage('error', 'Failed to apply preset');
+            }
+        }
+
+        function showSchedulerMessage(type, message) {
+            // Reuse the save status for brief messages
+            const status = $('#saveStatus');
+            const actions = $('#settingsActions');
+
+            status.textContent = message;
+            status.className = `save-status ${type}`;
+            actions.classList.add('visible');
+
+            setTimeout(() => {
+                if (!hasChanges) {
+                    actions.classList.remove('visible');
+                }
+            }, 2000);
+        }
+
+        async function saveSchedulerConfig() {
+            // Gather scheduler state from UI
+            const strategy = $('.strategy-card.selected')?.dataset.strategy || 'equal';
+
+            const skills = {};
+            schedulerStatus?.skills.forEach(skill => {
+                const enabledEl = $(`#skill_${skill.id}_enabled`);
+                const priorityEl = $(`#skill_${skill.id}_priority`);
+                const weightEl = $(`#skill_${skill.id}_weight`);
+
+                skills[skill.id] = {
+                    enabled: enabledEl?.classList.contains('active') ?? skill.enabled,
+                    priority: parseInt(priorityEl?.value) || skill.priority,
+                    weight: parseFloat(weightEl?.value) || skill.weight,
+                };
+            });
+
+            try {
+                const response = await fetch('/api/scheduler/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ strategy, skills })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    // Reload scheduler to get updated next decision
+                    await loadScheduler();
+                    return true;
+                } else {
+                    console.error('Scheduler save failed:', data.error);
+                    return false;
+                }
+            } catch (error) {
+                console.error('Failed to save scheduler:', error);
+                return false;
+            }
+        }
+
+        // Extend the existing saveConfig to also save scheduler
+        const originalSaveConfig = saveConfig;
+        saveConfig = async function() {
+            // Save scheduler first
+            await saveSchedulerConfig();
+            // Then save main config
+            await originalSaveConfig();
+        };
+
         // Initialize
-        loadConfig();
+        loadConfig().then(() => {
+            hookVramCalculator();
+            calculateVram();
+        });
+        loadScheduler();
     </script>
 </body>
 </html>

@@ -1,0 +1,93 @@
+presets:
+  balanced:
+    description: Train both skills equally
+    skills:
+      bin:
+        enabled: true
+        weight: 1.0
+      sy:
+        enabled: true
+        weight: 1.0
+    strategy: equal
+  bin_focus:
+    description: Master BIN first, then SY
+    skills:
+      bin:
+        enabled: true
+        priority: 1
+      sy:
+        enabled: true
+        priority: 2
+    strategy: focus
+  bin_heavy:
+    description: 2:1 ratio favoring BIN
+    skills:
+      bin:
+        enabled: true
+        weight: 2.0
+      sy:
+        enabled: true
+        weight: 1.0
+    strategy: weighted
+  bin_only:
+    description: Only train BIN (disable SY)
+    skills:
+      bin:
+        enabled: true
+      sy:
+        enabled: false
+    strategy: focus
+  catch_up:
+    description: Focus on whichever skill is behind
+    skills:
+      bin:
+        enabled: true
+      sy:
+        enabled: true
+    strategy: lowest_first
+  sy_focus:
+    description: Master SY first, then BIN
+    skills:
+      bin:
+        enabled: true
+        priority: 2
+      sy:
+        enabled: true
+        priority: 1
+    strategy: focus
+  sy_heavy:
+    description: 2:1 ratio favoring SY
+    skills:
+      bin:
+        enabled: true
+        weight: 1.0
+      sy:
+        enabled: true
+        weight: 2.0
+    strategy: weighted
+  sy_only:
+    description: Only train SY (disable BIN)
+    skills:
+      bin:
+        enabled: false
+      sy:
+        enabled: true
+    strategy: focus
+settings:
+  advancement_evals: 3
+  batch_size: 100
+  catch_up_threshold: 3
+skills:
+  bin:
+    enabled: true
+    max_level: 30
+    priority: 2
+    target_level: null
+    weight: 1
+  sy:
+    enabled: true
+    max_level: 50
+    priority: 1
+    target_level: null
+    weight: 1
+strategy: equal

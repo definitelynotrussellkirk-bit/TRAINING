@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quests - Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/game.css?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .quests-main {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            height: calc(100vh - 120px);
+            overflow: hidden;
+        }
+
+        /* Left Panel - Queue Summary */
+        .queue-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .summary-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        .summary-card h3 {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .queue-counts {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .queue-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-dark);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .queue-row:hover {
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .queue-row.active {
+            border: 1px solid var(--color-gold);
+            background: rgba(245, 158, 11, 0.15);
+        }
+
+        .queue-row .label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .queue-row .priority-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .queue-row .priority-dot.high { background: #ef4444; }
+        .queue-row .priority-dot.normal { background: #3b82f6; }
+        .queue-row .priority-dot.low { background: #6b7280; }
+        .queue-row .priority-dot.processing { background: #f59e0b; animation: pulse 1.5s infinite; }
+        .queue-row .priority-dot.completed { background: #22c55e; }
+        .queue-row .priority-dot.failed { background: #ef4444; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .queue-row .count {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Current Quest */
+        .current-quest {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(234, 88, 12, 0.1));
+            border-color: var(--border-gold);
+        }
+
+        .current-quest-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .current-quest-name {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        .current-quest-progress {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-dark);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--color-gold);
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            min-width: 40px;
+            text-align: right;
+        }
+
+        .idle-message {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        /* Right Panel - Quest List */
+        .quest-list-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .quest-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .quest-list-header h2 {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            font-size: 1.25rem;
+        }
+
+        .quest-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .quest-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .quest-btn:hover {
+            border-color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .quest-btn.primary {
+            background: var(--color-gold);
+            color: var(--bg-dark);
+            border-color: var(--color-gold);
+        }
+
+        .quest-btn.primary:hover {
+            filter: brightness(1.1);
+        }
+
+        /* Quest Table */
+        .quest-table-container {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+
+        .quest-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .quest-table th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-panel);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .quest-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+
+        .quest-table tr:hover {
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .quest-table tr.selected {
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .quest-name {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .quest-priority {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .quest-priority.high {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .quest-priority.normal {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .quest-priority.low {
+            background: rgba(107, 114, 128, 0.2);
+            color: #9ca3af;
+        }
+
+        .quest-size {
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+        }
+
+        .quest-time {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .quest-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .quest-status.completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .quest-status.failed {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .quest-status.processing {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+
+        .quest-actions-cell {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            padding: 0.3rem 0.6rem;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            border-color: var(--color-gold);
+            color: var(--text-primary);
+        }
+
+        .action-btn.danger:hover {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state-text {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state-hint {
+            font-size: 0.85rem;
+            opacity: 0.7;
+        }
+
+        /* Tabs */
+        .quest-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .quest-tab {
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .quest-tab:hover {
+            border-color: var(--border-gold);
+        }
+
+        .quest-tab.active {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: var(--color-gold);
+            color: var(--text-primary);
+        }
+
+        .quest-tab .badge {
+            margin-left: 0.4rem;
+            padding: 0.1rem 0.4rem;
+            background: var(--bg-dark);
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-family: var(--font-mono);
+        }
+
+        /* Refresh indicator */
+        .refresh-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .refresh-indicator.loading::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--color-gold);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Data Forge */
+        .forge-card {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
+            border-color: rgba(139, 92, 246, 0.3);
+        }
+
+        .generator-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .generator-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-dark);
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .generator-row:hover {
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .generator-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex: 1;
+        }
+
+        .generator-icon {
+            font-size: 1rem;
+        }
+
+        .generator-name {
+            font-size: 0.85rem;
+            color: var(--text-primary);
+        }
+
+        .generator-status {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .generator-toggle {
+            width: 36px;
+            height: 20px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+            border: 1px solid var(--border-color);
+        }
+
+        .generator-toggle::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            top: 1px;
+            left: 1px;
+            transition: all 0.2s;
+        }
+
+        .generator-toggle.active {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: #22c55e;
+        }
+
+        .generator-toggle.active::after {
+            background: #22c55e;
+            left: 17px;
+        }
+
+        .generator-stats {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 0.5rem;
+        }
+
+        /* API Status */
+        .api-status-section {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .api-status-title {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+        }
+
+        .api-status-grid {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .api-status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.6rem;
+            background: var(--bg-dark);
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .api-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .api-dot.online {
+            background: #22c55e;
+            box-shadow: 0 0 6px #22c55e;
+        }
+
+        .api-dot.offline {
+            background: #ef4444;
+        }
+
+        .api-name {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .api-port {
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .quests-main {
+                grid-template-columns: 1fr;
+            }
+            .queue-summary {
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+            .summary-card {
+                flex: 1;
+                min-width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- TITLE BAR -->
+    <header class="game-header">
+        <div class="header-left">
+            <h1 class="game-title">Quest Board</h1>
+        </div>
+        <div class="header-center">
+            <div class="resource-bar">
+                <div class="resource">
+                    <span class="resource-icon">📜</span>
+                    <span class="resource-label">QUEUED</span>
+                    <span class="resource-value" id="totalQueued">--</span>
+                </div>
+                <div class="resource">
+                    <span class="resource-icon">⚔️</span>
+                    <span class="resource-label">ACTIVE</span>
+                    <span class="resource-value" id="activeCount">--</span>
+                </div>
+                <div class="resource">
+                    <span class="resource-icon">✓</span>
+                    <span class="resource-label">COMPLETED</span>
+                    <span class="resource-value" id="completedCount">--</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="refresh-indicator" id="refreshIndicator">
+                <span id="lastRefresh">--</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="quests-main">
+        <!-- LEFT: Queue Summary -->
+        <aside class="queue-summary">
+            <!-- Current Quest -->
+            <div class="summary-card current-quest">
+                <h3>⚔️ Active Quest</h3>
+                <div id="currentQuestContent">
+                    <div class="idle-message">No quest active</div>
+                </div>
+            </div>
+
+            <!-- Queue Counts -->
+            <div class="summary-card">
+                <h3>📋 Queue</h3>
+                <div class="queue-counts">
+                    <div class="queue-row" data-filter="high" onclick="setFilter('high')">
+                        <span class="label">
+                            <span class="priority-dot high"></span>
+                            High Priority
+                        </span>
+                        <span class="count" id="highCount">0</span>
+                    </div>
+                    <div class="queue-row active" data-filter="normal" onclick="setFilter('normal')">
+                        <span class="label">
+                            <span class="priority-dot normal"></span>
+                            Normal
+                        </span>
+                        <span class="count" id="normalCount">0</span>
+                    </div>
+                    <div class="queue-row" data-filter="low" onclick="setFilter('low')">
+                        <span class="label">
+                            <span class="priority-dot low"></span>
+                            Low Priority
+                        </span>
+                        <span class="count" id="lowCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History -->
+            <div class="summary-card">
+                <h3>📖 History</h3>
+                <div class="queue-counts">
+                    <div class="queue-row" data-filter="completed" onclick="setFilter('completed')">
+                        <span class="label">
+                            <span class="priority-dot completed"></span>
+                            Completed
+                        </span>
+                        <span class="count" id="completedHistoryCount">0</span>
+                    </div>
+                    <div class="queue-row" data-filter="failed" onclick="setFilter('failed')">
+                        <span class="label">
+                            <span class="priority-dot failed"></span>
+                            Failed
+                        </span>
+                        <span class="count" id="failedCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Forge -->
+            <div class="summary-card forge-card">
+                <h3>🔥 Data Forge</h3>
+                <div class="generator-list" id="generatorList">
+                    <!-- Filled by JS -->
+                </div>
+                <div class="api-status-section">
+                    <div class="api-status-title">Skill APIs</div>
+                    <div class="api-status-grid" id="apiStatusGrid">
+                        <div class="api-status-item" title="Syllacrostic puzzle generator">
+                            <span class="api-dot" id="syApiDot"></span>
+                            <span class="api-name">SY</span>
+                            <span class="api-port">:8080</span>
+                        </div>
+                        <div class="api-status-item" title="Binary arithmetic generator">
+                            <span class="api-dot" id="binApiDot"></span>
+                            <span class="api-name">BIN</span>
+                            <span class="api-port">:8090</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- RIGHT: Quest List -->
+        <section class="quest-list-panel">
+            <div class="quest-list-header">
+                <h2 id="listTitle">Normal Queue</h2>
+                <div class="quest-actions">
+                    <button class="quest-btn" onclick="refreshQuests()">Refresh</button>
+                </div>
+            </div>
+
+            <div class="quest-table-container">
+                <table class="quest-table">
+                    <thead>
+                        <tr>
+                            <th>Quest Name</th>
+                            <th>Priority</th>
+                            <th>Size</th>
+                            <th>Added</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="questTableBody">
+                        <!-- Filled by JS -->
+                    </tbody>
+                </table>
+                <div class="empty-state" id="emptyState" style="display: none;">
+                    <div class="empty-state-icon">📜</div>
+                    <div class="empty-state-text">No quests in this queue</div>
+                    <div class="empty-state-hint">Drop .jsonl files in the inbox folder to add quests</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- NAVIGATION -->
+    <nav class="game-nav">
+        <button class="nav-btn" onclick="window.location.href='/'">
+            <span class="nav-icon">⚔️</span>
+            <span class="nav-label">Battle</span>
+        </button>
+        <button class="nav-btn" onclick="window.location.href='/guild'">
+            <span class="nav-icon">🏰</span>
+            <span class="nav-label">Guild</span>
+        </button>
+        <button class="nav-btn active">
+            <span class="nav-icon">📜</span>
+            <span class="nav-label">Quests</span>
+        </button>
+        <button class="nav-btn" onclick="window.location.href='/vault'">
+            <span class="nav-icon">🗃️</span>
+            <span class="nav-label">Vault</span>
+        </button>
+        <button class="nav-btn" onclick="window.location.href='/settings'">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Settings</span>
+        </button>
+    </nav>
+
+    <script>
+        // State
+        let currentFilter = 'normal';
+        let questData = null;
+
+        // DOM helpers
+        function $(sel) { return document.querySelector(sel); }
+        function $$(sel) { return document.querySelectorAll(sel); }
+        function setText(sel, text) { const el = $(sel); if (el) el.textContent = text; }
+
+        // Filter titles
+        const filterTitles = {
+            high: 'High Priority Queue',
+            normal: 'Normal Queue',
+            low: 'Low Priority Queue',
+            completed: 'Recently Completed',
+            failed: 'Failed Quests'
+        };
+
+        // Load quest data
+        async function loadQuests() {
+            $('#refreshIndicator').classList.add('loading');
+
+            try {
+                const response = await fetch('/api/quests');
+                questData = await response.json();
+                updateUI();
+                $('#lastRefresh').textContent = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Failed to load quests:', error);
+            } finally {
+                $('#refreshIndicator').classList.remove('loading');
+            }
+        }
+
+        function updateUI() {
+            if (!questData) return;
+
+            // Update counts
+            setText('#totalQueued', questData.status?.queued?.total || 0);
+            setText('#activeCount', questData.status?.processing || 0);
+            setText('#completedCount', questData.status?.completed || 0);
+
+            setText('#highCount', questData.status?.queued?.high || 0);
+            setText('#normalCount', questData.status?.queued?.normal || 0);
+            setText('#lowCount', questData.status?.queued?.low || 0);
+            setText('#completedHistoryCount', questData.recently_completed?.length || 0);
+            setText('#failedCount', questData.status?.failed || 0);
+
+            // Update current quest
+            updateCurrentQuest();
+
+            // Update quest list
+            updateQuestList();
+        }
+
+        function updateCurrentQuest() {
+            const container = $('#currentQuestContent');
+            const processing = questData.processing;
+
+            if (processing && processing.length > 0) {
+                const quest = processing[0];
+                container.innerHTML = `
+                    <div class="current-quest-content">
+                        <div class="current-quest-name">${quest.file}</div>
+                        <div class="current-quest-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${quest.progress || 0}%"></div>
+                            </div>
+                            <span class="progress-text">${quest.progress || 0}%</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = '<div class="idle-message">No quest active - DIO is resting</div>';
+            }
+        }
+
+        function updateQuestList() {
+            const tbody = $('#questTableBody');
+            const emptyState = $('#emptyState');
+
+            // Get quests for current filter
+            let quests = [];
+            if (currentFilter === 'completed') {
+                quests = questData.recently_completed || [];
+            } else if (currentFilter === 'failed') {
+                quests = questData.failed || [];
+            } else {
+                quests = (questData.queued || []).filter(q => q.priority === currentFilter);
+            }
+
+            // Update title
+            setText('#listTitle', filterTitles[currentFilter]);
+
+            if (quests.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.style.display = 'flex';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+
+            // Render table rows
+            tbody.innerHTML = quests.map(quest => {
+                const isHistory = currentFilter === 'completed' || currentFilter === 'failed';
+
+                return `
+                    <tr>
+                        <td class="quest-name" title="${quest.file}">${quest.file}</td>
+                        <td>
+                            <span class="quest-priority ${quest.priority || currentFilter}">
+                                <span class="priority-dot ${quest.priority || currentFilter}"></span>
+                                ${(quest.priority || currentFilter).toUpperCase()}
+                            </span>
+                        </td>
+                        <td class="quest-size">${formatSize(quest.size_mb)}</td>
+                        <td class="quest-time">${formatTime(quest.added_at || quest.completed_at || quest.failed_at)}</td>
+                        <td class="quest-actions-cell">
+                            ${isHistory ? `
+                                ${currentFilter === 'failed' ? `
+                                    <button class="action-btn" onclick="retryQuest('${quest.file}')" title="Retry">↻</button>
+                                ` : ''}
+                            ` : `
+                                ${quest.priority !== 'high' ? `
+                                    <button class="action-btn" onclick="changePriority('${quest.file}', 'high')" title="Boost priority">⬆</button>
+                                ` : ''}
+                                ${quest.priority !== 'low' ? `
+                                    <button class="action-btn" onclick="changePriority('${quest.file}', 'low')" title="Lower priority">⬇</button>
+                                ` : ''}
+                                <button class="action-btn danger" onclick="deleteQuest('${quest.file}')" title="Delete">✕</button>
+                            `}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+
+            // Update active state
+            $$('.queue-row').forEach(row => {
+                row.classList.toggle('active', row.dataset.filter === filter);
+            });
+
+            updateQuestList();
+        }
+
+        function formatSize(sizeMb) {
+            if (!sizeMb) return '--';
+            if (sizeMb < 1) return `${(sizeMb * 1024).toFixed(0)} KB`;
+            return `${sizeMb.toFixed(1)} MB`;
+        }
+
+        function formatTime(isoString) {
+            if (!isoString) return '--';
+            const date = new Date(isoString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            if (diffDays < 7) return `${diffDays}d ago`;
+            return date.toLocaleDateString();
+        }
+
+        async function changePriority(filename, newPriority) {
+            try {
+                const response = await fetch('/api/quests/priority', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename, priority: newPriority })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    loadQuests();  // Refresh
+                } else {
+                    alert(result.error || 'Failed to change priority');
+                }
+            } catch (error) {
+                alert('Error changing priority');
+            }
+        }
+
+        async function deleteQuest(filename) {
+            if (!confirm(`Delete quest "${filename}"?`)) return;
+
+            try {
+                const response = await fetch('/api/quests/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    loadQuests();  // Refresh
+                } else {
+                    alert(result.error || 'Failed to delete quest');
+                }
+            } catch (error) {
+                alert('Error deleting quest');
+            }
+        }
+
+        async function retryQuest(filename) {
+            try {
+                const response = await fetch('/api/quests/retry', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    loadQuests();  // Refresh
+                } else {
+                    alert(result.error || 'Failed to retry quest');
+                }
+            } catch (error) {
+                alert('Error retrying quest');
+            }
+        }
+
+        function refreshQuests() {
+            loadQuests();
+        }
+
+        // ==========================================
+        // DATA FORGE - Generator Controls
+        // ==========================================
+
+        const generators = [
+            {
+                id: 'auto_generate',
+                name: 'Skill Training',
+                icon: '🎯',
+                tooltip: 'Generates training data when queue is low. The "hands" that produce examples.'
+            },
+            {
+                id: 'curriculum',
+                name: 'Curriculum',
+                icon: '📚',
+                tooltip: 'Controls skill level progression. The "brain" that decides difficulty.'
+            },
+            {
+                id: 'self_correction',
+                name: 'Self-Correction',
+                icon: '🔄',
+                tooltip: 'Captures model errors and generates correction training data.'
+            },
+            {
+                id: 'discrimination',
+                name: 'Discrimination',
+                icon: '⚖️',
+                tooltip: 'Generates CORRECT/INCORRECT verification training (always on).'
+            },
+        ];
+
+        let generatorStatus = {};
+
+        async function loadGeneratorStatus() {
+            try {
+                const response = await fetch('/api/generators');
+                generatorStatus = await response.json();
+                renderGenerators();
+            } catch (error) {
+                console.error('Failed to load generator status:', error);
+            }
+        }
+
+        function renderGenerators() {
+            const container = $('#generatorList');
+            if (!container) return;
+
+            container.innerHTML = generators.map(gen => {
+                const status = generatorStatus[gen.id] || {};
+                const enabled = status.enabled ?? false;
+                const lastRun = status.last_run ? formatTime(status.last_run) : 'Never';
+
+                return `
+                    <div class="generator-row" title="${gen.tooltip}">
+                        <div class="generator-info">
+                            <span class="generator-icon">${gen.icon}</span>
+                            <div>
+                                <div class="generator-name">${gen.name}</div>
+                                <div class="generator-status">Last: ${lastRun}</div>
+                            </div>
+                        </div>
+                        <div class="generator-toggle ${enabled ? 'active' : ''}"
+                             onclick="toggleGenerator('${gen.id}', ${!enabled})"></div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function toggleGenerator(generatorId, enable) {
+            try {
+                const response = await fetch('/api/generators/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ generator: generatorId, enabled: enable })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    // Update local state immediately for responsiveness
+                    if (generatorStatus[generatorId]) {
+                        generatorStatus[generatorId].enabled = enable;
+                    } else {
+                        generatorStatus[generatorId] = { enabled: enable };
+                    }
+                    renderGenerators();
+                } else {
+                    alert(result.error || 'Failed to toggle generator');
+                }
+            } catch (error) {
+                alert('Error toggling generator');
+            }
+        }
+
+        // ==========================================
+        // SKILL API STATUS
+        // ==========================================
+
+        async function checkApiStatus() {
+            try {
+                const response = await fetch('/api/skill-apis/status');
+                const status = await response.json();
+
+                // Update SY API dot
+                const syDot = $('#syApiDot');
+                if (syDot) {
+                    syDot.classList.toggle('online', status.sy?.online);
+                    syDot.classList.toggle('offline', !status.sy?.online);
+                }
+
+                // Update BIN API dot
+                const binDot = $('#binApiDot');
+                if (binDot) {
+                    binDot.classList.toggle('online', status.bin?.online);
+                    binDot.classList.toggle('offline', !status.bin?.online);
+                }
+            } catch (error) {
+                console.error('Failed to check API status:', error);
+            }
+        }
+
+        // Initialize
+        loadQuests();
+        loadGeneratorStatus();
+        checkApiStatus();
+
+        // Auto-refresh
+        setInterval(loadQuests, 10000);
+        setInterval(loadGeneratorStatus, 30000);
+        setInterval(checkApiStatus, 15000);  // Check APIs every 15s
+    </script>
+</body>
+</html>

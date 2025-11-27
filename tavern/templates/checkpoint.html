@@ -396,6 +396,14 @@
                     </div>
                 </div>
 
+                <!-- Evaluation Results -->
+                <div class="checkpoint-card full-width">
+                    <h3>📈 Evaluation Results</h3>
+                    <div id="evaluationsContent">
+                        <p class="no-data">No evaluations run yet</p>
+                    </div>
+                </div>
+
                 <!-- Comparison Scores -->
                 <div class="checkpoint-card">
                     <h3>🏆 Comparison Scores</h3>
@@ -478,14 +486,22 @@
             const comparison = data.comparison || {};
             const deployment = data.deployment || {};
             const physical = data.physical || {};
+            const isBase = ledger.is_base || step === 0;
 
             // Header
-            document.getElementById('stepNumber').textContent = step.toLocaleString();
-            document.getElementById('canonicalName').textContent = ledger.canonical_name || physical.name || `checkpoint-${step}`;
+            if (isBase) {
+                document.getElementById('stepNumber').textContent = 'Base';
+                document.getElementById('canonicalName').textContent = ledger.display_name || 'Qwen3-0.6B (Untrained)';
+            } else {
+                document.getElementById('stepNumber').textContent = step.toLocaleString();
+                document.getElementById('canonicalName').textContent = ledger.canonical_name || physical.name || `checkpoint-${step}`;
+            }
 
-            // Icon (champion?)
+            // Icon
             const icon = document.getElementById('checkpointIcon');
-            if (comparison.is_best) {
+            if (isBase) {
+                icon.textContent = '🏛️';
+            } else if (comparison.is_best) {
                 icon.textContent = '👑';
                 icon.classList.add('champion');
             }
@@ -493,17 +509,27 @@
             // Badges
             const badges = document.getElementById('badges');
             badges.innerHTML = '';
-            if (comparison.is_best) {
-                badges.innerHTML += '<span class="checkpoint-badge champion">Champion</span>';
-            }
-            if (deployment.deployed) {
-                badges.innerHTML += '<span class="checkpoint-badge deployed">Deployed</span>';
-            }
-            if (physical.has_optimizer) {
-                badges.innerHTML += '<span class="checkpoint-badge has-optimizer">Has Optimizer</span>';
-            }
-            if (ledger.skill_name) {
-                badges.innerHTML += `<span class="checkpoint-badge">${ledger.skill_name} L${ledger.skill_level || '?'}</span>`;
+            if (isBase) {
+                badges.innerHTML += '<span class="checkpoint-badge" style="background: rgba(136, 136, 136, 0.2); border-color: #888;">Untrained</span>';
+                if (ledger.model_type) {
+                    badges.innerHTML += `<span class="checkpoint-badge">${ledger.model_type}</span>`;
+                }
+                if (ledger.hidden_size && ledger.num_layers) {
+                    badges.innerHTML += `<span class="checkpoint-badge">${ledger.hidden_size}d × ${ledger.num_layers}L</span>`;
+                }
+            } else {
+                if (comparison.is_best) {
+                    badges.innerHTML += '<span class="checkpoint-badge champion">Champion</span>';
+                }
+                if (deployment.deployed) {
+                    badges.innerHTML += '<span class="checkpoint-badge deployed">Deployed</span>';
+                }
+                if (physical.has_optimizer) {
+                    badges.innerHTML += '<span class="checkpoint-badge has-optimizer">Has Optimizer</span>';
+                }
+                if (ledger.skill_name) {
+                    badges.innerHTML += `<span class="checkpoint-badge">${ledger.skill_name} L${ledger.skill_level || '?'}</span>`;
+                }
             }
 
             // Main stats
@@ -608,6 +634,57 @@
                 compContent.innerHTML = html;
             } else if (comparison.is_best) {
                 compContent.innerHTML = '<p style="color: #4CAF50;">This is the current best checkpoint!</p>';
+            }
+
+            // Evaluation results
+            const evalsContent = document.getElementById('evaluationsContent');
+            const evaluations = data.evaluations || {};
+            if (evaluations.has_data) {
+                let html = '<div class="metrics-grid">';
+
+                // Curriculum eval
+                if (evaluations.curriculum) {
+                    const curr = evaluations.curriculum;
+                    html += `
+                        <div class="metric-box" style="grid-column: span 2;">
+                            <div class="metric-value" style="color: ${curr.accuracy >= 0.8 ? '#4CAF50' : '#ff9800'};">
+                                ${(curr.accuracy * 100).toFixed(1)}%
+                            </div>
+                            <div class="metric-label">Curriculum L${curr.level} (${curr.problems_correct}/${curr.problems_total})</div>
+                        </div>
+                    `;
+                }
+
+                // Skill evals
+                if (evaluations.skill_evals?.length > 0) {
+                    for (const eval_ of evaluations.skill_evals) {
+                        html += `
+                            <div class="metric-box">
+                                <div class="metric-value" style="color: ${eval_.accuracy >= 0.8 ? '#4CAF50' : '#ff9800'};">
+                                    ${(eval_.accuracy * 100).toFixed(1)}%
+                                </div>
+                                <div class="metric-label">${eval_.skill} L${eval_.level}</div>
+                            </div>
+                        `;
+                    }
+                }
+
+                // Passive evals
+                if (evaluations.passives?.length > 0) {
+                    for (const p of evaluations.passives) {
+                        html += `
+                            <div class="metric-box">
+                                <div class="metric-value" style="color: ${p.accuracy >= 0.7 ? '#4CAF50' : p.accuracy >= 0.5 ? '#ff9800' : '#f44336'};">
+                                    ${(p.accuracy * 100).toFixed(1)}%
+                                </div>
+                                <div class="metric-label">${p.passive_id} (${p.mode})</div>
+                            </div>
+                        `;
+                    }
+                }
+
+                html += '</div>';
+                evalsContent.innerHTML = html;
             }
 
             // Deployment history

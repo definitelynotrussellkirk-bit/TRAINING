@@ -36,9 +36,16 @@ def generate_binary_validation():
 
             problems = []
             for sample in data.get("samples", []):
+                # Chat format: messages array
                 problems.append({
-                    "prompt": sample.get("user_prompt", ""),
-                    "expected": sample.get("assistant_response", ""),
+                    "messages": [
+                        {"role": "user", "content": sample.get("user_prompt", "")},
+                        {"role": "assistant", "content": sample.get("assistant_response", "")},
+                    ],
+                    "metadata": {
+                        "skill": "bin",
+                        "level": level,
+                    }
                 })
 
             validation[str(level)] = problems
@@ -78,10 +85,20 @@ def generate_syllo_validation():
 
             problems = []
             for puzzle in data.get("puzzles", []):
-                words = [w.get("label", "") for w in puzzle.get("words", [])]
+                # API returns user_prompt and assistant_response
+                user_prompt = puzzle.get("user_prompt", "")
+                assistant_response = puzzle.get("assistant_response", "")
+                # Chat format: messages array
                 problems.append({
-                    "prompt": puzzle.get("prompt", ""),
-                    "expected": ", ".join(words),
+                    "messages": [
+                        {"role": "user", "content": user_prompt},
+                        {"role": "assistant", "content": assistant_response},
+                    ],
+                    "metadata": {
+                        "skill": "sy",
+                        "level": level,
+                        "puzzle_id": puzzle.get("puzzle_id", ""),
+                    }
                 })
 
             validation[str(level)] = problems

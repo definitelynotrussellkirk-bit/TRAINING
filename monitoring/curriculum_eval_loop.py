@@ -101,13 +101,18 @@ class CurriculumEvalLoop:
 
     def check_services(self) -> Tuple[bool, str]:
         """Check if required services are running."""
-        # Check SYLLO API
-        try:
-            r = requests.get(f"{self.syllo_url}/health", timeout=5)
-            if r.status_code != 200:
-                return False, f"SYLLO API unhealthy: {r.status_code}"
-        except Exception as e:
-            return False, f"SYLLO API unreachable: {e}"
+        from monitoring.skill_evaluators import get_evaluator, SKILL_EVALUATORS
+
+        # Get active skill from curriculum
+        active_skill = self.curriculum.state.get("active_skill", "syllo")
+
+        # Check skill API using the evaluator
+        if active_skill not in SKILL_EVALUATORS:
+            return False, f"No evaluator for active skill: {active_skill}"
+
+        evaluator = get_evaluator(active_skill)
+        if not evaluator.health_check():
+            return False, f"{active_skill.upper()} API unreachable (port {SKILL_EVALUATORS[active_skill]['default_url']})"
 
         # Check inference server
         try:
@@ -117,7 +122,7 @@ class CurriculumEvalLoop:
         except Exception as e:
             return False, f"Inference server unreachable: {e}"
 
-        return True, "All services OK"
+        return True, f"All services OK (active skill: {active_skill})"
 
     def get_current_step(self) -> int:
         """Get current training step from status file."""
@@ -360,57 +365,77 @@ class CurriculumEvalLoop:
 
     def run_evaluation(self, skill: str = "syllo") -> Dict:
         """
-        Run a full evaluation cycle.
+        Run a full evaluation cycle using pluggable skill evaluators.
 
         Returns evaluation results.
         """
+        from monitoring.skill_evaluators import get_evaluator, SKILL_EVALUATORS
+
         logger.info(f"\n{'='*60}")
         logger.info(f"Starting {skill.upper()} evaluation")
         logger.info(f"{'='*60}")
+
+        # Get evaluator for this skill
+        if skill not in SKILL_EVALUATORS:
+            logger.error(f"No evaluator for skill: {skill}")
+            return {"success": False, "error": f"Unknown skill: {skill}"}
+
+        evaluator = get_evaluator(skill)
+
+        # Check skill API is up
+        if not evaluator.health_check():
+            logger.error(f"{skill} API is not available")
+            return {"success": False, "error": f"{skill} API unavailable"}
 
         # Get current level
         level_config = self.curriculum.get_current_level(skill)
         level_num = level_config.get("level", 1)
         level_name = level_config.get("name", "Unknown")
-        word_count = level_config.get("word_count", 4)
 
-        logger.info(f"Current level: {level_num} ({level_name}) - {word_count} words")
+        logger.info(f"Current level: {level_num} ({level_name})")
 
-        # Generate test problems
+        # Generate test problems using skill evaluator
         logger.info(f"Generating {self.problems_per_eval} test problems...")
-        puzzles = self.generate_test_problems(skill, level_config)
+        problems = evaluator.generate_problems(level=level_num, count=self.problems_per_eval)
 
-        if not puzzles:
+        if not problems:
             logger.error("Failed to generate test problems")
             return {"success": False, "error": "No problems generated"}
 
-        logger.info(f"Generated {len(puzzles)} puzzles")
+        logger.info(f"Generated {len(problems)} problems")
 
-        # Evaluate each puzzle
+        # Evaluate each problem
         results = []
         correct = 0
-        total = len(puzzles)
+        total = len(problems)
 
-        for i, puzzle in enumerate(puzzles, 1):
-            prompt = self.format_puzzle_prompt(puzzle, puzzle_index=i)
-            answer = self.get_model_answer(prompt)
+        for i, problem in enumerate(problems, 1):
+            # Get prompt and expected answer
+            prompt = evaluator.get_prompt(problem)
+            expected = evaluator.get_expected(problem)
 
-            is_correct, partial = self.check_answer(puzzle, answer)
+            # Get model's answer
+            model_response = self.get_model_answer(prompt)
+            actual = evaluator.extract_answer(model_response)
+
+            # Check correctness
+            is_correct, partial = evaluator.check_correct(expected, actual)
 
             if is_correct:
                 correct += 1
                 logger.info(f"  [{i}/{total}] ✓ Correct")
             else:
-                expected = [w.get("label") for w in puzzle.get("words", [])]
-                got = self.extract_words_from_answer(answer)
-                logger.info(f"  [{i}/{total}] ✗ Wrong - expected {expected}, got {got}")
+                # Truncate for logging
+                exp_str = str(expected)[:50]
+                act_str = str(actual)[:50]
+                logger.info(f"  [{i}/{total}] ✗ Wrong - expected {exp_str}..., got {act_str}...")
 
             results.append({
-                "puzzle_id": puzzle.get("puzzle_id"),
+                "problem_id": problem.get("id", f"{skill}_{i}"),
                 "correct": is_correct,
                 "partial_score": partial,
-                "expected": [w.get("label") for w in puzzle.get("words", [])],
-                "model_answer": self.extract_words_from_answer(answer)
+                "expected": str(expected)[:200],
+                "model_answer": str(actual)[:200]
             })
 
         accuracy = correct / total if total > 0 else 0.0
@@ -480,10 +505,16 @@ class CurriculumEvalLoop:
 
     def run_loop(self):
         """Main evaluation loop."""
+        from monitoring.skill_evaluators import SKILL_EVALUATORS
+
+        # Get active skill for startup display
+        active_skill = self.curriculum.state.get("active_skill", "syllo")
+        skill_url = SKILL_EVALUATORS.get(active_skill, {}).get("default_url", "unknown")
+
         logger.info("="*60)
-        logger.info("Curriculum Evaluation Loop Starting")
+        logger.info("Curriculum Evaluation Loop Starting (Arena)")
         logger.info("="*60)
-        logger.info(f"SYLLO API: {self.syllo_url}")
+        logger.info(f"Active Trainer: {active_skill.upper()} ({skill_url})")
         logger.info(f"Inference: {self.inference_url}")
         # DYNAMIC: Model ID comes from --model arg or auto-detected
         logger.info(f"Model: {self.model_name} {'(specified)' if self._model_was_specified else '(auto-detected)'}")
@@ -630,8 +661,9 @@ def main():
     )
 
     if args.once:
-        # Single evaluation
-        result = loop.run_evaluation("syllo")
+        # Single evaluation on active skill
+        active_skill = loop.curriculum.state.get("active_skill", "syllo")
+        result = loop.run_evaluation(active_skill)
         print(json.dumps(result, indent=2))
     else:
         # Continuous loop

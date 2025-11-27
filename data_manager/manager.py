@@ -198,8 +198,9 @@ class DataManager:
                     training_data.append(syllo_to_training_format(puzzle))
             elif active_skill == "binary":
                 from data_manager.skill_api_client import binary_to_training_format
-                for conv in response.get("conversations", []):
-                    training_data.append(binary_to_training_format(conv))
+                level_info_dict = response.get("level_info", {})
+                for sample in response.get("samples", []):
+                    training_data.append(binary_to_training_format(sample, level_info_dict))
 
             logger.info(f"✅ Generated {len(training_data):,} examples in {generation_time:.1f}s")
             logger.info(f"   Rate: {len(training_data) / generation_time:.1f} examples/sec")

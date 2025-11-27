@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Master Monitoring Dashboard</title>
-    <link rel="stylesheet" href="/css/master_dashboard.css">
+    <title>Guild Hall</title>
+    <link rel="stylesheet" href="/css/guildhall.css">
 </head>
 <body>
     <!-- ERROR ALERT CARDS CONTAINER -->
@@ -15,7 +15,7 @@
     <!-- TOP STATUS BAR -->
     <header class="master-header">
         <div class="header-left">
-            <h1 class="master-title">⚡ Master Monitoring Dashboard</h1>
+            <h1 class="master-title">🏰 Guild Hall</h1>
             <div class="system-health">
                 <div class="health-dot" id="systemHealthDot"></div>
                 <span id="systemHealthLabel">INITIALIZING</span>
@@ -72,14 +72,14 @@
         <!-- LEFT COLUMN: TRAINING MACHINE (4090) -->
         <div class="column column-left">
             <div class="column-header">
-                <h2>🚀 RTX 4090 - Training Machine</h2>
+                <h2>🔥 The Forge (4090)</h2>
                 <div class="machine-badge machine-4090">LOCAL</div>
             </div>
 
             <!-- Training Status Card -->
             <div class="card card-training">
                 <div class="card-header">
-                    <h3>📊 Training Status</h3>
+                    <h3>⚔️ Hero Status</h3>
                     <div class="status-indicator" id="trainingStatusIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -127,7 +127,7 @@
             <!-- Training Queue Card (Interactive) -->
             <div class="card card-queue">
                 <div class="card-header">
-                    <h3>📦 Training Queue</h3>
+                    <h3>📜 Quest Board</h3>
                     <button onclick="refreshQueue()" class="refresh-btn">↻</button>
                 </div>
                 <div class="card-body">
@@ -163,7 +163,7 @@
             <!-- GPU 4090 Card -->
             <div class="card card-gpu">
                 <div class="card-header">
-                    <h3>🎮 GPU 4090 Statistics</h3>
+                    <h3>🔥 Forge Power</h3>
                     <div class="status-indicator" id="gpu4090Indicator">●</div>
                 </div>
                 <div class="card-body">
@@ -195,7 +195,7 @@
             <!-- Data Health Card (Protocol Conformance) -->
             <div class="card card-data-health">
                 <div class="card-header">
-                    <h3>📋 Data Health</h3>
+                    <h3>💪 Constitution</h3>
                     <div class="status-indicator" id="dataHealthIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -231,7 +231,7 @@
             <!-- Data Lineage Card (Generator/Validator Stats) -->
             <div class="card card-lineage">
                 <div class="card-header">
-                    <h3>🔗 Data Lineage</h3>
+                    <h3>📖 Lineage Records</h3>
                     <div class="status-indicator" id="lineageIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -287,14 +287,14 @@
         <!-- CENTER COLUMN: INTELLIGENCE SYSTEMS 1 (3090) -->
         <div class="column column-center">
             <div class="column-header">
-                <h2>🧠 RTX 3090 - Intelligence Systems</h2>
+                <h2>⚔️ The Arena (3090)</h2>
                 <div class="machine-badge machine-3090">REMOTE</div>
             </div>
 
             <!-- Curriculum Optimization Card -->
             <div class="card card-intelligence">
                 <div class="card-header">
-                    <h3>📚 Curriculum & Data Flow</h3>
+                    <h3>📈 Skill Progression</h3>
                     <div class="status-indicator" id="curriculumIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -357,7 +357,7 @@
             <!-- Regression Monitoring Card -->
             <div class="card card-intelligence">
                 <div class="card-header">
-                    <h3>⚠️ Regression Monitoring</h3>
+                    <h3>⚠️ Curse Detection</h3>
                     <div class="status-indicator" id="regressionIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -386,7 +386,7 @@
             <!-- Model Comparison Card -->
             <div class="card card-intelligence">
                 <div class="card-header">
-                    <h3>🏆 Model Comparison</h3>
+                    <h3>🏆 Tournament Rankings</h3>
                     <div class="status-indicator" id="modelCompIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -413,7 +413,7 @@
             <!-- Automated Testing Card -->
             <div class="card card-intelligence">
                 <div class="card-header">
-                    <h3>✅ Automated Testing</h3>
+                    <h3>⚔️ Combat Trials</h3>
                     <div class="status-indicator" id="testingIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -599,13 +599,13 @@
         <!-- RIGHT COLUMN: INTELLIGENCE SYSTEMS 2 (3090) -->
         <div class="column column-right">
             <div class="column-header">
-                <h2>🔬 More Intelligence & Hardware</h2>
+                <h2>🛡️ Armory & Vault</h2>
             </div>
 
             <!-- Adversarial Mining Card -->
             <div class="card card-intelligence">
                 <div class="card-header">
-                    <h3>💀 Adversarial Mining</h3>
+                    <h3>💀 Monster Hunting</h3>
                     <div class="status-indicator" id="advIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -628,7 +628,7 @@
             <!-- Confidence Calibration Card -->
             <div class="card card-intelligence">
                 <div class="card-header">
-                    <h3>📈 Confidence Calibration</h3>
+                    <h3>🎯 Wisdom Score</h3>
                     <div class="status-indicator" id="confIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -652,7 +652,7 @@
             <!-- Self-Correction Loop Card -->
             <div class="card card-intelligence">
                 <div class="card-header">
-                    <h3>🔄 Self-Correction Loop</h3>
+                    <h3>📚 Learning from Defeats</h3>
                     <div class="status-indicator" id="selfCorrIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -680,7 +680,7 @@
             <!-- Checkpoint Sync Card -->
             <div class="card card-intelligence">
                 <div class="card-header">
-                    <h3>🔄 Checkpoint Sync</h3>
+                    <h3>💾 Save Points</h3>
                     <div class="status-indicator" id="checkpointIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -708,7 +708,7 @@
             <!-- Layer Drift Analysis Card -->
             <div class="card card-analytics">
                 <div class="card-header">
-                    <h3>📊 Layer Drift Analysis</h3>
+                    <h3>🧬 Soul Drift Analysis</h3>
                     <div class="status-indicator" id="layerDriftIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -743,7 +743,7 @@
             <!-- Parameter Stability Card -->
             <div class="card card-analytics">
                 <div class="card-header">
-                    <h3>⚖️ Parameter Stability</h3>
+                    <h3>⚖️ Inner Balance</h3>
                     <div class="status-indicator" id="paramStabilityIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -773,7 +773,7 @@
             <!-- GPU 3090 Card -->
             <div class="card card-gpu">
                 <div class="card-header">
-                    <h3>🎮 GPU 3090 Statistics</h3>
+                    <h3>⚔️ Arena Power</h3>
                     <div class="status-indicator" id="gpu3090Indicator">●</div>
                 </div>
                 <div class="card-body">
@@ -805,7 +805,7 @@
             <!-- GPU Task Scheduler Card -->
             <div class="card card-scheduler">
                 <div class="card-header">
-                    <h3>🎛️ GPU Task Scheduler</h3>
+                    <h3>🎛️ Quest Dispatcher</h3>
                     <div class="status-indicator" id="schedulerIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -838,7 +838,7 @@
             <!-- Storage & Retention Card -->
             <div class="card card-retention">
                 <div class="card-header">
-                    <h3>💾 Storage & Retention</h3>
+                    <h3>💰 Treasury</h3>
                     <div class="status-indicator" id="retentionIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -870,7 +870,7 @@
             <!-- Data File Impact Card -->
             <div class="card card-data-impact">
                 <div class="card-header">
-                    <h3>📊 Data File Impact</h3>
+                    <h3>📊 Training Scrolls Impact</h3>
                     <div class="status-indicator" id="dataImpactIndicator">●</div>
                 </div>
                 <div class="card-body">
@@ -912,7 +912,7 @@
         </div>
     </footer>
 
-    <script src="/js/master_dashboard.js"></script>
+    <script src="/js/guildhall.js"></script>
 
     <!-- File Preview Modal -->
     <div id="previewModal" class="preview-modal" style="display: none;">

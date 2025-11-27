@@ -44,16 +44,41 @@ SKILL_LEVELS = {
     },
     "binary": {
         "name": "Binary Arithmetic",
-        "total_levels": 7,
+        "total_levels": 30,
         "api_port": 8090,
+        # Bin uses bit-width progression: level N = (N+1) bits
+        # Key milestones in 30-level system:
         "levels": [
-            {"level": 1, "name": "Foundation", "magnitude": "1-10", "ops": ["add", "subtract"], "threshold": 0.80},
-            {"level": 2, "name": "Small Numbers", "magnitude": "1-20", "ops": ["add", "subtract", "multiply"], "threshold": 0.80},
-            {"level": 3, "name": "Two-Digit", "magnitude": "10-100", "ops": ["add", "subtract", "multiply"], "threshold": 0.80},
-            {"level": 4, "name": "Shifts", "magnitude": "10-100", "ops": ["all", "+shifts"], "threshold": 0.80},
-            {"level": 5, "name": "Medium", "magnitude": "100-1K", "ops": ["all"], "threshold": 0.80},
-            {"level": 6, "name": "Large", "magnitude": "1K-10K", "ops": ["all"], "threshold": 0.80},
-            {"level": 7, "name": "Expert", "magnitude": "10K-100K", "ops": ["all"], "threshold": None},  # Mastered
+            {"level": 1, "name": "Tiny (2-bit)", "bits": 2, "max": 3, "threshold": 0.80},
+            {"level": 2, "name": "3-bit", "bits": 3, "max": 7, "threshold": 0.80},
+            {"level": 3, "name": "4-bit", "bits": 4, "max": 15, "threshold": 0.80},
+            {"level": 4, "name": "5-bit", "bits": 5, "max": 31, "threshold": 0.80},
+            {"level": 5, "name": "6-bit", "bits": 6, "max": 63, "threshold": 0.80},
+            {"level": 6, "name": "7-bit", "bits": 7, "max": 127, "threshold": 0.80},
+            {"level": 7, "name": "Byte (8-bit)", "bits": 8, "max": 255, "threshold": 0.80},
+            {"level": 8, "name": "9-bit + Symbols", "bits": 9, "max": 511, "threshold": 0.80, "symbols": True},
+            {"level": 9, "name": "10-bit", "bits": 10, "max": 1023, "threshold": 0.80, "symbols": True},
+            {"level": 10, "name": "11-bit", "bits": 11, "max": 2047, "threshold": 0.80, "symbols": True},
+            {"level": 11, "name": "12-bit", "bits": 12, "max": 4095, "threshold": 0.80, "symbols": True},
+            {"level": 12, "name": "13-bit", "bits": 13, "max": 8191, "threshold": 0.80, "symbols": True},
+            {"level": 13, "name": "14-bit", "bits": 14, "max": 16383, "threshold": 0.80, "symbols": True},
+            {"level": 14, "name": "15-bit", "bits": 15, "max": 32767, "threshold": 0.80, "symbols": True},
+            {"level": 15, "name": "Word (16-bit)", "bits": 16, "max": 65535, "threshold": 0.80, "symbols": True},
+            {"level": 16, "name": "17-bit", "bits": 17, "max": 131071, "threshold": 0.80, "symbols": True},
+            {"level": 17, "name": "18-bit", "bits": 18, "max": 262143, "threshold": 0.80, "symbols": True},
+            {"level": 18, "name": "19-bit", "bits": 19, "max": 524287, "threshold": 0.80, "symbols": True},
+            {"level": 19, "name": "20-bit", "bits": 20, "max": 1048575, "threshold": 0.80, "symbols": True},
+            {"level": 20, "name": "21-bit (~2M)", "bits": 21, "max": 2097151, "threshold": 0.80, "symbols": True},
+            {"level": 21, "name": "22-bit", "bits": 22, "max": 4194303, "threshold": 0.80, "symbols": True},
+            {"level": 22, "name": "23-bit", "bits": 23, "max": 8388607, "threshold": 0.80, "symbols": True},
+            {"level": 23, "name": "24-bit", "bits": 24, "max": 16777215, "threshold": 0.80, "symbols": True},
+            {"level": 24, "name": "25-bit", "bits": 25, "max": 33554431, "threshold": 0.80, "symbols": True},
+            {"level": 25, "name": "26-bit (~67M)", "bits": 26, "max": 67108863, "threshold": 0.80, "symbols": True},
+            {"level": 26, "name": "27-bit", "bits": 27, "max": 134217727, "threshold": 0.80, "symbols": True},
+            {"level": 27, "name": "28-bit", "bits": 28, "max": 268435455, "threshold": 0.80, "symbols": True},
+            {"level": 28, "name": "29-bit", "bits": 29, "max": 536870911, "threshold": 0.80, "symbols": True},
+            {"level": 29, "name": "30-bit (~1B)", "bits": 30, "max": 1073741823, "threshold": 0.80, "symbols": True},
+            {"level": 30, "name": "DWord (32-bit)", "bits": 32, "max": 4294967295, "threshold": None, "symbols": True},  # Mastered
         ]
     }
 }

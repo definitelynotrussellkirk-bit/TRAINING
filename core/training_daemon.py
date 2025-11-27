@@ -1488,6 +1488,9 @@ class TrainingDaemon:
                     # Update controller to idle after processing
                     self.controller.update_state("idle")
 
+                    # Check if Quest Board needs topping up
+                    self.maybe_auto_generate(queue_status)
+
                 else:
                     # No files, just log periodically
                     if iteration % 10 == 0:  # Every 10 iterations
@@ -1509,20 +1512,40 @@ class TrainingDaemon:
 
     def maybe_auto_generate(self, queue_status: dict):
         """
-        Auto-generate training data using Data Manager
+        Auto-generate training data using Data Manager when queue is low.
+
+        Maintains minimum queue depth (default: 2 items) so the Forge
+        never runs dry. Quest Master proactively generates new quests.
 
         Data Manager handles:
-        - Remote GPU communication (192.168.x.x:8765)
-        - Quality testing (5 test suites)
+        - Skill API communication (Sy/Bin via singleSKILL)
+        - Quality testing
         - Queue management
         - Cooldown tracking
         """
         try:
-            # Data Manager handles all checks internally
+            # Get minimum queue threshold (default: 2)
+            auto_cfg = self.config.get("auto_generate", {})
+            min_queue_depth = auto_cfg.get("min_queue_depth", 2)
+
+            # Calculate total queue items
+            total_queued = (
+                queue_status.get("high", 0) +
+                queue_status.get("normal", 0) +
+                queue_status.get("low", 0)
+            )
+
+            # Only generate if below threshold
+            if total_queued >= min_queue_depth:
+                return  # Quest Board has enough items
+
+            self.logger.info(f"📜 Quest Board low ({total_queued} < {min_queue_depth}), asking Quest Master for more...")
+
+            # Data Manager handles all generation logic
             success = self.data_manager.generate_and_queue(force=False)
 
             if success:
-                self.logger.info("🤖 Data Manager: Successfully generated, tested, and queued new batch")
+                self.logger.info("🤖 Quest Master: Successfully generated and queued new quests")
 
         except Exception as e:
             self.logger.error(f"Data Manager auto-generation failed: {e}")

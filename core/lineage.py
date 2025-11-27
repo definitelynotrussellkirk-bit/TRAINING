@@ -78,6 +78,11 @@ GENERATOR_REGISTRY: Dict[str, Dict[str, Any]] = {
         "source": "human",
         "description": "Manually created or external data",
     },
+    "bin_api": {
+        "version": "1.0.0",
+        "source": "singleSKILL Binary API (localhost:8090)",
+        "description": "Binary arithmetic training via Bin API",
+    },
 }
 
 
@@ -252,6 +257,9 @@ def infer_generator_from_filename(filename: str) -> tuple:
 
     if "auto_gen" in filename_lower:
         return ("curriculum", GENERATOR_REGISTRY["curriculum"]["version"])
+
+    if "binary" in filename_lower or "train_binary" in filename_lower:
+        return ("bin_api", GENERATOR_REGISTRY["bin_api"]["version"])
 
     return ("unknown", "?")
 

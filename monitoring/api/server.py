@@ -269,9 +269,24 @@ def api_queue():
         inbox_dir = base_dir / 'inbox'
         inbox_files = list(inbox_dir.glob('*.jsonl')) if inbox_dir.exists() else []
 
+        # Get min_queue_depth from config
+        config_path = base_dir / 'config.json'
+        min_queue_depth = 2  # default
+        try:
+            with open(config_path) as f:
+                config = json.load(f)
+                min_queue_depth = config.get('auto_generate', {}).get('min_queue_depth', 2)
+        except Exception:
+            pass
+
+        # Quest Board health status
+        queue_healthy = len(files) >= min_queue_depth
+
         return jsonify({
             'total_files': len(files),
             'total_examples': total_examples,
+            'min_queue_depth': min_queue_depth,
+            'queue_healthy': queue_healthy,
             'files': sorted(files, key=lambda x: (
                 {'high': 0, 'normal': 1, 'low': 2}.get(x.get('priority', 'normal'), 1),
                 x.get('modified', '')

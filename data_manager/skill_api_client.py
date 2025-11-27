@@ -38,8 +38,8 @@ SKILL_APIS = {
     "binary": {
         "name": "Binary Arithmetic",
         "base_url": "http://127.0.0.1:8090",
-        "levels": 7,
-        "server_script": "/path/to/skills/skill_basic_math/api_server.py",
+        "levels": 30,  # 30 levels: 2-bit to 32-bit
+        "server_script": "/path/to/skills/skill_binary/api_server.py",
     }
 }
 
@@ -129,21 +129,33 @@ def syllo_to_training_format(puzzle: Dict[str, Any], puzzle_index: int = 1) -> D
     }
 
 
-def binary_to_training_format(conversation: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Convert binary conversation to training messages format.
+GENERATOR_ID = "bin_api"
+GENERATOR_VERSION = "1.0.0"
 
-    The conversation already has messages[] format from the API.
+
+def binary_to_training_format(sample: Dict[str, Any], level_info: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Convert binary sample to training messages format.
+
+    Bin API returns samples with user_prompt/assistant_response fields.
+    Convert to standard messages[] format for training.
     """
     return {
-        "messages": conversation["conversation"]["messages"],
+        "messages": [
+            {"role": "user", "content": sample["user_prompt"]},
+            {"role": "assistant", "content": sample["assistant_response"]}
+        ],
         "metadata": {
+            "source": "bin_api",
+            "generator_id": GENERATOR_ID,
+            "generator_version": GENERATOR_VERSION,
             "skill": "binary",
-            "conversation_id": conversation.get("conversation_id"),
-            "level": conversation.get("level"),
-            "level_name": conversation.get("level_name"),
-            "bits": conversation.get("bits"),
-            "operations": conversation.get("operations"),
+            "sample_id": sample.get("id"),
+            "scenario": sample.get("scenario"),
+            "tags": [t for t in sample.get("tags", []) if t not in ["easy", "medium", "hard", "expert"]],  # Level is the only scale
+            "rubric": sample.get("rubric"),
+            "level": level_info.get("level") if level_info else None,
+            "bits": level_info.get("bits") if level_info else None,
         }
     }
 
@@ -188,8 +200,9 @@ def generate_skill_data(
         for i, puzzle in enumerate(response.get("puzzles", []), 1):
             training_examples.append(syllo_to_training_format(puzzle, puzzle_index=i))
     elif skill == "binary":
-        for conv in response.get("conversations", []):
-            training_examples.append(binary_to_training_format(conv))
+        level_info = response.get("level_info", {})
+        for sample in response.get("samples", []):
+            training_examples.append(binary_to_training_format(sample, level_info))
 
     # Write to file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

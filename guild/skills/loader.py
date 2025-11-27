@@ -1,4 +1,10 @@
-"""Skill configuration loading from YAML files."""
+"""
+Skill loading and trainer access.
+
+Two ways to access skills:
+1. YAML configs (for Guild UI): load_skill_config(), SkillLoader
+2. API trainers (for samples): get_trainer(), SKILL_REGISTRY
+"""
 
 from pathlib import Path
 from typing import Optional, Type, TypeVar
@@ -9,9 +15,73 @@ from guild.config.loader import (
     ConfigLoader,
 )
 from guild.skills.types import SkillConfig, SkillCategory, MetricDefinition
+from guild.skills.contract import SkillClient, SkillDefinition, Batch
 
 
 T = TypeVar('T')
+
+
+# =============================================================================
+# SKILL REGISTRY - Maps skill IDs to API URLs
+# =============================================================================
+
+SKILL_REGISTRY: dict[str, dict] = {
+    "binary": {
+        "api_url": "http://localhost:8090",
+        "category": "math",
+        "description": "Binary arithmetic with circled notation",
+    },
+    # DISABLED: Re-enable when ready
+    # "syllo": {
+    #     "api_url": "http://localhost:8080",
+    #     "category": "reasoning",
+    #     "description": "Syllable puzzles",
+    # },
+}
+
+
+def get_trainer(skill_id: str) -> SkillClient:
+    """
+    Get a trainer (API client) for a skill.
+
+    Usage:
+        trainer = get_trainer("binary")
+        batch = trainer.sample(level=5, count=100)
+
+    Args:
+        skill_id: Skill identifier (e.g., "binary", "syllo")
+
+    Returns:
+        SkillClient instance connected to the skill's API
+
+    Raises:
+        KeyError: If skill not in registry
+    """
+    if skill_id not in SKILL_REGISTRY:
+        raise KeyError(
+            f"Unknown skill: '{skill_id}'. "
+            f"Available: {list(SKILL_REGISTRY.keys())}"
+        )
+
+    config = SKILL_REGISTRY[skill_id]
+    return SkillClient(skill_id, config["api_url"])
+
+
+def list_trainers() -> list[str]:
+    """List all registered trainer skill IDs."""
+    return list(SKILL_REGISTRY.keys())
+
+
+def get_trainer_info(skill_id: str) -> dict:
+    """Get registry info for a skill (without calling API)."""
+    if skill_id not in SKILL_REGISTRY:
+        raise KeyError(f"Unknown skill: '{skill_id}'")
+    return SKILL_REGISTRY[skill_id].copy()
+
+
+# =============================================================================
+# YAML CONFIG LOADING (existing functionality)
+# =============================================================================
 
 
 def load_skill_config(skill_id: str, config_dir: Optional[Path] = None) -> SkillConfig:

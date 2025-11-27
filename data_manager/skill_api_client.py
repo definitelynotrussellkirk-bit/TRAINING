@@ -29,12 +29,13 @@ from typing import Dict, Any, List, Optional
 
 # Skill API configuration
 SKILL_APIS = {
-    "syllo": {
-        "name": "SYLLO Puzzles",
-        "base_url": "http://127.0.0.1:8080",
-        "levels": 5,
-        "server_script": "/path/to/skills/skill_syllo_variant/api_server.py",
-    },
+    # DISABLED: Re-enable when Sy trainer is ready
+    # "syllo": {
+    #     "name": "SYLLO Puzzles",
+    #     "base_url": "http://127.0.0.1:8080",
+    #     "levels": 5,
+    #     "server_script": "/path/to/skills/skill_syllo_variant/api_server.py",
+    # },
     "binary": {
         "name": "Binary Arithmetic",
         "base_url": "http://127.0.0.1:8090",

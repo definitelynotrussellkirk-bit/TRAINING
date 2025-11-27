@@ -259,11 +259,12 @@ SKILL_EVALUATORS = {
         "default_url": "http://localhost:8090",
         "description": "Binary arithmetic with circled notation",
     },
-    "syllo": {
-        "class": SylloEvaluator,
-        "default_url": "http://localhost:8080",
-        "description": "Syllable puzzles",
-    },
+    # DISABLED: Re-enable when Sy trainer is ready
+    # "syllo": {
+    #     "class": SylloEvaluator,
+    #     "default_url": "http://localhost:8080",
+    #     "description": "Syllable puzzles",
+    # },
 }
 
 

@@ -10,6 +10,20 @@ The Guild framework provides:
 - Incidents: Structured error tracking
 - Combat: Result calculation (CRIT/HIT/MISS)
 - Consistency: World model validation
+
+Quick Start:
+    import guild
+
+    # Initialize systems
+    guild.init_resolver("/path/to/configs/facilities")
+    guild.init_skill_registry("/path/to/configs")
+    guild.init_quest_registry("/path/to/configs")
+    guild.init_run_state_manager("/path/to/status")
+
+    # Create and execute a run
+    config = guild.RunConfig(id="train", type=guild.RunType.TRAINING)
+    run = guild.create_run(config)
+    guild.start_run(run.run_id)
 """
 
 __version__ = "0.1.0"
@@ -101,6 +115,42 @@ from guild.progression import (
     get_hero_status,
 )
 
+# Run management
+from guild.runs import (
+    # Types
+    RunType,
+    RunConfig,
+    RunState,
+    # Registry
+    init_run_registry,
+    get_run_registry,
+    reset_run_registry,
+    get_run_config,
+    list_run_configs,
+    run_configs_by_type,
+    # State management
+    RunStateManager,
+    init_run_state_manager,
+    get_run_state_manager,
+    reset_run_state_manager,
+    create_run,
+    get_run,
+    start_run,
+    pause_run,
+    resume_run,
+    complete_run,
+    get_current_run,
+    # Executor
+    RunCallback,
+    RunCallbackAdapter,
+    StepResult,
+    RunHandler,
+    RunExecutor,
+    init_run_executor,
+    get_run_executor,
+    reset_run_executor,
+)
+
 __all__ = [
     # Facilities
     "init_resolver",
@@ -174,4 +224,36 @@ __all__ = [
     "get_hero",
     "record_result",
     "get_hero_status",
+    # Runs - types
+    "RunType",
+    "RunConfig",
+    "RunState",
+    # Runs - registry
+    "init_run_registry",
+    "get_run_registry",
+    "reset_run_registry",
+    "get_run_config",
+    "list_run_configs",
+    "run_configs_by_type",
+    # Runs - state management
+    "RunStateManager",
+    "init_run_state_manager",
+    "get_run_state_manager",
+    "reset_run_state_manager",
+    "create_run",
+    "get_run",
+    "start_run",
+    "pause_run",
+    "resume_run",
+    "complete_run",
+    "get_current_run",
+    # Runs - executor
+    "RunCallback",
+    "RunCallbackAdapter",
+    "StepResult",
+    "RunHandler",
+    "RunExecutor",
+    "init_run_executor",
+    "get_run_executor",
+    "reset_run_executor",
 ]

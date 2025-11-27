@@ -1,0 +1,40 @@
+# Quick Evaluation Run Configuration
+# A fast evaluation run for checkpoint testing
+
+id: quick_eval
+type: evaluation
+name: Quick Evaluation
+description: Fast eval run to test checkpoint quality
+
+facility_id: local
+hero_id: qwen3_hero
+
+# Quest filters - specific skill evaluation
+quest_filters:
+  skills:
+    - logic_weaving
+  difficulties:
+    - 3
+    - 4
+    - 5
+
+# Limits - small for quick feedback
+max_quests: 100
+max_duration_seconds: 600  # 10 minutes
+
+# Hyperparameters (eval-specific)
+hyperparams:
+  temperature: 0.0
+  max_tokens: 512
+  num_samples: 1
+
+log_level: INFO
+log_facility_id: local
+
+# No checkpointing for eval runs
+checkpoint_every_steps: 0
+
+tags:
+  - evaluation
+  - quick
+  - checkpoint_test

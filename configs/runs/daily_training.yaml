@@ -1,0 +1,47 @@
+# Daily Training Run Configuration
+# A continuous training run optimized for overnight execution
+
+id: daily_training
+type: training
+name: Daily Training Run
+description: Standard overnight training session with checkpointing
+
+# Target facility for execution
+facility_id: local
+
+# Hero (model) to train
+hero_id: qwen3_hero
+
+# Quest filters - which problems to train on
+quest_filters:
+  skills:
+    - logic_weaving
+    - pattern_recognition
+  min_difficulty: 2
+  max_difficulty: 4
+
+# Limits
+max_steps: 10000
+max_duration_seconds: 28800  # 8 hours
+
+# Hyperparameters
+hyperparams:
+  learning_rate: 0.0004
+  batch_size: 16
+  gradient_accumulation: 4
+  warmup_steps: 100
+  weight_decay: 0.01
+
+# Logging
+log_level: INFO
+log_facility_id: local
+
+# Checkpointing
+checkpoint_every_steps: 1000
+checkpoint_facility_id: local
+
+# Tags for filtering
+tags:
+  - production
+  - overnight
+  - standard

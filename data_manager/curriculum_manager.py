@@ -133,13 +133,15 @@ class CurriculumManager:
 
             return state
 
-        # Default state - start with SYLLO level 1
+        # Default state - start at level 0 (no mastery yet)
+        # current_level = highest level MASTERED (0 = haven't proven any skill)
+        # training_level = current_level + 1 (what you're working on)
         return {
             "skills": {
-                "syllo": {"current_level": 1, "accuracy_history": [], "progression_history": []},
-                "binary": {"current_level": 1, "accuracy_history": [], "progression_history": []},
+                "syllo": {"current_level": 0, "accuracy_history": [], "progression_history": []},
+                "binary": {"current_level": 0, "accuracy_history": [], "progression_history": []},
             },
-            "active_skill": "syllo",
+            "active_skill": "binary",  # Binary only for now
             "started_at": datetime.now().isoformat()
         }
 
@@ -156,13 +158,24 @@ class CurriculumManager:
             raise ValueError(f"Unknown skill: {skill}")
         return SKILL_LEVELS[skill]
 
-    def get_current_level(self, skill: str) -> Dict[str, Any]:
-        """Get current level configuration for a skill"""
+    def get_mastered_level(self, skill: str) -> int:
+        """Get the highest level mastered for a skill (0 = none)."""
+        return self.state["skills"][skill]["current_level"]
+
+    def get_training_level(self, skill: str) -> int:
+        """Get the level currently being trained on (mastered + 1)."""
+        mastered = self.get_mastered_level(skill)
         skill_config = self.get_skill_config(skill)
-        current_level = self.state["skills"][skill]["current_level"]
+        max_level = skill_config["total_levels"]
+        return min(mastered + 1, max_level)
+
+    def get_current_level(self, skill: str) -> Dict[str, Any]:
+        """Get current TRAINING level configuration for a skill."""
+        skill_config = self.get_skill_config(skill)
+        training_level = self.get_training_level(skill)
 
         for lvl in skill_config["levels"]:
-            if lvl["level"] == current_level:
+            if lvl["level"] == training_level:
                 return lvl
 
         # Fallback to first level
@@ -173,12 +186,13 @@ class CurriculumManager:
         Get parameters for skill_api_client.generate_skill_data()
 
         Returns params ready to pass to the API.
+        Uses training_level (mastered + 1), not mastered level.
         """
-        current_level = self.get_current_level(skill)
+        training_level = self.get_training_level(skill)
 
         return {
             "skill": skill,
-            "level": current_level["level"],
+            "level": training_level,
             "count": count,
         }
 
@@ -206,11 +220,14 @@ class CurriculumManager:
             }
 
         skill_state = self.state["skills"][skill]
+        training_level = self.get_training_level(skill)
+        mastered_level = self.get_mastered_level(skill)
 
         record = {
             "step": step,
             "accuracy": accuracy,
-            "level": skill_state["current_level"],
+            "training_level": training_level,  # Level being tested
+            "mastered_level": mastered_level,  # Level already earned
             "timestamp": datetime.now().isoformat()
         }
         if metadata:
@@ -223,11 +240,11 @@ class CurriculumManager:
             skill_state["accuracy_history"] = skill_state["accuracy_history"][-100:]
 
         self._save_state()
-        logger.info(f"[{skill}] Recorded accuracy: {accuracy:.1%} at step {step} (Level {skill_state['current_level']})")
+        logger.info(f"[{skill}] Recorded accuracy: {accuracy:.1%} at step {step} (Training L{training_level}, Mastered L{mastered_level})")
 
     def should_progress(self, skill: str) -> Tuple[bool, str]:
         """
-        Check if should progress to next level.
+        Check if should progress to next level (earn the training level).
 
         Returns:
             (should_progress, reason)
@@ -236,25 +253,27 @@ class CurriculumManager:
             return False, "Curriculum disabled"
 
         skill_state = self.state["skills"].get(skill, {})
-        current_level_num = skill_state.get("current_level", 1)
+        mastered_level = skill_state.get("current_level", 0)
+        training_level = self.get_training_level(skill)
 
         skill_config = self.get_skill_config(skill)
-        current_level = self.get_current_level(skill)
+        current_level_config = self.get_current_level(skill)  # Training level config
 
-        # Check if at max level
-        if current_level_num >= skill_config["total_levels"]:
-            return False, f"Already at max level ({skill_config['total_levels']})"
+        # Check if already mastered max level
+        if mastered_level >= skill_config["total_levels"]:
+            return False, f"Already mastered max level ({skill_config['total_levels']})"
 
-        threshold = current_level.get("threshold")
+        threshold = current_level_config.get("threshold")
         if threshold is None:
             return False, "Skill mastered (no threshold)"
 
-        # Get recent evals at current level
+        # Get recent evals at current TRAINING level
         history = skill_state.get("accuracy_history", [])
-        at_level = [r for r in history if r.get("level") == current_level_num]
+        # Support both old format (level) and new format (training_level)
+        at_level = [r for r in history if r.get("training_level", r.get("level")) == training_level]
 
         if len(at_level) < self.min_evals:
-            return False, f"Need {self.min_evals} evals at level (have {len(at_level)})"
+            return False, f"Need {self.min_evals} evals at L{training_level} (have {len(at_level)})"
 
         # Check last N evals
         recent = at_level[-self.min_evals:]
@@ -266,30 +285,38 @@ class CurriculumManager:
         return False, f"Avg accuracy {avg_accuracy:.1%} < threshold {threshold:.0%}"
 
     def progress_to_next_level(self, skill: str) -> Dict[str, Any]:
-        """Progress to next level."""
+        """
+        Earn the current training level (mastered level increases by 1).
+
+        Example: If mastered=0, training=1, and you pass:
+          -> mastered becomes 1, next training becomes 2
+        """
         skill_state = self.state["skills"][skill]
-        old_level = skill_state["current_level"]
-        new_level = old_level + 1
+        old_mastered = skill_state["current_level"]
+        earned_level = self.get_training_level(skill)  # The level just passed
+        new_mastered = earned_level  # Now mastered up to this level
 
         skill_config = self.get_skill_config(skill)
-        if new_level > skill_config["total_levels"]:
-            new_level = skill_config["total_levels"]
+        if new_mastered > skill_config["total_levels"]:
+            new_mastered = skill_config["total_levels"]
 
         # Record progression
         progression = {
-            "from_level": old_level,
-            "to_level": new_level,
+            "earned_level": earned_level,
+            "old_mastered": old_mastered,
+            "new_mastered": new_mastered,
             "timestamp": datetime.now().isoformat()
         }
         skill_state["progression_history"].append(progression)
-        skill_state["current_level"] = new_level
+        skill_state["current_level"] = new_mastered
 
         self._save_state()
 
-        new_level_config = self.get_current_level(skill)
-        logger.info(f"[{skill}] PROGRESSION: Level {old_level} -> {new_level} ({new_level_config['name']})")
+        # Get the NEW training level config (what they'll work on next)
+        new_training_config = self.get_current_level(skill)
+        logger.info(f"[{skill}] LEVEL EARNED! Mastered L{old_mastered} -> L{new_mastered}. Now training on L{self.get_training_level(skill)}")
 
-        return new_level_config
+        return new_training_config
 
     def check_and_progress(
         self,

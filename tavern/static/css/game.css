@@ -1,0 +1,996 @@
+/* ========================================
+   REALM OF TRAINING - Game UI Styles
+   ======================================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Dark Fantasy Theme */
+    --bg-dark: #0a0c10;
+    --bg-panel: #12151c;
+    --bg-card: #1a1e28;
+    --bg-highlight: #242a38;
+    --border-color: #2d3548;
+    --border-gold: #c9a227;
+
+    /* Text */
+    --text-primary: #e8e6e3;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    --text-gold: #fbbf24;
+
+    /* Game Colors */
+    --color-gold: #fbbf24;
+    --color-xp: #a855f7;
+    --color-health: #22c55e;
+    --color-damage: #ef4444;
+    --color-defense: #3b82f6;
+    --color-mana: #06b6d4;
+
+    /* Status */
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-danger: #ef4444;
+
+    /* Fonts */
+    --font-title: 'Cinzel', serif;
+    --font-body: 'Inter', sans-serif;
+
+    /* Effects */
+    --glow-gold: 0 0 20px rgba(251, 191, 36, 0.3);
+    --glow-purple: 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+body {
+    font-family: var(--font-body);
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+}
+
+/* ========================================
+   HEADER
+   ======================================== */
+
+.game-header {
+    background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-dark) 100%);
+    border-bottom: 2px solid var(--border-gold);
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.game-title {
+    font-family: var(--font-title);
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--color-gold) 0%, #f59e0b 50%, var(--color-gold) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: var(--glow-gold);
+}
+
+.resource-bar {
+    display: flex;
+    gap: 2rem;
+}
+
+.resource {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.resource-icon {
+    font-size: 1.1rem;
+}
+
+.resource-value {
+    font-weight: 600;
+    font-size: 1rem;
+    font-family: 'Courier New', monospace;
+}
+
+.resource-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.resource.steps .resource-value { color: var(--color-xp); }
+.resource.evals .resource-value { color: var(--color-success); }
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.idle-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.idle-indicator.active {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+    animation: battlePulse 1s ease-in-out infinite;
+}
+
+@keyframes battlePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    50% { box-shadow: 0 0 10px 2px rgba(239, 68, 68, 0.2); }
+}
+
+.time-display {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+/* ========================================
+   MAIN LAYOUT
+   ======================================== */
+
+.game-main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr 300px;
+    gap: 1rem;
+    padding: 1rem;
+    max-width: 1800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* ========================================
+   HERO PANEL (LEFT)
+   ======================================== */
+
+.hero-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.hero-frame {
+    position: relative;
+    background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-panel) 100%);
+    border: 2px solid var(--border-gold);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    overflow: hidden;
+}
+
+.hero-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(251, 191, 36, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.hero-portrait {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-ascii {
+    display: flex;
+    justify-content: center;
+}
+
+.skeptic-art {
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.1;
+    color: var(--text-secondary);
+    text-shadow: 0 0 10px rgba(200, 200, 200, 0.3);
+}
+
+.skeptic-art .hair { color: #9ca3af; }
+.skeptic-art .face { color: #d4a574; }
+.skeptic-art .eye { color: #06b6d4; }
+.skeptic-art .nose { color: #d4a574; }
+.skeptic-art .mouth { color: #b8907a; }
+.skeptic-art .beard { color: #e5e7eb; }
+.skeptic-art .robe { color: #6366f1; }
+
+.dio-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: #00ff00;
+    padding: 1rem;
+}
+
+.dio-preview {
+    font-size: 4rem;
+    margin-bottom: 0.5rem;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.dio-icon {
+    font-size: 4rem;
+    animation: pulse 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 15px rgba(0, 255, 100, 0.5));
+}
+
+.view-text {
+    font-size: 0.9rem;
+    color: #6b7280;
+    transition: color 0.3s;
+}
+
+.dio-link:hover .view-text {
+    color: #00ff00;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+}
+
+.hero-info {
+    text-align: center;
+    padding: 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.hero-name {
+    font-family: var(--font-title);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-gold);
+    text-shadow: var(--glow-gold);
+    margin-bottom: 0.25rem;
+}
+
+.hero-title {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: 0.5rem;
+}
+
+.hero-class {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: rgba(168, 85, 247, 0.2);
+    border: 1px solid var(--color-xp);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--color-xp);
+}
+
+.hero-level-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    flex-wrap: wrap;
+}
+
+.level-badge {
+    background: linear-gradient(135deg, var(--color-gold) 0%, #f59e0b 100%);
+    color: var(--bg-dark);
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    cursor: help;
+}
+
+.current-skill {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    background: var(--bg-dark);
+    border: 1px solid var(--color-mana);
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+
+.current-skill .skill-training {
+    color: var(--text-muted);
+}
+
+.current-skill .skill-name {
+    color: var(--color-mana);
+    font-weight: 600;
+}
+
+.current-skill .skill-lvl {
+    color: var(--color-success);
+    font-weight: 700;
+}
+
+.hero-stats {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.stat-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-row:last-child {
+    margin-bottom: 0;
+}
+
+.stat {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--bg-dark);
+    border-radius: 4px;
+    cursor: help;
+    position: relative;
+}
+
+.stat:hover {
+    background: var(--bg-highlight);
+}
+
+/* Custom tooltip styling - z-index 9999 to appear above all panels */
+[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-panel);
+    border: 1px solid var(--border-gold);
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 9999;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+}
+
+[title] {
+    position: relative;
+}
+
+.battle-stat[title] {
+    cursor: help;
+}
+
+.battle-stat[title]:hover {
+    background: var(--bg-highlight);
+}
+
+.stat-icon {
+    font-size: 1rem;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-value {
+    margin-left: auto;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    color: var(--text-primary);
+}
+
+/* ========================================
+   BATTLE PANEL (CENTER)
+   ======================================== */
+
+.battle-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.battle-status {
+    background: var(--bg-panel);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.5rem;
+    min-height: 250px;
+}
+
+.battle-status.fighting {
+    border-color: var(--color-danger);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+}
+
+.battle-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.battle-icon {
+    font-size: 2rem;
+}
+
+.battle-title {
+    font-family: var(--font-title);
+    font-size: 1.5rem;
+    color: var(--text-primary);
+}
+
+.battle-status.fighting .battle-title {
+    color: var(--color-danger);
+}
+
+.quest-info {
+    margin-bottom: 1.5rem;
+}
+
+.quest-name {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    font-family: monospace;
+    word-break: break-all;
+}
+
+.quest-progress-container {
+    position: relative;
+    height: 32px;
+    background: var(--bg-dark);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.quest-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-damage), #f97316);
+    border-radius: 6px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.quest-progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.battle-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.battle-stat {
+    text-align: center;
+    padding: 1rem;
+    background: var(--bg-card);
+    border-radius: 8px;
+}
+
+.bs-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.bs-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+}
+
+.bs-value.damage { color: var(--color-damage); }
+.bs-value.defense { color: var(--color-defense); }
+
+/* Idle Progress */
+.idle-progress {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.idle-progress h4 {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.idle-reward {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    color: var(--color-xp);
+}
+
+.idle-ticker {
+    height: 40px;
+    position: relative;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.idle-tick {
+    position: absolute;
+    color: var(--color-xp);
+    font-weight: 700;
+    font-size: 0.9rem;
+    animation: floatUp 2s ease-out forwards;
+    opacity: 0;
+}
+
+@keyframes floatUp {
+    0% { transform: translateY(30px); opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { transform: translateY(-20px); opacity: 0; }
+}
+
+/* Activity Log */
+.activity-log {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.activity-log h4 {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.log-entries {
+    flex: 1;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+}
+
+.log-entry {
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-entry.success { color: var(--color-success); }
+.log-entry.warning { color: var(--color-warning); }
+.log-entry.error { color: var(--color-danger); }
+
+/* ========================================
+   GUILD PANEL (RIGHT)
+   ======================================== */
+
+.guild-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.panel-header {
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.panel-header h3 {
+    font-family: var(--font-title);
+    font-size: 1.1rem;
+    color: var(--color-gold);
+}
+
+/* Skill Cards */
+.skill-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--color-success);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.skill-card.locked {
+    opacity: 0.6;
+    border-left-color: var(--text-muted);
+}
+
+.skill-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.skill-icon {
+    font-size: 1.25rem;
+}
+
+.skill-name {
+    font-weight: 600;
+    flex: 1;
+}
+
+.skill-level {
+    font-size: 0.85rem;
+    color: var(--color-mana);
+    background: rgba(6, 182, 212, 0.15);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.skill-bar-container {
+    height: 8px;
+    background: var(--bg-dark);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.skill-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-success), var(--color-warning));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    width: 0%;
+}
+
+.skill-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+}
+
+.skill-acc {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.skill-desc {
+    color: var(--text-muted);
+}
+
+.skill-training {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding-top: 0.3rem;
+    border-top: 1px solid var(--border-color);
+    margin-top: 0.5rem;
+    opacity: 0.8;
+}
+
+.skill-card.active {
+    border-color: var(--skill-color, var(--accent-primary));
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
+.skill-card.active .skill-training {
+    color: var(--skill-color, var(--accent-primary));
+    opacity: 1;
+    font-weight: 500;
+}
+
+.skill-card.loading {
+    opacity: 0.5;
+}
+
+.skill-card.clickable {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.skill-card.clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border-color: var(--skill-color, var(--accent-primary));
+}
+
+/* Vault Card */
+.vault-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.vault-card .panel-header {
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.vault-stats {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.vault-stat {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+}
+
+.vs-label {
+    color: var(--text-secondary);
+}
+
+.vs-value {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+}
+
+/* Forge Card */
+.forge-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.forge-card .panel-header {
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.forge-stats {
+    padding: 1rem;
+}
+
+.forge-meter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.forge-meter:last-child {
+    margin-bottom: 0;
+}
+
+.meter-label {
+    width: 50px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.meter-bar-container {
+    flex: 1;
+    height: 12px;
+    background: var(--bg-dark);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.meter-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-success), var(--color-warning));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    width: 50%;
+}
+
+.meter-bar-container.temp .meter-bar {
+    background: linear-gradient(90deg, var(--color-mana), var(--color-warning), var(--color-danger));
+}
+
+.meter-value {
+    width: 60px;
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+/* ========================================
+   NAVIGATION
+   ======================================== */
+
+.game-nav {
+    background: var(--bg-panel);
+    border-top: 2px solid var(--border-gold);
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    position: sticky;
+    bottom: 0;
+}
+
+.nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.nav-btn:hover {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.nav-btn.active {
+    background: var(--bg-card);
+    border-color: var(--border-gold);
+    color: var(--color-gold);
+}
+
+.nav-icon {
+    font-size: 1.25rem;
+}
+
+.nav-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* ========================================
+   NOTIFICATIONS
+   ======================================== */
+
+.notifications {
+    position: fixed;
+    top: 80px;
+    right: 1rem;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.notification {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--color-gold);
+    border-radius: 8px;
+    padding: 1rem;
+    min-width: 280px;
+    animation: slideIn 0.3s ease;
+}
+
+.notification.success { border-left-color: var(--color-success); }
+.notification.warning { border-left-color: var(--color-warning); }
+.notification.error { border-left-color: var(--color-danger); }
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.notification-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.notification-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 1400px) {
+    .game-main {
+        grid-template-columns: 260px 1fr 280px;
+    }
+}
+
+@media (max-width: 1100px) {
+    .game-main {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-panel {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 1rem;
+    }
+
+    .hero-frame {
+        grid-row: span 2;
+    }
+
+    .guild-panel {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .game-header {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .resource-bar {
+        gap: 1rem;
+    }
+
+    .hero-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .guild-panel {
+        grid-template-columns: 1fr;
+    }
+}

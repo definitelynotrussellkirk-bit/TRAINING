@@ -193,10 +193,13 @@ class RetentionManager:
 
         # Scan checkpoints
         if self.checkpoints_dir.exists():
+            # Import canonical name parser (handles both legacy and new names)
+            from core.checkpoint_ledger import extract_step
+
             for checkpoint_dir in sorted(self.checkpoints_dir.glob("checkpoint-*")):
                 if checkpoint_dir.is_dir():
                     try:
-                        step = int(checkpoint_dir.name.split("-")[1])
+                        step = extract_step(checkpoint_dir.name)
                         size = self._get_dir_size(checkpoint_dir)
                         mtime = checkpoint_dir.stat().st_mtime
                         created = datetime.fromtimestamp(mtime).isoformat()
@@ -350,12 +353,11 @@ class RetentionManager:
             logger.error(f"Checkpoint {checkpoint_full} does not exist")
             return
 
-        # Extract step number
-        try:
-            step = int(checkpoint_path.name.split("-")[1])
-        except:
+        # Extract step number (handles canonical names like checkpoint-190000-20251127-1430)
+        from core.checkpoint_ledger import extract_step
+        step = extract_step(checkpoint_path.name)
+        if step == 0:
             logger.warning(f"Could not extract step from {checkpoint_path.name}")
-            step = 0
 
         # Create metadata
         metadata = CheckpointMetadata(

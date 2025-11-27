@@ -1,7 +1,7 @@
 {
-  "status": "training",
-  "last_update": "2025-11-26T18:47:51.950703",
-  "current_file": "train_SYLLO_L1_20251126_184659.jsonl",
+  "status": "idle",
+  "last_update": "2025-11-27T01:19:58.461126",
+  "current_file": "train_SYLLO_L1_20251127_011439.jsonl",
   "paused_at": "2025-11-21T05:13:38.792400",
   "reason": "Recovered from crash"
 }

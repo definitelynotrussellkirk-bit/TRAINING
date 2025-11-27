@@ -1,0 +1,83 @@
+#!/bin/bash
+# Branch Officer launcher script
+#
+# Start a Branch Officer daemon on a remote zone
+#
+# Usage:
+#   branch_officer 3090    # Start on 3090 with defaults
+#   branch_officer nas     # Start on NAS with defaults
+#   branch_officer --help  # Show help
+
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT="$BASE_DIR/vault/branch_officer.py"
+
+# Zone configurations
+declare -A ZONE_CONFIGS
+ZONE_CONFIGS["3090"]="--zone 3090 --port 8768 --base-dir /path/to/models"
+ZONE_CONFIGS["nas"]="--zone nas --port 8768 --base-dir /volume1/data/llm_training"
+
+show_help() {
+    echo "Branch Officer Launcher"
+    echo ""
+    echo "Usage:"
+    echo "  branch_officer <zone>           Start Branch Officer for a zone"
+    echo "  branch_officer <zone> --daemon  Run in background"
+    echo "  branch_officer --help           Show this help"
+    echo ""
+    echo "Zones:"
+    echo "  3090   RTX 3090 inference server (192.168.x.x)"
+    echo "  nas    Synology NAS storage (192.168.x.x)"
+    echo ""
+    echo "Examples:"
+    echo "  # Start on 3090 (run this ON the 3090):"
+    echo "  branch_officer 3090"
+    echo ""
+    echo "  # Start on 3090 in background:"
+    echo "  branch_officer 3090 --daemon"
+    echo ""
+    echo "  # SSH and start on 3090 from 4090:"
+    echo "  ssh user@xxx.xxx.88.149 'python3 /path/to/training/vault/branch_officer.py --zone 3090 --port 8768 --base-dir /path/to/models'"
+    echo ""
+    echo "Endpoints (once running):"
+    echo "  GET  /status       Zone health and status"
+    echo "  GET  /assets       List local assets"
+    echo "  GET  /fetch/<id>   Get asset details/transfer info"
+    echo "  POST /scan         Scan for new assets"
+    echo "  POST /receive      Prepare to receive asset"
+}
+
+if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+    show_help
+    exit 0
+fi
+
+if [ -z "$1" ]; then
+    echo "Error: Zone required"
+    echo ""
+    show_help
+    exit 1
+fi
+
+ZONE="$1"
+DAEMON="$2"
+
+if [ -z "${ZONE_CONFIGS[$ZONE]}" ]; then
+    echo "Error: Unknown zone '$ZONE'"
+    echo "Valid zones: 3090, nas"
+    exit 1
+fi
+
+CONFIG="${ZONE_CONFIGS[$ZONE]}"
+
+if [ "$DAEMON" == "--daemon" ]; then
+    LOG_DIR="$BASE_DIR/logs"
+    mkdir -p "$LOG_DIR"
+    echo "Starting Branch Officer '$ZONE' in background..."
+    nohup python3 "$SCRIPT" $CONFIG > "$LOG_DIR/branch_officer_$ZONE.log" 2>&1 &
+    PID=$!
+    echo "Started with PID $PID"
+    echo "Log: $LOG_DIR/branch_officer_$ZONE.log"
+else
+    echo "Starting Branch Officer '$ZONE'..."
+    exec python3 "$SCRIPT" $CONFIG
+fi

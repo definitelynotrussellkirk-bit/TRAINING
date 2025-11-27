@@ -320,7 +320,7 @@ class TrainingDaemon:
                 "load_in_4bit": False,  # 4-bit quantization (reduces VRAM but lower quality)
                 "eval_steps": 100,
                 "num_eval_samples": 5,
-                "save_steps": 500,
+                "save_steps": 10000,
                 "poll_interval": 60,  # Check inbox every 60 seconds
                 "snapshot_time": "02:00",  # Daily snapshot at 2 AM
                 "auto_generate": {
@@ -1006,7 +1006,7 @@ class TrainingDaemon:
         args.warmup_steps = self.config.get("warmup_steps", 100)
         args.log_steps = self.config.get("log_steps", 10)
         args.eval_steps = self.config.get("eval_steps", 500)
-        args.save_steps = self.config.get("save_steps", 1000)
+        args.save_steps = self.config.get("save_steps", 10000)
         args.num_eval_samples = self.config.get("num_eval_samples", 2)
         args.load_in_4bit = self.config.get("load_in_4bit", False)
 

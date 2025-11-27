@@ -1,0 +1,162 @@
+#!/bin/bash
+# tavern - Start/stop/status/watch the Tavern server
+#
+# Usage:
+#   tavern start       Start the Tavern
+#   tavern stop        Stop the Tavern
+#   tavern restart     Restart the Tavern
+#   tavern status      Check Tavern status
+#   tavern watch       Watch and auto-restart (background)
+#   tavern logs        Tail the logs
+
+set -e
+
+BASE_DIR="/path/to/training"
+PID_FILE="$BASE_DIR/.pids/tavern.pid"
+LOG_FILE="$BASE_DIR/logs/tavern.log"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+cmd_start() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if kill -0 "$PID" 2>/dev/null; then
+            echo -e "${YELLOW}Tavern already running (PID $PID)${NC}"
+            return 0
+        fi
+        rm -f "$PID_FILE"
+    fi
+
+    echo "Starting Tavern..."
+    cd "$BASE_DIR"
+    nohup python3 tavern/server.py --port 8888 --log-to-file > /dev/null 2>&1 &
+    sleep 2
+
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if curl -s http://localhost:8888/health > /dev/null 2>&1; then
+            echo -e "${GREEN}Tavern started (PID $PID)${NC}"
+            echo "Visit: http://localhost:8888"
+        else
+            echo -e "${YELLOW}Tavern started but health check pending (PID $PID)${NC}"
+        fi
+    else
+        echo -e "${RED}Failed to start Tavern${NC}"
+        return 1
+    fi
+}
+
+cmd_stop() {
+    if [ ! -f "$PID_FILE" ]; then
+        echo "Tavern not running (no PID file)"
+        return 0
+    fi
+
+    PID=$(cat "$PID_FILE")
+    if ! kill -0 "$PID" 2>/dev/null; then
+        echo "Tavern not running (stale PID file)"
+        rm -f "$PID_FILE"
+        return 0
+    fi
+
+    echo "Stopping Tavern (PID $PID)..."
+    kill "$PID"
+
+    # Wait for graceful shutdown
+    for i in {1..10}; do
+        if ! kill -0 "$PID" 2>/dev/null; then
+            echo -e "${GREEN}Tavern stopped${NC}"
+            return 0
+        fi
+        sleep 1
+    done
+
+    # Force kill
+    echo "Force killing..."
+    kill -9 "$PID" 2>/dev/null || true
+    rm -f "$PID_FILE"
+    echo -e "${YELLOW}Tavern force stopped${NC}"
+}
+
+cmd_restart() {
+    cmd_stop
+    sleep 1
+    cmd_start
+}
+
+cmd_status() {
+    if [ ! -f "$PID_FILE" ]; then
+        echo -e "${RED}Tavern: NOT RUNNING${NC} (no PID file)"
+        return 1
+    fi
+
+    PID=$(cat "$PID_FILE")
+    if ! kill -0 "$PID" 2>/dev/null; then
+        echo -e "${RED}Tavern: NOT RUNNING${NC} (stale PID $PID)"
+        return 1
+    fi
+
+    # Check health
+    if curl -s http://localhost:8888/health > /dev/null 2>&1; then
+        echo -e "${GREEN}Tavern: RUNNING${NC} (PID $PID)"
+        echo "  URL: http://localhost:8888"
+        echo "  PID: $PID_FILE"
+        echo "  Log: $LOG_FILE"
+        return 0
+    else
+        echo -e "${YELLOW}Tavern: RUNNING (unhealthy)${NC} (PID $PID)"
+        return 1
+    fi
+}
+
+cmd_watch() {
+    echo "Starting Tavern watcher (auto-restart on failure)..."
+    cd "$BASE_DIR"
+    nohup python3 -m sentinels.service_watcher tavern --interval 30 > logs/tavern_watcher.log 2>&1 &
+    WATCHER_PID=$!
+    echo $WATCHER_PID > .pids/tavern_watcher.pid
+    echo -e "${GREEN}Watcher started (PID $WATCHER_PID)${NC}"
+    echo "Log: logs/tavern_watcher.log"
+}
+
+cmd_logs() {
+    if [ -f "$LOG_FILE" ]; then
+        tail -f "$LOG_FILE"
+    else
+        echo "No log file found at $LOG_FILE"
+    fi
+}
+
+cmd_help() {
+    echo "Usage: tavern <command>"
+    echo ""
+    echo "Commands:"
+    echo "  start     Start the Tavern server"
+    echo "  stop      Stop the Tavern server"
+    echo "  restart   Restart the Tavern server"
+    echo "  status    Check if Tavern is running"
+    echo "  watch     Start watcher for auto-restart"
+    echo "  logs      Tail the log file"
+    echo ""
+    echo "URLs:"
+    echo "  Game UI:  http://localhost:8888"
+}
+
+case "${1:-help}" in
+    start)   cmd_start ;;
+    stop)    cmd_stop ;;
+    restart) cmd_restart ;;
+    status)  cmd_status ;;
+    watch)   cmd_watch ;;
+    logs)    cmd_logs ;;
+    help|--help|-h) cmd_help ;;
+    *)
+        echo "Unknown command: $1"
+        cmd_help
+        exit 1
+        ;;
+esac

@@ -88,9 +88,20 @@ class CurriculumEvalLoop:
     def _get_current_model(self) -> str:
         """Get currently loaded model from inference server"""
         try:
-            resp = requests.get(f"{self.inference_url}/models/info", timeout=10)
+            resp = requests.get(
+                f"{self.inference_url}/models/info",
+                headers={"X-API-Key": self.api_key},
+                timeout=10
+            )
             if resp.status_code == 200:
                 data = resp.json()
+                # New pool API returns list of models
+                models = data.get("models", [])
+                if models:
+                    model_id = models[0].get("model_id", "current")
+                    logger.info(f"Detected model from inference server: {model_id}")
+                    return model_id
+                # Fallback to old format
                 model = data.get("model_name", data.get("loaded_model", "current"))
                 logger.info(f"Detected model from inference server: {model}")
                 return model
@@ -502,6 +513,48 @@ class CurriculumEvalLoop:
 
         with open(self.status_file, "w") as f:
             json.dump(status, f, indent=2)
+
+        # Also save to eval history (last 5 per skill per level)
+        self._save_eval_history(eval_result)
+
+    def _save_eval_history(self, eval_result: Dict):
+        """Save eval result to history file (last 5 per skill per level)."""
+        history_file = self.base_dir / "status" / "eval_results_history.json"
+
+        # Load existing history
+        history = {}
+        if history_file.exists():
+            try:
+                with open(history_file) as f:
+                    history = json.load(f)
+            except Exception:
+                history = {}
+
+        skill = eval_result.get("skill", "unknown")
+        level = str(eval_result.get("level", 1))
+
+        # Initialize structure if needed
+        if skill not in history:
+            history[skill] = {}
+        if level not in history[skill]:
+            history[skill][level] = []
+
+        # Add this eval to history
+        history[skill][level].insert(0, {
+            "timestamp": eval_result.get("timestamp"),
+            "step": eval_result.get("step"),
+            "accuracy": eval_result.get("accuracy"),
+            "correct": eval_result.get("correct"),
+            "total": eval_result.get("total"),
+            "results": eval_result.get("results", []),
+        })
+
+        # Keep only last 5 per level
+        history[skill][level] = history[skill][level][:5]
+
+        # Save
+        with open(history_file, "w") as f:
+            json.dump(history, f, indent=2)
 
     def run_loop(self):
         """Main evaluation loop."""

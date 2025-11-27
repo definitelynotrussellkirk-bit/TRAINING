@@ -4,12 +4,15 @@ Guild Trainer - A generic framework for LLM training with RPG-style progression.
 The Guild framework provides:
 - Skills: Trainable capabilities with metrics and progression
 - Quests: Task instances with templates and evaluation
+- Dispatch: Quest coordination from Trainers to Quest Board
 - Progression: XP, levels, and status effects
 - Facilities: Hardware abstraction for multi-machine setups
 - Runs: Unified training/eval/audit execution
 - Incidents: Structured error tracking
 - Combat: Result calculation (CRIT/HIT/MISS)
 - Consistency: World model validation
+- Herald: Event bus for broadcasting events across the realm
+- Saga: Persistent narrative log (scrolling chat log for Tavern UI)
 
 Quick Start:
     import guild
@@ -24,6 +27,17 @@ Quick Start:
     config = guild.RunConfig(id="train", type=guild.RunType.TRAINING)
     run = guild.create_run(config)
     guild.start_run(run.run_id)
+
+Event System:
+    # Subscribe to events
+    guild.subscribe(guild.EventType.LEVEL_UP, my_callback)
+
+    # Emit events (auto-recorded to Saga)
+    guild.emit(guild.EventType.LEVEL_UP, {"hero": "DIO", "level": 42})
+
+    # Read narrative log
+    saga, bridge = guild.connect_herald_to_saga("/path/to/training")
+    tales = guild.recent(limit=50)
 """
 
 __version__ = "0.1.0"
@@ -239,6 +253,59 @@ from guild.consistency import (
     get_rules_by_entity,
 )
 
+# Dispatch system (quest coordination)
+from guild.dispatch import (
+    # Types
+    DispatchDecision,
+    QuestVerdict,
+    DispatchStatus,
+    DispatchResult,
+    QualityReport,
+    ProgressionStatus,
+    # Quality Gate
+    QuestQualityGate,
+    # Progression Advisor
+    ProgressionAdvisor,
+    SKILL_CURRICULA,
+    # Quest Dispatcher
+    QuestDispatcher,
+)
+
+# Herald (event bus)
+from guild.herald import (
+    # Types
+    Event,
+    EventType,
+    # Herald class
+    Herald,
+    # Convenience functions
+    get_herald,
+    emit,
+    subscribe,
+    unsubscribe,
+)
+
+# Saga (narrative log)
+from guild.saga import (
+    # Types
+    TaleCategory,
+    TaleEntry,
+    TALE_ICONS,
+    # Writer
+    SagaWriter,
+    init_saga,
+    get_saga,
+    tell,
+    # Reader
+    SagaReader,
+    init_reader,
+    get_reader,
+    recent,
+    # Bridge
+    HeraldBridge,
+    connect_herald_to_saga,
+)
+
 __all__ = [
     # Facilities
     "init_resolver",
@@ -420,4 +487,42 @@ __all__ = [
     "get_skill_rules",
     "get_all_rules",
     "get_rules_by_entity",
+    # Dispatch - types
+    "DispatchDecision",
+    "QuestVerdict",
+    "DispatchStatus",
+    "DispatchResult",
+    "QualityReport",
+    "ProgressionStatus",
+    # Dispatch - components
+    "QuestQualityGate",
+    "ProgressionAdvisor",
+    "SKILL_CURRICULA",
+    "QuestDispatcher",
+    # Herald - types
+    "Event",
+    "EventType",
+    # Herald - class and functions
+    "Herald",
+    "get_herald",
+    "emit",
+    "subscribe",
+    "unsubscribe",
+    # Saga - types
+    "TaleCategory",
+    "TaleEntry",
+    "TALE_ICONS",
+    # Saga - writer
+    "SagaWriter",
+    "init_saga",
+    "get_saga",
+    "tell",
+    # Saga - reader
+    "SagaReader",
+    "init_reader",
+    "get_reader",
+    "recent",
+    # Saga - bridge
+    "HeraldBridge",
+    "connect_herald_to_saga",
 ]

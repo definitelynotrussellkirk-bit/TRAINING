@@ -32,15 +32,66 @@ class MetricDefinition:
 
 
 @dataclass
+class SkillDisplay:
+    """Display configuration for Tavern UI."""
+    icon: str = "🎯"           # Emoji icon
+    color: str = "#8B5CF6"     # Hex color for UI theming
+    short_name: str = "SKL"    # 2-4 char abbreviation
+
+
+@dataclass
+class SkillAPI:
+    """API server configuration for training data generation."""
+    url: str                            # e.g., http://localhost:8080
+    source_dir: Optional[str] = None    # Source code location
+    start_command: Optional[str] = None # How to start the API
+    endpoints: dict[str, str] = field(default_factory=lambda: {
+        "health": "GET /health",
+        "info": "GET /info",
+        "levels": "GET /levels",
+        "generate": "POST /generate",
+    })
+
+
+@dataclass
+class SkillEval:
+    """Evaluation configuration."""
+    samples_per_level: int = 5          # Fixed eval samples per level
+    endpoint: str = "/eval"             # GET /eval?level=N
+    local_cache: str = ""               # Where to cache eval sets
+    combinatorial_space: str = "infinite"
+    overlap_probability: str = "~0"
+
+
+@dataclass
 class SkillConfig:
     """
     Configuration for a trainable skill/discipline.
     Loaded from configs/skills/{id}.yaml
+
+    This is the SINGLE SOURCE OF TRUTH for skill configuration.
+    All skill metadata, API config, display settings, and eval config
+    are loaded from YAML and stored here.
     """
     id: str
     name: str
     description: str
     category: SkillCategory
+
+    # Version - must match API's /info version
+    version: str = "1.0.0"
+
+    # Level system
+    max_level: int = 10
+
+    # Display (for Tavern UI)
+    display: SkillDisplay = field(default_factory=SkillDisplay)
+
+    # API server config
+    api: Optional[SkillAPI] = None
+
+    # Evaluation config
+    eval: SkillEval = field(default_factory=SkillEval)
 
     tags: list[str] = field(default_factory=list)
     metrics: list[str] = field(default_factory=list)
@@ -64,6 +115,26 @@ class SkillConfig:
         if level > max_defined:
             return self.accuracy_thresholds[max_defined]
         return 0.6
+
+    @property
+    def api_url(self) -> Optional[str]:
+        """Get API URL (convenience property)."""
+        return self.api.url if self.api else None
+
+    @property
+    def icon(self) -> str:
+        """Get display icon (convenience property)."""
+        return self.display.icon
+
+    @property
+    def color(self) -> str:
+        """Get display color (convenience property)."""
+        return self.display.color
+
+    @property
+    def short_name(self) -> str:
+        """Get short name (convenience property)."""
+        return self.display.short_name
 
 
 @dataclass

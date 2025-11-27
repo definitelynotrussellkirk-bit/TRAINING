@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oracle - Talk to DIO</title>
+    <link rel="stylesheet" href="/static/css/game.css">
+    <style>
+        .oracle-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .oracle-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .oracle-header h1 {
+            color: var(--accent);
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .oracle-header .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .oracle-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+
+        /* Sidebar - Checkpoint Selection */
+        .checkpoint-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .checkpoint-panel h2 {
+            color: var(--accent);
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .host-selector {
+            margin-bottom: 20px;
+        }
+
+        .host-selector label {
+            display: block;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .host-selector select {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg);
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: inherit;
+        }
+
+        .host-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 0.85rem;
+        }
+
+        .host-status .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+        }
+
+        .host-status .status-dot.online {
+            background: var(--success);
+        }
+
+        .checkpoint-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .checkpoint-item {
+            padding: 12px;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .checkpoint-item:hover {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .checkpoint-item.selected {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.2);
+        }
+
+        .checkpoint-item.loaded {
+            border-color: var(--success);
+        }
+
+        .checkpoint-item .step {
+            font-weight: bold;
+            color: var(--text);
+        }
+
+        .checkpoint-item .stats {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .checkpoint-item .skill-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--accent);
+            border-radius: 10px;
+            font-size: 0.75rem;
+            color: white;
+            margin-top: 4px;
+        }
+
+        .load-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: opacity 0.2s;
+        }
+
+        .load-btn:hover {
+            opacity: 0.9;
+        }
+
+        .load-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Chat Panel */
+        .chat-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            height: 70vh;
+        }
+
+        .chat-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header .model-info {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .chat-header .model-info .loaded-model {
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            max-width: 80%;
+        }
+
+        .message.user {
+            margin-left: auto;
+        }
+
+        .message .bubble {
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.5;
+        }
+
+        .message.user .bubble {
+            background: var(--accent);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .bubble {
+            background: var(--bg);
+            border: 1px solid var(--card-border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message .sender {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .message.user .sender {
+            text-align: right;
+        }
+
+        .chat-input {
+            padding: 15px 20px;
+            border-top: 1px solid var(--card-border);
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input textarea {
+            flex: 1;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: inherit;
+            resize: none;
+            min-height: 50px;
+        }
+
+        .chat-input button {
+            padding: 12px 24px;
+            background: var(--accent);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            align-self: flex-end;
+        }
+
+        .chat-input button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Loading States */
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-muted);
+        }
+
+        .loading .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--card-border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .oracle-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .checkpoint-panel {
+                order: 2;
+            }
+
+            .chat-panel {
+                height: 50vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">Realm of Training</a>
+        <div class="nav-links">
+            <a href="/">Game</a>
+            <a href="/vault">Vault</a>
+            <a href="/oracle" class="active">Oracle</a>
+            <a href="/settings">Settings</a>
+        </div>
+    </nav>
+
+    <div class="oracle-container">
+        <div class="oracle-header">
+            <h1>The Oracle</h1>
+            <p class="subtitle">Consult with DIO - Your AI Champion</p>
+        </div>
+
+        <div class="oracle-layout">
+            <!-- Checkpoint Selection Panel -->
+            <div class="checkpoint-panel">
+                <h2>Select Version</h2>
+
+                <div class="host-selector">
+                    <label>Inference Host</label>
+                    <select id="hostSelect">
+                        <option value="3090">RTX 3090 (192.168.x.x)</option>
+                    </select>
+                    <div class="host-status">
+                        <span class="status-dot" id="hostDot"></span>
+                        <span id="hostStatusText">Checking...</span>
+                    </div>
+                </div>
+
+                <h2>Checkpoints</h2>
+                <div class="checkpoint-list" id="checkpointList">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <span>Loading checkpoints...</span>
+                    </div>
+                </div>
+
+                <button class="load-btn" id="loadBtn" disabled>Load Selected Checkpoint</button>
+            </div>
+
+            <!-- Chat Panel -->
+            <div class="chat-panel">
+                <div class="chat-header">
+                    <h2>Chat with DIO</h2>
+                    <div class="model-info">
+                        Loaded: <span class="loaded-model" id="loadedModel">None</span>
+                    </div>
+                </div>
+
+                <div class="chat-messages" id="chatMessages">
+                    <div class="empty-state">
+                        <div class="icon">🔮</div>
+                        <p>Select and load a checkpoint to begin</p>
+                    </div>
+                </div>
+
+                <div class="chat-input">
+                    <textarea id="messageInput" placeholder="Ask DIO anything..." disabled></textarea>
+                    <button id="sendBtn" disabled>Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const $ = (sel) => document.querySelector(sel);
+        const $$ = (sel) => document.querySelectorAll(sel);
+
+        // State
+        let selectedCheckpoint = null;
+        let loadedCheckpoint = null;
+        let currentHost = '3090';
+        let conversationHistory = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCheckpoints();
+            checkHostStatus();
+
+            // Event listeners
+            $('#hostSelect').addEventListener('change', (e) => {
+                currentHost = e.target.value;
+                checkHostStatus();
+            });
+
+            $('#loadBtn').addEventListener('click', loadSelectedCheckpoint);
+            $('#sendBtn').addEventListener('click', sendMessage);
+            $('#messageInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
+
+        async function loadCheckpoints() {
+            try {
+                const response = await fetch('/ledger?limit=20');
+                const data = await response.json();
+
+                const list = $('#checkpointList');
+
+                if (!data.checkpoints || data.checkpoints.length === 0) {
+                    list.innerHTML = `
+                        <div class="empty-state">
+                            <p>No checkpoints in ledger yet</p>
+                            <p style="font-size: 0.85rem; margin-top: 10px;">
+                                Checkpoints will appear here after training saves them
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                list.innerHTML = data.checkpoints.map(cp => `
+                    <div class="checkpoint-item" data-step="${cp.step}" data-name="${cp.canonical_name}">
+                        <div class="step">Step ${cp.step.toLocaleString()}</div>
+                        <div class="stats">
+                            Loss: ${cp.train_loss ? cp.train_loss.toFixed(4) : '?'}
+                            ${cp.age_hours ? `| ${cp.age_hours}h ago` : ''}
+                        </div>
+                        ${cp.skill_name ? `<span class="skill-badge">${cp.skill_name} L${cp.skill_level || '?'}</span>` : ''}
+                    </div>
+                `).join('');
+
+                // Click handlers
+                $$('.checkpoint-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        $$('.checkpoint-item').forEach(i => i.classList.remove('selected'));
+                        item.classList.add('selected');
+                        selectedCheckpoint = {
+                            step: parseInt(item.dataset.step),
+                            name: item.dataset.name
+                        };
+                        $('#loadBtn').disabled = false;
+                    });
+                });
+
+            } catch (error) {
+                console.error('Failed to load checkpoints:', error);
+                $('#checkpointList').innerHTML = `
+                    <div class="empty-state">
+                        <p>Failed to load checkpoints</p>
+                        <p style="font-size: 0.85rem;">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function checkHostStatus() {
+            const dot = $('#hostDot');
+            const text = $('#hostStatusText');
+
+            dot.classList.remove('online');
+            text.textContent = 'Checking...';
+
+            try {
+                const response = await fetch('/oracle/status');
+                const data = await response.json();
+
+                const hostInfo = data.hosts[currentHost];
+
+                if (hostInfo && hostInfo.status === 'online') {
+                    dot.classList.add('online');
+                    if (hostInfo.loaded_step) {
+                        text.textContent = `Online - Step ${hostInfo.loaded_step.toLocaleString()} loaded`;
+                        loadedCheckpoint = hostInfo.loaded_step;
+                        $('#loadedModel').textContent = `Step ${hostInfo.loaded_step.toLocaleString()}`;
+                        enableChat();
+
+                        // Mark loaded checkpoint in list
+                        $$('.checkpoint-item').forEach(item => {
+                            item.classList.remove('loaded');
+                            if (parseInt(item.dataset.step) === hostInfo.loaded_step) {
+                                item.classList.add('loaded');
+                            }
+                        });
+                    } else {
+                        text.textContent = 'Online - No model loaded';
+                    }
+                } else {
+                    text.textContent = hostInfo?.error || 'Offline';
+                }
+            } catch (error) {
+                text.textContent = 'Error checking status';
+            }
+        }
+
+        async function loadSelectedCheckpoint() {
+            if (!selectedCheckpoint) return;
+
+            const btn = $('#loadBtn');
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+
+            try {
+                const response = await fetch('/oracle/load', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        step: selectedCheckpoint.step,
+                        host: currentHost
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    loadedCheckpoint = selectedCheckpoint.step;
+                    $('#loadedModel').textContent = `Step ${selectedCheckpoint.step.toLocaleString()}`;
+                    enableChat();
+                    addSystemMessage(`Loaded checkpoint: Step ${selectedCheckpoint.step.toLocaleString()}`);
+
+                    // Update UI
+                    $$('.checkpoint-item').forEach(item => {
+                        item.classList.remove('loaded');
+                        if (parseInt(item.dataset.step) === selectedCheckpoint.step) {
+                            item.classList.add('loaded');
+                        }
+                    });
+
+                    checkHostStatus();
+                } else {
+                    alert(`Failed to load: ${data.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Load Selected Checkpoint';
+            }
+        }
+
+        function enableChat() {
+            $('#messageInput').disabled = false;
+            $('#sendBtn').disabled = false;
+
+            if ($('#chatMessages .empty-state')) {
+                $('#chatMessages').innerHTML = '';
+            }
+        }
+
+        function addSystemMessage(text) {
+            const messages = $('#chatMessages');
+            messages.innerHTML += `
+                <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin: 15px 0;">
+                    ${text}
+                </div>
+            `;
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function addMessage(role, content) {
+            const messages = $('#chatMessages');
+            const sender = role === 'user' ? 'You' : 'DIO';
+
+            messages.innerHTML += `
+                <div class="message ${role}">
+                    <div class="sender">${sender}</div>
+                    <div class="bubble">${escapeHtml(content)}</div>
+                </div>
+            `;
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = $('#messageInput');
+            const message = input.value.trim();
+
+            if (!message || !loadedCheckpoint) return;
+
+            input.value = '';
+            addMessage('user', message);
+
+            const sendBtn = $('#sendBtn');
+            sendBtn.disabled = true;
+            sendBtn.textContent = '...';
+
+            try {
+                const response = await fetch('/oracle/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: message,
+                        host: currentHost,
+                        max_tokens: 512
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    addMessage('assistant', data.response);
+                } else {
+                    addMessage('assistant', `Error: ${data.error}`);
+                }
+            } catch (error) {
+                addMessage('assistant', `Error: ${error.message}`);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Refresh host status periodically
+        setInterval(checkHostStatus, 30000);
+    </script>
+</body>
+</html>

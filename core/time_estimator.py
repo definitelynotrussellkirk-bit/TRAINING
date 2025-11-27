@@ -429,7 +429,7 @@ class TimeEstimator:
             5. Scale if needed: seconds_per_step *= (actual_size / closest_size)^0.5
             6. Calculate total time: total_seconds = total_steps * seconds_per_step
             7. Estimate memory: estimate_memory(model_size_b, batch_size)
-            8. Estimate checkpoints: (total_steps / 500) * 0.7 GB  (1 ckpt per 500 steps)
+            8. Estimate checkpoints: (total_steps / 10000) * 0.7 GB  (1 ckpt per 10k steps)
             9. Calculate completion time: now + total_seconds
             10. Return TrainingEstimate
 
@@ -495,8 +495,8 @@ class TimeEstimator:
         # Memory estimate
         memory = cls.estimate_memory(model_size_b, batch_size)
 
-        # Checkpoint size (assume saving every 500 steps)
-        num_checkpoints = total_steps // 500
+        # Checkpoint size (assume saving every 10k steps per config)
+        num_checkpoints = total_steps // 10000
         checkpoint_size_gb = model_size_b * 0.7  # LoRA adapter size
         checkpoints_gb = num_checkpoints * checkpoint_size_gb
 

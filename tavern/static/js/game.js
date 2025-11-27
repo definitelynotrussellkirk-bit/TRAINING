@@ -1,0 +1,643 @@
+/**
+ * REALM OF TRAINING - Game UI JavaScript
+ *
+ * Handles:
+ * - Live data fetching from the unified API
+ * - Idle game mechanics (XP ticks, resource accumulation)
+ * - Animations and visual feedback
+ * - Battle status updates
+ */
+
+// ============================================
+// CONFIGURATION
+// ============================================
+
+const CONFIG = {
+    API_BASE: '/api',
+    UPDATE_INTERVAL: 3000,      // Main update every 3 seconds
+};
+
+// ============================================
+// GAME STATE
+// ============================================
+
+const GameState = {
+    // Hero
+    totalLevel: 0,      // Sum of all MASTERED skill levels
+    currentStep: 0,
+    previousStep: 0,
+    totalEvals: 0,      // Real: total skill evaluations
+
+    // Current skill being trained
+    currentSkill: 'BINARY',
+    currentSkillMastered: 0,   // Highest level mastered
+    currentSkillTraining: 1,   // Level being trained (mastered + 1)
+    currentSkillAcc: 0,
+
+    // Training
+    isTraining: false,
+    currentQuest: null,
+    questProgress: 0,
+    loss: 0,            // Strain
+    valLoss: 0,         // Val Strain
+    perplexity: 0,      // For Clarity calculation
+
+    // Skills (real curriculum data) - MASTERED levels
+    sylloMastered: 0,
+    sylloTraining: 1,
+    sylloAcc: 0,
+    sylloEvals: 0,
+    binaryMastered: 0,
+    binaryTraining: 1,
+    binaryAcc: 0,
+    binaryEvals: 0,
+
+    // GPU (real hardware stats)
+    vramUsed: 0,
+    vramTotal: 24,
+    gpuTemp: 0,
+
+    // Vault (real checkpoint data)
+    checkpointCount: 0,
+    totalSize: 0,
+    bestCheckpoint: null,
+};
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return Math.round(num).toString();
+}
+
+function formatStrain(loss) {
+    // Strain = loss, lower is better
+    if (!loss || loss <= 0) return '--';
+    return loss.toFixed(4);
+}
+
+function formatClarity(perplexity) {
+    // Clarity = 1/perplexity, higher is better
+    if (!perplexity || perplexity <= 0) return '--';
+    const clarity = 1 / perplexity;
+    return clarity.toFixed(3);
+}
+
+function formatTime(date) {
+    return date.toLocaleTimeString('en-US', { hour12: false });
+}
+
+// ============================================
+// DOM HELPERS
+// ============================================
+
+function $(selector) {
+    return document.querySelector(selector);
+}
+
+function $$(selector) {
+    return document.querySelectorAll(selector);
+}
+
+function setText(selector, text) {
+    const el = $(selector);
+    if (el) el.textContent = text;
+}
+
+function setWidth(selector, percent) {
+    const el = $(selector);
+    if (el) el.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+}
+
+// ============================================
+// UI UPDATE FUNCTIONS
+// ============================================
+
+function updateHeader() {
+    setText('#totalSteps', formatNumber(GameState.currentStep));
+    setText('#totalEvals', formatNumber(GameState.totalEvals));
+}
+
+function updateHeroStats() {
+    // Total level (sum of all MASTERED skills)
+    setText('#totalLevel', GameState.totalLevel);
+
+    // Current skill being trained - show training level (what they're working on)
+    setText('#currentSkillName', GameState.currentSkill);
+    setText('#currentSkillLevel', GameState.currentSkillTraining);
+
+    // Stats are for current skill
+    setText('#statAcc', GameState.currentSkillAcc ? `${GameState.currentSkillAcc.toFixed(1)}%` : '0%');
+    setText('#statClarity', formatClarity(GameState.perplexity));
+    setText('#statStrain', formatStrain(GameState.loss));
+}
+
+function updateBattleStatus() {
+    const battleStatus = $('#battleStatus');
+    const idleIndicator = $('#idleIndicator');
+
+    if (GameState.isTraining) {
+        // Training mode
+        battleStatus.classList.add('fighting');
+        idleIndicator.classList.add('active');
+        setText('.idle-icon', '⚔️');
+        setText('.idle-text', 'TRAINING');
+
+        setText('#battleIcon', '⚔️');
+        setText('#battleTitle', 'Training in Progress');
+
+        const questName = GameState.currentQuest || 'Unknown file';
+        setText('#questName', questName.length > 50 ? questName.slice(0, 47) + '...' : questName);
+
+        setWidth('#questProgressBar', GameState.questProgress);
+        setText('#questProgressText', `${GameState.questProgress.toFixed(1)}%`);
+
+        setText('#battleStrain', formatStrain(GameState.loss));
+        setText('#battleValStrain', formatStrain(GameState.valLoss));
+
+    } else {
+        // Idle mode
+        battleStatus.classList.remove('fighting');
+        idleIndicator.classList.remove('active');
+        setText('.idle-icon', '💤');
+        setText('.idle-text', 'IDLE');
+
+        setText('#battleIcon', '💤');
+        setText('#battleTitle', 'Awaiting Orders');
+        setText('#questName', 'Drop training files in inbox/');
+
+        setWidth('#questProgressBar', 0);
+        setText('#questProgressText', '0%');
+
+        setText('#battleStrain', '--');
+        setText('#battleValStrain', '--');
+    }
+}
+
+// ============================================
+// SKILLS (Dynamic from YAML configs)
+// ============================================
+
+let skillsData = [];
+let skillsLoaded = false;
+
+async function fetchSkills() {
+    try {
+        const response = await fetch(`/skills?_t=${Date.now()}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (data.skills && data.skills.length > 0) {
+            skillsData = data.skills;
+            GameState.totalLevel = data.total_mastered || 0;
+
+            // Update individual skill state for backward compat
+            for (const skill of data.skills) {
+                if (skill.id === 'sy' || skill.id === 'syllo') {
+                    GameState.sylloMastered = skill.mastered_level;
+                    GameState.sylloTraining = skill.training_level;
+                    GameState.sylloAcc = skill.accuracy;
+                    GameState.sylloEvals = skill.eval_count;
+                } else if (skill.id === 'bin' || skill.id === 'binary') {
+                    GameState.binaryMastered = skill.mastered_level;
+                    GameState.binaryTraining = skill.training_level;
+                    GameState.binaryAcc = skill.accuracy;
+                    GameState.binaryEvals = skill.eval_count;
+                }
+            }
+
+            renderSkills();
+            skillsLoaded = true;
+        }
+    } catch (error) {
+        console.error('Failed to fetch skills:', error);
+    }
+}
+
+function renderSkills() {
+    const container = $('#skillsContainer');
+    if (!container || skillsData.length === 0) return;
+
+    container.innerHTML = skillsData.map(skill => {
+        const progressPct = skill.max_level > 0
+            ? (skill.mastered_level / skill.max_level) * 100
+            : 0;
+
+        const isActive = skill.id === GameState.currentSkill?.toLowerCase() ||
+                        skill.short_name === GameState.currentSkill;
+
+        return `
+            <div class="skill-card clickable ${isActive ? 'active' : ''}" data-skill="${skill.id}" style="--skill-color: ${skill.color}">
+                <div class="skill-header">
+                    <span class="skill-icon">${skill.icon}</span>
+                    <span class="skill-name">${skill.short_name}</span>
+                    <span class="skill-level">L${skill.mastered_level}/${skill.max_level}</span>
+                </div>
+                <div class="skill-bar-container">
+                    <div class="skill-bar" style="width: ${progressPct}%; background: ${skill.color}"></div>
+                </div>
+                <div class="skill-meta">
+                    <span class="skill-acc">${skill.accuracy.toFixed(1)}%</span>
+                    <span class="skill-desc">${skill.rpg_name}</span>
+                </div>
+                <div class="skill-training">
+                    Training L${skill.training_level}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Add click handlers for skill detail pages
+    container.querySelectorAll('.skill-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const skillId = card.dataset.skill;
+            if (skillId) {
+                window.location.href = `/skill/${skillId}`;
+            }
+        });
+    });
+}
+
+function updateSkills() {
+    // If skills loaded from API, re-render with latest state
+    if (skillsLoaded && skillsData.length > 0) {
+        // Update skill data from GameState
+        for (const skill of skillsData) {
+            if (skill.id === 'sy' || skill.id === 'syllo') {
+                skill.mastered_level = GameState.sylloMastered;
+                skill.training_level = GameState.sylloTraining;
+                skill.accuracy = GameState.sylloAcc;
+            } else if (skill.id === 'bin' || skill.id === 'binary') {
+                skill.mastered_level = GameState.binaryMastered;
+                skill.training_level = GameState.binaryTraining;
+                skill.accuracy = GameState.binaryAcc;
+            }
+        }
+        renderSkills();
+    }
+}
+
+function updateVault() {
+    setText('#vaultCheckpoints', GameState.checkpointCount || '--');
+    setText('#vaultSize', GameState.totalSize ? `${GameState.totalSize.toFixed(1)} GB` : '-- GB');
+    setText('#vaultBest', GameState.bestCheckpoint || '--');
+}
+
+// Fetch vault data directly (more reliable than unified API)
+async function fetchVaultData() {
+    try {
+        const response = await fetch(`/vault/assets?_t=${Date.now()}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        GameState.checkpointCount = data.checkpoint_count || 0;
+        GameState.totalSize = data.total_size_gb || 0;
+
+        // Find best checkpoint
+        if (data.checkpoints?.length > 0) {
+            const champion = data.checkpoints.find(cp => cp.is_champion);
+            if (champion) {
+                GameState.bestCheckpoint = champion.name.replace('checkpoint-', '');
+            } else {
+                GameState.bestCheckpoint = data.checkpoints[0].name.replace('checkpoint-', '');
+            }
+        }
+
+        updateVault();
+    } catch (error) {
+        console.error('Failed to fetch vault data:', error);
+    }
+}
+
+function updateForge() {
+    // VRAM
+    const vramPercent = GameState.vramTotal > 0 ? (GameState.vramUsed / GameState.vramTotal) * 100 : 0;
+    setWidth('#forgeVramBar', vramPercent);
+    setText('#forgeVram', GameState.vramUsed ? `${GameState.vramUsed.toFixed(1)} GB` : '-- GB');
+
+    // Temperature
+    const tempPercent = Math.min(100, (GameState.gpuTemp / 90) * 100);
+    setWidth('#forgeTempBar', tempPercent);
+    setText('#forgeTemp', GameState.gpuTemp ? `${Math.round(GameState.gpuTemp)}°C` : '--°C');
+}
+
+function updateTime() {
+    setText('#timeDisplay', formatTime(new Date()));
+}
+
+// ============================================
+// SAGA (Persistent Battle Log)
+// ============================================
+
+// Track what we've already displayed to avoid duplicates
+let lastSagaTimestamp = null;
+let sagaInitialized = false;
+
+async function fetchSaga() {
+    try {
+        const response = await fetch(`/saga?limit=30&_t=${Date.now()}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (data.tales && data.tales.length > 0) {
+            renderSaga(data.tales);
+        }
+    } catch (error) {
+        console.error('Failed to fetch saga:', error);
+    }
+}
+
+function renderSaga(tales) {
+    const container = $('#logEntries');
+    if (!container) return;
+
+    // First load: replace everything
+    if (!sagaInitialized) {
+        container.innerHTML = '';
+        sagaInitialized = true;
+    }
+
+    // Tales come newest-first, we display newest at top
+    // Only add tales we haven't seen (based on timestamp)
+    const newTales = [];
+    for (const tale of tales) {
+        const taleTs = `${tale.date}T${tale.time}`;
+        if (lastSagaTimestamp && taleTs <= lastSagaTimestamp) {
+            break;  // Already have this and older ones
+        }
+        newTales.push(tale);
+    }
+
+    // Update timestamp tracker
+    if (tales.length > 0) {
+        lastSagaTimestamp = `${tales[0].date}T${tales[0].time}`;
+    }
+
+    // Add new tales at the top (they're already newest-first)
+    for (const tale of newTales.reverse()) {
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${getCategoryClass(tale.category)}`;
+        entry.innerHTML = `${tale.icon} [${tale.time}] ${tale.message}`;
+        container.insertBefore(entry, container.firstChild);
+    }
+
+    // Keep only 30 entries max
+    while (container.children.length > 30) {
+        container.removeChild(container.lastChild);
+    }
+}
+
+function getCategoryClass(category) {
+    const classMap = {
+        'quest': 'info',
+        'combat': 'info',
+        'hero': 'success',
+        'champion': 'success',
+        'training': 'info',
+        'system': 'warning',
+    };
+    return classMap[category] || 'info';
+}
+
+// Local log for immediate feedback (before chronicle catches up)
+function addLocalLog(message, type = 'info') {
+    const container = $('#logEntries');
+    if (!container) return;
+
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+    const icons = { info: '📝', success: '✅', warning: '⚠️', error: '❌' };
+    const icon = icons[type] || '📝';
+
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    entry.innerHTML = `${icon} [${time}] ${message}`;
+
+    container.insertBefore(entry, container.firstChild);
+
+    // Keep only 20 entries
+    while (container.children.length > 20) {
+        container.removeChild(container.lastChild);
+    }
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+function showNotification(title, text, type = 'info') {
+    const container = $('#notifications');
+    if (!container) return;
+
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-title">${title}</div>
+        <div class="notification-text">${text}</div>
+    `;
+
+    container.appendChild(notification);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
+}
+
+// ============================================
+// API FETCHING
+// ============================================
+
+async function fetchGameData() {
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/game?_t=${Date.now()}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error('API error');
+
+        const data = await response.json();
+        processGameData(data);
+
+    } catch (error) {
+        console.error('Failed to fetch game data:', error);
+    }
+}
+
+function processGameData(data) {
+    /**
+     * Process fresh game data from /api/game endpoint.
+     * Data structure:
+     *   - training: training status
+     *   - gpu: GPU stats from nvidia-smi
+     *   - curriculum: skill progression state
+     *   - vault: checkpoint data
+     *   - comparison: model comparison results
+     */
+    const prevTraining = GameState.isTraining;
+    const prevStep = GameState.currentStep;
+    const prevTotalLevel = GameState.totalLevel;
+
+    // Training status
+    const training = data.training;
+    if (training) {
+        GameState.isTraining = training.status === 'training';
+        GameState.currentStep = training.current_step || 0;
+        GameState.loss = training.loss || 0;
+        GameState.valLoss = training.validation_loss || 0;
+        GameState.currentQuest = training.current_file || null;
+        GameState.questProgress = training.progress_percent || 0;
+    }
+
+    // GPU stats
+    const gpu = data.gpu;
+    if (gpu) {
+        GameState.vramUsed = gpu.vram_used_gb || 0;
+        GameState.vramTotal = gpu.vram_total_gb || 24;
+        GameState.gpuTemp = gpu.temperature_c || 0;
+    }
+
+    // Curriculum (skills)
+    // current_level = level being TRAINED on (not mastered)
+    // mastered = current_level - 1 (minimum 0)
+    const curriculum = data.curriculum;
+    if (curriculum?.skills) {
+        const skills = curriculum.skills;
+
+        if (skills.syllo) {
+            const trainingLevel = skills.syllo.current_level || 1;
+            GameState.sylloMastered = Math.max(0, trainingLevel - 1);
+            GameState.sylloTraining = trainingLevel;
+            GameState.sylloAcc = skills.syllo.recent_accuracy || 0;
+            GameState.sylloEvals = skills.syllo.eval_count || 0;
+        }
+        if (skills.binary) {
+            const trainingLevel = skills.binary.current_level || 1;
+            GameState.binaryMastered = Math.max(0, trainingLevel - 1);
+            GameState.binaryTraining = trainingLevel;
+            GameState.binaryAcc = skills.binary.recent_accuracy || 0;
+            GameState.binaryEvals = skills.binary.eval_count || 0;
+        }
+
+        // Total level = sum of all MASTERED skill levels
+        GameState.totalLevel = GameState.sylloMastered + GameState.binaryMastered;
+
+        // Total evals = SYLLO + BINARY evaluations
+        GameState.totalEvals = GameState.sylloEvals + GameState.binaryEvals;
+
+        // Determine current skill from training file name or default to BINARY
+        const questName = (GameState.currentQuest || '').toLowerCase();
+        if (questName.includes('syllo') || questName.includes('sy_')) {
+            GameState.currentSkill = 'SYLLO';
+            GameState.currentSkillMastered = GameState.sylloMastered;
+            GameState.currentSkillTraining = GameState.sylloTraining;
+            GameState.currentSkillAcc = GameState.sylloAcc;
+        } else {
+            GameState.currentSkill = 'BINARY';
+            GameState.currentSkillMastered = GameState.binaryMastered;
+            GameState.currentSkillTraining = GameState.binaryTraining;
+            GameState.currentSkillAcc = GameState.binaryAcc;
+        }
+    }
+
+    // Vault data (checkpoints)
+    const vault = data.vault;
+    if (vault) {
+        GameState.checkpointCount = vault.checkpoint_count || 0;
+        GameState.totalSize = vault.total_size_gb || 0;
+
+        // Find best checkpoint
+        if (vault.checkpoints?.length > 0) {
+            const champion = vault.checkpoints.find(cp => cp.is_champion);
+            if (champion) {
+                GameState.bestCheckpoint = champion.name.replace('checkpoint-', '');
+            } else {
+                GameState.bestCheckpoint = vault.checkpoints[0].name.replace('checkpoint-', '');
+            }
+        }
+    }
+
+    // Model comparison
+    const comparison = data.comparison;
+    if (comparison) {
+        if (comparison.best_checkpoint) {
+            // Extract step number from checkpoint name
+            const match = comparison.best_checkpoint.match(/checkpoint-(\d+)/);
+            if (match) {
+                GameState.bestCheckpoint = match[1];
+            }
+        }
+    }
+
+    // Check for events
+    if (!prevTraining && GameState.isTraining) {
+        showNotification('Training Started!', 'The Skeptic begins questioning', 'success');
+    } else if (prevTraining && !GameState.isTraining) {
+        showNotification('Training Complete!', 'The Skeptic rests', 'success');
+    }
+
+    // Skill level up detection
+    if (GameState.totalLevel > prevTotalLevel && prevTotalLevel > 0) {
+        showNotification('Skill Level Up!', `Total level is now ${GameState.totalLevel}!`, 'success');
+    }
+
+    // Update all UI
+    updateAll();
+}
+
+function updateAll() {
+    updateHeader();
+    updateHeroStats();
+    updateBattleStatus();
+    updateSkills();
+    updateVault();
+    updateForge();
+    updateTime();
+}
+
+// ============================================
+// INITIALIZATION
+// ============================================
+
+function init() {
+    console.log('Realm of Training initializing...');
+
+    // Initial UI update
+    updateAll();
+
+    // Fetch skills (from YAML configs)
+    fetchSkills();
+
+    // Fetch saga (persistent battle log)
+    fetchSaga();
+
+    // Start data fetching (includes vault data)
+    fetchGameData();
+
+    setInterval(fetchGameData, CONFIG.UPDATE_INTERVAL);
+
+    // Refresh saga every 5 seconds (incremental, won't wipe)
+    setInterval(fetchSaga, 5000);
+
+    // Refresh skills every 30 seconds (reads YAML + curriculum state)
+    setInterval(fetchSkills, 30000);
+
+    // Update time every second
+    setInterval(updateTime, 1000);
+}
+
+// Start when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}

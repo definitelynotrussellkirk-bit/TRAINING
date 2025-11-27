@@ -12,7 +12,7 @@
   "log_steps": 200,
   "eval_steps": 500,
   "num_eval_samples": 2,
-  "save_steps": 1000,
+  "save_steps": 10000,
   "poll_interval": 30,
   "snapshot_time": "03:00",
   "max_length": 2048,
@@ -27,13 +27,14 @@
   },
   "auto_generate": {
     "enabled": true,
-    "_comment": "Now uses local singleSKILL APIs (8080=syllo, 8090=binary) via curriculum",
+    "_comment": "Quest Master maintains at least min_queue_depth items on Quest Board",
     "count": 100,
     "priority": "normal",
     "threshold": 0,
     "cooldown_sec": 180,
     "host": "localhost",
-    "port": 8080
+    "port": 8080,
+    "min_queue_depth": 2
   },
   "remote_eval": {
     "enabled": true,

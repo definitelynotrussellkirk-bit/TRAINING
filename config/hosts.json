@@ -1,0 +1,67 @@
+{
+  "_comment": "Host registry - Single source of truth for all service locations",
+  "version": "2.0",
+
+  "hosts": {
+    "4090": {
+      "name": "Training Server",
+      "host": "192.168.x.x",
+      "role": "trainer",
+      "ssh_user": "user",
+      "services": {
+        "vault": {"port": 8767, "path": "/api"},
+        "ledger": {"port": 8767, "path": "/api/ledger"},
+        "training": {"port": 8767, "path": "/api/training"},
+        "branch": {"port": 8768},
+        "monitor": {"port": 8081},
+        "tavern": {"port": 8888}
+      },
+      "models_dir": "/path/to/training/models",
+      "checkpoints_dir": "/path/to/training/current_model",
+      "capabilities": ["training", "vault", "ledger", "tavern"]
+    },
+    "3090": {
+      "name": "Inference Server",
+      "host": "192.168.x.x",
+      "role": "inference",
+      "ssh_user": "user",
+      "services": {
+        "inference": {"port": 8765},
+        "branch": {"port": 8768}
+      },
+      "models_dir": "/path/to/models",
+      "checkpoints_dir": "/path/to/models",
+      "capabilities": ["inference", "eval"]
+    },
+    "nas": {
+      "name": "Synology NAS",
+      "host": "192.168.x.x",
+      "role": "storage",
+      "ssh_user": "admin",
+      "services": {
+        "branch": {"port": 8768}
+      },
+      "models_dir": "/volume1/data/llm_training/models",
+      "checkpoints_dir": "/volume1/data/llm_training/checkpoints",
+      "capabilities": ["storage", "backup"]
+    }
+  },
+
+  "local_host": null,
+  "default_trainer": "4090",
+  "default_inference": "3090",
+
+  "_notes": [
+    "local_host: Set to host_id if auto-detection fails (null = auto-detect)",
+    "default_trainer: Primary training host (owns ledger)",
+    "default_inference: Primary inference host",
+    "",
+    "Service ports:",
+    "  8765 - Inference API (OpenAI-compatible)",
+    "  8766 - GPU Task Scheduler",
+    "  8767 - VaultKeeper (vault, ledger, training APIs)",
+    "  8768 - Branch Officer (zone asset tracking)",
+    "  8081 - Monitoring API",
+    "  8888 - Tavern UI"
+  ]
+}

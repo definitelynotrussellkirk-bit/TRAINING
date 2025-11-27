@@ -1,9 +1,23 @@
 """
 Skill loading and trainer access.
 
-Two ways to access skills:
-1. YAML configs (for Guild UI): load_skill_config(), SkillLoader
-2. API trainers (for samples): get_trainer(), SKILL_REGISTRY
+=============================================================================
+SINGLE SOURCE OF TRUTH: YAML CONFIGS
+=============================================================================
+To add a new skill:
+1. Create YAML config: configs/skills/{skill_id}.yaml (use _template.yaml)
+2. Ensure the skill API server is implemented and can start
+3. That's it! The YAML config IS the registry.
+
+The YAML config provides everything:
+- Skill metadata (id, name, description, category)
+- Display config (icon, color, short_name)
+- API config (url, source_dir, start_command, endpoints)
+- Level system (max_level, level_progression)
+- Eval config (samples_per_level, endpoint, local_cache)
+- Progression (accuracy_thresholds, xp_multiplier)
+- RPG flavor (rpg_name, rpg_description)
+=============================================================================
 """
 
 from pathlib import Path
@@ -14,30 +28,18 @@ from guild.config.loader import (
     load_yaml,
     ConfigLoader,
 )
-from guild.skills.types import SkillConfig, SkillCategory, MetricDefinition
+from guild.skills.types import (
+    SkillConfig,
+    SkillCategory,
+    MetricDefinition,
+    SkillDisplay,
+    SkillAPI,
+    SkillEval,
+)
 from guild.skills.contract import SkillClient, SkillDefinition, Batch
 
 
 T = TypeVar('T')
-
-
-# =============================================================================
-# SKILL REGISTRY - Maps skill IDs to API URLs
-# =============================================================================
-
-SKILL_REGISTRY: dict[str, dict] = {
-    "binary": {
-        "api_url": "http://localhost:8090",
-        "category": "math",
-        "description": "Binary arithmetic with circled notation",
-    },
-    # DISABLED: Re-enable when ready
-    # "syllo": {
-    #     "api_url": "http://localhost:8080",
-    #     "category": "reasoning",
-    #     "description": "Syllable puzzles",
-    # },
-}
 
 
 def get_trainer(skill_id: str) -> SkillClient:
@@ -45,38 +47,71 @@ def get_trainer(skill_id: str) -> SkillClient:
     Get a trainer (API client) for a skill.
 
     Usage:
-        trainer = get_trainer("binary")
+        trainer = get_trainer("sy")
         batch = trainer.sample(level=5, count=100)
 
     Args:
-        skill_id: Skill identifier (e.g., "binary", "syllo")
+        skill_id: Skill identifier (e.g., "sy", "bin")
 
     Returns:
         SkillClient instance connected to the skill's API
 
     Raises:
-        KeyError: If skill not in registry
+        KeyError: If skill config not found
+        ValueError: If skill has no API URL configured
     """
-    if skill_id not in SKILL_REGISTRY:
+    try:
+        config = load_skill_config(skill_id)
+    except FileNotFoundError:
+        available = discover_skills()
         raise KeyError(
             f"Unknown skill: '{skill_id}'. "
-            f"Available: {list(SKILL_REGISTRY.keys())}"
+            f"Available: {available}"
         )
 
-    config = SKILL_REGISTRY[skill_id]
-    return SkillClient(skill_id, config["api_url"])
+    if not config.api_url:
+        raise ValueError(
+            f"Skill '{skill_id}' has no API URL configured. "
+            f"Add 'api.url' to configs/skills/{skill_id}.yaml"
+        )
+
+    return SkillClient(skill_id, config.api_url)
 
 
 def list_trainers() -> list[str]:
-    """List all registered trainer skill IDs."""
-    return list(SKILL_REGISTRY.keys())
+    """List all skill IDs that have API URLs configured."""
+    skills = []
+    for skill_id in discover_skills():
+        try:
+            config = load_skill_config(skill_id)
+            if config.api_url:
+                skills.append(skill_id)
+        except Exception:
+            pass
+    return skills
 
 
 def get_trainer_info(skill_id: str) -> dict:
-    """Get registry info for a skill (without calling API)."""
-    if skill_id not in SKILL_REGISTRY:
+    """
+    Get info for a skill (without calling API).
+
+    Returns dict with:
+        api_url, category, description, max_level
+    """
+    try:
+        config = load_skill_config(skill_id)
+    except FileNotFoundError:
         raise KeyError(f"Unknown skill: '{skill_id}'")
-    return SKILL_REGISTRY[skill_id].copy()
+
+    return {
+        "api_url": config.api_url,
+        "category": config.category.value,
+        "description": config.description,
+        "max_level": config.max_level,
+        "icon": config.icon,
+        "color": config.color,
+        "short_name": config.short_name,
+    }
 
 
 # =============================================================================
@@ -128,6 +163,46 @@ def _dict_to_skill_config(data: dict) -> SkillConfig:
     except ValueError:
         raise ValueError(f"Invalid skill category: {category_str}")
 
+    # Version
+    version = data.get("version", "1.0.0")
+
+    # Level system
+    max_level = int(data.get("max_level", 10))
+
+    # Display config
+    display_data = data.get("display", {})
+    display = SkillDisplay(
+        icon=display_data.get("icon", "🎯"),
+        color=display_data.get("color", "#8B5CF6"),
+        short_name=display_data.get("short_name", skill_id.upper()[:3]),
+    )
+
+    # API config
+    api_data = data.get("api")
+    api = None
+    if api_data and api_data.get("url"):
+        api = SkillAPI(
+            url=api_data.get("url"),
+            source_dir=api_data.get("source_dir"),
+            start_command=api_data.get("start_command"),
+            endpoints=api_data.get("endpoints", {
+                "health": "GET /health",
+                "info": "GET /info",
+                "levels": "GET /levels",
+                "generate": "POST /generate",
+            }),
+        )
+
+    # Eval config
+    eval_data = data.get("eval", {})
+    eval_config = SkillEval(
+        samples_per_level=eval_data.get("samples_per_level", 5),
+        endpoint=eval_data.get("endpoint", "/eval"),
+        local_cache=eval_data.get("local_cache", f"data/validation/{skill_id}/"),
+        combinatorial_space=eval_data.get("combinatorial_space", "infinite"),
+        overlap_probability=eval_data.get("overlap_probability", "~0"),
+    )
+
     # Optional fields with defaults
     tags = data.get("tags", [])
     metrics = data.get("metrics", ["accuracy"])
@@ -148,6 +223,11 @@ def _dict_to_skill_config(data: dict) -> SkillConfig:
         name=name,
         description=description,
         category=category,
+        version=version,
+        max_level=max_level,
+        display=display,
+        api=api,
+        eval=eval_config,
         tags=tags,
         metrics=metrics,
         primary_metric=primary_metric,

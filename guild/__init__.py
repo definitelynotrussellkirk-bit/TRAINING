@@ -44,6 +44,32 @@ from guild.skills import (
     reset_state_manager as reset_skill_state_manager,
 )
 
+# Quest management
+from guild.quests import (
+    # Types
+    QuestDifficulty,
+    CombatResult,
+    QuestTemplate,
+    QuestInstance,
+    QuestResult,
+    # Registry
+    init_quest_registry,
+    get_quest_registry,
+    reset_quest_registry,
+    get_quest,
+    list_quests,
+    quests_by_skill,
+    # Forge
+    get_forge as get_quest_forge,
+    reset_forge as reset_quest_forge,
+    create_quest,
+    create_quest_by_id,
+    # Evaluator
+    get_judge as get_quest_judge,
+    reset_judge as reset_quest_judge,
+    evaluate_quest,
+)
+
 __all__ = [
     # Facilities
     "init_resolver",
@@ -68,4 +94,26 @@ __all__ = [
     "init_skill_state_manager",
     "get_skill_state_manager",
     "reset_skill_state_manager",
+    # Quests - types
+    "QuestDifficulty",
+    "CombatResult",
+    "QuestTemplate",
+    "QuestInstance",
+    "QuestResult",
+    # Quests - registry
+    "init_quest_registry",
+    "get_quest_registry",
+    "reset_quest_registry",
+    "get_quest",
+    "list_quests",
+    "quests_by_skill",
+    # Quests - forge
+    "get_quest_forge",
+    "reset_quest_forge",
+    "create_quest",
+    "create_quest_by_id",
+    # Quests - evaluator
+    "get_quest_judge",
+    "reset_quest_judge",
+    "evaluate_quest",
 ]

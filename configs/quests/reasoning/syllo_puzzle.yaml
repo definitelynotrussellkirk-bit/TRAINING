@@ -1,0 +1,43 @@
+# SYLLO Puzzle Quest Template
+# Word guessing puzzles that train deductive reasoning
+
+id: syllo_puzzle
+name: SYLLO Logic Puzzle
+description: >
+  A word-guessing puzzle where the model must deduce a target word
+  based on clues about syllables, letter patterns, and definitions.
+
+skills:
+  - logic_weaving
+
+regions:
+  - puzzle_realm
+  - training_grounds
+
+difficulty_level: 1
+difficulty: bronze
+
+# Uses curriculum-aware generator
+generator_id: syllo_api
+generator_params:
+  word_count: 4
+  overlap: 0.0
+  red_herrings: 0
+
+# Exact match evaluator
+evaluator_id: exact_match
+evaluator_params:
+  case_sensitive: false
+
+# Base XP per skill
+base_xp:
+  logic_weaving: 10
+
+tags:
+  - reasoning
+  - deduction
+  - puzzles
+  - syllo
+  - curriculum
+
+enabled: true

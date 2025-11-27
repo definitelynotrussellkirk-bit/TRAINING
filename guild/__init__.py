@@ -183,6 +183,36 @@ from guild.incidents import (
     reset_incident_detector,
 )
 
+# Combat system
+from guild.combat import (
+    # Types
+    CombatStance,
+    CombatConfig,
+    StanceConfig,
+    # Evaluator
+    MatchQuality,
+    EvaluationResult,
+    CombatEvaluator,
+    init_combat_evaluator,
+    get_combat_evaluator,
+    reset_combat_evaluator,
+    evaluate_combat,
+    # Calculator
+    XPBreakdown,
+    CombatCalculator,
+    init_combat_calculator,
+    get_combat_calculator,
+    reset_combat_calculator,
+    calculate_combat_xp,
+    # Stance
+    StanceSelection,
+    StanceManager,
+    init_stance_manager,
+    get_stance_manager,
+    reset_stance_manager,
+    select_stance,
+)
+
 __all__ = [
     # Facilities
     "init_resolver",
@@ -316,4 +346,30 @@ __all__ = [
     "init_incident_detector",
     "get_incident_detector",
     "reset_incident_detector",
+    # Combat - types
+    "CombatStance",
+    "CombatConfig",
+    "StanceConfig",
+    # Combat - evaluator
+    "MatchQuality",
+    "EvaluationResult",
+    "CombatEvaluator",
+    "init_combat_evaluator",
+    "get_combat_evaluator",
+    "reset_combat_evaluator",
+    "evaluate_combat",
+    # Combat - calculator
+    "XPBreakdown",
+    "CombatCalculator",
+    "init_combat_calculator",
+    "get_combat_calculator",
+    "reset_combat_calculator",
+    "calculate_combat_xp",
+    # Combat - stance
+    "StanceSelection",
+    "StanceManager",
+    "init_stance_manager",
+    "get_stance_manager",
+    "reset_stance_manager",
+    "select_stance",
 ]

@@ -1,0 +1,23 @@
+# Consecutive Failures Detection Rule
+# Detects when model fails multiple quests in a row
+
+id: consecutive_failures
+name: Consecutive Quest Failures
+category: training
+severity: medium
+
+detector_type: consecutive
+detector_config:
+  check: failures
+  count: 5
+
+title_template: "{count} consecutive failures"
+description_template: |
+  Model failed {count} quests in a row.
+
+  This may indicate:
+  - Quest difficulty too high
+  - Model not learning
+  - Data quality issues
+
+rpg_name_template: "Losing Streak Affliction"

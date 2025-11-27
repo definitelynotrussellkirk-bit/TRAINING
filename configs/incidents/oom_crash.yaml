@@ -1,0 +1,25 @@
+# Out of Memory Crash Detection Rule
+# Detects CUDA OOM errors in training logs
+
+id: oom_crash
+name: Out of Memory Crash
+category: infra
+severity: critical
+
+detector_type: pattern
+detector_config:
+  pattern: "CUDA out of memory|OutOfMemoryError|OOM"
+  field: text
+  flags: "i"
+
+title_template: "OOM Crash: {match}"
+description_template: |
+  Out of memory error detected during training.
+  Matched pattern: {match}
+
+  Consider:
+  - Reducing batch size
+  - Enabling gradient checkpointing
+  - Using mixed precision training
+
+rpg_name_template: "Memory Overflow Curse"

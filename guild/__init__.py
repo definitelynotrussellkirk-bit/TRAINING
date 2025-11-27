@@ -151,6 +151,38 @@ from guild.runs import (
     reset_run_executor,
 )
 
+# Incident management
+from guild.incidents import (
+    # Types
+    IncidentCategory,
+    IncidentStatus,
+    Incident,
+    IncidentRule,
+    # Registry
+    init_incident_rule_registry,
+    get_incident_rule_registry,
+    reset_incident_rule_registry,
+    get_incident_rule,
+    list_incident_rules,
+    incident_rules_by_category,
+    # Tracker
+    IncidentTracker,
+    init_incident_tracker,
+    get_incident_tracker,
+    reset_incident_tracker,
+    create_incident,
+    get_incident,
+    resolve_incident,
+    list_open_incidents,
+    get_incident_stats,
+    # Detector
+    DetectionContext,
+    IncidentDetector,
+    init_incident_detector,
+    get_incident_detector,
+    reset_incident_detector,
+)
+
 __all__ = [
     # Facilities
     "init_resolver",
@@ -256,4 +288,32 @@ __all__ = [
     "init_run_executor",
     "get_run_executor",
     "reset_run_executor",
+    # Incidents - types
+    "IncidentCategory",
+    "IncidentStatus",
+    "Incident",
+    "IncidentRule",
+    # Incidents - registry
+    "init_incident_rule_registry",
+    "get_incident_rule_registry",
+    "reset_incident_rule_registry",
+    "get_incident_rule",
+    "list_incident_rules",
+    "incident_rules_by_category",
+    # Incidents - tracker
+    "IncidentTracker",
+    "init_incident_tracker",
+    "get_incident_tracker",
+    "reset_incident_tracker",
+    "create_incident",
+    "get_incident",
+    "resolve_incident",
+    "list_open_incidents",
+    "get_incident_stats",
+    # Incidents - detector
+    "DetectionContext",
+    "IncidentDetector",
+    "init_incident_detector",
+    "get_incident_detector",
+    "reset_incident_detector",
 ]

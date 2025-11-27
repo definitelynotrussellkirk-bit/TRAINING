@@ -1,0 +1,26 @@
+# Loss Spike Detection Rule
+# Detects sudden increases in training loss
+
+id: loss_spike
+name: Loss Spike Detected
+category: training
+severity: high
+
+detector_type: threshold
+detector_config:
+  metric: loss
+  operator: gt
+  value: 10.0
+
+title_template: "Loss spike: {value:.2f}"
+description_template: |
+  Training loss exceeded threshold.
+  Current loss: {value:.2f}
+  Threshold: {threshold}
+
+  This may indicate:
+  - Learning rate too high
+  - Corrupted training data
+  - Numerical instability
+
+rpg_name_template: "Training Instability Curse"

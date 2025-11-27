@@ -1,0 +1,151 @@
+# =============================================================================
+# SKILL TEMPLATE - Copy this file to create new skills
+# =============================================================================
+# IMPORTANT: Only REGISTERED skills are used by the system.
+# After creating a skill config, you must also add it to SKILL_REGISTRY in:
+#   guild/skills/loader.py
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# REQUIRED FIELDS
+# -----------------------------------------------------------------------------
+id: skill_id                    # Unique identifier (lowercase, no spaces)
+name: Skill Name                # Display name
+version: "1.0.0"                # Semantic version - must match API's /info version
+                                # Bump when: API changes output format, adds levels,
+                                # changes problem generation, etc.
+description: >
+  One paragraph description of what this skill teaches.
+  Include the core mechanic and what makes it unique.
+category: reasoning             # One of: reasoning, math, compression, generation,
+                                #         classification, tool_use, instruction, code
+
+# -----------------------------------------------------------------------------
+# DISPLAY (For Tavern UI)
+# -----------------------------------------------------------------------------
+display:
+  icon: "🎯"                    # Emoji icon for skill card
+  color: "#8B5CF6"              # Theme color (hex) for UI elements
+  short_name: "SKL"             # 2-4 char abbreviation for compact display
+
+# -----------------------------------------------------------------------------
+# API SERVER (Required for training data generation)
+# -----------------------------------------------------------------------------
+api:
+  url: http://localhost:PORT    # Where the skill API runs
+  source_dir: /path/to/skill    # Source code location in singleSKILL
+  start_command: python skill_xxx/api_server.py --port PORT
+  endpoints:
+    health: GET /health
+    info: GET /info
+    levels: GET /levels
+    generate: POST /generate
+
+# -----------------------------------------------------------------------------
+# LEVEL SYSTEM (Required)
+# -----------------------------------------------------------------------------
+max_level: 10                   # Maximum level for this skill
+
+level_progression:
+  # Define key levels - intermediate levels interpolate
+  1:  {desc: "Beginner level description"}
+  5:  {desc: "Mid level description"}
+  10: {desc: "Max level description"}
+
+# -----------------------------------------------------------------------------
+# OUTPUT SCHEMA (Required)
+# -----------------------------------------------------------------------------
+output_schema:
+  format: jsonl                 # Output format (jsonl, json)
+  structure: |
+    {
+      "field1": "...",
+      "field2": "..."
+    }
+  rules:
+    - Rule 1 for valid output
+    - Rule 2 for valid output
+
+# -----------------------------------------------------------------------------
+# TRAINING DATA CONTRACT (Required)
+# -----------------------------------------------------------------------------
+training:
+  format: jsonl
+  fields: ["list", "of", "required", "fields"]
+
+  generate_command: |
+    cd /path/to/skills
+    python skill_xxx/scripts/generate.py --count 1000 --output data.jsonl
+
+  validate_command: |
+    python HELPERS/scripts/validate.py data.jsonl
+
+# -----------------------------------------------------------------------------
+# EVALUATION (Required)
+# -----------------------------------------------------------------------------
+# CRITICAL DESIGN PRINCIPLE: Every skill MUST be COMBINATORIALLY INFINITE.
+# This means the space of possible problems is effectively unlimited, making
+# the probability of training/eval overlap essentially zero (~0).
+#
+# Each skill provides a STATIC FIXED eval set (5 samples per level).
+# The eval set never changes - we rely on combinatorics, not rotation.
+eval:
+  samples_per_level: 5          # Fixed eval samples per level (default: 5)
+  endpoint: "/eval"             # GET /eval?level=N returns eval set
+  local_cache: "data/validation/{skill_id}/"  # Where to cache eval sets
+  combinatorial_space: "infinite"  # REQUIRED: Must be combinatorially infinite
+  overlap_probability: "~0"        # Must be effectively zero
+
+# -----------------------------------------------------------------------------
+# PROGRESSION (Required)
+# -----------------------------------------------------------------------------
+metrics:
+  - accuracy                    # Primary metric
+primary_metric: accuracy
+
+accuracy_thresholds:            # Level -> required accuracy to advance
+  1: 0.60
+  5: 0.70
+  10: 0.80
+
+xp_multiplier: 1.0              # XP scaling factor
+
+# -----------------------------------------------------------------------------
+# RPG FLAVOR (Required for Tavern UI)
+# -----------------------------------------------------------------------------
+rpg_name: Fantasy Name          # RPG-style name for the skill
+rpg_description: >
+  Evocative description of the skill in RPG terms.
+  What does mastery look like? What challenges await?
+
+# -----------------------------------------------------------------------------
+# OPTIONAL SECTIONS
+# -----------------------------------------------------------------------------
+
+tags:                           # Searchable tags
+  - tag1
+  - tag2
+
+# Difficulty system (if skill has difficulty separate from level)
+difficulty_system:
+  easy: {desc: "..."}
+  hard: {desc: "..."}
+
+# Operations/tasks the skill covers
+operations:
+  category1:
+    - op1
+    - op2
+
+# Auxiliary/meta tasks
+auxiliary_tasks:
+  task_type: "Description"
+
+# Anti-overfitting mechanisms
+anti_overfitting:
+  mechanism: "Description of how overfitting is prevented"
+
+# Special rules taught by the skill
+special_rules:
+  - "Rule 1"
+  - "Rule 2"

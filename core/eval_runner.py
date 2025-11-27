@@ -1,0 +1,682 @@
+"""
+Eval Runner - Processes evaluation queues.
+
+Handles:
+1. Skill evaluations (from checkpoint saves)
+2. Passive evaluations (LITE priority, FULL manual)
+
+Run as daemon or one-shot:
+    # Daemon mode (continuous)
+    python3 core/eval_runner.py --daemon --interval 60
+
+    # One-shot (process all pending)
+    python3 core/eval_runner.py --once
+
+    # Process specific checkpoint
+    python3 core/eval_runner.py --checkpoint 190000
+"""
+
+import argparse
+import json
+import logging
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Dict, Any, List
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Add project root to path
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from core.evaluation_ledger import (
+    get_eval_ledger,
+    record_evaluation,
+    pop_evaluation,
+    get_pending_evaluations,
+    EvalRecord,
+)
+from core.passives import (
+    get_passives_ledger,
+    get_passive_definitions,
+    get_passive,
+    pop_passive,
+    get_pending_passives,
+    PassiveResult,
+    PassiveMode,
+)
+
+
+class EvalRunner:
+    """
+    Runs evaluations against checkpoints.
+
+    Uses static validation sets for skills, generates problems for passives.
+    """
+
+    def __init__(
+        self,
+        base_dir: Optional[Path] = None,
+        inference_host: str = "192.168.x.x",
+        inference_port: int = 8765,
+    ):
+        self.base_dir = Path(base_dir) if base_dir else PROJECT_ROOT
+        self.inference_url = f"http://{inference_host}:{inference_port}"
+        self.eval_ledger = get_eval_ledger(self.base_dir)
+        self.passives_ledger = get_passives_ledger(self.base_dir)
+
+        # Load validation sets
+        self.validation_dir = self.base_dir / "data" / "validation"
+
+    def run_skill_evaluation(self, checkpoint_step: int, skill: str, level: int) -> Optional[EvalRecord]:
+        """
+        Run skill evaluation using static validation set.
+
+        Returns EvalRecord if successful, None if failed.
+        """
+        logger.info(f"Running skill eval: checkpoint-{checkpoint_step} {skill} L{level}")
+
+        # Check if already done
+        if self.eval_ledger.has_evaluation(checkpoint_step, skill, level):
+            logger.info(f"Already evaluated, skipping")
+            return self.eval_ledger.get(checkpoint_step, skill, level)
+
+        # Load validation set
+        val_file = self.validation_dir / f"{skill}_validation.json"
+        if not val_file.exists():
+            logger.error(f"Validation file not found: {val_file}")
+            return None
+
+        try:
+            with open(val_file) as f:
+                validation_data = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load validation: {e}")
+            return None
+
+        # Get problems for this level
+        level_key = str(level)
+        if level_key not in validation_data:
+            logger.error(f"Level {level} not in validation set")
+            return None
+
+        problems = validation_data[level_key]
+        if not problems:
+            logger.error(f"No problems for level {level}")
+            return None
+
+        # Load checkpoint on inference server
+        if not self._load_checkpoint(checkpoint_step):
+            logger.error(f"Failed to load checkpoint-{checkpoint_step}")
+            return None
+
+        # Run evaluation
+        correct = 0
+        total = len(problems)
+        results = []
+
+        for i, problem in enumerate(problems):
+            prompt = problem.get("prompt", "")
+            expected = problem.get("expected", "")
+
+            # Get model response
+            response = self._get_model_response(prompt)
+            if response is None:
+                logger.warning(f"No response for problem {i+1}")
+                results.append({
+                    "problem_idx": i,
+                    "correct": False,
+                    "expected": expected,
+                    "got": None,
+                    "error": "no_response",
+                })
+                continue
+
+            # Check correctness (simple exact match for now)
+            is_correct = self._check_answer(expected, response, skill)
+            if is_correct:
+                correct += 1
+
+            results.append({
+                "problem_idx": i,
+                "correct": is_correct,
+                "expected": expected,
+                "got": response,
+            })
+
+        accuracy = correct / total if total > 0 else 0
+
+        # Record result
+        success = record_evaluation(
+            checkpoint_step=checkpoint_step,
+            skill=skill,
+            level=level,
+            accuracy=accuracy,
+            correct=correct,
+            total=total,
+            problems=results,
+            validation_type="static",
+            base_dir=self.base_dir,
+        )
+
+        if success:
+            logger.info(f"Recorded: {skill} L{level} = {accuracy:.1%} ({correct}/{total})")
+            return self.eval_ledger.get(checkpoint_step, skill, level)
+        else:
+            logger.warning(f"Failed to record evaluation")
+            return None
+
+    def run_passive_evaluation(
+        self,
+        checkpoint_step: int,
+        passive_id: str,
+        mode: str,
+    ) -> Optional[PassiveResult]:
+        """
+        Run passive evaluation using modular passive system.
+
+        Uses guild/passives/ modules for problem generation and answer checking.
+        Records version for result comparability.
+        """
+        logger.info(f"Running passive eval: checkpoint-{checkpoint_step} {passive_id} ({mode})")
+
+        # Get passive module (modular system)
+        from core.passives import get_passive_module
+        passive_module = get_passive_module(passive_id)
+
+        if not passive_module:
+            # Fall back to legacy method
+            logger.warning(f"No module for {passive_id}, using legacy generator")
+            return self._run_passive_legacy(checkpoint_step, passive_id, mode)
+
+        # Get version info
+        config = passive_module.get_config()
+        version = config.version
+        config_hash = config.config_hash()
+
+        # Check if already done (same version)
+        existing = self.passives_ledger.get(checkpoint_step, passive_id, mode)
+        if existing and existing.version == version:
+            logger.info(f"Already evaluated with v{version}, skipping")
+            return existing
+
+        # Determine problem count
+        count = config.lite_count if mode == "lite" else config.full_count
+
+        # Generate problems using module
+        seed = checkpoint_step  # Reproducible per checkpoint
+        problems = passive_module.generate_problems(count, seed=seed)
+        if not problems:
+            logger.error(f"Failed to generate problems for {passive_id}")
+            return None
+
+        # Load checkpoint
+        if not self._load_checkpoint(checkpoint_step):
+            logger.error(f"Failed to load checkpoint-{checkpoint_step}")
+            return None
+
+        # Run evaluation
+        correct = 0
+        total = len(problems)
+        results = []
+
+        for i, problem in enumerate(problems):
+            prompt = problem.get("prompt", "")
+            expected = problem.get("expected", "")
+
+            response = self._get_model_response(prompt)
+            if response is None:
+                results.append({
+                    "problem_idx": i,
+                    "correct": False,
+                    "expected": expected,
+                    "got": None,
+                    "error": "no_response",
+                })
+                continue
+
+            # Use module's answer checker
+            is_correct = passive_module.check_answer(expected, response)
+            if is_correct:
+                correct += 1
+
+            results.append({
+                "problem_idx": i,
+                "correct": is_correct,
+                "expected": expected,
+                "got": response,
+            })
+
+        accuracy = correct / total if total > 0 else 0
+
+        # Record result with version
+        result = PassiveResult(
+            checkpoint_step=checkpoint_step,
+            passive_id=passive_id,
+            mode=mode,
+            accuracy=accuracy,
+            correct=correct,
+            total=total,
+            timestamp=datetime.now().isoformat(),
+            version=version,
+            config_hash=config_hash,
+            problems=results,
+        )
+
+        if self.passives_ledger.record(result):
+            logger.info(f"Recorded: {passive_id} v{version} ({mode}) = {accuracy:.1%} ({correct}/{total})")
+            return result
+        else:
+            logger.warning(f"Failed to record passive result")
+            return None
+
+    def _run_passive_legacy(
+        self,
+        checkpoint_step: int,
+        passive_id: str,
+        mode: str,
+    ) -> Optional[PassiveResult]:
+        """Legacy passive evaluation (for passives without modules)."""
+        passive_def = get_passive(passive_id)
+        if not passive_def:
+            logger.error(f"Unknown passive: {passive_id}")
+            return None
+
+        count = passive_def.lite_count if mode == "lite" else passive_def.full_count
+        problems = self._generate_passive_problems(passive_id, count)
+
+        if not problems or not self._load_checkpoint(checkpoint_step):
+            return None
+
+        correct = 0
+        results = []
+        for i, problem in enumerate(problems):
+            prompt = problem.get("prompt", "")
+            expected = problem.get("expected", "")
+            response = self._get_model_response(prompt)
+
+            if response is None:
+                results.append({"problem_idx": i, "correct": False, "expected": expected, "got": None})
+                continue
+
+            is_correct = self._check_passive_answer(passive_id, expected, response)
+            if is_correct:
+                correct += 1
+            results.append({"problem_idx": i, "correct": is_correct, "expected": expected, "got": response})
+
+        accuracy = correct / len(problems) if problems else 0
+
+        result = PassiveResult(
+            checkpoint_step=checkpoint_step,
+            passive_id=passive_id,
+            mode=mode,
+            accuracy=accuracy,
+            correct=correct,
+            total=len(problems),
+            timestamp=datetime.now().isoformat(),
+            version="legacy",
+            problems=results,
+        )
+
+        self.passives_ledger.record(result)
+        return result
+
+    def _load_checkpoint(self, checkpoint_step: int) -> bool:
+        """Load checkpoint on inference server using Ledger as source of truth."""
+        import requests
+
+        # Use the Checkpoint Ledger to find the path (single source of truth!)
+        try:
+            from core.checkpoint_ledger import get_ledger
+            ledger = get_ledger()
+            record = ledger.get(checkpoint_step)
+
+            if not record:
+                logger.error(f"Checkpoint {checkpoint_step} not in ledger")
+                return False
+
+            checkpoint_path = record.path
+            if not Path(checkpoint_path).exists():
+                logger.error(f"Checkpoint path from ledger doesn't exist: {checkpoint_path}")
+                return False
+
+            logger.info(f"Loading {record.canonical_name} from ledger")
+
+        except ImportError:
+            # Fallback to glob if ledger not available
+            logger.warning("Ledger not available, falling back to glob")
+            models_dir = self.base_dir / "models" / "current_model"
+            checkpoint_dirs = list(models_dir.glob(f"checkpoint-{checkpoint_step}*"))
+            if not checkpoint_dirs:
+                logger.error(f"Checkpoint directory not found for step {checkpoint_step}")
+                return False
+            checkpoint_path = str(checkpoint_dirs[0])
+
+        try:
+            response = requests.post(
+                f"{self.inference_url}/models/reload",
+                json={"model_path": checkpoint_path},
+                timeout=120,
+            )
+            if response.status_code == 200:
+                logger.info(f"Loaded checkpoint-{checkpoint_step}")
+                return True
+            else:
+                logger.error(f"Failed to load checkpoint: {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"Error loading checkpoint: {e}")
+            return False
+
+    def _get_model_response(self, prompt: str) -> Optional[str]:
+        """Get response from inference server."""
+        import requests
+
+        try:
+            response = requests.post(
+                f"{self.inference_url}/v1/chat/completions",
+                json={
+                    "model": "current",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 512,
+                    "temperature": 0,  # Deterministic for evaluation
+                },
+                timeout=60,
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            else:
+                logger.warning(f"Inference error: {response.status_code}")
+                return None
+        except Exception as e:
+            logger.error(f"Request error: {e}")
+            return None
+
+    def _check_answer(self, expected: str, got: str, skill: str) -> bool:
+        """Check if answer is correct for a skill evaluation."""
+        # Normalize
+        expected_norm = expected.strip().lower()
+        got_norm = got.strip().lower()
+
+        # Skill-specific checking
+        if skill == "bin":
+            # For binary, check if expected result appears in response
+            # The expected format is like "decrement(①⓪) = ①"
+            # Model might include verification steps
+            return expected_norm in got_norm or self._extract_binary_result(expected) in got
+
+        elif skill == "sy":
+            # For syllacrostic, check word list
+            expected_words = set(w.strip().lower() for w in expected.split(",") if w.strip())
+            # Extract words from response (look for comma-separated or newline-separated)
+            got_words = set()
+            for line in got.split("\n"):
+                for word in line.replace(",", " ").split():
+                    cleaned = word.strip().lower()
+                    if cleaned and len(cleaned) > 1:
+                        got_words.add(cleaned)
+            return expected_words == got_words
+
+        else:
+            # Default: exact match
+            return expected_norm == got_norm
+
+    def _extract_binary_result(self, expected: str) -> str:
+        """Extract just the result from binary expected answer."""
+        if "=" in expected:
+            return expected.split("=")[-1].strip()
+        return expected
+
+    def _check_passive_answer(self, passive_id: str, expected: str, got: str) -> bool:
+        """Check answer for passive evaluation."""
+        expected_norm = expected.strip().lower()
+        got_norm = got.strip().lower()
+
+        # Most passives use simple containment or exact match
+        if passive_id == "decimal_math":
+            # Check if the numeric answer appears
+            import re
+            expected_nums = re.findall(r'-?\d+\.?\d*', expected)
+            got_nums = re.findall(r'-?\d+\.?\d*', got)
+            if expected_nums:
+                return expected_nums[-1] in got_nums
+
+        elif passive_id == "instruction_following":
+            # Check key parts of expected response appear
+            return expected_norm in got_norm
+
+        elif passive_id == "common_sense":
+            # Multiple choice - check if correct letter/option appears
+            return expected_norm in got_norm
+
+        # Default: containment
+        return expected_norm in got_norm
+
+    def _generate_passive_problems(self, passive_id: str, count: int) -> List[Dict[str, Any]]:
+        """Generate problems for a passive evaluation."""
+        # For now, use static problems. Later: integrate with problem generators
+        problems = []
+
+        if passive_id == "decimal_math":
+            import random
+            random.seed(42)  # Reproducible
+            for i in range(count):
+                a = random.randint(1, 100)
+                b = random.randint(1, 100)
+                op = random.choice(["+", "-", "*"])
+                if op == "+":
+                    result = a + b
+                elif op == "-":
+                    result = a - b
+                else:
+                    result = a * b
+                problems.append({
+                    "prompt": f"Calculate: {a} {op} {b} = ?",
+                    "expected": str(result),
+                })
+
+        elif passive_id == "instruction_following":
+            # Simple instruction following
+            instructions = [
+                ("Say 'hello' three times", "hello hello hello"),
+                ("Count from 1 to 5", "1 2 3 4 5"),
+                ("List the colors of a rainbow", "red orange yellow green blue indigo violet"),
+                ("Name the first three letters of the alphabet", "a b c"),
+                ("What is the opposite of hot?", "cold"),
+            ]
+            for prompt, expected in instructions[:count]:
+                problems.append({"prompt": prompt, "expected": expected})
+
+        elif passive_id == "common_sense":
+            # Common sense questions
+            questions = [
+                ("Water freezes at what temperature in Celsius? A) 0 B) 100 C) 50 D) -10", "A"),
+                ("How many legs does a spider have? A) 4 B) 6 C) 8 D) 10", "C"),
+                ("What comes after Monday? A) Sunday B) Tuesday C) Wednesday D) Friday", "B"),
+                ("What do you use to cut paper? A) hammer B) scissors C) spoon D) pencil", "B"),
+                ("Which is the largest ocean? A) Atlantic B) Indian C) Pacific D) Arctic", "C"),
+            ]
+            for prompt, expected in questions[:count]:
+                problems.append({"prompt": prompt, "expected": expected})
+
+        elif passive_id == "word_problems":
+            word_problems = [
+                ("If you have 5 apples and eat 2, how many are left?", "3"),
+                ("A train travels 60 miles per hour. How far does it go in 2 hours?", "120"),
+                ("You have 10 cookies and share them equally with a friend. How many does each person get?", "5"),
+                ("If a book costs $15 and you have $50, how much change do you get?", "35"),
+                ("There are 24 hours in a day. How many hours in 2 days?", "48"),
+            ]
+            for prompt, expected in word_problems[:count]:
+                problems.append({"prompt": prompt, "expected": expected})
+
+        elif passive_id == "text_completion":
+            completions = [
+                ("The sun rises in the ___", "east"),
+                ("Water is made of hydrogen and ___", "oxygen"),
+                ("The capital of France is ___", "paris"),
+                ("Dogs bark and cats ___", "meow"),
+                ("The opposite of up is ___", "down"),
+            ]
+            for prompt, expected in completions[:count]:
+                problems.append({"prompt": prompt, "expected": expected})
+
+        return problems
+
+    def process_skill_queue(self, limit: int = 10) -> int:
+        """Process pending skill evaluations. Returns count processed."""
+        processed = 0
+
+        for _ in range(limit):
+            item = pop_evaluation()
+            if not item:
+                break
+
+            result = self.run_skill_evaluation(
+                checkpoint_step=item["checkpoint_step"],
+                skill=item["skill"],
+                level=item["level"],
+            )
+
+            if result:
+                processed += 1
+
+        return processed
+
+    def process_passive_queue(self, limit: int = 10) -> int:
+        """Process pending passive evaluations. Returns count processed."""
+        processed = 0
+
+        for _ in range(limit):
+            item = pop_passive()
+            if not item:
+                break
+
+            result = self.run_passive_evaluation(
+                checkpoint_step=item["checkpoint_step"],
+                passive_id=item["passive_id"],
+                mode=item["mode"],
+            )
+
+            if result:
+                processed += 1
+
+        return processed
+
+    def process_all(self) -> Dict[str, int]:
+        """Process all pending evaluations."""
+        skills_processed = self.process_skill_queue(limit=100)
+        passives_processed = self.process_passive_queue(limit=100)
+
+        return {
+            "skills": skills_processed,
+            "passives": passives_processed,
+        }
+
+
+def run_daemon(
+    base_dir: Path,
+    interval: int = 60,
+    inference_host: str = "192.168.x.x",
+    inference_port: int = 8765,
+):
+    """Run eval runner as daemon."""
+    logger.info(f"Starting eval runner daemon (interval={interval}s)")
+
+    runner = EvalRunner(
+        base_dir=base_dir,
+        inference_host=inference_host,
+        inference_port=inference_port,
+    )
+
+    while True:
+        try:
+            # Check queues
+            skill_pending = len(get_pending_evaluations())
+            passive_pending = len(get_pending_passives())
+
+            if skill_pending > 0 or passive_pending > 0:
+                logger.info(f"Pending: {skill_pending} skills, {passive_pending} passives")
+                results = runner.process_all()
+                logger.info(f"Processed: {results['skills']} skills, {results['passives']} passives")
+            else:
+                logger.debug("No pending evaluations")
+
+        except Exception as e:
+            logger.error(f"Error in daemon loop: {e}")
+
+        time.sleep(interval)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Eval Runner")
+    parser.add_argument("--base-dir", type=Path, default=PROJECT_ROOT)
+    parser.add_argument("--inference-host", default="192.168.x.x")
+    parser.add_argument("--inference-port", type=int, default=8765)
+    parser.add_argument("--daemon", action="store_true", help="Run as daemon")
+    parser.add_argument("--interval", type=int, default=60, help="Daemon check interval")
+    parser.add_argument("--once", action="store_true", help="Process all pending and exit")
+    parser.add_argument("--checkpoint", type=int, help="Evaluate specific checkpoint")
+    parser.add_argument("--skill", help="Skill to evaluate (with --checkpoint)")
+    parser.add_argument("--level", type=int, help="Level to evaluate (with --checkpoint)")
+
+    args = parser.parse_args()
+
+    runner = EvalRunner(
+        base_dir=args.base_dir,
+        inference_host=args.inference_host,
+        inference_port=args.inference_port,
+    )
+
+    if args.daemon:
+        run_daemon(
+            base_dir=args.base_dir,
+            interval=args.interval,
+            inference_host=args.inference_host,
+            inference_port=args.inference_port,
+        )
+
+    elif args.once:
+        results = runner.process_all()
+        print(f"Processed: {results['skills']} skills, {results['passives']} passives")
+
+    elif args.checkpoint:
+        if args.skill and args.level:
+            result = runner.run_skill_evaluation(args.checkpoint, args.skill, args.level)
+            if result:
+                print(f"Result: {result.accuracy:.1%} ({result.correct}/{result.total})")
+            else:
+                print("Evaluation failed")
+        else:
+            print("Specify --skill and --level with --checkpoint")
+            sys.exit(1)
+
+    else:
+        # Show status
+        skill_pending = get_pending_evaluations()
+        passive_pending = get_pending_passives()
+        print(f"Pending skill evaluations: {len(skill_pending)}")
+        print(f"Pending passive evaluations: {len(passive_pending)}")
+
+        if skill_pending:
+            print("\nSkill queue:")
+            for item in skill_pending[:5]:
+                print(f"  - checkpoint-{item['checkpoint_step']} {item['skill']} L{item['level']}")
+
+        if passive_pending:
+            print("\nPassive queue:")
+            for item in passive_pending[:5]:
+                print(f"  - checkpoint-{item['checkpoint_step']} {item['passive_id']} ({item['mode']})")
+
+
+if __name__ == "__main__":
+    main()

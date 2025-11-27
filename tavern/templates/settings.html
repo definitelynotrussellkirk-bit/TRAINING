@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/game.css?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .settings-main {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            height: calc(100vh - 120px);
+            overflow: hidden;
+        }
+
+        .settings-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .settings-nav-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .settings-nav-item:hover {
+            border-color: var(--border-gold);
+        }
+
+        .settings-nav-item.active {
+            border-color: var(--color-gold);
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(245, 158, 11, 0.1) 100%);
+        }
+
+        .settings-nav-icon {
+            font-size: 1.25rem;
+        }
+
+        .settings-nav-label {
+            font-weight: 500;
+        }
+
+        .settings-content {
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .settings-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+
+        .settings-section.active {
+            display: block;
+        }
+
+        .settings-section h2 {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .settings-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .settings-group h3 {
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .settings-row {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 1rem;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .settings-row:last-child {
+            border-bottom: none;
+        }
+
+        .settings-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .settings-label small {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            opacity: 0.7;
+            margin-top: 0.25rem;
+        }
+
+        .settings-value {
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+        }
+
+        .settings-value.locked {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* Form inputs */
+        .settings-input {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            width: 100%;
+            max-width: 300px;
+            transition: border-color 0.2s ease;
+        }
+
+        .settings-input:focus {
+            outline: none;
+            border-color: var(--color-gold);
+        }
+
+        .settings-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .settings-input[type="number"] {
+            max-width: 150px;
+        }
+
+        .settings-select {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            min-width: 150px;
+        }
+
+        .settings-toggle {
+            position: relative;
+            width: 48px;
+            height: 24px;
+            background: var(--bg-dark);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .settings-toggle.active {
+            background: var(--color-success);
+        }
+
+        .settings-toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+
+        .settings-toggle.active::after {
+            transform: translateX(24px);
+        }
+
+        /* Action buttons */
+        .settings-actions {
+            position: fixed;
+            bottom: 80px;
+            right: 2rem;
+            display: flex;
+            gap: 1rem;
+            background: var(--bg-panel);
+            padding: 1rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+            z-index: 100;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .settings-actions.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: all;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: var(--color-success);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.1);
+        }
+
+        .btn-secondary {
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--border-gold);
+        }
+
+        /* JSON view */
+        .json-view {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        /* Status indicator */
+        .save-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .save-status.success {
+            color: var(--color-success);
+        }
+
+        .save-status.error {
+            color: var(--color-danger);
+        }
+
+        .save-status.pending {
+            color: var(--color-warning);
+        }
+
+        /* Defaults toolbar */
+        .defaults-toolbar {
+            position: fixed;
+            bottom: 80px;
+            left: 2rem;
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            background: var(--bg-panel);
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+        }
+
+        .defaults-toolbar .btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        .defaults-status {
+            font-size: 0.85rem;
+            margin-left: 0.5rem;
+        }
+
+        .defaults-status.success {
+            color: var(--color-success);
+        }
+
+        .defaults-status.error {
+            color: var(--color-danger);
+        }
+    </style>
+</head>
+<body>
+    <!-- TITLE BAR -->
+    <header class="game-header">
+        <div class="header-left">
+            <h1 class="game-title">Settings</h1>
+        </div>
+        <div class="header-center">
+            <div class="resource-bar">
+                <div class="resource">
+                    <span class="resource-icon">⚙️</span>
+                    <span class="resource-label">CONFIG</span>
+                    <span class="resource-value" id="configStatus">Loaded</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="time-display" id="timeDisplay">--:--:--</div>
+        </div>
+    </header>
+
+    <!-- MAIN SETTINGS AREA -->
+    <main class="settings-main">
+        <!-- LEFT NAV -->
+        <nav class="settings-nav">
+            <div class="settings-nav-item active" data-section="training">
+                <span class="settings-nav-icon">🎯</span>
+                <span class="settings-nav-label">Training</span>
+            </div>
+            <div class="settings-nav-item" data-section="generation">
+                <span class="settings-nav-icon">🔄</span>
+                <span class="settings-nav-label">Data Generation</span>
+            </div>
+            <div class="settings-nav-item" data-section="curriculum">
+                <span class="settings-nav-icon">📚</span>
+                <span class="settings-nav-label">Curriculum</span>
+            </div>
+            <div class="settings-nav-item" data-section="remote">
+                <span class="settings-nav-icon">🌐</span>
+                <span class="settings-nav-label">Remote Eval</span>
+            </div>
+            <div class="settings-nav-item" data-section="model">
+                <span class="settings-nav-icon">🤖</span>
+                <span class="settings-nav-label">Model Info</span>
+            </div>
+            <div class="settings-nav-item" data-section="raw">
+                <span class="settings-nav-icon">📄</span>
+                <span class="settings-nav-label">Raw JSON</span>
+            </div>
+        </nav>
+
+        <!-- CONTENT -->
+        <div class="settings-content">
+            <!-- TRAINING SECTION -->
+            <section class="settings-section active" id="section-training">
+                <h2>🎯 Training Configuration</h2>
+
+                <div class="settings-group">
+                    <h3>Hyperparameters</h3>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Batch Size
+                            <small>Samples per step</small>
+                        </div>
+                        <input type="number" class="settings-input" id="batch_size" min="1" max="32" value="1">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Gradient Accumulation
+                            <small>Effective batch = batch × accum</small>
+                        </div>
+                        <input type="number" class="settings-input" id="gradient_accumulation" min="1" max="128" value="16">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Learning Rate
+                            <small>Step size for optimization</small>
+                        </div>
+                        <input type="text" class="settings-input" id="learning_rate" value="0.0004">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Precision
+                            <small>Floating point format</small>
+                        </div>
+                        <select class="settings-select" id="fp_precision">
+                            <option value="bf16">bf16 (Brain Float)</option>
+                            <option value="fp16">fp16 (Half)</option>
+                            <option value="fp32">fp32 (Full)</option>
+                        </select>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Max Length
+                            <small>Maximum sequence length</small>
+                        </div>
+                        <input type="number" class="settings-input" id="max_length" min="512" max="8192" value="2048">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Gradient Checkpointing
+                            <small>Trade compute for memory</small>
+                        </div>
+                        <div class="settings-toggle" id="use_gradient_checkpointing" onclick="toggleSetting(this)"></div>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Logging & Saves</h3>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Log Steps</div>
+                        <input type="number" class="settings-input" id="log_steps" min="10" max="1000" value="200">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Eval Steps</div>
+                        <input type="number" class="settings-input" id="eval_steps" min="100" max="5000" value="500">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Save Steps</div>
+                        <input type="number" class="settings-input" id="save_steps" min="500" max="10000" value="1000">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Profile</div>
+                        <select class="settings-select" id="profile_name">
+                            <option value="none">None</option>
+                            <option value="emoji_think">Emoji Think</option>
+                            <option value="regime3">Regime 3</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- DATA GENERATION SECTION -->
+            <section class="settings-section" id="section-generation">
+                <h2>🔄 Data Generation</h2>
+
+                <div class="settings-group">
+                    <h3>Auto-Generate</h3>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Enabled</div>
+                        <div class="settings-toggle" id="auto_generate_enabled" onclick="toggleSetting(this)"></div>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Batch Count
+                            <small>Examples per generation</small>
+                        </div>
+                        <input type="number" class="settings-input" id="auto_generate_count" min="10" max="1000" value="100">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Min Queue Depth
+                            <small>Keep this many items ready</small>
+                        </div>
+                        <input type="number" class="settings-input" id="auto_generate_min_queue" min="1" max="10" value="2">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Cooldown (sec)
+                            <small>Wait between generations</small>
+                        </div>
+                        <input type="number" class="settings-input" id="auto_generate_cooldown" min="60" max="3600" value="180">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">API Host</div>
+                        <input type="text" class="settings-input" id="auto_generate_host" value="localhost">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">API Port</div>
+                        <input type="number" class="settings-input" id="auto_generate_port" min="1" max="65535" value="8080">
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Self-Correction</h3>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Enabled</div>
+                        <div class="settings-toggle" id="self_correction_enabled" onclick="toggleSetting(this)"></div>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Auto Queue</div>
+                        <div class="settings-toggle" id="self_correction_auto_queue" onclick="toggleSetting(this)"></div>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Max Examples</div>
+                        <input type="number" class="settings-input" id="self_correction_max" min="10" max="1000" value="200">
+                    </div>
+                </div>
+            </section>
+
+            <!-- CURRICULUM SECTION -->
+            <section class="settings-section" id="section-curriculum">
+                <h2>📚 Curriculum</h2>
+
+                <div class="settings-group">
+                    <h3>Progression</h3>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Enabled</div>
+                        <div class="settings-toggle" id="curriculum_enabled" onclick="toggleSetting(this)"></div>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Target Accuracy
+                            <small>Required to level up</small>
+                        </div>
+                        <input type="number" class="settings-input" id="curriculum_target" min="0.5" max="1.0" step="0.05" value="0.75">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Current Skill</div>
+                        <select class="settings-select" id="curriculum_skill">
+                            <option value="binary">Binary (BIN)</option>
+                            <option value="syllo">Syllacrostic (SY)</option>
+                        </select>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Progression Mode</div>
+                        <select class="settings-select" id="curriculum_mode">
+                            <option value="automatic">Automatic</option>
+                            <option value="manual">Manual</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Retention</h3>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Enabled</div>
+                        <div class="settings-toggle" id="retention_enabled" onclick="toggleSetting(this)"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- REMOTE EVAL SECTION -->
+            <section class="settings-section" id="section-remote">
+                <h2>🌐 Remote Evaluation (RTX 3090)</h2>
+
+                <div class="settings-group">
+                    <h3>Connection</h3>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Enabled</div>
+                        <div class="settings-toggle" id="remote_enabled" onclick="toggleSetting(this)"></div>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Host</div>
+                        <input type="text" class="settings-input" id="remote_host" value="192.168.x.x">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Port</div>
+                        <input type="number" class="settings-input" id="remote_port" min="1" max="65535" value="8765">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Eval Interval (steps)
+                            <small>Steps between remote evals</small>
+                        </div>
+                        <input type="number" class="settings-input" id="remote_interval" min="1000" max="50000" value="5000">
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Sync Checkpoints</div>
+                        <div class="settings-toggle" id="remote_sync" onclick="toggleSetting(this)"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MODEL INFO SECTION -->
+            <section class="settings-section" id="section-model">
+                <h2>🤖 Model Information</h2>
+
+                <div class="settings-group">
+                    <h3>Locked Configuration</h3>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                        These values cannot be changed without restarting training from scratch.
+                    </p>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Base Model</div>
+                        <div class="settings-value locked" id="locked_base_model">--</div>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Architecture</div>
+                        <div class="settings-value locked" id="locked_architecture">--</div>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Max Context</div>
+                        <div class="settings-value locked" id="locked_context">--</div>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Vocab Size</div>
+                        <div class="settings-value locked" id="locked_vocab">--</div>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Paths</h3>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Model Path</div>
+                        <div class="settings-value" id="path_model">--</div>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">Current Model Dir</div>
+                        <div class="settings-value" id="path_current">--</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RAW JSON SECTION -->
+            <section class="settings-section" id="section-raw">
+                <h2>📄 Raw Configuration</h2>
+
+                <div class="settings-group">
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                        Full config.json content (read-only view)
+                    </p>
+                    <pre class="json-view" id="rawConfig">Loading...</pre>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- SAVE ACTIONS (appears when changes detected) -->
+    <div class="settings-actions" id="settingsActions">
+        <span class="save-status" id="saveStatus"></span>
+        <button class="btn btn-secondary" onclick="resetChanges()">Reset</button>
+        <button class="btn btn-primary" onclick="saveConfig()">Save Changes</button>
+    </div>
+
+    <!-- DEFAULTS TOOLBAR (always visible) -->
+    <div class="defaults-toolbar" id="defaultsToolbar">
+        <button class="btn btn-secondary" onclick="restoreDefaults()" title="Restore from saved defaults">
+            Restore Defaults
+        </button>
+        <button class="btn btn-secondary" onclick="saveAsDefault()" title="Save current config as default">
+            Save as Default
+        </button>
+        <span class="defaults-status" id="defaultsStatus"></span>
+    </div>
+
+    <!-- NAVIGATION -->
+    <nav class="game-nav">
+        <button class="nav-btn" onclick="window.location.href='/'">
+            <span class="nav-icon">⚔️</span>
+            <span class="nav-label">Battle</span>
+        </button>
+        <button class="nav-btn" onclick="window.location.href='/guild'">
+            <span class="nav-icon">🏰</span>
+            <span class="nav-label">Guild</span>
+        </button>
+        <button class="nav-btn" data-view="quests">
+            <span class="nav-icon">📜</span>
+            <span class="nav-label">Quests</span>
+        </button>
+        <button class="nav-btn" onclick="window.location.href='/vault'">
+            <span class="nav-icon">🗃️</span>
+            <span class="nav-label">Vault</span>
+        </button>
+        <button class="nav-btn active">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Settings</span>
+        </button>
+    </nav>
+
+    <script>
+        // ============================================
+        // SETTINGS PAGE JAVASCRIPT
+        // ============================================
+
+        let originalConfig = null;
+        let currentConfig = null;
+        let hasChanges = false;
+
+        // DOM helpers
+        function $(sel) { return document.querySelector(sel); }
+        function $$(sel) { return document.querySelectorAll(sel); }
+        function setText(sel, text) { const el = $(sel); if (el) el.textContent = text; }
+
+        // Time display
+        function updateTime() {
+            setText('#timeDisplay', new Date().toLocaleTimeString('en-US', { hour12: false }));
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Section navigation
+        $$('.settings-nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                // Update nav
+                $$('.settings-nav-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+
+                // Update content
+                const section = item.dataset.section;
+                $$('.settings-section').forEach(s => s.classList.remove('active'));
+                $(`#section-${section}`)?.classList.add('active');
+            });
+        });
+
+        // Toggle switches
+        function toggleSetting(el) {
+            el.classList.toggle('active');
+            checkForChanges();
+        }
+
+        // Load config from server
+        async function loadConfig() {
+            try {
+                const response = await fetch('/config');
+                if (!response.ok) throw new Error('Failed to load config');
+
+                const config = await response.json();
+                originalConfig = JSON.parse(JSON.stringify(config));
+                currentConfig = config;
+
+                populateForm(config);
+                setText('#configStatus', 'Loaded');
+            } catch (error) {
+                console.error('Failed to load config:', error);
+                setText('#configStatus', 'Error');
+            }
+        }
+
+        function populateForm(config) {
+            // Training hyperparams
+            $('#batch_size').value = config.hyperparams?.batch_size || config.batch_size || 1;
+            $('#gradient_accumulation').value = config.hyperparams?.gradient_accumulation || config.gradient_accumulation || 16;
+            $('#learning_rate').value = config.hyperparams?.learning_rate || config.learning_rate || 0.0004;
+            $('#fp_precision').value = config.hyperparams?.fp_precision || 'bf16';
+            $('#max_length').value = config.hyperparams?.max_length || config.max_length || 2048;
+            setToggle('#use_gradient_checkpointing', config.hyperparams?.use_gradient_checkpointing);
+
+            // Logging
+            $('#log_steps').value = config.log_steps || 200;
+            $('#eval_steps').value = config.eval_steps || 500;
+            $('#save_steps').value = config.save_steps || 1000;
+            $('#profile_name').value = config.profile?.name || 'none';
+
+            // Auto-generate
+            setToggle('#auto_generate_enabled', config.auto_generate?.enabled);
+            $('#auto_generate_count').value = config.auto_generate?.count || 100;
+            $('#auto_generate_min_queue').value = config.auto_generate?.min_queue_depth || 2;
+            $('#auto_generate_cooldown').value = config.auto_generate?.cooldown_sec || 180;
+            $('#auto_generate_host').value = config.auto_generate?.host || 'localhost';
+            $('#auto_generate_port').value = config.auto_generate?.port || 8080;
+
+            // Self-correction
+            setToggle('#self_correction_enabled', config.self_correction?.enabled);
+            setToggle('#self_correction_auto_queue', config.self_correction?.auto_queue);
+            $('#self_correction_max').value = config.self_correction?.max_examples || 200;
+
+            // Curriculum
+            setToggle('#curriculum_enabled', config.curriculum?.enabled);
+            $('#curriculum_target').value = config.curriculum?.target_accuracy || 0.75;
+            $('#curriculum_skill').value = config.curriculum?.current_skill || 'binary';
+            $('#curriculum_mode').value = config.curriculum?.progression_mode || 'automatic';
+
+            // Retention
+            setToggle('#retention_enabled', config.retention?.enabled);
+
+            // Remote eval
+            setToggle('#remote_enabled', config.remote_eval?.enabled);
+            $('#remote_host').value = config.remote_eval?.host || '192.168.x.x';
+            $('#remote_port').value = config.remote_eval?.port || 8765;
+            $('#remote_interval').value = config.remote_eval?.eval_interval_steps || 5000;
+            setToggle('#remote_sync', config.remote_eval?.sync_checkpoints);
+
+            // Locked values
+            setText('#locked_base_model', config.locked?.base_model || '--');
+            setText('#locked_architecture', config.locked?.model_architecture || '--');
+            setText('#locked_context', config.locked?.max_context_length?.toLocaleString() || '--');
+            setText('#locked_vocab', config.locked?.vocab_size?.toLocaleString() || '--');
+
+            // Paths
+            setText('#path_model', config.model_path || '--');
+            setText('#path_current', config.current_model_dir || '--');
+
+            // Raw JSON
+            $('#rawConfig').textContent = JSON.stringify(config, null, 2);
+
+            // Add change listeners
+            addChangeListeners();
+        }
+
+        function setToggle(sel, value) {
+            const el = $(sel);
+            if (el) {
+                if (value) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
+            }
+        }
+
+        function getToggle(sel) {
+            return $(sel)?.classList.contains('active') || false;
+        }
+
+        function addChangeListeners() {
+            $$('.settings-input, .settings-select').forEach(el => {
+                el.addEventListener('input', checkForChanges);
+                el.addEventListener('change', checkForChanges);
+            });
+        }
+
+        function checkForChanges() {
+            const current = gatherFormData();
+            hasChanges = JSON.stringify(current) !== JSON.stringify(originalConfig);
+
+            const actions = $('#settingsActions');
+            if (hasChanges) {
+                actions.classList.add('visible');
+                $('#saveStatus').textContent = '';
+                $('#saveStatus').className = 'save-status';
+            } else {
+                actions.classList.remove('visible');
+            }
+        }
+
+        function gatherFormData() {
+            const config = JSON.parse(JSON.stringify(originalConfig));
+
+            // Training
+            config.batch_size = parseInt($('#batch_size').value);
+            config.gradient_accumulation = parseInt($('#gradient_accumulation').value);
+            config.learning_rate = parseFloat($('#learning_rate').value);
+            config.max_length = parseInt($('#max_length').value);
+            config.log_steps = parseInt($('#log_steps').value);
+            config.eval_steps = parseInt($('#eval_steps').value);
+            config.save_steps = parseInt($('#save_steps').value);
+
+            // Hyperparams nested
+            config.hyperparams = config.hyperparams || {};
+            config.hyperparams.batch_size = config.batch_size;
+            config.hyperparams.gradient_accumulation = config.gradient_accumulation;
+            config.hyperparams.learning_rate = config.learning_rate;
+            config.hyperparams.max_length = config.max_length;
+            config.hyperparams.fp_precision = $('#fp_precision').value;
+            config.hyperparams.use_gradient_checkpointing = getToggle('#use_gradient_checkpointing');
+
+            // Profile
+            config.profile = { name: $('#profile_name').value };
+
+            // Auto-generate
+            config.auto_generate = config.auto_generate || {};
+            config.auto_generate.enabled = getToggle('#auto_generate_enabled');
+            config.auto_generate.count = parseInt($('#auto_generate_count').value);
+            config.auto_generate.min_queue_depth = parseInt($('#auto_generate_min_queue').value);
+            config.auto_generate.cooldown_sec = parseInt($('#auto_generate_cooldown').value);
+            config.auto_generate.host = $('#auto_generate_host').value;
+            config.auto_generate.port = parseInt($('#auto_generate_port').value);
+
+            // Self-correction
+            config.self_correction = config.self_correction || {};
+            config.self_correction.enabled = getToggle('#self_correction_enabled');
+            config.self_correction.auto_queue = getToggle('#self_correction_auto_queue');
+            config.self_correction.max_examples = parseInt($('#self_correction_max').value);
+
+            // Curriculum
+            config.curriculum = config.curriculum || {};
+            config.curriculum.enabled = getToggle('#curriculum_enabled');
+            config.curriculum.target_accuracy = parseFloat($('#curriculum_target').value);
+            config.curriculum.current_skill = $('#curriculum_skill').value;
+            config.curriculum.progression_mode = $('#curriculum_mode').value;
+
+            // Retention
+            config.retention = config.retention || {};
+            config.retention.enabled = getToggle('#retention_enabled');
+
+            // Remote eval
+            config.remote_eval = config.remote_eval || {};
+            config.remote_eval.enabled = getToggle('#remote_enabled');
+            config.remote_eval.host = $('#remote_host').value;
+            config.remote_eval.port = parseInt($('#remote_port').value);
+            config.remote_eval.eval_interval_steps = parseInt($('#remote_interval').value);
+            config.remote_eval.sync_checkpoints = getToggle('#remote_sync');
+
+            return config;
+        }
+
+        function resetChanges() {
+            populateForm(originalConfig);
+            hasChanges = false;
+            $('#settingsActions').classList.remove('visible');
+        }
+
+        async function saveConfig() {
+            const status = $('#saveStatus');
+            status.textContent = 'Saving...';
+            status.className = 'save-status pending';
+
+            try {
+                const config = gatherFormData();
+                const response = await fetch('/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                if (!response.ok) throw new Error('Save failed');
+
+                const result = await response.json();
+                if (result.success) {
+                    status.textContent = 'Saved!';
+                    status.className = 'save-status success';
+                    originalConfig = JSON.parse(JSON.stringify(config));
+                    hasChanges = false;
+
+                    // Update raw view
+                    $('#rawConfig').textContent = JSON.stringify(config, null, 2);
+
+                    setTimeout(() => {
+                        $('#settingsActions').classList.remove('visible');
+                    }, 1500);
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
+            } catch (error) {
+                status.textContent = `Error: ${error.message}`;
+                status.className = 'save-status error';
+            }
+        }
+
+        async function saveAsDefault() {
+            const status = $('#defaultsStatus');
+            status.textContent = 'Saving...';
+            status.className = 'defaults-status';
+
+            try {
+                const response = await fetch('/config/save-default', { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    status.textContent = 'Saved as default!';
+                    status.className = 'defaults-status success';
+                    setTimeout(() => { status.textContent = ''; }, 3000);
+                } else {
+                    throw new Error(result.error || 'Failed to save');
+                }
+            } catch (error) {
+                status.textContent = error.message;
+                status.className = 'defaults-status error';
+            }
+        }
+
+        async function restoreDefaults() {
+            if (!confirm('Restore config from saved defaults? Current settings will be backed up.')) {
+                return;
+            }
+
+            const status = $('#defaultsStatus');
+            status.textContent = 'Restoring...';
+            status.className = 'defaults-status';
+
+            try {
+                const response = await fetch('/config/restore-default', { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    status.textContent = 'Restored!';
+                    status.className = 'defaults-status success';
+
+                    // Reload the form with restored config
+                    if (result.config) {
+                        originalConfig = JSON.parse(JSON.stringify(result.config));
+                        currentConfig = result.config;
+                        populateForm(result.config);
+                        hasChanges = false;
+                        $('#settingsActions').classList.remove('visible');
+                    }
+
+                    setTimeout(() => { status.textContent = ''; }, 3000);
+                } else {
+                    throw new Error(result.error || 'Failed to restore');
+                }
+            } catch (error) {
+                status.textContent = error.message;
+                status.className = 'defaults-status error';
+            }
+        }
+
+        // Initialize
+        loadConfig();
+    </script>
+</body>
+</html>

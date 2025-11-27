@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Vault - Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/game.css?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .vault-main {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            height: calc(100vh - 120px);
+            overflow: hidden;
+        }
+
+        .vault-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+        }
+
+        .vault-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+        }
+
+        .vault-card h3 {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .vault-stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .vault-stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .vault-stat-label {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .vault-stat-value {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .vault-stat-value.success { color: var(--color-success); }
+        .vault-stat-value.warning { color: var(--color-warning); }
+        .vault-stat-value.muted { color: var(--text-muted); font-style: italic; }
+
+        /* Base Model Card */
+        .base-model-card {
+            border-left: 3px solid var(--color-gold);
+        }
+
+        .base-model-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .base-model-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Zone Cards */
+        .zone-card {
+            border-left: 3px solid var(--color-mana);
+        }
+
+        .zone-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .zone-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--color-danger);
+        }
+
+        .zone-indicator.online {
+            background: var(--color-success);
+            box-shadow: 0 0 6px var(--color-success);
+        }
+
+        /* Main Content */
+        .vault-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow: hidden;
+        }
+
+        .vault-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .vault-header h2 {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+        }
+
+        .asset-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding-right: 0.5rem;
+        }
+
+        .asset-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 1rem;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .asset-card:hover {
+            border-color: var(--border-gold);
+            transform: translateX(4px);
+        }
+
+        .asset-card.clickable {
+            cursor: pointer;
+        }
+
+        .asset-card.clickable:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .asset-card.champion {
+            border-color: var(--color-gold);
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(245, 158, 11, 0.1) 100%);
+        }
+
+        .asset-card.latest {
+            border-left: 3px solid var(--color-success);
+        }
+
+        .asset-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: var(--bg-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .asset-card.champion .asset-icon {
+            background: var(--color-gold);
+        }
+
+        .asset-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .asset-name {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .asset-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .asset-metrics {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .metric {
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--color-mana);
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .empty-vault {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .empty-vault-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .storage-bar {
+            height: 8px;
+            background: var(--bg-dark);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .storage-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-success), var(--color-warning));
+            transition: width 0.5s ease;
+        }
+
+        .storage-fill.danger {
+            background: linear-gradient(90deg, var(--color-warning), var(--color-danger));
+        }
+
+        .section-divider {
+            border-top: 1px solid var(--border-color);
+            margin: 0.5rem 0;
+            padding-top: 0.75rem;
+        }
+
+        .section-divider h4 {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- TITLE BAR -->
+    <header class="game-header">
+        <div class="header-left">
+            <h1 class="game-title">The Vault</h1>
+        </div>
+        <div class="header-center">
+            <div class="resource-bar">
+                <div class="resource steps">
+                    <span class="resource-icon">🗃️</span>
+                    <span class="resource-label">ASSETS</span>
+                    <span class="resource-value" id="assetCount">0</span>
+                </div>
+                <div class="resource evals">
+                    <span class="resource-icon">💾</span>
+                    <span class="resource-label">STORAGE</span>
+                    <span class="resource-value" id="storageUsed">0 GB</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="time-display" id="timeDisplay">--:--:--</div>
+        </div>
+    </header>
+
+    <!-- MAIN VAULT AREA -->
+    <main class="vault-main">
+        <!-- LEFT SIDEBAR -->
+        <aside class="vault-sidebar">
+            <!-- Base Model -->
+            <div class="vault-card base-model-card">
+                <h3>🤖 Base Model</h3>
+                <div class="base-model-name" id="baseModelName">Loading...</div>
+                <div class="base-model-meta" id="baseModelMeta">--</div>
+                <div class="vault-stat-row">
+                    <span class="vault-stat-label">Size</span>
+                    <span class="vault-stat-value" id="baseModelSize">-- GB</span>
+                </div>
+                <div class="vault-stat-row">
+                    <span class="vault-stat-label">Architecture</span>
+                    <span class="vault-stat-value" id="baseModelArch">--</span>
+                </div>
+            </div>
+
+            <!-- Zones / Branch Officers -->
+            <div class="vault-card zone-card">
+                <h3>🌐 Zones</h3>
+                <div class="vault-stat-row">
+                    <span class="vault-stat-label">
+                        <span class="zone-status">
+                            <span class="zone-indicator online" id="zone4090"></span>
+                            RTX 4090 (Local)
+                        </span>
+                    </span>
+                    <span class="vault-stat-value success">Training</span>
+                </div>
+                <div class="vault-stat-row">
+                    <span class="vault-stat-label">
+                        <span class="zone-status">
+                            <span class="zone-indicator" id="zone3090"></span>
+                            RTX 3090 (Inference)
+                        </span>
+                    </span>
+                    <span class="vault-stat-value muted" id="zone3090Status">Offline</span>
+                </div>
+                <div class="vault-stat-row">
+                    <span class="vault-stat-label">
+                        <span class="zone-status">
+                            <span class="zone-indicator" id="zoneNAS"></span>
+                            Synology NAS
+                        </span>
+                    </span>
+                    <span class="vault-stat-value muted" id="zoneNASStatus">Offline</span>
+                </div>
+            </div>
+
+            <!-- Storage Summary -->
+            <div class="vault-card">
+                <h3>📊 Storage</h3>
+                <div class="vault-stat-row">
+                    <span class="vault-stat-label">Total Size</span>
+                    <span class="vault-stat-value" id="totalSize">-- GB</span>
+                </div>
+                <div class="vault-stat-row">
+                    <span class="vault-stat-label">Checkpoints</span>
+                    <span class="vault-stat-value" id="checkpointCount">0</span>
+                </div>
+                <div class="vault-stat-row">
+                    <span class="vault-stat-label">Latest</span>
+                    <span class="vault-stat-value success" id="latestCheckpoint">--</span>
+                </div>
+                <div class="storage-bar">
+                    <div class="storage-fill" id="storageFill" style="width: 0%"></div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <section class="vault-content">
+            <div class="vault-header">
+                <h2>Vault Assets</h2>
+                <span id="lastUpdated" style="color: var(--text-muted); font-size: 0.85rem;">--</span>
+            </div>
+
+            <div class="asset-list" id="assetList">
+                <div class="empty-vault">
+                    <div class="empty-vault-icon">🗃️</div>
+                    <p>Loading vault contents...</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- NAVIGATION -->
+    <nav class="game-nav">
+        <button class="nav-btn" onclick="window.location.href='/'">
+            <span class="nav-icon">⚔️</span>
+            <span class="nav-label">Battle</span>
+        </button>
+        <button class="nav-btn" onclick="window.location.href='/guild'">
+            <span class="nav-icon">🏰</span>
+            <span class="nav-label">Guild</span>
+        </button>
+        <button class="nav-btn" data-view="quests">
+            <span class="nav-icon">📜</span>
+            <span class="nav-label">Quests</span>
+        </button>
+        <button class="nav-btn active">
+            <span class="nav-icon">🗃️</span>
+            <span class="nav-label">Vault</span>
+        </button>
+        <button class="nav-btn" onclick="window.location.href='/settings'">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Settings</span>
+        </button>
+    </nav>
+
+    <script>
+        // ============================================
+        // VAULT PAGE JAVASCRIPT
+        // ============================================
+
+        let vaultData = null;
+
+        function $(sel) { return document.querySelector(sel); }
+        function setText(sel, text) { const el = $(sel); if (el) el.textContent = text; }
+
+        // Update time display
+        function updateTime() {
+            setText('#timeDisplay', new Date().toLocaleTimeString('en-US', { hour12: false }));
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Fetch vault assets from new endpoint
+        async function fetchVaultAssets() {
+            try {
+                const response = await fetch('/vault/assets');
+                if (!response.ok) throw new Error('Failed to load');
+
+                const data = await response.json();
+                vaultData = data;
+                updateUI(data);
+            } catch (error) {
+                console.error('Failed to fetch vault:', error);
+            }
+        }
+
+        function updateUI(data) {
+            // Base model
+            if (data.base_model) {
+                setText('#baseModelName', data.base_model.display_name || data.base_model.name);
+                setText('#baseModelMeta', data.base_model.name);
+                setText('#baseModelSize', `${data.base_model.size_gb} GB`);
+                setText('#baseModelArch', data.base_model.locked?.model_architecture || '--');
+            }
+
+            // Storage stats
+            setText('#totalSize', `${data.total_size_gb} GB`);
+            setText('#storageUsed', `${data.total_size_gb} GB`);
+            setText('#checkpointCount', data.checkpoint_count || 0);
+            setText('#assetCount', (data.checkpoint_count || 0) + (data.base_model ? 1 : 0));
+
+            // Latest checkpoint
+            if (data.checkpoints?.length > 0) {
+                setText('#latestCheckpoint', data.checkpoints[0].name.replace('checkpoint-', ''));
+            }
+
+            // Storage bar (assuming 150GB limit)
+            const limitGb = 150;
+            const usagePct = (data.total_size_gb / limitGb) * 100;
+            const fillEl = $('#storageFill');
+            if (fillEl) {
+                fillEl.style.width = `${Math.min(100, usagePct)}%`;
+                if (usagePct > 80) fillEl.classList.add('danger');
+            }
+
+            // Last updated
+            if (data.last_updated) {
+                const date = new Date(data.last_updated);
+                setText('#lastUpdated', `Updated: ${date.toLocaleTimeString()}`);
+            }
+
+            // Check zone status
+            checkZones();
+
+            // Render asset list
+            renderAssets(data);
+        }
+
+        async function checkZones() {
+            try {
+                const response = await fetch('/vault/zones');
+                if (!response.ok) return;
+
+                const data = await response.json();
+                if (data.zones) {
+                    for (const zone of data.zones) {
+                        updateZoneUI(zone);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch zones:', error);
+            }
+        }
+
+        function updateZoneUI(zone) {
+            // Map zone IDs to UI elements
+            const indicators = {
+                '4090': { dot: '#zone4090', status: null },
+                '3090': { dot: '#zone3090', status: '#zone3090Status' },
+                'nas': { dot: '#zoneNAS', status: '#zoneNASStatus' },
+            };
+
+            const ui = indicators[zone.zone_id];
+            if (!ui) return;
+
+            const dot = $(ui.dot);
+            const statusEl = ui.status ? $(ui.status) : null;
+
+            if (zone.status === 'online') {
+                if (dot) dot.classList.add('online');
+                if (statusEl) {
+                    statusEl.textContent = zone.can_infer ? 'Inference' :
+                                          zone.can_train ? 'Training' :
+                                          `${zone.asset_count} assets`;
+                    statusEl.classList.remove('muted');
+                    statusEl.classList.add('success');
+                }
+            } else {
+                if (dot) dot.classList.remove('online');
+                if (statusEl) {
+                    statusEl.textContent = 'Offline';
+                    statusEl.classList.remove('success');
+                    statusEl.classList.add('muted');
+                }
+            }
+        }
+
+        function renderAssets(data) {
+            const listEl = $('#assetList');
+            if (!listEl) return;
+
+            let html = '';
+
+            // Base model first
+            if (data.base_model) {
+                html += `
+                    <div class="section-divider">
+                        <h4>Base Model</h4>
+                    </div>
+                    <div class="asset-card">
+                        <div class="asset-icon">🤖</div>
+                        <div class="asset-info">
+                            <div class="asset-name">${data.base_model.display_name || data.base_model.name}</div>
+                            <div class="asset-meta">
+                                <span>${data.base_model.locked?.base_model || 'Qwen3-0.6B'}</span>
+                                <span>Vocab: ${(data.base_model.locked?.vocab_size || 0).toLocaleString()}</span>
+                            </div>
+                        </div>
+                        <div class="asset-metrics">
+                            <div class="metric">
+                                <div class="metric-value">${data.base_model.size_gb}</div>
+                                <div class="metric-label">GB</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Checkpoints
+            if (data.checkpoints?.length > 0) {
+                html += `
+                    <div class="section-divider">
+                        <h4>Checkpoints (${data.checkpoints.length})</h4>
+                    </div>
+                `;
+
+                for (const cp of data.checkpoints) {
+                    const classes = ['asset-card', 'clickable'];
+                    if (cp.is_champion) classes.push('champion');
+                    if (cp.is_latest) classes.push('latest');
+
+                    const icon = cp.is_champion ? '👑' : (cp.is_latest ? '✨' : '💾');
+
+                    html += `
+                        <div class="${classes.join(' ')}" data-step="${cp.step}" onclick="viewCheckpoint(${cp.step})">
+                            <div class="asset-icon">${icon}</div>
+                            <div class="asset-info">
+                                <div class="asset-name">${cp.name}</div>
+                                <div class="asset-meta">
+                                    <span>Step ${cp.step.toLocaleString()}</span>
+                                    <span>${cp.age_hours < 1 ? 'Just now' : cp.age_hours.toFixed(1) + 'h ago'}</span>
+                                </div>
+                            </div>
+                            <div class="asset-metrics">
+                                <div class="metric">
+                                    <div class="metric-value">${cp.size_gb}</div>
+                                    <div class="metric-label">GB</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            } else {
+                html += `
+                    <div class="empty-vault">
+                        <div class="empty-vault-icon">🗃️</div>
+                        <p>No checkpoints found</p>
+                        <p style="font-size: 0.85rem; margin-top: 0.5rem;">
+                            Train DIO to create checkpoints
+                        </p>
+                    </div>
+                `;
+            }
+
+            listEl.innerHTML = html;
+        }
+
+        function viewCheckpoint(step) {
+            window.location.href = `/checkpoint/${step}`;
+        }
+
+        // Initialize
+        fetchVaultAssets();
+        setInterval(fetchVaultAssets, 10000); // Refresh every 10 seconds
+    </script>
+</body>
+</html>

@@ -1,0 +1,280 @@
+# =============================================================================
+# SKILL: BIN (Binary Arithmetic)
+# Source: /path/to/skills/skill_binary/
+# =============================================================================
+
+id: bin
+name: Bin
+version: "1.0.0"  # Must match API version - bump when API changes significantly
+description: >
+  Binary arithmetic using circled notation (⓪①). Two independent axes:
+  Level controls bit width (2-bit to 32-bit), Difficulty controls output
+  verbosity (brief to full trace). Symbol language after L8 prevents overfitting.
+category: math
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  icon: "🔢"
+  color: "#F59E0B"              # Amber/Orange
+  short_name: "BIN"
+
+tags:
+  - math
+  - binary
+  - arithmetic
+  - computation
+  - notation
+
+# =============================================================================
+# API SERVER
+# =============================================================================
+api:
+  url: http://localhost:8090
+  source_dir: /path/to/skills/skill_binary
+  start_command: python skill_binary/api_server.py --port 8090
+  endpoints:
+    health: GET /health
+    info: GET /info
+    levels: GET /levels
+    generate: POST /generate
+
+# =============================================================================
+# LEVEL SYSTEM (30 Levels - Bit Width Progression)
+# =============================================================================
+# Level controls bit width, NOT problem difficulty
+# Symbol language unlocks at Level 8 (75% of samples use random symbols)
+
+max_level: 30
+
+level_progression:
+  # Level: {bits, max_unsigned, max_signed, description, symbol_lang}
+  1:  {bits: 2,  max_unsigned: 3,          max_signed: 1,       desc: "Tiny",       symbols: false}
+  2:  {bits: 3,  max_unsigned: 7,          max_signed: 3,       desc: "Tiny+",      symbols: false}
+  3:  {bits: 4,  max_unsigned: 15,         max_signed: 7,       desc: "Nibble",     symbols: false}
+  4:  {bits: 5,  max_unsigned: 31,         max_signed: 15,      desc: "Small",      symbols: false}
+  5:  {bits: 6,  max_unsigned: 63,         max_signed: 31,      desc: "Small+",     symbols: false}
+  6:  {bits: 7,  max_unsigned: 127,        max_signed: 63,      desc: "Pre-byte",   symbols: false}
+  7:  {bits: 8,  max_unsigned: 255,        max_signed: 127,     desc: "1 byte",     symbols: false}
+  8:  {bits: 9,  max_unsigned: 511,        max_signed: 255,     desc: "Unlock",     symbols: "75%"}
+  9:  {bits: 10, max_unsigned: 1023,       max_signed: 511,     desc: "Medium-",    symbols: true}
+  10: {bits: 11, max_unsigned: 2047,       max_signed: 1023,    desc: "Medium",     symbols: true}
+  15: {bits: 16, max_unsigned: 65535,      max_signed: 32767,   desc: "2 bytes",    symbols: true}
+  20: {bits: 21, max_unsigned: 2097151,    max_signed: 1048575, desc: "Large",      symbols: true}
+  25: {bits: 26, max_unsigned: 67108863,   max_signed: 33554431, desc: "Huge",      symbols: true}
+  30: {bits: 32, max_unsigned: 4294967295, max_signed: 2147483647, desc: "Full 32-bit", symbols: true}
+
+# =============================================================================
+# DIFFICULTY SYSTEM (Independent of Level)
+# =============================================================================
+# Difficulty controls problem complexity AND output format verbosity
+
+difficulty_system:
+  easy:
+    signal: "(none)"
+    output_format: "Brief result only"
+    chain_depth: 1
+    operations: ["add", "subtract", "convert"]
+  medium:
+    signal: "[verify]"
+    output_format: "+ Decimal verification"
+    chain_depth: "1-2"
+    operations: ["+ signed", "compare"]
+  hard:
+    signal: "[show-work]"
+    output_format: "+ Key computation steps"
+    chain_depth: "2-3"
+    operations: ["+ sign rules", "chains"]
+  expert:
+    signal: "[trace]"
+    output_format: "Full step-by-step trace"
+    chain_depth: "3-5"
+    operations: ["+ complex chains"]
+
+# Auto difficulty distribution by level
+difficulty_distribution:
+  "1-5":   {easy: 50, medium: 35, hard: 12, expert: 3}
+  "6-10":  {easy: 40, medium: 35, hard: 20, expert: 5}
+  "11-15": {easy: 30, medium: 35, hard: 25, expert: 10}
+  "16-20": {easy: 25, medium: 30, hard: 30, expert: 15}
+  "21-25": {easy: 20, medium: 30, hard: 30, expert: 20}
+  "26-30": {easy: 15, medium: 25, hard: 35, expert: 25}
+
+# =============================================================================
+# OPERATIONS
+# =============================================================================
+operations:
+  unsigned:
+    - add
+    - subtract
+    - multiply
+    - increment
+    - decrement
+  signed:
+    - add_signed
+    - subtract_signed
+    - multiply_signed
+    - negate
+    - absolute_value
+  comparisons:
+    - equals
+    - lessthan
+    - greaterthan
+    - minimum
+    - maximum
+  special:
+    - multiply_by_2
+    - divide_by_2
+    - tobinary
+    - todecimal
+
+# =============================================================================
+# AUXILIARY TASKS (Non-Computation)
+# =============================================================================
+auxiliary_tasks:
+  error_detection: "Find and fix computation errors"
+  fill_blank: "Find missing digits or operands"
+  true_false: "Verify equation correctness"
+  comparison: "Which expression is larger?"
+  properties: "Is it divisible by 2? Power of 2?"
+  overflow: "Predict signed overflow"
+  reverse: "Find operands given result"
+
+# =============================================================================
+# SYMBOL LANGUAGE (Anti-Overfitting)
+# =============================================================================
+symbol_language:
+  enabled_at_level: 8
+  percentage: 75
+  description: >
+    After level 8, 75% of samples use random symbol mappings.
+    Forces pattern learning, not symbol memorization.
+  example: |
+    Symbol Key:
+      moon = 0 (zero bit)
+      sun = 1 (one bit)
+      sum = add
+    Compute [verify]: sum(sun-moon-sun, sun-sun)
+
+# =============================================================================
+# SIGN RULES (Taught Explicitly)
+# =============================================================================
+sign_rules:
+  - "neg x neg = pos: (-3) x (-2) = 6"
+  - "neg x pos = neg: (-3) x 2 = -6"
+  - "a - (-b) = a + b: 5 - (-3) = 8"
+
+# =============================================================================
+# OUTPUT SCHEMA
+# =============================================================================
+output_schema:
+  format: jsonl
+  structure: |
+    {
+      "id": "bin-0001",
+      "skill": "binary",
+      "scenario": "add-verify",
+      "user_prompt": "Compute [verify]: add(...)...",
+      "assistant_response": "add(...) = ...\n\nVerification: ...",
+      "rubric": "Include decimal verification",
+      "tags": ["add", "verify", "medium", "level-10"]
+    }
+
+# =============================================================================
+# TRAINING DATA CONTRACT
+# =============================================================================
+training:
+  format: jsonl
+  fields: ["id", "skill", "scenario", "user_prompt", "assistant_response", "rubric", "tags"]
+
+  generate_command: |
+    cd /path/to/skills
+    python skill_binary/scripts/generate_training_batch.py \
+      --count 1000 --level 10 \
+      --difficulty easy:0.4,medium:0.35,hard:0.2,expert:0.05 \
+      --output skill_binary/data/training.jsonl
+
+  auxiliary_command: |
+    python skill_binary/scripts/generate_auxiliary_tasks.py \
+      --count 500 --level 10 --task-type all \
+      --difficulty easy:0.5,medium:0.3,hard:0.15,expert:0.05 \
+      --output skill_binary/data/auxiliary.jsonl
+
+  validate_command: |
+    python HELPERS/scripts/validate.py skill_binary/data/training.jsonl
+
+# =============================================================================
+# EVALUATION
+# =============================================================================
+# IMPORTANT: This skill is COMBINATORIALLY INFINITE.
+# Number combinations × operations × symbol mappings × difficulty variants
+# create effectively unlimited unique problems. Overlap probability ~0.
+eval:
+  samples_per_level: 5          # Static fixed eval set per level
+  endpoint: "/eval"             # GET /eval?level=N
+  local_cache: "data/validation/bin/"
+  combinatorial_space: "infinite"  # Numbers × ops × symbols × formats
+  overlap_probability: "~0"        # Effectively zero chance of repeat
+
+# =============================================================================
+# PROMPT FORMAT
+# =============================================================================
+prompt_format:
+  examples:
+    brief: "Compute: add(one-zero-one, one-one)"
+    verify: "Compute [verify]: add(one-zero-one, one-one)"
+    show_work: "Compute [show-work]: add(one-zero-one, one-one)"
+    trace: "Compute [trace]: add(one-zero-one, one-one)"
+
+# =============================================================================
+# PROGRESSION
+# =============================================================================
+metrics:
+  - accuracy
+primary_metric: accuracy
+
+accuracy_thresholds:
+  1: 0.80
+  2: 0.80
+  3: 0.80
+  4: 0.80
+  5: 0.80
+  6: 0.80
+  7: 0.80
+  8: 0.80
+  9: 0.80
+  10: 0.80
+  11: 0.80
+  12: 0.80
+  13: 0.80
+  14: 0.80
+  15: 0.80
+  16: 0.80
+  17: 0.80
+  18: 0.80
+  19: 0.80
+  20: 0.80
+  21: 0.80
+  22: 0.80
+  23: 0.80
+  24: 0.80
+  25: 0.80
+  26: 0.80
+  27: 0.80
+  28: 0.80
+  29: 0.80
+  30: 0.80
+
+xp_multiplier: 1.2
+
+# =============================================================================
+# RPG FLAVOR
+# =============================================================================
+rpg_name: Binary Alchemy
+rpg_description: >
+  The ancient art of transmuting circled symbols into numerical truth.
+  Practitioners read zero-one as others read letters, computing additions
+  and conversions from tiny 2-bit whispers to thundering 32-bit operations.
+  At higher levels, the symbols themselves shift - masters see through
+  any notation to the patterns beneath.

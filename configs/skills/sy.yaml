@@ -1,0 +1,243 @@
+# =============================================================================
+# SKILL: SY (Syllacrostic Word Puzzles)
+# Source: /path/to/skills/skill_syllo_variant/
+# =============================================================================
+
+id: sy
+name: Sy
+version: "1.0.0"  # Must match API version - bump when API changes significantly
+description: >
+  Syllacrostic word puzzles. Given a syllable bank and clues (definitions,
+  synonyms, examples), assemble words using each syllable tile exactly once.
+  Signal degradation model - hints weaken at higher levels.
+category: reasoning
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  icon: "🧩"
+  color: "#8B5CF6"              # Purple
+  short_name: "SY"
+
+tags:
+  - reasoning
+  - puzzles
+  - vocabulary
+  - assembly
+  - multimodal
+
+# =============================================================================
+# API SERVER
+# =============================================================================
+api:
+  url: http://localhost:8080
+  source_dir: /path/to/skills/skill_syllo_variant
+  start_command: python skill_syllo_variant/api_server.py --port 8080
+  endpoints:
+    health: GET /health
+    info: GET /info
+    levels: GET /levels
+    generate: POST /generate
+
+# =============================================================================
+# LEVEL SYSTEM (50 Levels - Signal Degradation Model)
+# =============================================================================
+# 6 Dimensions that degrade as level increases:
+#   1. Words: 4 -> 10 (puzzle size)
+#   2. Syllables: 2-3 -> 4-6 per word (word complexity)
+#   3. Zipf: 5.5 -> 2.0 (common -> rare vocabulary)
+#   4. Overlap: 0% -> 80% (syllable reuse confusion)
+#   5. Red Herrings: 0 -> 5-6 (distractor tiles)
+#   6. Hint Types: strong only -> any (signal strength)
+
+max_level: 50
+
+level_progression:
+  # Level: {name, words, syllables, zipf, overlap%, red_herrings, hint_types}
+  1:  {name: "Beginner",      words: 4,    syllables: "2-3", zipf: 5.5, overlap: 0,  herrings: 0,   hints: "definitions, synonyms"}
+  2:  {name: "Easy",          words: "4-5", syllables: "2-3", zipf: 5.0, overlap: 0,  herrings: 0,   hints: "definitions, synonyms"}
+  3:  {name: "Novice",        words: 5,    syllables: "2-4", zipf: 4.5, overlap: 10, herrings: 0,   hints: "+ slight overlap"}
+  4:  {name: "Learning",      words: "5-6", syllables: "3-4", zipf: 4.0, overlap: 20, herrings: "0-1", hints: "+ categories"}
+  5:  {name: "Intermediate",  words: 6,    syllables: "3-5", zipf: 3.5, overlap: 30, herrings: "1-2", hints: "+ examples"}
+  6:  {name: "Competent",     words: "6-7", syllables: "3-5", zipf: 3.0, overlap: 40, herrings: "1-2", hints: "+ hypernyms/hyponyms"}
+  7:  {name: "Proficient",    words: 7,    syllables: "4-5", zipf: 2.8, overlap: 50, herrings: "2-3", hints: "+ antonyms, domains"}
+  8:  {name: "Advanced",      words: "7-8", syllables: "4-6", zipf: 2.5, overlap: 60, herrings: "3-4", hints: "+ morphology"}
+  9:  {name: "Expert",        words: "8-9", syllables: "4-6", zipf: 2.5, overlap: 70, herrings: "4-5", hints: "+ etymology"}
+  10: {name: "Master",        words: "9-10", syllables: "4-6", zipf: 2.0, overlap: 80, herrings: "5-6", hints: "any (may be minimal)"}
+  # Levels 11-50 extrapolate beyond the original 10-level system
+
+# =============================================================================
+# OUTPUT SCHEMA (Runtime Response)
+# =============================================================================
+output_schema:
+  format: json
+  structure: |
+    {
+      "solutions": [
+        {"ans_num": 1, "syllables": ["trans", "ports"], "answer": "TRANSPORTS"}
+      ],
+      "inventory_check": {
+        "total_tiles": 13,
+        "usage": {"trans": 1, "ports": 1},
+        "used": {"trans": 1, "ports": 1},
+        "unused_tiles": [],
+        "status": "All syllable tiles consumed exactly once."
+      }
+    }
+  rules:
+    - answers must be UPPERCASE
+    - syllables listed before word (commitment first)
+    - every tile used exactly once (except red herrings)
+    - ans_num is sequential starting at 1
+    - no prose outside JSON block
+
+# =============================================================================
+# TRAINING DATA CONTRACT
+# =============================================================================
+training:
+  format: jsonl
+  message_count: 2  # user prompt + assistant JSON
+  dataset_name: syllo_multimodal
+  metadata_fields:
+    - puzzle_id
+    - word_count
+    - syllable_bank_size
+    - difficulty
+    - red_herring_count
+
+  generate_command: |
+    cd /path/to/skills
+    python skill_syllo_variant/scripts/export_training_data.py \
+      --count 200 --output data/syllo_training.jsonl
+
+  deliver_command: |
+    python skill_syllo_variant/scripts/export_training_data.py \
+      --count 200 --deliver-to-inbox --deliver-name syllo_batch.jsonl
+
+  validate_command: |
+    python skill_syllo_variant/scripts/validate_solution_payload.py \
+      --training-jsonl data/syllo_training.jsonl
+
+# =============================================================================
+# EVALUATION
+# =============================================================================
+# IMPORTANT: This skill is COMBINATORIALLY INFINITE.
+# The word database + syllable permutations create effectively unlimited
+# unique puzzles. Probability of training/eval overlap is essentially zero.
+eval:
+  samples_per_level: 5          # Static fixed eval set per level
+  endpoint: "/eval"             # GET /eval?level=N
+  local_cache: "data/validation/sy/"
+  combinatorial_space: "infinite"  # Word DB × syllable arrangements × hints
+  overlap_probability: "~0"        # Effectively zero chance of repeat
+
+# =============================================================================
+# DIFFICULTY TIERS
+# =============================================================================
+difficulty_tiers:
+  easy:
+    - syllables unique (no overlap)
+    - no red herrings
+    - common words (high Zipf)
+    - strong hints (definitions, synonyms)
+  medium:
+    - some syllable overlap
+    - 1-2 red herrings
+    - moderate vocabulary
+    - mixed hint types
+  hard:
+    - high syllable overlap
+    - 3-5 red herrings
+    - rare words (low Zipf)
+    - weak hints (etymology, minimal)
+
+# =============================================================================
+# HINT TYPES (Signal Strength)
+# =============================================================================
+hint_types:
+  strong:
+    - definitions
+    - synonyms
+  moderate:
+    - categories
+    - examples
+    - hypernyms
+    - hyponyms
+  weak:
+    - antonyms
+    - domains
+    - morphology
+    - etymology
+    - "starts with X"
+
+# =============================================================================
+# PROGRESSION
+# =============================================================================
+metrics:
+  - accuracy
+primary_metric: accuracy
+
+accuracy_thresholds:
+  1: 0.80
+  2: 0.80
+  3: 0.80
+  4: 0.80
+  5: 0.80
+  6: 0.80
+  7: 0.80
+  8: 0.80
+  9: 0.80
+  10: 0.80
+  11: 0.80
+  12: 0.80
+  13: 0.80
+  14: 0.80
+  15: 0.80
+  16: 0.80
+  17: 0.80
+  18: 0.80
+  19: 0.80
+  20: 0.80
+  21: 0.80
+  22: 0.80
+  23: 0.80
+  24: 0.80
+  25: 0.80
+  26: 0.80
+  27: 0.80
+  28: 0.80
+  29: 0.80
+  30: 0.80
+  31: 0.80
+  32: 0.80
+  33: 0.80
+  34: 0.80
+  35: 0.80
+  36: 0.80
+  37: 0.80
+  38: 0.80
+  39: 0.80
+  40: 0.80
+  41: 0.80
+  42: 0.80
+  43: 0.80
+  44: 0.80
+  45: 0.80
+  46: 0.80
+  47: 0.80
+  48: 0.80
+  49: 0.80
+  50: 0.80
+
+xp_multiplier: 1.0
+
+# =============================================================================
+# RPG FLAVOR
+# =============================================================================
+rpg_name: Word Weaving
+rpg_description: >
+  The art of assembling meaning from scattered syllables. Given a bank of
+  sound fragments and cryptic clues, masters weave complete words while
+  using each tile exactly once. At higher levels, decoys cloud the bank
+  and hints grow sparse. True masters hear words in the chaos.

@@ -1317,18 +1317,40 @@ class UltimateTrainer:
 
             # Training arguments
             # Use max_steps for continuous training instead of num_train_epochs
+            # Determine last checkpoint step to control save frequency
+            # HuggingFace Trainer saves at END of trainer.train() by default
+            # We need to track this ourselves to avoid checkpoints every file
+            last_checkpoint_step = 0
+            checkpoint_paths = sorted(Path(self.args.output_dir).glob("checkpoint-*"))
+            if checkpoint_paths:
+                try:
+                    last_checkpoint_step = int(checkpoint_paths[-1].name.split("-")[1])
+                except (ValueError, IndexError):
+                    pass
+
+            # Calculate next checkpoint boundary
+            save_steps = self.args.save_steps
+            next_checkpoint_at = ((last_checkpoint_step // save_steps) + 1) * save_steps
+
+            # Only enable saving if we'll reach the next checkpoint boundary
+            # This prevents end-of-file saves that create checkpoints at every step
+            should_enable_saving = max_steps >= next_checkpoint_at
+
             training_args = TrainingArguments(
                 output_dir=self.args.output_dir,
-                max_steps=max_steps,  # ✅ FIX: Use max_steps for continuous training
+                max_steps=max_steps,  # Use max_steps for continuous training
                 per_device_train_batch_size=self._get_hyperparam('batch_size', 1),
                 per_device_eval_batch_size=1,  # MEMORY FIX: Match train batch size to avoid eval spikes
                 gradient_accumulation_steps=self._get_hyperparam('gradient_accumulation', 1),
                 learning_rate=self._get_hyperparam('learning_rate', 2e-4),
                 warmup_steps=self.args.warmup_steps,
                 logging_steps=10,
-                save_steps=self.args.save_steps,
+                save_steps=save_steps,
                 eval_steps=self.args.eval_steps,
-                eval_strategy="steps" if self.args.eval_steps else "no",  # Enable eval loss calculation
+                eval_strategy="steps" if self.args.eval_steps else "no",
+                # CRITICAL: Disable saves unless we'll cross a checkpoint boundary
+                # This prevents the end-of-training save that creates checkpoints at every file
+                save_strategy="steps" if should_enable_saving else "no",
                 save_total_limit=None,  # Keep all checkpoints - manually clean by date later
                 fp16=use_fp16,   # Set from config precision
                 bf16=use_bf16,   # Set from config precision
@@ -1340,6 +1362,11 @@ class UltimateTrainer:
                 report_to="none",
                 remove_unused_columns=False,
             )
+
+            if should_enable_saving:
+                print(f"💾 Checkpoints enabled: next save at step {next_checkpoint_at}")
+            else:
+                print(f"💾 Checkpoints disabled: won't reach {next_checkpoint_at} (max_steps={max_steps})")
 
             # Data collator - ONLY train on assistant response, NOT the user prompt
             # This prevents the model from learning to output the full conversation format
@@ -1897,7 +1924,76 @@ class UltimateTrainer:
                                     print(f"   ⚠️  Large gap detected - possible overfitting!")
 
                 def on_save(self, args, state, control, **kwargs):
-                    """Handle checkpoint save - sync to remote and submit eval job."""
+                    """Handle checkpoint save - record to ledger, rename, sync to remote."""
+                    # =========================================================
+                    # CHECKPOINT LEDGER - Record stats at exact moment of save
+                    # =========================================================
+                    try:
+                        from core.checkpoint_ledger import record_checkpoint
+
+                        # Find the checkpoint that was just saved
+                        checkpoint_dir = Path(args.output_dir) / f"checkpoint-{state.global_step}"
+
+                        if checkpoint_dir.exists():
+                            # Extract stats from training state
+                            train_loss = None
+                            val_loss = None
+                            learning_rate = None
+                            for entry in reversed(state.log_history or []):
+                                if train_loss is None and "loss" in entry:
+                                    train_loss = entry["loss"]
+                                if val_loss is None and "eval_loss" in entry:
+                                    val_loss = entry["eval_loss"]
+                                if learning_rate is None and "learning_rate" in entry:
+                                    learning_rate = entry["learning_rate"]
+                                if train_loss and learning_rate:
+                                    break
+
+                            # Record to ledger (also renames to canonical name)
+                            record = record_checkpoint(
+                                step=state.global_step,
+                                path=str(checkpoint_dir),
+                                train_loss=train_loss,
+                                val_loss=val_loss,
+                                learning_rate=learning_rate,
+                                epoch=state.epoch,
+                                training_file=getattr(self, 'current_file', None),
+                                rename=True,  # Rename to canonical: checkpoint-{step}-{date}-{time}
+                            )
+                            print(f"📖 Ledger: {record.canonical_name} (loss={train_loss:.4f})" if train_loss else f"📖 Ledger: {record.canonical_name}")
+
+                            # =========================================================
+                            # QUEUE EVALUATIONS - Skill eval + LITE passives
+                            # =========================================================
+                            try:
+                                from core.evaluation_ledger import queue_evaluation
+                                from core.passives import queue_passive_lite
+
+                                # Get current curriculum level from state
+                                curriculum_state_file = Path(args.output_dir).parent.parent / "data_manager" / "curriculum_state.json"
+                                if curriculum_state_file.exists():
+                                    import json
+                                    with open(curriculum_state_file) as f:
+                                        curriculum = json.load(f)
+                                    # Queue eval for each active skill at current level
+                                    for skill_id, skill_state in curriculum.get("skills", {}).items():
+                                        current_level = skill_state.get("current_level", 1)
+                                        queue_evaluation(state.global_step, skill_id, current_level)
+                                        print(f"📋 Queued eval: {skill_id} L{current_level}")
+
+                                # Queue LITE passives
+                                queue_passive_lite(state.global_step)
+                                print(f"📋 Queued LITE passives")
+
+                            except Exception as e:
+                                print(f"⚠️  Eval queue failed: {e}")
+
+                    except Exception as e:
+                        print(f"⚠️  Ledger recording failed: {e}")
+
+                    # =========================================================
+                    # REMOTE EVAL - Sync and evaluate on 3090
+                    # =========================================================
                     if not self.remote_evaluator or not self.remote_eval_config.get("enabled", False):
                         return
 
@@ -1913,8 +2009,15 @@ class UltimateTrainer:
                         import subprocess
                         import threading
 
-                        # Find the checkpoint directory that was just saved
-                        checkpoint_dir = Path(args.output_dir) / f"checkpoint-{state.global_step}"
+                        # Find the checkpoint directory (may have been renamed)
+                        checkpoint_dir = None
+                        for candidate in Path(args.output_dir).glob(f"checkpoint-{state.global_step}*"):
+                            if candidate.is_dir():
+                                checkpoint_dir = candidate
+                                break
+
+                        if not checkpoint_dir:
+                            checkpoint_dir = Path(args.output_dir) / f"checkpoint-{state.global_step}"
 
                         if not checkpoint_dir.exists():
                             print(f"⚠️  Checkpoint not found: {checkpoint_dir}")
@@ -2107,10 +2210,8 @@ class UltimateTrainer:
             trainer.save_model(self.args.output_dir)
             self.tokenizer.save_pretrained(self.args.output_dir)
 
-            # Trainer has automatically managed checkpoints during training:
-            # - Saved checkpoints every save_steps (100 steps)
-            # - Kept only last save_total_limit (3) checkpoints
-            # - Latest checkpoint contains full state for resumption
+            # Checkpoints managed via save_steps from config (default: 10000)
+            # Saves disabled for files that won't cross a checkpoint boundary
             checkpoint_paths = sorted(Path(self.args.output_dir).glob("checkpoint-*"))
             if checkpoint_paths:
                 latest_checkpoint = checkpoint_paths[-1]
@@ -2293,7 +2394,7 @@ def parse_args():
     # Monitoring
     parser.add_argument("--eval-steps", type=int, default=100, help="Run live inference every N steps")
     parser.add_argument("--num-eval-samples", type=int, default=5, help="Number of examples for live monitoring")
-    parser.add_argument("--save-steps", type=int, default=500, help="Save checkpoint every N steps")
+    parser.add_argument("--save-steps", type=int, default=10000, help="Save checkpoint every N steps")
 
     # Flags
     parser.add_argument("--skip-validation", action="store_true", help="Skip pre-training validation (not recommended!)")

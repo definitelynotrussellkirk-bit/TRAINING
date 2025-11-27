@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/game.css?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- TITLE BAR -->
+    <header class="game-header">
+        <div class="header-left">
+            <h1 class="game-title">Realm of Training</h1>
+        </div>
+        <div class="header-center">
+            <div class="resource-bar">
+                <div class="resource steps">
+                    <span class="resource-icon">⚡</span>
+                    <span class="resource-label">STEPS</span>
+                    <span class="resource-value" id="totalSteps">0</span>
+                </div>
+                <div class="resource evals">
+                    <span class="resource-icon">🎯</span>
+                    <span class="resource-label">EVALS</span>
+                    <span class="resource-value" id="totalEvals">0</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="idle-indicator" id="idleIndicator">
+                <span class="idle-icon">💤</span>
+                <span class="idle-text">IDLE</span>
+            </div>
+            <div class="time-display" id="timeDisplay">--:--:--</div>
+        </div>
+    </header>
+
+    <!-- MAIN GAME AREA -->
+    <main class="game-main">
+        <!-- LEFT: HERO PANEL -->
+        <section class="hero-panel">
+            <div class="hero-frame">
+                <div class="hero-portrait" id="heroPortrait">
+                    <!-- ASCII/SVG Hero will go here -->
+                    <div class="hero-ascii">
+                        <div class="dio-icon">🧔🏽</div>
+                    </div>
+                <div class="hero-glow"></div>
+            </div>
+
+            <div class="hero-info">
+                <h2 class="hero-name">Dio</h2>
+                <p class="hero-title">The Skeptic</p>
+                <div class="hero-class">Qwen3-0.6B</div>
+            </div>
+
+            <div class="hero-level-bar">
+                <div class="level-badge" title="Total level = sum of all MASTERED skill levels">TOTAL <span id="totalLevel">0</span></div>
+                <div class="current-skill" id="currentSkillBadge">
+                    <span class="skill-training">Training:</span>
+                    <span class="skill-name" id="currentSkillName">BIN</span>
+                    <span class="skill-lvl">L<span id="currentSkillLevel">1</span></span>
+                </div>
+            </div>
+
+            <div class="hero-stats">
+                <div class="stat-row">
+                    <div class="stat" title="Curriculum evaluation accuracy. Higher = better skill mastery.">
+                        <span class="stat-icon">🎯</span>
+                        <span class="stat-label">ACCURACY</span>
+                        <span class="stat-value" id="statAcc">0%</span>
+                    </div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat" title="Clarity = 1/Perplexity. Higher = less confused, sharper understanding.">
+                        <span class="stat-icon">💎</span>
+                        <span class="stat-label">CLARITY</span>
+                        <span class="stat-value" id="statClarity">--</span>
+                    </div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat" title="Strain = Training Loss. Lower = easier learning, less struggle.">
+                        <span class="stat-icon">💪</span>
+                        <span class="stat-label">STRAIN</span>
+                        <span class="stat-value" id="statStrain">--</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CENTER: BATTLE/QUEST AREA -->
+        <section class="battle-panel">
+            <!-- BATTLE STATUS -->
+            <div class="battle-status" id="battleStatus">
+                <div class="battle-header">
+                    <span class="battle-icon" id="battleIcon">💤</span>
+                    <h3 class="battle-title" id="battleTitle">Awaiting Orders</h3>
+                </div>
+
+                <div class="quest-info" id="questInfo">
+                    <div class="quest-name" id="questName">No active quest</div>
+                    <div class="quest-progress-container">
+                        <div class="quest-progress-bar" id="questProgressBar"></div>
+                        <span class="quest-progress-text" id="questProgressText">0%</span>
+                    </div>
+                </div>
+
+                <div class="battle-stats" id="battleStats">
+                    <div class="battle-stat" title="Current training strain (loss). Lower = learning more easily.">
+                        <span class="bs-label">Strain</span>
+                        <span class="bs-value" id="battleStrain">--</span>
+                    </div>
+                    <div class="battle-stat" title="Validation strain (val loss). Lower = generalizing better.">
+                        <span class="bs-label">Val Strain</span>
+                        <span class="bs-value" id="battleValStrain">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RECENT ACTIVITY -->
+            <div class="activity-log">
+                <h4>Battle Log</h4>
+                <div class="log-entries" id="logEntries">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT: SKILLS & GUILD -->
+        <section class="guild-panel">
+            <div class="panel-header">
+                <h3>🏰 Guild Skills</h3>
+            </div>
+
+            <!-- SKILLS (Loaded dynamically from YAML configs) -->
+            <div id="skillsContainer">
+                <!-- Skills will be rendered here by JavaScript -->
+                <div class="skill-card loading">
+                    <div class="skill-header">
+                        <span class="skill-icon">⏳</span>
+                        <span class="skill-name">Loading...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VAULT SUMMARY -->
+            <div class="vault-card">
+                <div class="panel-header">
+                    <h3>🗃️ Vault</h3>
+                </div>
+                <div class="vault-stats">
+                    <div class="vault-stat">
+                        <span class="vs-label">Checkpoints</span>
+                        <span class="vs-value" id="vaultCheckpoints">--</span>
+                    </div>
+                    <div class="vault-stat">
+                        <span class="vs-label">Total Size</span>
+                        <span class="vs-value" id="vaultSize">-- GB</span>
+                    </div>
+                    <div class="vault-stat">
+                        <span class="vs-label">Best Model</span>
+                        <span class="vs-value" id="vaultBest">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FORGE STATUS -->
+            <div class="forge-card">
+                <div class="panel-header">
+                    <h3>🔥 The Forge (4090)</h3>
+                </div>
+                <div class="forge-stats">
+                    <div class="forge-meter">
+                        <span class="meter-label">VRAM</span>
+                        <div class="meter-bar-container">
+                            <div class="meter-bar" id="forgeVramBar"></div>
+                        </div>
+                        <span class="meter-value" id="forgeVram">-- GB</span>
+                    </div>
+                    <div class="forge-meter">
+                        <span class="meter-label">Temp</span>
+                        <div class="meter-bar-container temp">
+                            <div class="meter-bar" id="forgeTempBar"></div>
+                        </div>
+                        <span class="meter-value" id="forgeTemp">--°C</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- NAVIGATION -->
+    <nav class="game-nav">
+        <button class="nav-btn active">
+            <span class="nav-icon">⚔️</span>
+            <span class="nav-label">Battle</span>
+        </button>
+        <button class="nav-btn" onclick="window.location.href='/guild'">
+            <span class="nav-icon">🏰</span>
+            <span class="nav-label">Guild</span>
+        </button>
+        <button class="nav-btn" data-view="quests">
+            <span class="nav-icon">📜</span>
+            <span class="nav-label">Quests</span>
+        </button>
+        <button class="nav-btn" onclick="window.location.href='/vault'">
+            <span class="nav-icon">🗃️</span>
+            <span class="nav-label">Vault</span>
+        </button>
+        <button class="nav-btn" onclick="window.location.href='/settings'">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Settings</span>
+        </button>
+    </nav>
+
+    <!-- FLOATING NOTIFICATIONS -->
+    <div class="notifications" id="notifications">
+        <!-- Notifications will be injected here -->
+    </div>
+
+    <script src="/static/js/game.js?v=13"></script>
+</body>
+</html>

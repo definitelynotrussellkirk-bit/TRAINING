@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guild Hall - DIO's Skills</title>
+    <style>
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-hover: #1a1a25;
+            --border: #2a2a3a;
+            --text: #e0e0e0;
+            --text-dim: #808090;
+            --accent: #7c3aed;
+            --accent-glow: rgba(124, 58, 237, 0.3);
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-links a {
+            color: var(--text-dim);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .nav-links a:hover {
+            background: var(--bg-hover);
+            color: var(--text);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            color: var(--text);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Skills Grid */
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .skill-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .skill-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .skill-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .skill-icon {
+            font-size: 2rem;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-hover);
+            border-radius: 10px;
+        }
+
+        .skill-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .skill-level {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .skill-progress {
+            margin: 1rem 0;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--bg-dark);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #a78bfa);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .skill-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        /* Passives Section */
+        .passives-section {
+            margin-top: 2rem;
+        }
+
+        .passives-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .passive-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .passive-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .passive-name {
+            font-weight: 600;
+        }
+
+        .passive-version {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            background: var(--bg-hover);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .passive-accuracy {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+
+        .passive-accuracy.good { color: var(--success); }
+        .passive-accuracy.ok { color: var(--warning); }
+        .passive-accuracy.bad { color: var(--danger); }
+        .passive-accuracy.none { color: var(--text-dim); }
+
+        .passive-meta {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .drift-indicator {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .drift-positive { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+        .drift-neutral { background: rgba(128, 128, 144, 0.2); color: var(--text-dim); }
+        .drift-negative { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        /* Summary Cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .summary-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .summary-label {
+            color: var(--text-dim);
+            font-size: 0.875rem;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-dim);
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>🏰 Guild Hall</h1>
+        <nav class="nav-links">
+            <a href="/">Tavern</a>
+            <a href="/vault">Vault</a>
+            <a href="/oracle">Oracle</a>
+            <a href="/settings">Settings</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <!-- Summary -->
+        <div class="summary-row" id="summary">
+            <div class="summary-card">
+                <div class="summary-value" id="totalLevel">--</div>
+                <div class="summary-label">Total Level</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="activeSkills">--</div>
+                <div class="summary-label">Active Skills</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="passivesHealthy">--</div>
+                <div class="summary-label">Passives Healthy</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="lastEval">--</div>
+                <div class="summary-label">Last Evaluation</div>
+            </div>
+        </div>
+
+        <!-- Active Skills -->
+        <h2 class="section-title">⚔️ Active Skills</h2>
+        <div class="skills-grid" id="skillsGrid">
+            <div class="loading">Loading skills...</div>
+        </div>
+
+        <!-- Passives -->
+        <div class="passives-section">
+            <h2 class="section-title">🛡️ Passives (Transfer Learning)</h2>
+            <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.875rem;">
+                General abilities tested independently of active training. Detects catastrophic forgetting.
+            </p>
+            <div class="passives-grid" id="passivesGrid">
+                <div class="loading">Loading passives...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadGuildData() {
+            try {
+                // Load skills
+                const skillsRes = await fetch('/api/skills');
+                const skills = await skillsRes.json();
+                renderSkills(skills);
+
+                // Load passives
+                const passivesRes = await fetch('/api/passives/summary');
+                const passives = await passivesRes.json();
+                renderPassives(passives);
+
+                // Load curriculum state for summary
+                const curriculumRes = await fetch('/api/curriculum');
+                const curriculum = await curriculumRes.json();
+                renderSummary(skills, passives, curriculum);
+
+            } catch (err) {
+                console.error('Failed to load guild data:', err);
+                document.getElementById('skillsGrid').innerHTML =
+                    '<div class="error">Failed to load skills. Is the API running?</div>';
+            }
+        }
+
+        function renderSkills(skills) {
+            const grid = document.getElementById('skillsGrid');
+
+            if (!skills || skills.length === 0) {
+                grid.innerHTML = '<div class="loading">No skills configured</div>';
+                return;
+            }
+
+            grid.innerHTML = skills.map(skill => `
+                <div class="skill-card" onclick="window.location.href='/skill/${skill.id}'">
+                    <div class="skill-header">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div class="skill-icon">${skill.icon || '⚔️'}</div>
+                            <div>
+                                <div class="skill-name">${skill.name}</div>
+                                <div style="color: var(--text-dim); font-size: 0.875rem;">
+                                    ${skill.description || ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="skill-level">L${skill.current_level || 1}</div>
+                    </div>
+                    <div class="skill-progress">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-size: 0.75rem; color: var(--text-dim);">
+                                Progress to L${(skill.current_level || 1) + 1}
+                            </span>
+                            <span style="font-size: 0.75rem;">
+                                ${skill.progress_pct || 0}%
+                            </span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${skill.progress_pct || 0}%"></div>
+                        </div>
+                    </div>
+                    <div class="skill-stats">
+                        <div class="stat">
+                            <div class="stat-value">${(skill.accuracy * 100 || 0).toFixed(0)}%</div>
+                            <div class="stat-label">Accuracy</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${skill.evals_at_level || 0}/3</div>
+                            <div class="stat-label">Evals</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${skill.max_level || '?'}</div>
+                            <div class="stat-label">Max Level</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderPassives(data) {
+            const grid = document.getElementById('passivesGrid');
+
+            // Get passive definitions
+            fetch('/api/passives/definitions').then(r => r.json()).then(definitions => {
+                const results = data.by_passive || {};
+
+                grid.innerHTML = definitions.map(p => {
+                    const result = results[p.id] || {};
+                    const accuracy = result.best_lite || null;
+                    const accClass = accuracy === null ? 'none' :
+                                    accuracy >= 0.8 ? 'good' :
+                                    accuracy >= 0.5 ? 'ok' : 'bad';
+
+                    return `
+                        <div class="passive-card">
+                            <div class="passive-header">
+                                <span class="passive-name">${p.name}</span>
+                                <span class="passive-version">v${p.version || '1.0.0'}</span>
+                            </div>
+                            <div class="passive-accuracy ${accClass}">
+                                ${accuracy !== null ? (accuracy * 100).toFixed(0) + '%' : '--'}
+                            </div>
+                            <div class="passive-meta">
+                                ${p.category} &bull; ${result.lite_count || 0} evals
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }).catch(() => {
+                grid.innerHTML = '<div class="loading">No passives configured</div>';
+            });
+        }
+
+        function renderSummary(skills, passives, curriculum) {
+            // Total level = sum of all skill levels
+            const totalLevel = skills.reduce((sum, s) => sum + (s.current_level || 1), 0);
+            document.getElementById('totalLevel').textContent = totalLevel;
+
+            // Active skills count
+            document.getElementById('activeSkills').textContent = skills.length;
+
+            // Passives healthy (>= 50% accuracy)
+            const passiveResults = passives.by_passive || {};
+            const healthyCount = Object.values(passiveResults)
+                .filter(p => (p.best_lite || 0) >= 0.5).length;
+            const totalPassives = Object.keys(passiveResults).length || '?';
+            document.getElementById('passivesHealthy').textContent =
+                `${healthyCount}/${totalPassives}`;
+
+            // Last eval time
+            if (curriculum && curriculum.last_eval_time) {
+                const date = new Date(curriculum.last_eval_time);
+                const ago = Math.round((Date.now() - date) / 60000);
+                document.getElementById('lastEval').textContent =
+                    ago < 60 ? `${ago}m ago` : `${Math.round(ago/60)}h ago`;
+            }
+        }
+
+        // Load on page load
+        loadGuildData();
+
+        // Refresh every 30 seconds
+        setInterval(loadGuildData, 30000);
+    </script>
+</body>
+</html>

@@ -224,6 +224,40 @@
             text-transform: uppercase;
         }
 
+        /* Eval count badge */
+        .eval-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 6px;
+            border-radius: 11px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: var(--bg-dark);
+            color: var(--text-muted);
+        }
+
+        .eval-badge.has-evals {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .eval-badge.many-evals {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .eval-badge.lots-evals {
+            background: rgba(168, 85, 247, 0.2);
+            color: #a855f7;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+        }
+
         .empty-vault {
             text-align: center;
             padding: 3rem;
@@ -381,29 +415,9 @@
         </section>
     </main>
 
-    <!-- NAVIGATION -->
-    <nav class="game-nav">
-        <button class="nav-btn" onclick="window.location.href='/'">
-            <span class="nav-icon">⚔️</span>
-            <span class="nav-label">Battle</span>
-        </button>
-        <button class="nav-btn" onclick="window.location.href='/guild'">
-            <span class="nav-icon">🏰</span>
-            <span class="nav-label">Guild</span>
-        </button>
-        <button class="nav-btn" data-view="quests">
-            <span class="nav-icon">📜</span>
-            <span class="nav-label">Quests</span>
-        </button>
-        <button class="nav-btn active">
-            <span class="nav-icon">🗃️</span>
-            <span class="nav-label">Vault</span>
-        </button>
-        <button class="nav-btn" onclick="window.location.href='/settings'">
-            <span class="nav-icon">⚙️</span>
-            <span class="nav-label">Settings</span>
-        </button>
-    </nav>
+    <!-- NAVIGATION (dynamic) -->
+    <nav class="game-nav" id="bottomNav"></nav>
+    <script src="/static/js/nav.js"></script>
 
     <script>
         // ============================================
@@ -584,6 +598,11 @@
                                 </div>
                             </div>
                             <div class="asset-metrics">
+                                ${cp.eval_count > 0 ? `
+                                <div class="eval-badge ${cp.eval_count >= 5 ? 'lots-evals' : cp.eval_count >= 3 ? 'many-evals' : 'has-evals'}" title="${cp.eval_count} evaluation${cp.eval_count !== 1 ? 's' : ''} run">
+                                    ${cp.eval_count}
+                                </div>
+                                ` : ''}
                                 <div class="metric">
                                     <div class="metric-value">${cp.size_gb}</div>
                                     <div class="metric-label">GB</div>

@@ -1568,6 +1568,17 @@ class TavernHandler(SimpleHTTPRequestHandler):
                             # Get modification time
                             mtime = datetime.fromtimestamp(item.stat().st_mtime)
 
+                            # Check for evals sidecar
+                            eval_count = 0
+                            evals_file = item / ".evals.json"
+                            if evals_file.exists():
+                                try:
+                                    with open(evals_file) as ef:
+                                        evals_data = json.load(ef)
+                                        eval_count = len(evals_data.get("evaluations", []))
+                                except Exception:
+                                    pass
+
                             assets["checkpoints"].append({
                                 "name": item.name,
                                 "step": step,
@@ -1575,6 +1586,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
                                 "size_gb": size_gb,
                                 "created": mtime.isoformat(),
                                 "age_hours": round((datetime.now() - mtime).total_seconds() / 3600, 1),
+                                "eval_count": eval_count,
                             })
                             assets["total_size_gb"] += size_gb
                         except (ValueError, OSError) as e:

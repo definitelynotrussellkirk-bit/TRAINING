@@ -190,29 +190,9 @@
         </section>
     </main>
 
-    <!-- NAVIGATION -->
-    <nav class="game-nav">
-        <button class="nav-btn active">
-            <span class="nav-icon">⚔️</span>
-            <span class="nav-label">Battle</span>
-        </button>
-        <button class="nav-btn" onclick="window.location.href='/guild'">
-            <span class="nav-icon">🏰</span>
-            <span class="nav-label">Guild</span>
-        </button>
-        <button class="nav-btn" onclick="window.location.href='/quests'">
-            <span class="nav-icon">📜</span>
-            <span class="nav-label">Quests</span>
-        </button>
-        <button class="nav-btn" onclick="window.location.href='/vault'">
-            <span class="nav-icon">🗃️</span>
-            <span class="nav-label">Vault</span>
-        </button>
-        <button class="nav-btn" onclick="window.location.href='/settings'">
-            <span class="nav-icon">⚙️</span>
-            <span class="nav-label">Settings</span>
-        </button>
-    </nav>
+    <!-- NAVIGATION (dynamic) -->
+    <nav class="game-nav" id="bottomNav"></nav>
+    <script src="/static/js/nav.js"></script>
 
     <!-- FLOATING NOTIFICATIONS -->
     <div class="notifications" id="notifications">

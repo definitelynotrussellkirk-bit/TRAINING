@@ -70,6 +70,37 @@ from guild.quests import (
     evaluate_quest,
 )
 
+# Progression system
+from guild.progression import (
+    # Types
+    EffectType,
+    StatusEffect,
+    HeroIdentity,
+    HeroState,
+    # XP
+    LevelConfig,
+    XPCalculator,
+    get_xp_calculator,
+    reset_xp_calculator,
+    calculate_xp,
+    xp_for_level,
+    level_from_xp,
+    # Effects
+    get_effect_manager,
+    reset_effect_manager,
+    apply_effect,
+    update_effects,
+    get_xp_multiplier,
+    # Hero
+    HeroManager,
+    init_hero_manager,
+    get_hero_manager,
+    reset_hero_manager,
+    get_hero,
+    record_result,
+    get_hero_status,
+)
+
 __all__ = [
     # Facilities
     "init_resolver",
@@ -116,4 +147,31 @@ __all__ = [
     "get_quest_judge",
     "reset_quest_judge",
     "evaluate_quest",
+    # Progression - types
+    "EffectType",
+    "StatusEffect",
+    "HeroIdentity",
+    "HeroState",
+    # Progression - XP
+    "LevelConfig",
+    "XPCalculator",
+    "get_xp_calculator",
+    "reset_xp_calculator",
+    "calculate_xp",
+    "xp_for_level",
+    "level_from_xp",
+    # Progression - effects
+    "get_effect_manager",
+    "reset_effect_manager",
+    "apply_effect",
+    "update_effects",
+    "get_xp_multiplier",
+    # Progression - hero
+    "HeroManager",
+    "init_hero_manager",
+    "get_hero_manager",
+    "reset_hero_manager",
+    "get_hero",
+    "record_result",
+    "get_hero_status",
 ]

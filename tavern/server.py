@@ -2553,24 +2553,30 @@ class TavernHandler(SimpleHTTPRequestHandler):
             except (ImportError, AttributeError):
                 pass
 
-            # 3. Curriculum eval status (check if this checkpoint was evaluated)
-            curriculum_file = BASE_DIR / "status" / "curriculum_eval.json"
+            # 3. Curriculum eval status from curriculum_state.json
+            curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
             if curriculum_file.exists():
                 try:
                     with open(curriculum_file) as f:
                         curr_data = json.load(f)
-                    # Check if this checkpoint was evaluated
-                    for eval_record in curr_data.get("eval_history", []):
-                        if eval_record.get("checkpoint_step") == step:
-                            evals["curriculum"] = {
-                                "level": eval_record.get("level"),
-                                "accuracy": eval_record.get("accuracy"),
-                                "problems_correct": eval_record.get("problems_correct"),
-                                "problems_total": eval_record.get("problems_total"),
-                                "evaluated_at": eval_record.get("evaluated_at"),
-                            }
-                            evals["has_data"] = True
-                            break
+                    # Find evals near this step (within 500 steps)
+                    curriculum_evals = []
+                    for skill_id, skill_data in curr_data.get("skills", {}).items():
+                        for eval_entry in skill_data.get("accuracy_history", []):
+                            eval_step = eval_entry.get("step", 0)
+                            if abs(eval_step - step) <= 500:
+                                curriculum_evals.append({
+                                    "skill": skill_id,
+                                    "level": eval_entry.get("level") or eval_entry.get("metadata", {}).get("level", 1),
+                                    "accuracy": eval_entry.get("accuracy", 0),
+                                    "correct": eval_entry.get("metadata", {}).get("correct", 0),
+                                    "total": eval_entry.get("metadata", {}).get("problems", 20),
+                                    "step": eval_step,
+                                    "evaluated_at": eval_entry.get("timestamp"),
+                                })
+                    if curriculum_evals:
+                        evals["skill_evals"] = curriculum_evals
+                        evals["has_data"] = True
                 except Exception:
                     pass
 

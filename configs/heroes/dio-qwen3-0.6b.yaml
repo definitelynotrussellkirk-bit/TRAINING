@@ -90,7 +90,7 @@ vram:
 display:
   portrait: "portraits/dio.png"
   color: "#8B5CF6"             # Purple - wisdom and mystery
-  emoji: "emoji"
+  emoji: "🧔🏽"
 
 # =============================================================================
 # SKILLS AFFINITY

@@ -425,7 +425,7 @@
             <!-- Current Campaign -->
             <div class="current-campaign" id="currentCampaign">
                 <div class="campaign-header">
-                    <div class="campaign-hero-portrait" id="heroPortrait">emoji</div>
+                    <div class="campaign-hero-portrait" id="heroPortrait">🦸</div>
                     <div class="campaign-hero-info">
                         <h2 id="heroName">Loading...</h2>
                         <div class="subtitle" id="campaignName">-</div>
@@ -472,7 +472,7 @@
             <!-- No Campaign State -->
             <div class="campaign-section" id="noCampaign" style="display: none;">
                 <div class="empty-state">
-                    <div class="empty-state-icon">scroll</div>
+                    <div class="empty-state-icon">📜</div>
                     <h3>No Active Campaign</h3>
                     <p>Run the migration script or create a new campaign to begin.</p>
                     <button class="campaign-btn primary" onclick="showNewCampaignModal()" style="margin-top: 1rem;">
@@ -601,7 +601,7 @@
 
             list.innerHTML = heroes.map(h => `
                 <div class="hero-item ${activeCampaign?.hero_id === h.id ? 'active' : ''}" data-id="${h.id}">
-                    <div class="hero-icon">${h.display?.emoji || 'emoji'}</div>
+                    <div class="hero-icon">${h.display?.emoji || '🦸'}</div>
                     <div class="hero-details">
                         <div class="hero-name">${h.name}</div>
                         <div class="hero-model">${h.model?.hf_name || 'Unknown'}</div>
@@ -641,7 +641,7 @@
             // Find hero
             const hero = heroes.find(h => h.id === activeCampaign.hero_id) || {};
 
-            document.getElementById('heroPortrait').textContent = hero.display?.emoji || 'emoji';
+            document.getElementById('heroPortrait').textContent = hero.display?.emoji || '🦸';
             document.getElementById('heroName').textContent = hero.name || activeCampaign.hero_id;
             document.getElementById('campaignName').textContent = activeCampaign.name;
             document.getElementById('heroTitle').textContent = hero.rpg_name || '';

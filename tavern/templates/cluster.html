@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluster | Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+    <style>
+        body {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #333;
+        }
+
+        h1 {
+            margin: 0;
+            color: #ffd700;
+            font-size: 1.8rem;
+        }
+
+        .nav-links a {
+            color: #888;
+            text-decoration: none;
+            margin-left: 16px;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: #ffd700;
+        }
+
+        /* Cluster mode banner */
+        .mode-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 20px 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-size: 1.2rem;
+        }
+
+        .mode-normal {
+            background: linear-gradient(135deg, #1a3a1a 0%, #0d2a0d 100%);
+            border: 2px solid #4CAF50;
+        }
+        .mode-catch_up {
+            background: linear-gradient(135deg, #3a3a1a 0%, #2a2a0d 100%);
+            border: 2px solid #ffa726;
+        }
+        .mode-idle {
+            background: linear-gradient(135deg, #1a2a3a 0%, #0d1a2a 100%);
+            border: 2px solid #2196F3;
+        }
+        .mode-unknown {
+            background: #252538;
+            border: 2px solid #666;
+        }
+
+        .mode-icon {
+            font-size: 2rem;
+        }
+
+        .mode-label {
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .mode-description {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        /* Stats grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #252538;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+
+        /* Section headers */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 24px 0 16px 0;
+        }
+
+        .section-header h2 {
+            margin: 0;
+            color: #ffd700;
+            font-size: 1.3rem;
+        }
+
+        /* Workers table */
+        .workers-container {
+            background: #252538;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .workers-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .workers-table th,
+        .workers-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+
+        .workers-table th {
+            background: #1e1e30;
+            color: #888;
+            font-weight: 500;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .workers-table tr:hover {
+            background: rgba(255, 215, 0, 0.05);
+        }
+
+        /* Resource class badges */
+        .resource-class {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .rc-gpu_heavy { background: #3a1a3a; color: #e040fb; border-left: 3px solid #e040fb; }
+        .rc-gpu_medium { background: #1a3a3a; color: #00bcd4; border-left: 3px solid #00bcd4; }
+        .rc-cpu_heavy { background: #3a2a1a; color: #ff9800; border-left: 3px solid #ff9800; }
+        .rc-cpu_light { background: #2a2a2a; color: #9e9e9e; border-left: 3px solid #9e9e9e; }
+        .rc-unknown { background: #252538; color: #666; }
+
+        /* Priority class badges */
+        .priority-class {
+            font-size: 0.85rem;
+        }
+        .pc-critical { color: #ff6b6b; }
+        .pc-support { color: #ffa726; }
+        .pc-auxiliary { color: #888; }
+
+        /* Status indicator */
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online { background: #4CAF50; }
+        .status-offline { background: #666; }
+
+        /* Load bar */
+        .load-bar {
+            width: 100px;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        .load-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .load-low { background: #4CAF50; }
+        .load-medium { background: #ffa726; }
+        .load-high { background: #ff6b6b; }
+
+        /* Queue depths section */
+        .queue-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .queue-card {
+            background: #252538;
+            border-radius: 8px;
+            padding: 16px;
+            border-left: 3px solid #444;
+        }
+
+        .queue-card.has-pending {
+            border-left-color: #ffd700;
+        }
+
+        .queue-type {
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .queue-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .queue-stats span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .queue-pending { color: #ffd700; }
+        .queue-running { color: #00bcd4; }
+
+        /* Refresh button */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-secondary {
+            background: #333;
+            color: #e0e0e0;
+        }
+
+        .btn-secondary:hover {
+            background: #444;
+        }
+
+        .refreshing {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Cluster Status</h1>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/jobs">Jobs</a>
+                <a href="/guild">Guild</a>
+                <a href="/vault">Vault</a>
+            </div>
+        </header>
+
+        <!-- Cluster Mode Banner -->
+        <div class="mode-banner mode-unknown" id="mode-banner">
+            <span class="mode-icon" id="mode-icon">?</span>
+            <div>
+                <div class="mode-label" id="mode-label">Loading...</div>
+                <div class="mode-description" id="mode-description">Fetching cluster status</div>
+            </div>
+        </div>
+
+        <!-- Stats Summary -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-workers">-</div>
+                <div class="stat-label">Workers Online</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-capacity">-</div>
+                <div class="stat-label">Total Capacity</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-active">-</div>
+                <div class="stat-label">Active Jobs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-utilization">-</div>
+                <div class="stat-label">Utilization</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-pending">-</div>
+                <div class="stat-label">Queue Depth</div>
+            </div>
+        </div>
+
+        <!-- Queue Depths -->
+        <div class="section-header">
+            <h2>Queue Depths by Job Type</h2>
+            <button class="btn btn-secondary" onclick="refreshData()">
+                <span id="refresh-icon">Refresh</span>
+            </button>
+        </div>
+        <div class="queue-grid" id="queue-grid">
+            <div class="empty-state">Loading queue data...</div>
+        </div>
+
+        <!-- Workers by Resource Class -->
+        <div class="section-header">
+            <h2>Workers</h2>
+        </div>
+        <div class="workers-container">
+            <table class="workers-table">
+                <thead>
+                    <tr>
+                        <th>Worker</th>
+                        <th>Resource Class</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Load</th>
+                        <th>Capabilities</th>
+                        <th>Heartbeat</th>
+                    </tr>
+                </thead>
+                <tbody id="workers-body">
+                    <tr>
+                        <td colspan="7" class="empty-state">Loading workers...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const MODE_CONFIG = {
+            normal: {
+                icon: '=',
+                label: 'Normal',
+                description: 'Balanced operation - all job types processed equally'
+            },
+            catch_up: {
+                icon: '!',
+                label: 'Catch-Up',
+                description: 'Critical jobs backlogged - protecting critical workers'
+            },
+            idle: {
+                icon: '~',
+                label: 'Idle',
+                description: 'No critical work - analytics jobs enabled on all resources'
+            },
+            unknown: {
+                icon: '?',
+                label: 'Unknown',
+                description: 'Unable to determine cluster mode'
+            }
+        };
+
+        async function fetchClusterStatus() {
+            try {
+                const res = await fetch('/api/cluster');
+                const data = await res.json();
+                return data;
+            } catch (e) {
+                console.error('Cluster fetch error:', e);
+                return null;
+            }
+        }
+
+        async function fetchWorkersData() {
+            try {
+                const res = await fetch('/api/workers');
+                const data = await res.json();
+                return data;
+            } catch (e) {
+                console.error('Workers fetch error:', e);
+                return null;
+            }
+        }
+
+        function updateModeBanner(mode) {
+            const banner = document.getElementById('mode-banner');
+            const icon = document.getElementById('mode-icon');
+            const label = document.getElementById('mode-label');
+            const desc = document.getElementById('mode-description');
+
+            const config = MODE_CONFIG[mode] || MODE_CONFIG.unknown;
+
+            banner.className = `mode-banner mode-${mode}`;
+            icon.textContent = config.icon;
+            label.textContent = config.label;
+            desc.textContent = config.description;
+        }
+
+        function updateStats(data) {
+            const summary = data.workers_summary || {};
+
+            document.getElementById('stat-workers').textContent =
+                `${summary.online || 0}/${summary.total || 0}`;
+            document.getElementById('stat-capacity').textContent =
+                summary.total_capacity || 0;
+            document.getElementById('stat-active').textContent =
+                summary.total_active || 0;
+
+            // Calculate utilization
+            const capacity = summary.total_capacity || 1;
+            const active = summary.total_active || 0;
+            const utilization = Math.round((active / capacity) * 100);
+            document.getElementById('stat-utilization').textContent = `${utilization}%`;
+
+            // Total queue depth
+            const queueDepths = data.queue_depths || {};
+            let totalPending = 0;
+            for (const [jobType, stats] of Object.entries(queueDepths)) {
+                totalPending += stats.pending || 0;
+            }
+            document.getElementById('stat-pending').textContent = totalPending;
+        }
+
+        function updateQueueGrid(queueDepths) {
+            const grid = document.getElementById('queue-grid');
+
+            if (!queueDepths || Object.keys(queueDepths).length === 0) {
+                grid.innerHTML = '<div class="empty-state">No queue data available</div>';
+                return;
+            }
+
+            // Sort by pending count (most pending first)
+            const sorted = Object.entries(queueDepths)
+                .sort((a, b) => (b[1].pending || 0) - (a[1].pending || 0));
+
+            grid.innerHTML = sorted.map(([jobType, stats]) => {
+                const pending = stats.pending || 0;
+                const running = stats.running || 0;
+                const claimed = stats.claimed || 0;
+                const hasPending = pending > 0;
+
+                return `
+                    <div class="queue-card ${hasPending ? 'has-pending' : ''}">
+                        <div class="queue-type">${jobType}</div>
+                        <div class="queue-stats">
+                            <span class="${pending > 0 ? 'queue-pending' : ''}">${pending} pending</span>
+                            <span class="${running > 0 ? 'queue-running' : ''}">${running + claimed} active</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateWorkersTable(workers) {
+            const tbody = document.getElementById('workers-body');
+
+            if (!workers || workers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No workers registered</td></tr>';
+                return;
+            }
+
+            // Sort by resource class then by worker_id
+            workers.sort((a, b) => {
+                const rcOrder = ['gpu_heavy', 'gpu_medium', 'cpu_heavy', 'cpu_light'];
+                const aIdx = rcOrder.indexOf(a.resource_class) ?? 99;
+                const bIdx = rcOrder.indexOf(b.resource_class) ?? 99;
+                if (aIdx !== bIdx) return aIdx - bIdx;
+                return (a.worker_id || '').localeCompare(b.worker_id || '');
+            });
+
+            tbody.innerHTML = workers.map(w => {
+                const rc = w.resource_class || 'unknown';
+                const pc = w.priority_class || 'unknown';
+                const status = w.status || 'offline';
+                const active = w.active_jobs || 0;
+                const max = w.max_concurrent_jobs || 1;
+                const loadPct = Math.round((active / max) * 100);
+
+                let loadClass = 'load-low';
+                if (loadPct >= 80) loadClass = 'load-high';
+                else if (loadPct >= 50) loadClass = 'load-medium';
+
+                const heartbeatAge = w.heartbeat_age_sec || 0;
+                const heartbeat = heartbeatAge < 60
+                    ? `${heartbeatAge}s ago`
+                    : `${Math.round(heartbeatAge / 60)}m ago`;
+
+                const capabilities = (w.capabilities || []).slice(0, 3).join(', ');
+                const moreCapabilities = (w.capabilities || []).length > 3
+                    ? ` +${w.capabilities.length - 3}` : '';
+
+                return `
+                    <tr>
+                        <td>
+                            <span class="status-dot status-${status}"></span>
+                            ${w.worker_id || w.device_id || 'unknown'}
+                        </td>
+                        <td><span class="resource-class rc-${rc}">${rc}</span></td>
+                        <td><span class="priority-class pc-${pc}">${pc}</span></td>
+                        <td>${status}</td>
+                        <td>
+                            <div class="load-bar">
+                                <div class="load-fill ${loadClass}" style="width: ${loadPct}%"></div>
+                            </div>
+                            ${active}/${max}
+                        </td>
+                        <td title="${(w.capabilities || []).join(', ')}">${capabilities}${moreCapabilities}</td>
+                        <td>${heartbeat}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function refreshData() {
+            const icon = document.getElementById('refresh-icon');
+            icon.classList.add('refreshing');
+
+            try {
+                // Fetch from VaultKeeper API
+                const clusterRes = await fetch('http://localhost:8767/api/jobs/cluster');
+                const clusterData = await clusterRes.json();
+
+                const workersRes = await fetch('http://localhost:8767/api/jobs/workers');
+                const workersData = await workersRes.json();
+
+                // Update UI
+                updateModeBanner(clusterData.mode || 'unknown');
+                updateStats(clusterData);
+                updateQueueGrid(clusterData.queue_depths);
+                updateWorkersTable(workersData.workers || []);
+            } catch (e) {
+                console.error('Refresh error:', e);
+            }
+
+            setTimeout(() => icon.classList.remove('refreshing'), 500);
+        }
+
+        // Initial load
+        refreshData();
+
+        // Auto-refresh every 5 seconds
+        setInterval(refreshData, 5000);
+    </script>
+</body>
+</html>

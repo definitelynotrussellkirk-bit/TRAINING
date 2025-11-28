@@ -486,6 +486,24 @@ def format_title_earned(hero: str, title: str) -> str:
     return f"{hero} earned the title '{title}'"
 
 
+def format_cluster_mode_change(old_mode: str, new_mode: str, reason: Optional[str] = None) -> str:
+    """Format a cluster mode change message."""
+    base = f"Cluster mode: {old_mode} -> {new_mode}"
+    if reason:
+        base += f" ({reason})"
+    return base
+
+
+def format_worker_joined(worker_id: str, resource_class: str) -> str:
+    """Format a worker joined message."""
+    return f"Worker {worker_id} joined ({resource_class})"
+
+
+def format_worker_left(worker_id: str, reason: str = "disconnected") -> str:
+    """Format a worker left message."""
+    return f"Worker {worker_id} left ({reason})"
+
+
 # =============================================================================
 # CLI
 # =============================================================================

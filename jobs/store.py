@@ -1442,6 +1442,24 @@ class SQLiteJobStore(JobStore):
                 )
                 logger.info(f"Worker {worker_id} registered (device={device_id}, resource_class={resource_class})")
 
+                # Log to Battle Log for new worker joins
+                try:
+                    from core.battle_log import log_jobs
+                    log_jobs(
+                        f"Worker {worker_id} joined ({resource_class or 'unknown'})",
+                        source="jobs.store",
+                        severity="success",
+                        details={
+                            "worker_id": worker_id,
+                            "device_id": device_id,
+                            "resource_class": resource_class,
+                            "priority_class": priority_class,
+                            "roles": roles,
+                        }
+                    )
+                except ImportError:
+                    pass
+
         # Get allowed job types for this worker
         from jobs.registry import get_allowed_job_types
         allowed_types = get_allowed_job_types(roles)
@@ -1555,6 +1573,17 @@ class SQLiteJobStore(JobStore):
         cutoff = (datetime.utcnow() - timedelta(seconds=max_age_sec)).isoformat()
 
         with self._transaction() as conn:
+            # First, get the workers that will be marked offline for Battle Log
+            cursor = conn.execute(
+                """
+                SELECT id, resource_class FROM workers
+                WHERE status = 'online' AND last_heartbeat_at < ?
+                """,
+                (cutoff,),
+            )
+            stale_workers = cursor.fetchall()
+
+            # Mark them offline
             cursor = conn.execute(
                 """
                 UPDATE workers SET
@@ -1568,6 +1597,24 @@ class SQLiteJobStore(JobStore):
 
         if count > 0:
             logger.info(f"Marked {count} workers as offline (no heartbeat for {max_age_sec}s)")
+
+            # Log to Battle Log
+            try:
+                from core.battle_log import log_jobs
+                for worker in stale_workers:
+                    log_jobs(
+                        f"Worker {worker['id']} left (no heartbeat)",
+                        source="jobs.store",
+                        severity="warning",
+                        details={
+                            "worker_id": worker["id"],
+                            "resource_class": worker["resource_class"],
+                            "reason": "stale_heartbeat",
+                        }
+                    )
+            except ImportError:
+                pass
+
         return count
 
     def get_worker_stats(self) -> Dict[str, Any]:

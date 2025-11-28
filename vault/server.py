@@ -71,6 +71,9 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
     zone_registry: Optional[ZoneRegistry] = None
     job_store = None  # Set by run_server
 
+    # Cluster mode tracking for Battle Log
+    _last_cluster_mode: Optional[str] = None
+
     def log_message(self, format, *args):
         """Override to use our logger."""
         logger.info(f"{self.address_string()} - {format % args}")
@@ -1736,6 +1739,28 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
                 cluster_mode = compute_cluster_mode(queue_stats)
             except ImportError:
                 cluster_mode = "unknown"
+
+            # Log mode changes to Battle Log
+            if cluster_mode != VaultKeeperHandler._last_cluster_mode:
+                if VaultKeeperHandler._last_cluster_mode is not None:
+                    try:
+                        from core.battle_log import log_system
+                        old_mode = VaultKeeperHandler._last_cluster_mode
+                        reason = self._get_mode_reason(cluster_mode, queue_stats)
+                        severity = "warning" if cluster_mode == "catch_up" else "info"
+                        log_system(
+                            f"Cluster mode: {old_mode} -> {cluster_mode} ({reason})",
+                            source="cluster",
+                            severity=severity,
+                            details={
+                                "old_mode": old_mode,
+                                "new_mode": cluster_mode,
+                                "reason": reason,
+                            }
+                        )
+                    except ImportError:
+                        pass
+                VaultKeeperHandler._last_cluster_mode = cluster_mode
 
             # Get workers
             workers = store.list_workers()

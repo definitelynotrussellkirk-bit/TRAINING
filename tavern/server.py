@@ -568,6 +568,10 @@ class TavernHandler(SimpleHTTPRequestHandler):
             job_id = path.replace("/api/jobs/", "")
             self._serve_job(job_id)
 
+        # Cluster Dashboard - Heterogeneous cluster status
+        elif path == "/cluster" or path == "/cluster.html":
+            self._serve_template("cluster.html")
+
         # Forge - Data validation and queue health
         elif path == "/forge" or path == "/forge.html":
             self._serve_template("forge.html")

@@ -2026,16 +2026,21 @@ class TavernHandler(SimpleHTTPRequestHandler):
                             # Get modification time
                             mtime = datetime.fromtimestamp(item.stat().st_mtime)
 
-                            # Check for evals sidecar
+                            # Get eval count from curriculum_state.json
                             eval_count = 0
-                            evals_file = item / ".evals.json"
-                            if evals_file.exists():
-                                try:
-                                    with open(evals_file) as ef:
-                                        evals_data = json.load(ef)
-                                        eval_count = len(evals_data.get("evaluations", []))
-                                except Exception:
-                                    pass
+                            try:
+                                curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
+                                if curriculum_file.exists():
+                                    with open(curriculum_file) as cf:
+                                        curriculum = json.load(cf)
+                                    # Count evals at or near this step (within 500 steps)
+                                    for skill_id, skill_data in curriculum.get("skills", {}).items():
+                                        for eval_entry in skill_data.get("accuracy_history", []):
+                                            eval_step = eval_entry.get("step", 0)
+                                            if abs(eval_step - step) <= 500:
+                                                eval_count += 1
+                            except Exception:
+                                pass
 
                             assets["checkpoints"].append({
                                 "name": item.name,

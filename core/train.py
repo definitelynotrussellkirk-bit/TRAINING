@@ -243,20 +243,16 @@ try:
 except ImportError:
     DETAILED_MONITORING_AVAILABLE = False
 
-# Try to import desktop notifier (optional)
-try:
-    from desktop_notifier import DesktopNotifier
-except ImportError:
-    # Create stub class if not available
-    class DesktopNotifier:
-        def __init__(self): pass
-        def notify(self, *args, **kwargs): pass
-        def notify_success(self, *args, **kwargs): pass
-        def notify_error(self, *args, **kwargs): pass
-        # Added no-op handlers to avoid crashes when optional notifier is absent
-        def training_complete(self, *args, **kwargs): pass
-        def training_crashed(self, *args, **kwargs): pass
-        def oom_error(self, *args, **kwargs): pass
+# Desktop notifier stub (optional feature, not implemented)
+class DesktopNotifier:
+    """Stub for optional desktop notifications. No-op by default."""
+    def __init__(self): pass
+    def notify(self, *args, **kwargs): pass
+    def notify_success(self, *args, **kwargs): pass
+    def notify_error(self, *args, **kwargs): pass
+    def training_complete(self, *args, **kwargs): pass
+    def training_crashed(self, *args, **kwargs): pass
+    def oom_error(self, *args, **kwargs): pass
 
 
 class UltimateTrainer:

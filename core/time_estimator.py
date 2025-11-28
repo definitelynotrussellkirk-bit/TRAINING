@@ -326,7 +326,10 @@ class TimeEstimator:
         batch_size: int,
         use_4bit: bool = True,
         max_length: int = 2048,
-        gradient_checkpointing: bool = True
+        gradient_checkpointing: bool = True,
+        num_layers: int = None,
+        num_heads: int = None,
+        hidden_dim: int = None
     ) -> Dict[str, float]:
         """
         Estimate GPU memory usage for training.
@@ -335,76 +338,135 @@ class TimeEstimator:
         and activations. Used for pre-flight checks to prevent OOM crashes.
 
         Args:
-            model_size_b: Model size in billions of parameters (e.g., 1.0 for 1B model)
+            model_size_b: Model size in billions of parameters (e.g., 0.6 for Qwen3-0.6B)
             batch_size: Training batch size (micro-batch, not effective batch)
-            use_4bit: Whether using 4-bit quantization (default: True)
+            use_4bit: Whether using 4-bit quantization (QLoRA) - default True
             max_length: Maximum sequence length (default: 2048)
             gradient_checkpointing: Whether gradient checkpointing is enabled (default: True)
+            num_layers: Number of transformer layers (auto-estimated if None)
+            num_heads: Number of attention heads (auto-estimated if None)
+            hidden_dim: Hidden dimension size (auto-estimated if None)
 
         Returns:
             Dict[str, float]: Memory breakdown in GB
-            {
-                "model": float,      # Model weights
-                "optimizer": float,  # AdamW optimizer states
-                "gradients": float,  # Gradient tensors
-                "activations": float,# Activation memory (batch × seq length dependent)
-                "total": float       # Sum of all components
-            }
 
-        Memory Formulas (4-bit quantization):
-            model = model_size_b × 0.5 GB
-            optimizer = model_size_b × 0.6 GB  (AdamW: momentum + variance)
-            gradients = model_size_b × 0.25 GB
-            activations = batch_size × 0.8 GB × (max_length / 2048) × checkpoint_factor
-            total = sum of above
+        Memory Formulas:
+            For bf16/fp16 full training (use_4bit=False):
+                model = params × 2 bytes
+                optimizer = params × 8 bytes (AdamW: momentum fp32 + variance fp32)
+                gradients = params × 4 bytes (accumulated in fp32)
+                activations = hidden_states + attention_matrices
+                    - hidden: layers × batch × seq × hidden × 2 bytes
+                    - attention: layers × batch × heads × seq² × 4 bytes (BIG!)
 
-        Note on gradient_accumulation:
-            VRAM is determined by micro-batch size (batch_size), not effective batch.
-            gradient_accumulation only affects training time, not memory usage.
+            For 4-bit QLoRA (use_4bit=True):
+                model = params × 0.5 bytes (4-bit quantized)
+                optimizer = trainable_params × 8 bytes (only LoRA weights)
+                gradients = trainable_params × 4 bytes
+                activations = similar but reduced due to frozen base
+
+        Note: Attention matrices scale with seq_length² - this dominates VRAM
+        for long sequences. Gradient checkpointing helps by recomputing activations.
 
         Example:
-            # 0.6B model, batch_size=16, max_length=2048, 4-bit, checkpointing on
-            mem = TimeEstimator.estimate_memory(0.6, 16, use_4bit=True)
-            print(mem)
-            # {'model': 0.3, 'optimizer': 0.4, 'gradients': 0.2,
-            #  'activations': 4.5, 'total': 5.3}
-
-            # Same but max_length=4096 (activations ~double)
-            mem = TimeEstimator.estimate_memory(0.6, 16, max_length=4096)
-            # activations will be ~9.0 GB instead of ~4.5 GB
+            # Qwen3-0.6B, batch_size=1, max_length=2048, bf16 full training
+            mem = TimeEstimator.estimate_memory(0.6, 1, use_4bit=False)
+            # Returns ~17 GB (attention matrices are 6+ GB alone!)
         """
+        # Auto-estimate architecture params based on model size
+        # These are approximate - real values vary by architecture
+        if num_layers is None:
+            if model_size_b <= 0.5:
+                num_layers = 16
+            elif model_size_b <= 1.0:
+                num_layers = 24
+            elif model_size_b <= 3.0:
+                num_layers = 32
+            elif model_size_b <= 8.0:
+                num_layers = 40
+            else:
+                num_layers = 48
 
-        # Base model memory (4-bit quantized)
+        if hidden_dim is None:
+            if model_size_b <= 0.5:
+                hidden_dim = 896
+            elif model_size_b <= 1.0:
+                hidden_dim = 1024
+            elif model_size_b <= 3.0:
+                hidden_dim = 2048
+            elif model_size_b <= 8.0:
+                hidden_dim = 4096
+            else:
+                hidden_dim = 5120
+
+        if num_heads is None:
+            if model_size_b <= 0.5:
+                num_heads = 14
+            elif model_size_b <= 1.0:
+                num_heads = 16
+            elif model_size_b <= 3.0:
+                num_heads = 32
+            elif model_size_b <= 8.0:
+                num_heads = 32
+            else:
+                num_heads = 40
+
+        params_billion = model_size_b
+
         if use_4bit:
-            model_memory = model_size_b * 0.5  # ~0.5 GB per billion params (4-bit)
+            # 4-bit QLoRA training
+            model_memory = params_billion * 0.5  # 4-bit = 0.5 bytes per param
+
+            # Only LoRA params are trained (typically ~1-2% of model)
+            trainable_fraction = 0.02
+            trainable_params = params_billion * trainable_fraction
+
+            optimizer_memory = trainable_params * 8  # AdamW states for LoRA only
+            gradient_memory = trainable_params * 4   # Gradients for LoRA only
+
+            # Activations still needed but base model frozen reduces overhead
+            # Use simplified formula for QLoRA
+            activation_memory = batch_size * 0.8 * (max_length / 2048.0)
+            if gradient_checkpointing:
+                activation_memory *= 0.35
+
         else:
-            model_memory = model_size_b * 2.0  # ~2 GB per billion params (fp16)
+            # Full bf16/fp16 training - ALL params trained
+            model_memory = params_billion * 2  # bf16 = 2 bytes per param
 
-        # Optimizer states (AdamW)
-        optimizer_memory = model_size_b * 0.6  # Rough estimate
+            # AdamW optimizer: momentum (fp32) + variance (fp32) = 8 bytes per param
+            optimizer_memory = params_billion * 8
 
-        # Gradients
-        gradient_memory = model_size_b * 0.25
+            # Gradients accumulated in fp32 = 4 bytes per param
+            gradient_memory = params_billion * 4
 
-        # Activations (depends on batch size AND sequence length)
-        # Base coefficient 0.8 GB/batch was empirically calibrated at max_length=2048
-        # Scale linearly with sequence length
-        seq_length_factor = max_length / 2048.0
+            # Activations: hidden states + attention matrices
+            # Hidden states: layers × batch × seq × hidden × 2 bytes
+            hidden_memory = (num_layers * batch_size * max_length * hidden_dim * 2) / 1e9
 
-        # Gradient checkpointing reduces activation memory significantly
-        # Typical reduction is ~65% (stores only layer boundaries, recomputes forward)
-        checkpoint_factor = 0.35 if gradient_checkpointing else 1.0
+            # Attention matrices: layers × batch × heads × seq × seq × 4 bytes
+            # This is the BIG one - scales with seq_length²!
+            attention_memory = (num_layers * batch_size * num_heads * max_length * max_length * 4) / 1e9
 
-        activation_memory = batch_size * 0.8 * seq_length_factor * checkpoint_factor
+            activation_memory = hidden_memory + attention_memory
 
-        total = model_memory + optimizer_memory + gradient_memory + activation_memory
+            # Gradient checkpointing: recompute forward pass, only store layer boundaries
+            # Reduces activation memory by ~70%
+            if gradient_checkpointing:
+                activation_memory *= 0.3
+
+        # CUDA/PyTorch overhead (kernels, fragmentation, workspace)
+        overhead = 1.5
+
+        total = model_memory + optimizer_memory + gradient_memory + activation_memory + overhead
 
         return {
-            "model": round(model_memory, 2),
-            "optimizer": round(optimizer_memory, 2),
-            "gradients": round(gradient_memory, 2),
-            "activations": round(activation_memory, 2),
-            "total": round(total, 2)
+            "model": round(model_memory, 1),
+            "optimizer": round(optimizer_memory, 1),
+            "gradients": round(gradient_memory, 1),
+            "activations": round(activation_memory, 1),
+            "overhead": round(overhead, 1),
+            "total": round(total, 1)
         }
 
     @classmethod

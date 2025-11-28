@@ -1,6 +1,53 @@
-# LLM Training System
+# The Realm of Training
 
-**Purpose:** Pure training module for continuous fine-tuning of small language models.
+> *We propose a surjective morphism* **T: ML** *&rarr;* **RPG** *which maps the high-dimensional manifold of machine learning operations onto the more cognitively tractable space of role-playing game mechanics. This transformation preserves essential structure while minimizing the Kolmogorov complexity of the user's mental model. Empirically, we observe that framing gradient descent as "battle damage" and checkpoint management as "treasure vaults" yields a mass reduction in the probability of the developer staring blankly at terminal output wondering if anything is actually happening.*
+>
+> *&mdash; Definitely Not A Real Paper, 2025*
+
+**Translation:** We turned ML training into an RPG because staring at loss curves is boring, but watching your hero level up is fun.
+
+---
+
+## What Is This?
+
+**Your hero DIO** (a Qwen3 model) battles through **quests** (training data), learning **skills** (SY, BIN), and growing stronger. You watch from the **Tavern** (http://localhost:8888) as DIO fights, levels up, and becomes a champion.
+
+| RPG Term | Boring ML Term |
+|----------|----------------|
+| Hero (DIO) | The model being trained |
+| Quest | Training data file |
+| Battle | Training run |
+| Damage Dealt | 1 / Loss (lower loss = more damage) |
+| Level Up | Every 1000 training steps |
+| Champion | Best checkpoint by eval metrics |
+| Tavern | Web UI dashboard |
+| Vault | Checkpoint storage |
+| Oracle | Inference server (chat with the model) |
+
+---
+
+## Quick Start
+
+```bash
+# Start the realm
+./scripts/start_all.sh
+
+# Visit the Tavern
+open http://localhost:8888
+
+# Watch DIO battle
+# (Training runs automatically when quests are in the queue)
+```
+
+See `QUICKSTART.md` for full setup.
+
+---
+
+## Technical Details
+
+*(For those who prefer their manifolds un-surjected)*
+
+**Purpose:** Continuous fine-tuning system for small language models.
 
 ## Architecture Overview
 

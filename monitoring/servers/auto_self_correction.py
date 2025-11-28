@@ -7,13 +7,76 @@ Hooks into LiveInferenceMonitor to capture model predictions vs golden answers.
 
 Usage:
     Integrates with train.py - runs automatically every N eval steps
+
+NOTE: This module requires self-correction infrastructure to be implemented.
+      Currently uses stub classes until trainer/self_correction/ package is created.
 """
 
 import json
 from pathlib import Path
 from typing import List, Dict
 from datetime import datetime
-from self_correction_trainer import ErrorCodeGenerator, SelfCorrectionPipeline
+
+# TODO: Create trainer/self_correction/ package with:
+#   - ErrorCodeGenerator
+#   - SelfCorrectionPipeline
+# For now, use stubs so the module imports cleanly
+
+
+class ErrorCodeGenerator:
+    """Stub - generates error codes for failed predictions."""
+
+    def generate_code(self, expected: str, predicted: str) -> str:
+        """Generate a simple error code based on mismatch type."""
+        if not predicted:
+            return "EMPTY_RESPONSE"
+        if len(predicted) > len(expected) * 3:
+            return "VERBOSE_RESPONSE"
+        return "INCORRECT_ANSWER"
+
+
+class SelfCorrectionPipeline:
+    """Stub - generates self-correction training examples."""
+
+    def __init__(self):
+        self.error_generator = ErrorCodeGenerator()
+
+    def generate_from_qa_pair(
+        self,
+        prompt: str,
+        golden_answer: str,
+        initial_answer: str
+    ) -> List[Dict]:
+        """
+        Generate self-correction training examples.
+
+        Returns list of training examples:
+        - If correct: single self-evaluation example
+        - If incorrect: self-evaluation + correction example
+        """
+        is_correct = initial_answer.strip() == golden_answer.strip()
+
+        examples = []
+
+        # Self-evaluation example
+        eval_response = "Correct!" if is_correct else f"Incorrect. Error: {self.error_generator.generate_code(golden_answer, initial_answer)}"
+        examples.append({
+            'prompt': f"{prompt}\n\nYour answer: {initial_answer}\n\nIs this correct?",
+            'response': eval_response,
+            'type': 'self_evaluation',
+            'correct': is_correct
+        })
+
+        # If incorrect, add correction example
+        if not is_correct:
+            examples.append({
+                'prompt': f"{prompt}\n\nYour previous answer was: {initial_answer}\n\nPlease correct your answer:",
+                'response': golden_answer,
+                'type': 'correction',
+                'correct': False
+            })
+
+        return examples
 
 
 class AutoSelfCorrectionGenerator:

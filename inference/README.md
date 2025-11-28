@@ -1,6 +1,6 @@
 # RTX 3090 Inference Server
 
-This directory contains the inference API server that runs on the RTX 3090 machine.
+This directory contains the inference API server that runs on the inference machine.
 
 ## Architecture
 
@@ -40,16 +40,16 @@ Include API key in the `X-API-Key` header:
 
 ```bash
 # Health check - no auth required
-curl http://192.168.x.x:8765/health
+curl "http://${INFERENCE_HOST:-localhost}:${INFERENCE_PORT:-8765}/health"
 
 # Inference - read key required
-curl -X POST http://192.168.x.x:8765/v1/chat/completions \
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/v1/chat/completions" \
   -H "X-API-Key: $INFERENCE_READ_KEY" \
   -H "Content-Type: application/json" \
   -d '{"messages": [{"role": "user", "content": "Hello"}]}'
 
 # Model reload - admin key required
-curl -X POST http://192.168.x.x:8765/models/reload \
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/models/reload" \
   -H "X-API-Key: $INFERENCE_ADMIN_KEY"
 ```
 
@@ -85,12 +85,12 @@ The server uses `~/llm/` for data storage:
 └── venv/            # Python virtual environment
 ```
 
-## Setup on 3090
+## Setup on Inference Server
 
 ```bash
 # Clone repo (if not already)
 cd ~
-git clone https://github.com/definitelynotuserellkirk-bit/TRAINING.git
+git clone <your-repo-url>
 
 # Ensure data directory exists
 mkdir -p ~/llm/{models,data,checkpoints,datasets,logs}
@@ -122,20 +122,21 @@ python main.py
 
 ## Loading a Checkpoint
 
-1. Sync checkpoint from 4090 to 3090:
+1. Sync checkpoint from trainer to inference server:
    ```bash
-   rsync -av /path/to/training/current_model/checkpoint-175000/ user@xxx.xxx.88.149:~/llm/models/checkpoint-175000/
+   rsync -av "${TRAINING_BASE_DIR}/models/current_model/checkpoint-175000/" \
+     "${INFERENCE_SSH_USER}@${INFERENCE_HOST}:${INFERENCE_MODELS_DIR}/checkpoint-175000/"
    ```
-2. Load checkpoint on 3090:
+2. Load checkpoint on inference server:
    ```bash
-   curl -X POST http://192.168.x.x:8765/models/reload \
+   curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/models/reload" \
      -H "Content-Type: application/json" \
-     -d '{"model_path":"/path/to/models/checkpoint-175000"}'
+     -d '{"model_path":"~/llm/models/checkpoint-175000"}'
    ```
 3. Verify:
    ```bash
-   curl http://192.168.x.x:8765/models/info
-   # Should show: "loaded_from": "/path/to/models/checkpoint-175000"
+   curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/models/info"
+   # Should show: "loaded_from": "~/llm/models/checkpoint-175000"
    ```
 
 **Always use explicit checkpoint names (checkpoint-NNNNNN), never generic "deployed" folder.**
@@ -145,5 +146,16 @@ python main.py
 Default: **8765**
 
 ```bash
-curl http://192.168.x.x:8765/health
+curl "http://${INFERENCE_HOST:-localhost}:${INFERENCE_PORT:-8765}/health"
+```
+
+## Environment Variables
+
+Configure via environment or `config/hosts.json`:
+
+```bash
+export INFERENCE_HOST="your.inference.host"
+export INFERENCE_PORT="8765"
+export INFERENCE_SSH_USER="youruser"
+export INFERENCE_MODELS_DIR="~/llm/models"
 ```

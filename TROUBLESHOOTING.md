@@ -79,8 +79,7 @@ ps aux | grep training_daemon | grep -v grep
 **Solution:**
 ```bash
 # Restart daemon
-cd /path/to/training
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+nohup python3 core/training_daemon.py > training_output.log 2>&1 &
 
 # Verify it started
 sleep 2
@@ -145,7 +144,7 @@ pkill -f training_daemon
 sleep 3
 
 # Start single daemon
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+nohup python3 core/training_daemon.py > training_output.log 2>&1 &
 ```
 
 ## Out of Memory (OOM) Errors
@@ -181,7 +180,7 @@ pkill -f "python.*train.py"
 sleep 5
 
 # Restart daemon
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+nohup python3 core/training_daemon.py > training_output.log 2>&1 &
 ```
 
 **Solution 3: Reduce max_length (if data allows)**
@@ -241,7 +240,7 @@ pkill -f training_daemon
 mv queue/processing/* queue/normal/
 
 # Restart daemon
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+nohup python3 core/training_daemon.py > training_output.log 2>&1 &
 ```
 
 ### Files Stuck in Failed Queue
@@ -295,7 +294,7 @@ cat logs/daemon_$(date +%Y%m%d).log | grep "inbox"
 
    # Restart if needed
    pkill -f training_daemon
-   nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+   nohup python3 core/training_daemon.py > training_output.log 2>&1 &
    ```
 
 2. **File permissions:**
@@ -333,7 +332,7 @@ ls -lh models/current_model/
 cp -r models/Qwen3-0.6B/* models/current_model/
 
 # Or update config to point to base model
-python3 tools/config/edit_config.py model_path "/path/to/training/models/Qwen3-0.6B"
+python3 tools/config/edit_config.py model_path "models/Qwen3-0.6B"
 ```
 
 ### Checkpoint Resume Fails
@@ -409,7 +408,7 @@ touch status/test.json && rm status/test.json
 ```bash
 # If daemon running but status not updating, restart
 pkill -f training_daemon
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+nohup python3 core/training_daemon.py > training_output.log 2>&1 &
 ```
 
 ## Disk Space Issues
@@ -420,7 +419,7 @@ nohup python3 core/training_daemon.py --base-dir /path/to/training > training_ou
 
 **Check disk usage:**
 ```bash
-df -h /path/to/training
+df -h .
 du -sh models/ logs/ queue/
 ```
 
@@ -497,7 +496,7 @@ ls .config_lock.json  # Should not exist
 nano config.json
 
 # Restart training
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+nohup python3 core/training_daemon.py > training_output.log 2>&1 &
 ```
 
 ### Invalid Config JSON
@@ -634,7 +633,7 @@ python3 tools/config/edit_config.py num_eval_samples 2
 # Restart daemon to clear memory
 pkill -f training_daemon
 sleep 5
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+nohup python3 core/training_daemon.py > training_output.log 2>&1 &
 ```
 
 ## Remote Connection Issues
@@ -643,14 +642,14 @@ See `REMOTE_INFERENCE.md` for remote server troubleshooting.
 
 **Quick checks:**
 ```bash
-# Test connection
-ping 192.168.x.x
+# Test connection (use your configured inference host)
+ping "${INFERENCE_HOST}"
 
 # Test SSH
-ssh user@xxx.xxx.88.149 'echo "Connected"'
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" 'echo "Connected"'
 
 # Check remote GPU
-ssh user@xxx.xxx.88.149 'nvidia-smi'
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" 'nvidia-smi'
 ```
 
 ## Emergency Procedures
@@ -748,9 +747,9 @@ See "Out of Memory (OOM) Errors" section above.
 ```bash
 # Verify you're in TRAINING directory
 pwd
-# Should be: /path/to/training
 
-cd /path/to/training
+# Navigate to correct directory
+cd "${TRAINING_BASE_DIR:-/path/to/TRAINING}"
 ```
 
 ### "PermissionError: [Errno 13] Permission denied"

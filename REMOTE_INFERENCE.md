@@ -1,10 +1,26 @@
-# Remote Inference Server - RTX 3090
+# Remote Inference Server
 
 **Purpose:** HTTP API server for all inference, evaluation, and data generation operations.
 
-**Server:** 192.168.x.x:8765
-**API Base URL:** http://192.168.x.x:8765
-**Status:** ✅ Running (PID 275295)
+**Configuration:** See `config/hosts.json` for server IP, port, and SSH settings.
+
+**Server:** `<INFERENCE_HOST>:<INFERENCE_PORT>` (default: port 8765)
+**API Base URL:** `http://<INFERENCE_HOST>:<INFERENCE_PORT>`
+
+---
+
+## Environment Setup
+
+Set these environment variables to customize access (or use `config/hosts.json`):
+
+```bash
+# From config/hosts.json or set manually
+export INFERENCE_HOST="your.inference.host"    # IP or hostname
+export INFERENCE_PORT="8765"
+export INFERENCE_SSH_USER="youruser"
+export INFERENCE_MODELS_DIR="~/llm/models"
+export TRAINING_BASE_DIR="/path/to/TRAINING"
+```
 
 ---
 
@@ -13,7 +29,7 @@
 ```
 ┌─────────────────────────┐      ┌─────────────────────────┐
 │   4090 (Training)       │      │   3090 (Inference)      │
-│   This Machine          │      │   192.168.x.x        │
+│   Trainer Host          │      │   <INFERENCE_HOST>      │
 │                         │      │                         │
 │  - Train models         │◄────►│  HTTP API (port 8765)   │
 │  - Save checkpoints     │ HTTP │                         │
@@ -36,39 +52,26 @@
 
 ---
 
-## Current Status
-
-**Last verified:** 2025-11-22 05:32 AM
-
-- **Server:** Running at http://192.168.x.x:8765
-- **GPU:** RTX 3090, 24GB VRAM
-- **Temperature:** 41°C
-- **Power:** 21W idle
-- **Active model:** Qwen3-0.6B (1.5GB)
-- **VRAM usage:** 0.0GB (model loaded on-demand)
-
----
-
 ## Quick Reference
 
 ### Health Check
 ```bash
-curl http://192.168.x.x:8765/health
+curl "http://${INFERENCE_HOST:-localhost}:${INFERENCE_PORT:-8765}/health"
 ```
 
 ### GPU Stats
 ```bash
-curl http://192.168.x.x:8765/gpu | jq .
+curl "http://${INFERENCE_HOST:-localhost}:${INFERENCE_PORT:-8765}/gpu" | jq .
 ```
 
 ### List Models
 ```bash
-curl http://192.168.x.x:8765/models | jq .
+curl "http://${INFERENCE_HOST:-localhost}:${INFERENCE_PORT:-8765}/models" | jq .
 ```
 
 ### System Stats
 ```bash
-curl http://192.168.x.x:8765/system | jq .
+curl "http://${INFERENCE_HOST:-localhost}:${INFERENCE_PORT:-8765}/system" | jq .
 ```
 
 ---
@@ -79,7 +82,7 @@ curl http://192.168.x.x:8765/system | jq .
 
 **GET /health** - System health and GPU status
 ```bash
-curl http://192.168.x.x:8765/health
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/health"
 ```
 Response:
 ```json
@@ -99,12 +102,12 @@ Response:
 
 **GET /info** - Server configuration
 ```bash
-curl http://192.168.x.x:8765/info
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/info"
 ```
 
 **GET /version** - Software versions
 ```bash
-curl http://192.168.x.x:8765/version
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/version"
 ```
 Response:
 ```json
@@ -124,16 +127,16 @@ Response:
 
 **GET /models** - List all registered models
 ```bash
-curl http://192.168.x.x:8765/models | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/models" | jq .
 ```
 
-**POST /models/register** - Register new checkpoint from 4090
+**POST /models/register** - Register new checkpoint from trainer
 ```bash
-# After training, copy checkpoint to 3090:
-scp -r models/current_model user@xxx.xxx.88.149:~/llm/models/qwen3-step-5000
+# After training, copy checkpoint to inference server:
+scp -r models/current_model "${INFERENCE_SSH_USER}@${INFERENCE_HOST}:${INFERENCE_MODELS_DIR}/qwen3-step-5000"
 
 # Register it:
-curl -X POST http://192.168.x.x:8765/models/register \
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/models/register" \
   -H "Content-Type: application/json" \
   -d '{
     "id": "qwen3-step-5000",
@@ -144,14 +147,14 @@ curl -X POST http://192.168.x.x:8765/models/register \
 
 **POST /models/set_active** - Switch active model
 ```bash
-curl -X POST http://192.168.x.x:8765/models/set_active \
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/models/set_active" \
   -H "Content-Type: application/json" \
   -d '{"id": "qwen3-step-5000"}'
 ```
 
 **GET /models/active** - Get currently active model
 ```bash
-curl http://192.168.x.x:8765/models/active
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/models/active"
 ```
 
 ---
@@ -160,7 +163,7 @@ curl http://192.168.x.x:8765/models/active
 
 **POST /generate** - Generate text (queued)
 ```bash
-curl -X POST http://192.168.x.x:8765/generate \
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "What is 2+2?",
@@ -173,7 +176,7 @@ curl -X POST http://192.168.x.x:8765/generate \
 
 **POST /v1/chat/completions** - OpenAI-compatible chat
 ```bash
-curl -X POST http://192.168.x.x:8765/v1/chat/completions \
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "Qwen3-0.6B",
@@ -191,7 +194,7 @@ curl -X POST http://192.168.x.x:8765/v1/chat/completions \
 
 **POST /eval/jobs** - Queue evaluation job
 ```bash
-curl -X POST http://192.168.x.x:8765/eval/jobs \
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/eval/jobs" \
   -H "Content-Type: application/json" \
   -d '{
     "model_id": "qwen3-step-5000",
@@ -205,7 +208,7 @@ curl -X POST http://192.168.x.x:8765/eval/jobs \
 
 **GET /eval/jobs/{job_id}** - Get eval results
 ```bash
-curl http://192.168.x.x:8765/eval/jobs/eval_20251122_053000 | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/eval/jobs/eval_20251122_053000" | jq .
 ```
 
 Response:
@@ -230,7 +233,7 @@ Response:
 
 **POST /data_gen/jobs** - Generate training data
 ```bash
-curl -X POST http://192.168.x.x:8765/data_gen/jobs \
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/data_gen/jobs" \
   -H "Content-Type: application/json" \
   -d '{
     "model_id": "Qwen3-0.6B",
@@ -245,7 +248,7 @@ curl -X POST http://192.168.x.x:8765/data_gen/jobs \
 
 **GET /data_gen/jobs/{job_id}** - Check generation status
 ```bash
-curl http://192.168.x.x:8765/data_gen/jobs/datagen_20251122_060000 | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/data_gen/jobs/datagen_20251122_060000" | jq .
 ```
 
 ---
@@ -255,21 +258,21 @@ curl http://192.168.x.x:8765/data_gen/jobs/datagen_20251122_060000 | jq .
 **GET /jobs** - List all jobs (with filters)
 ```bash
 # All jobs
-curl http://192.168.x.x:8765/jobs | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/jobs" | jq .
 
 # Filter by type
-curl 'http://192.168.x.x:8765/jobs?type=eval' | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/jobs?type=eval" | jq .
 
 # Filter by status
-curl 'http://192.168.x.x:8765/jobs?status=pending' | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/jobs?status=pending" | jq .
 
 # Combined filters
-curl 'http://192.168.x.x:8765/jobs?type=eval&status=done&limit=10' | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/jobs?type=eval&status=done&limit=10" | jq .
 ```
 
 **GET /jobs/stats** - Queue statistics
 ```bash
-curl http://192.168.x.x:8765/jobs/stats | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/jobs/stats" | jq .
 ```
 
 Response:
@@ -289,7 +292,7 @@ Response:
 
 **GET /gpu** - GPU statistics
 ```bash
-curl http://192.168.x.x:8765/gpu | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/gpu" | jq .
 ```
 
 Response:
@@ -310,7 +313,7 @@ Response:
 
 **GET /system** - System statistics
 ```bash
-curl http://192.168.x.x:8765/system | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/system" | jq .
 ```
 
 Response:
@@ -337,7 +340,7 @@ Response:
 
 **GET /settings/power_profile** - Current power profile
 ```bash
-curl http://192.168.x.x:8765/settings/power_profile | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/settings/power_profile" | jq .
 ```
 
 Response:
@@ -367,13 +370,13 @@ Response:
 **POST /settings/power_profile** - Set power profile
 ```bash
 # Quiet mode (220W) - for overnight jobs
-curl -X POST http://192.168.x.x:8765/settings/power_profile?profile=quiet
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/settings/power_profile?profile=quiet"
 
 # Normal mode (280W) - default
-curl -X POST http://192.168.x.x:8765/settings/power_profile?profile=normal
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/settings/power_profile?profile=normal"
 
 # Max mode (350W) - for heavy workloads
-curl -X POST http://192.168.x.x:8765/settings/power_profile?profile=max
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/settings/power_profile?profile=max"
 ```
 
 ---
@@ -383,18 +386,18 @@ curl -X POST http://192.168.x.x:8765/settings/power_profile?profile=max
 **GET /logs/{component}** - View component logs
 ```bash
 # API server logs
-curl http://192.168.x.x:8765/logs/api_server?lines=50
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/logs/api_server?lines=50"
 
 # GPU worker logs
-curl http://192.168.x.x:8765/logs/gpu_worker?lines=100
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/logs/gpu_worker?lines=100"
 
 # Job execution logs
-curl http://192.168.x.x:8765/logs/jobs?lines=200
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/logs/jobs?lines=200"
 ```
 
 **GET /config** - Current configuration
 ```bash
-curl http://192.168.x.x:8765/config | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/config" | jq .
 ```
 
 ---
@@ -404,21 +407,21 @@ curl http://192.168.x.x:8765/config | jq .
 ### Workflow 1: Evaluate Latest Checkpoint
 
 ```bash
-# 1. Copy checkpoint to 3090
-scp -r models/current_model user@xxx.xxx.88.149:~/llm/models/current_checkpoint
+# 1. Copy checkpoint to inference server
+scp -r models/current_model "${INFERENCE_SSH_USER}@${INFERENCE_HOST}:${INFERENCE_MODELS_DIR}/current_checkpoint"
 
 # 2. Register the checkpoint
-curl -X POST http://192.168.x.x:8765/models/register \
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/models/register" \
   -H "Content-Type: application/json" \
   -d '{"id": "current_checkpoint", "source": "4090"}'
 
 # 3. Set as active
-curl -X POST http://192.168.x.x:8765/models/set_active \
+curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/models/set_active" \
   -H "Content-Type: application/json" \
   -d '{"id": "current_checkpoint"}'
 
 # 4. Queue eval job
-EVAL_JOB=$(curl -X POST http://192.168.x.x:8765/eval/jobs \
+EVAL_JOB=$(curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/eval/jobs" \
   -H "Content-Type: application/json" \
   -d '{
     "model_id": "current_checkpoint",
@@ -430,21 +433,21 @@ EVAL_JOB=$(curl -X POST http://192.168.x.x:8765/eval/jobs \
 
 # 5. Poll for results
 while true; do
-  STATUS=$(curl -s http://192.168.x.x:8765/eval/jobs/$EVAL_JOB | jq -r '.status')
+  STATUS=$(curl -s "http://${INFERENCE_HOST}:${INFERENCE_PORT}/eval/jobs/$EVAL_JOB" | jq -r '.status')
   echo "Status: $STATUS"
   [ "$STATUS" = "done" ] && break
   sleep 10
 done
 
 # 6. Get final results
-curl http://192.168.x.x:8765/eval/jobs/$EVAL_JOB | jq .result
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/eval/jobs/$EVAL_JOB" | jq .result
 ```
 
 ### Workflow 2: Generate Training Data
 
 ```bash
 # 1. Queue data generation job
-JOB_ID=$(curl -X POST http://192.168.x.x:8765/data_gen/jobs \
+JOB_ID=$(curl -X POST "http://${INFERENCE_HOST}:${INFERENCE_PORT}/data_gen/jobs" \
   -H "Content-Type: application/json" \
   -d '{
     "model_id": "Qwen3-0.6B",
@@ -458,18 +461,18 @@ JOB_ID=$(curl -X POST http://192.168.x.x:8765/data_gen/jobs \
 
 # 2. Wait for completion
 while true; do
-  STATUS=$(curl -s http://192.168.x.x:8765/data_gen/jobs/$JOB_ID | jq -r '.status')
+  STATUS=$(curl -s "http://${INFERENCE_HOST}:${INFERENCE_PORT}/data_gen/jobs/$JOB_ID" | jq -r '.status')
   echo "Status: $STATUS"
   [ "$STATUS" = "done" ] && break
   sleep 30
 done
 
 # 3. Get output shards
-SHARDS=$(curl -s http://192.168.x.x:8765/data_gen/jobs/$JOB_ID | jq -r '.shards[]')
+SHARDS=$(curl -s "http://${INFERENCE_HOST}:${INFERENCE_PORT}/data_gen/jobs/$JOB_ID" | jq -r '.shards[]')
 
 # 4. Copy shards to training machine
 for shard in $SHARDS; do
-  scp user@xxx.xxx.88.149:~/llm/train_shards_out/$shard inbox/
+  scp "${INFERENCE_SSH_USER}@${INFERENCE_HOST}:${INFERENCE_MODELS_DIR}/../train_shards_out/$shard" inbox/
 done
 
 # 5. Training starts automatically
@@ -479,13 +482,13 @@ done
 
 ```bash
 # Watch GPU stats in real-time
-watch -n 5 'curl -s http://192.168.x.x:8765/gpu | jq .'
+watch -n 5 "curl -s 'http://${INFERENCE_HOST}:${INFERENCE_PORT}/gpu' | jq ."
 
 # Or create a simple monitor
 while true; do
   clear
   echo "=== GPU Stats ==="
-  curl -s http://192.168.x.x:8765/gpu | jq '{
+  curl -s "http://${INFERENCE_HOST}:${INFERENCE_PORT}/gpu" | jq '{
     temp: .temperature_gpu,
     power: .power_draw_w,
     vram: .memory_used_mb,
@@ -493,7 +496,7 @@ while true; do
   }'
   echo ""
   echo "=== Job Queue ==="
-  curl -s http://192.168.x.x:8765/jobs/stats | jq .
+  curl -s "http://${INFERENCE_HOST}:${INFERENCE_PORT}/jobs/stats" | jq .
   sleep 5
 done
 ```
@@ -511,7 +514,7 @@ done
 ├── db.sqlite                    # Job queue database
 ├── models/
 │   ├── Qwen3-0.6B/             # Base model (active)
-│   ├── qwen3-step-5000/         # Checkpoint from 4090
+│   ├── qwen3-step-5000/         # Checkpoint from trainer
 │   └── qwen3-step-10000/
 ├── runs/
 │   ├── eval/
@@ -522,7 +525,7 @@ done
 │   └── data_gen/
 │       ├── job_001/
 │       │   └── shard_000.jsonl
-├── train_shards_out/            # Ready for 4090
+├── train_shards_out/            # Ready for trainer
 │   ├── shard_2025-11-22_001.jsonl
 │   └── shard_2025-11-22_002.jsonl
 ├── datasets/                    # Eval datasets
@@ -539,33 +542,33 @@ done
 
 **Manual start:**
 ```bash
-ssh user@xxx.xxx.88.149 "cd ~/llm && source venv/bin/activate && nohup python3 main.py > logs/api_server.log 2>&1 &"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "cd ~/llm && source venv/bin/activate && nohup python3 main.py > logs/api_server.log 2>&1 &"
 ```
 
 **Check if running:**
 ```bash
-curl http://192.168.x.x:8765/health
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/health"
 # or
-ssh user@xxx.xxx.88.149 "ps aux | grep 'main.py' | grep -v grep"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "ps aux | grep 'main.py' | grep -v grep"
 ```
 
 **Stop server:**
 ```bash
-ssh user@xxx.xxx.88.149 "pkill -f 'python3 main.py'"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "pkill -f 'python3 main.py'"
 ```
 
 **View logs:**
 ```bash
-ssh user@xxx.xxx.88.149 "tail -f ~/llm/logs/api_server.log"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "tail -f ~/llm/logs/api_server.log"
 ```
 
 ### Systemd Service (Optional)
 
-Service file location: `/tmp/llm-api.service` on 3090
+Service file location: `/tmp/llm-api.service` on inference server
 
 **Install service:**
 ```bash
-ssh user@xxx.xxx.88.149
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}"
 sudo cp /tmp/llm-api.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable llm-api
@@ -593,32 +596,32 @@ sudo systemctl stop llm-api
 
 **Connection:**
 ```bash
-ssh user@xxx.xxx.88.149
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}"
 # Use SSH key or credentials from ~/.ssh/config
 ```
 
 **Direct commands:**
 ```bash
 # Check GPU
-ssh user@xxx.xxx.88.149 'nvidia-smi'
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" 'nvidia-smi'
 
 # View server status
-ssh user@xxx.xxx.88.149 'ps aux | grep main.py'
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" 'ps aux | grep main.py'
 
 # Tail logs
-ssh user@xxx.xxx.88.149 'tail -f ~/llm/logs/api_server.log'
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" 'tail -f ~/llm/logs/api_server.log'
 ```
 
 **File transfers:**
 ```bash
-# Transfer model to 3090
-scp -r models/current_model user@xxx.xxx.88.149:~/llm/models/my_checkpoint
+# Transfer model to inference server
+scp -r models/current_model "${INFERENCE_SSH_USER}@${INFERENCE_HOST}:${INFERENCE_MODELS_DIR}/my_checkpoint"
 
-# Pull generated data from 3090
-scp user@xxx.xxx.88.149:~/llm/train_shards_out/*.jsonl inbox/
+# Pull generated data from inference server
+scp "${INFERENCE_SSH_USER}@${INFERENCE_HOST}:~/llm/train_shards_out/*.jsonl" inbox/
 
 # Rsync (faster for large transfers)
-rsync -avz --progress models/current_model/ user@xxx.xxx.88.149:~/llm/models/my_checkpoint/
+rsync -avz --progress models/current_model/ "${INFERENCE_SSH_USER}@${INFERENCE_HOST}:${INFERENCE_MODELS_DIR}/my_checkpoint/"
 ```
 
 ---
@@ -629,52 +632,52 @@ rsync -avz --progress models/current_model/ user@xxx.xxx.88.149:~/llm/models/my_
 
 ```bash
 # Check if server is running
-ssh user@xxx.xxx.88.149 "ps aux | grep 'main.py' | grep -v grep"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "ps aux | grep 'main.py' | grep -v grep"
 
 # Check logs
-ssh user@xxx.xxx.88.149 "tail -50 ~/llm/logs/api_server.log"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "tail -50 ~/llm/logs/api_server.log"
 
 # Restart server
-ssh user@xxx.xxx.88.149 "pkill -f 'python3 main.py' && cd ~/llm && source venv/bin/activate && nohup python3 main.py > logs/api_server.log 2>&1 &"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "pkill -f 'python3 main.py' && cd ~/llm && source venv/bin/activate && nohup python3 main.py > logs/api_server.log 2>&1 &"
 
 # Test connection
-curl http://192.168.x.x:8765/health
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/health"
 ```
 
 ### Model Loading Fails
 
 ```bash
 # Check model files exist
-ssh user@xxx.xxx.88.149 "ls -lh ~/llm/models/Qwen3-0.6B/"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "ls -lh ~/llm/models/Qwen3-0.6B/"
 
 # Test model loading
-ssh user@xxx.xxx.88.149 "cd ~/llm && source venv/bin/activate && python3 -c 'from transformers import AutoModelForCausalLM; m = AutoModelForCausalLM.from_pretrained(\"models/Qwen3-0.6B\"); print(\"✓ Model loaded\")'"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "cd ~/llm && source venv/bin/activate && python3 -c 'from transformers import AutoModelForCausalLM; m = AutoModelForCausalLM.from_pretrained(\"models/Qwen3-0.6B\"); print(\"✓ Model loaded\")'"
 ```
 
 ### GPU Out of Memory
 
 ```bash
 # Check VRAM usage
-curl http://192.168.x.x:8765/gpu | jq '.memory_used_mb'
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/gpu" | jq '.memory_used_mb'
 
 # Stop all jobs
-ssh user@xxx.xxx.88.149 "sqlite3 ~/llm/db.sqlite 'UPDATE jobs SET status=\"cancelled\" WHERE status=\"pending\"'"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "sqlite3 ~/llm/db.sqlite 'UPDATE jobs SET status=\"cancelled\" WHERE status=\"pending\"'"
 
 # Restart server to clear VRAM
-ssh user@xxx.xxx.88.149 "pkill -f 'python3 main.py'"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "pkill -f 'python3 main.py'"
 ```
 
 ### Disk Space Issues
 
 ```bash
 # Check disk usage
-curl http://192.168.x.x:8765/system | jq '.disk'
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/system" | jq '.disk'
 
 # Clean old job outputs
-ssh user@xxx.xxx.88.149 "find ~/llm/runs/ -type f -mtime +7 -delete"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "find ~/llm/runs/ -type f -mtime +7 -delete"
 
 # Clean old shards
-ssh user@xxx.xxx.88.149 "rm ~/llm/train_shards_out/*.jsonl"
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" "rm ~/llm/train_shards_out/*.jsonl"
 ```
 
 ---
@@ -682,11 +685,16 @@ ssh user@xxx.xxx.88.149 "rm ~/llm/train_shards_out/*.jsonl"
 ## Python Client Example
 
 ```python
+import os
 import requests
 import time
 
 class LLMInferenceClient:
-    def __init__(self, base_url="http://192.168.x.x:8765"):
+    def __init__(self, base_url=None):
+        if base_url is None:
+            host = os.environ.get("INFERENCE_HOST", "localhost")
+            port = os.environ.get("INFERENCE_PORT", "8765")
+            base_url = f"http://{host}:{port}"
         self.base_url = base_url
 
     def health(self):
@@ -751,29 +759,29 @@ print(f"Accuracy: {result['result']['accuracy']}")
 
 ```bash
 # Health check
-curl http://192.168.x.x:8765/health
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/health"
 
 # GPU stats
-curl http://192.168.x.x:8765/gpu | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/gpu" | jq .
 
 # List models
-curl http://192.168.x.x:8765/models | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/models" | jq .
 
 # Job queue stats
-curl http://192.168.x.x:8765/jobs/stats | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/jobs/stats" | jq .
 
 # System stats
-curl http://192.168.x.x:8765/system | jq .
+curl "http://${INFERENCE_HOST}:${INFERENCE_PORT}/system" | jq .
 
 # Check server logs
-ssh user@xxx.xxx.88.149 'tail -50 ~/llm/logs/api_server.log'
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" 'tail -50 ~/llm/logs/api_server.log'
 
 # Restart server
-ssh user@xxx.xxx.88.149 'pkill -f main.py && cd ~/llm && source venv/bin/activate && nohup python3 main.py > logs/api_server.log 2>&1 &'
+ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" 'pkill -f main.py && cd ~/llm && source venv/bin/activate && nohup python3 main.py > logs/api_server.log 2>&1 &'
 
 # Transfer checkpoint
-scp -r models/current_model user@xxx.xxx.88.149:~/llm/models/checkpoint_name
+scp -r models/current_model "${INFERENCE_SSH_USER}@${INFERENCE_HOST}:${INFERENCE_MODELS_DIR}/checkpoint_name"
 
 # Pull generated data
-scp user@xxx.xxx.88.149:~/llm/train_shards_out/*.jsonl inbox/
+scp "${INFERENCE_SSH_USER}@${INFERENCE_HOST}:~/llm/train_shards_out/*.jsonl" inbox/
 ```

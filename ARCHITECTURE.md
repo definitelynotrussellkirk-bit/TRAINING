@@ -1,15 +1,17 @@
 # System Architecture
 
-**Last Updated:** 2025-11-26
+**Last Updated:** 2025-11-28
 
 ## System Split
 
 Two-GPU architecture with distinct responsibilities:
 
-| GPU | IP | Role | Key Processes |
-|-----|-----|------|---------------|
-| **RTX 4090** | 192.168.x.x | Training, evaluation, orchestration | training_daemon, model_comparison_engine, deployment_orchestrator |
-| **RTX 3090** | 192.168.x.x | Inference only | FastAPI server (port 8765) |
+| GPU | Host ID | Role | Key Processes |
+|-----|---------|------|---------------|
+| **RTX 4090** | `4090` (trainer) | Training, evaluation, orchestration | training_daemon, model_comparison_engine, deployment_orchestrator |
+| **RTX 3090** | `3090` (inference) | Inference only | FastAPI server (port 8765) |
+
+**Note:** Concrete IPs, ports, and SSH users are defined in `config/hosts.json` and must not be hardcoded in code.
 
 ## Data Flow
 
@@ -161,7 +163,7 @@ Primary config: `config.json` (source of truth for all training parameters)
 ```json
 {
   "model_name": "qwen3_0.6b",
-  "model_path": "/path/to/training/models/Qwen3-0.6B",
+  "model_path": "models/Qwen3-0.6B",
   "profile": {"name": "emoji_think"},
   "hyperparams": {
     "fp_precision": "bf16",
@@ -188,12 +190,14 @@ See `trainer/config/schema.py` for full TrainerConfig dataclass.
 
 | Port | Host | Service | Description |
 |------|------|---------|-------------|
-| 8080 | 4090 | Live Monitor UI | Training metrics dashboard |
-| 8080 | 4090 | SYLLO Skill API | Local skill API for curriculum data |
-| 8081 | 4090 | Unified Monitoring API | Aggregated metrics via plugins |
-| 8090 | 4090 | Binary Skill API | Local skill API for binary math |
-| 8765 | 3090 | Inference Server | Primary model inference |
-| 8766 | 3090 | GPU Task Scheduler | Task queue coordinator |
+| 8080 | trainer | Live Monitor UI | Training metrics dashboard |
+| 8080 | trainer | SYLLO Skill API | Local skill API for curriculum data |
+| 8081 | trainer | Unified Monitoring API | Aggregated metrics via plugins |
+| 8090 | trainer | Binary Skill API | Local skill API for binary math |
+| 8765 | inference | Inference Server | Primary model inference |
+| 8766 | inference | GPU Task Scheduler | Task queue coordinator |
+| 8767 | trainer | VaultKeeper | Asset registry and ledger API |
+| 8888 | trainer | Tavern UI | Main game interface |
 
 ## Module Contracts
 
@@ -276,3 +280,28 @@ python3 data_manager/manager.py generate --force --count 100
 # Check curriculum progress
 python3 data_manager/curriculum_manager.py status
 ```
+
+## Host Configuration
+
+All host-specific settings (IPs, ports, SSH users, paths) are in `config/hosts.json`:
+
+```json
+{
+  "hosts": {
+    "4090": {
+      "name": "Training Server",
+      "host": "<trainer-ip>",
+      "role": "trainer",
+      "services": { ... }
+    },
+    "3090": {
+      "name": "Inference Server",
+      "host": "<inference-ip>",
+      "role": "inference",
+      "services": { ... }
+    }
+  }
+}
+```
+
+Copy `config/hosts.example.json` to `config/hosts.json` and customize for your setup.

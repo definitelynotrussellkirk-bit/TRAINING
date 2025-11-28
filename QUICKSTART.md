@@ -13,7 +13,10 @@ Get up and running with the training system in 5 minutes.
 
 ```bash
 # Clone or navigate to training directory
-cd /path/to/training
+cd /path/to/TRAINING
+
+# Optional: set base dir for all commands
+export TRAINING_BASE_DIR="$(pwd)"
 
 # Install dependencies (if not already installed)
 pip install torch transformers datasets peft accelerate
@@ -177,7 +180,6 @@ python3 core/training_queue.py status
 ```bash
 # After training milestone, create versioned snapshot
 python3 management/consolidate_model.py \
-  --base-dir /path/to/training \
   --description "Trained on 100k syllogistic examples"
 ```
 
@@ -242,17 +244,16 @@ cat status/training_status.json | jq '{step: .current_step, loss: .loss, val_los
 ```bash
 # After significant training (e.g., 10k steps)
 python3 management/consolidate_model.py \
-  --base-dir /path/to/training \
   --description "10k steps on logic data"
 ```
 
 ### 6. Test Model (on remote machine)
 
-Transfer latest checkpoint to remote RTX 3090 for inference testing:
+Transfer latest checkpoint to remote inference server for testing:
 
 ```bash
-# Copy to remote
-rsync -avz models/current_model/ remote:/path/to/inference/models/
+# Copy to remote (see config/hosts.json for inference host details)
+rsync -avz models/current_model/ "${INFERENCE_HOST}:${INFERENCE_MODELS_DIR}/latest/"
 
 # Run inference on remote machine (not on this training machine)
 ```
@@ -278,7 +279,7 @@ python3 tools/analysis/state_tracker.py --check
 ```bash
 ps aux | grep training_daemon | grep -v grep
 # If not found, restart:
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+nohup python3 core/training_daemon.py > training_output.log 2>&1 &
 ```
 
 **OOM errors:**
@@ -289,7 +290,7 @@ python3 tools/config/edit_config.py batch_size 16
 # Restart daemon
 pkill -f training_daemon
 sleep 3
-nohup python3 core/training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
+nohup python3 core/training_daemon.py > training_output.log 2>&1 &
 ```
 
 **Queue stuck:**

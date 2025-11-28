@@ -8,8 +8,8 @@ Usage:
     from core.hosts import get_service_url, get_host, is_local
 
     # Get URL for a service
-    ledger_url = get_service_url("ledger")  # "http://192.168.x.x:8767/api/ledger"
-    inference_url = get_service_url("inference")  # "http://192.168.x.x:8765"
+    ledger_url = get_service_url("ledger")    # e.g. "http://trainer.local:8767/api/ledger"
+    inference_url = get_service_url("inference")  # e.g. "http://inference.local:8765"
 
     # Check if we're on a specific host
     if is_local("trainer"):

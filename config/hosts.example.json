@@ -1,0 +1,114 @@
+{
+  "_comment": "Host registry - Copy to hosts.json and customize for your setup",
+  "version": "3.0",
+
+  "warden_port": 8760,
+
+  "hosts": {
+    "4090": {
+      "name": "Training Server",
+      "host": "trainer.local",
+      "role": "trainer",
+      "ssh_user": "<your-username>",
+      "base_dir": "/path/to/TRAINING",
+      "services": {
+        "tavern": {
+          "port": 8888,
+          "health": "/health",
+          "name": "Tavern UI",
+          "critical": true
+        },
+        "vault_keeper": {
+          "port": 8767,
+          "health": "/health",
+          "name": "VaultKeeper",
+          "critical": true
+        },
+        "training_daemon": {
+          "type": "process",
+          "pid_file": ".pids/training_daemon.pid",
+          "name": "Training Daemon",
+          "critical": false
+        },
+        "monitor": {
+          "port": 8081,
+          "health": "/health",
+          "name": "Monitor API",
+          "critical": false
+        }
+      },
+      "models_dir": "/path/to/TRAINING/models",
+      "checkpoints_dir": "/path/to/TRAINING/models/current_model",
+      "capabilities": ["training", "vault", "ledger", "tavern"]
+    },
+    "3090": {
+      "name": "Inference Server",
+      "host": "inference.local",
+      "role": "inference",
+      "ssh_user": "<your-username>",
+      "services": {
+        "inference": {
+          "port": 8765,
+          "health": "/health",
+          "name": "Inference API",
+          "critical": true
+        },
+        "scheduler": {
+          "port": 8766,
+          "health": "/health",
+          "name": "GPU Scheduler",
+          "critical": false
+        }
+      },
+      "models_dir": "~/llm/models",
+      "checkpoints_dir": "~/llm/models",
+      "capabilities": ["inference", "eval"]
+    },
+    "nas": {
+      "name": "NAS Storage",
+      "host": "nas.local",
+      "role": "storage",
+      "ssh_user": "admin",
+      "services": {},
+      "models_dir": "/volume1/data/llm_training/models",
+      "checkpoints_dir": "/volume1/data/llm_training/checkpoints",
+      "capabilities": ["storage", "backup"]
+    }
+  },
+
+  "local_host": null,
+  "default_trainer": "4090",
+  "default_inference": "3090",
+
+  "_notes": [
+    "version 3.0: Added warden support with service health definitions",
+    "",
+    "SETUP INSTRUCTIONS:",
+    "1. Copy this file to config/hosts.json",
+    "2. Replace 'trainer.local' with your training machine's IP or hostname",
+    "3. Replace 'inference.local' with your inference machine's IP or hostname",
+    "4. Replace '<your-username>' with your SSH username",
+    "5. Update paths to match your directory structure",
+    "",
+    "local_host: Set to host_id if auto-detection fails (null = auto-detect)",
+    "default_trainer: Primary training host (owns ledger)",
+    "default_inference: Primary inference host",
+    "warden_port: All zones use same port (8760) for their warden",
+    "",
+    "Service definitions:",
+    "  port: HTTP port for the service",
+    "  health: Health check endpoint (default: /health)",
+    "  type: 'http' (default) or 'process' for local daemons",
+    "  pid_file: For process type, path to PID file",
+    "  critical: If true, zone is 'offline' when service is down",
+    "",
+    "Service ports:",
+    "  8760 - ZoneWarden (zone health aggregator)",
+    "  8765 - Inference API (OpenAI-compatible)",
+    "  8766 - GPU Task Scheduler",
+    "  8767 - VaultKeeper (vault, ledger, training APIs)",
+    "  8768 - Branch Officer (zone asset tracking)",
+    "  8081 - Monitoring API",
+    "  8888 - Tavern UI"
+  ]
+}

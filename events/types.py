@@ -59,6 +59,12 @@ class EventType(str, Enum):
     TRANSFER_STARTED = "vault.transfer_started"
     TRANSFER_COMPLETED = "vault.transfer_completed"
 
+    # Analytics Events (Model Archaeology)
+    ANALYSIS_STARTED = "analysis.started"
+    ANALYSIS_COMPLETED = "analysis.completed"
+    ANALYSIS_FAILED = "analysis.failed"
+    ANALYSIS_DRIFT_DETECTED = "analysis.drift_detected"
+
 
 class Severity(str, Enum):
     """Event severity levels."""
@@ -255,4 +261,90 @@ def daemon_heartbeat_event(status: str, queue_depth: int, step: int) -> Event:
         severity=Severity.DEBUG,
         source="daemon",
         data={"status": status, "queue_depth": queue_depth, "step": step},
+    )
+
+
+# =============================================================================
+# ANALYTICS EVENTS (Model Archaeology)
+# =============================================================================
+
+def analysis_started_event(job_type: str, checkpoint_step: int, hero_id: str = "") -> Event:
+    """Analysis job started."""
+    return Event(
+        type=EventType.ANALYSIS_STARTED,
+        message=f"Analyzing checkpoint {checkpoint_step:,} ({job_type})",
+        severity=Severity.INFO,
+        source="archaeologist",
+        data={
+            "job_type": job_type,
+            "checkpoint_step": checkpoint_step,
+            "hero_id": hero_id,
+        },
+    )
+
+
+def analysis_completed_event(
+    job_type: str,
+    checkpoint_step: int,
+    duration_sec: float = 0,
+    num_layers: int = 0,
+    most_changed_layer: Optional[str] = None,
+) -> Event:
+    """Analysis job completed."""
+    msg = f"Analysis complete: checkpoint {checkpoint_step:,}"
+    if most_changed_layer:
+        msg += f" (most drift: {most_changed_layer})"
+
+    return Event(
+        type=EventType.ANALYSIS_COMPLETED,
+        message=msg,
+        severity=Severity.SUCCESS,
+        source="archaeologist",
+        data={
+            "job_type": job_type,
+            "checkpoint_step": checkpoint_step,
+            "duration_sec": duration_sec,
+            "num_layers": num_layers,
+            "most_changed_layer": most_changed_layer,
+        },
+    )
+
+
+def analysis_failed_event(
+    job_type: str,
+    checkpoint_step: int,
+    error: str,
+) -> Event:
+    """Analysis job failed."""
+    return Event(
+        type=EventType.ANALYSIS_FAILED,
+        message=f"Analysis failed: checkpoint {checkpoint_step:,} - {error}",
+        severity=Severity.ERROR,
+        source="archaeologist",
+        data={
+            "job_type": job_type,
+            "checkpoint_step": checkpoint_step,
+            "error": error,
+        },
+    )
+
+
+def drift_detected_event(
+    checkpoint_step: int,
+    layer_name: str,
+    drift_l2: float,
+    threshold: float = 0.1,
+) -> Event:
+    """Significant drift detected in a layer."""
+    return Event(
+        type=EventType.ANALYSIS_DRIFT_DETECTED,
+        message=f"Drift alert: {layer_name} changed by {drift_l2:.4f} (threshold: {threshold})",
+        severity=Severity.WARNING,
+        source="archaeologist",
+        data={
+            "checkpoint_step": checkpoint_step,
+            "layer_name": layer_name,
+            "drift_l2": drift_l2,
+            "threshold": threshold,
+        },
     )

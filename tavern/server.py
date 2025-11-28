@@ -578,6 +578,30 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/heroes":
             self._serve_heroes_data()
 
+        # Analysis - Model Archaeology
+        elif path == "/analysis" or path == "/analysis.html":
+            self._serve_template("analysis.html")
+        elif path.startswith("/api/analysis/") and "/layer_stats/" in path:
+            # /api/analysis/{campaign_id}/layer_stats/{checkpoint}
+            parts = path.replace("/api/analysis/", "").split("/layer_stats/")
+            if len(parts) == 2:
+                campaign_id, checkpoint_name = parts
+                self._serve_analysis_layer_stats_detail(campaign_id, checkpoint_name, query)
+            else:
+                self._send_error(400, "Invalid path")
+        elif path.startswith("/api/analysis/") and path.endswith("/layer_stats"):
+            # /api/analysis/{campaign_id}/layer_stats
+            campaign_id = path.replace("/api/analysis/", "").replace("/layer_stats", "")
+            self._serve_analysis_layer_stats_list(campaign_id, query)
+        elif path.startswith("/api/analysis/") and path.endswith("/drift_timeline"):
+            # /api/analysis/{campaign_id}/drift_timeline
+            campaign_id = path.replace("/api/analysis/", "").replace("/drift_timeline", "")
+            self._serve_analysis_drift_timeline(campaign_id, query)
+        elif path.startswith("/api/analysis/") and path.endswith("/top_movers"):
+            # /api/analysis/{campaign_id}/top_movers
+            campaign_id = path.replace("/api/analysis/", "").replace("/top_movers", "")
+            self._serve_analysis_top_movers(campaign_id, query)
+
         elif path.startswith("/api/"):
             self._proxy_api(path)
 
@@ -2156,6 +2180,210 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": "Campaign system not installed"}, 503)
         except Exception as e:
             logger.error(f"Active campaign error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    # =========================================================================
+    # ANALYSIS API - Model Archaeology
+    # =========================================================================
+
+    def _get_analysis_dir(self, campaign_id: str, hero_id: str = None) -> Path:
+        """Get the analysis directory for a campaign."""
+        if not hero_id:
+            hero_id = "dio-qwen3-0.6b"  # Default hero
+        return BASE_DIR / "campaigns" / hero_id / campaign_id / "analysis"
+
+    def _serve_analysis_layer_stats_list(self, campaign_id: str, query: dict):
+        """List available layer stats for a campaign."""
+        hero_id = query.get("hero_id", ["dio-qwen3-0.6b"])[0]
+        analysis_dir = self._get_analysis_dir(campaign_id, hero_id) / "layer_stats"
+
+        if not analysis_dir.exists():
+            self._send_json({"stats": [], "count": 0, "campaign_id": campaign_id})
+            return
+
+        try:
+            stats = []
+            for f in sorted(analysis_dir.glob("*.layer_stats.json")):
+                # Read summary fields only
+                with open(f) as fp:
+                    data = json.load(fp)
+
+                stats.append({
+                    "checkpoint_step": data.get("checkpoint_step", 0),
+                    "created_at": data.get("created_at"),
+                    "has_drift": bool(data.get("drift_stats")),
+                    "has_activations": bool(data.get("activation_stats")),
+                    "num_layers": len(data.get("weight_stats", {})),
+                    "most_changed_layer": (
+                        data.get("global_drift_stats", {}).get("most_changed_layer")
+                    ),
+                    "avg_weight_norm": (
+                        data.get("global_weight_stats", {}).get("avg_weight_norm")
+                    ),
+                    "compute_duration_sec": data.get("compute_duration_sec", 0),
+                    "filename": f.name,
+                })
+
+            self._send_json({
+                "stats": stats,
+                "count": len(stats),
+                "campaign_id": campaign_id,
+                "hero_id": hero_id,
+            })
+
+        except Exception as e:
+            logger.error(f"Layer stats list error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_analysis_layer_stats_detail(self, campaign_id: str, checkpoint_name: str, query: dict):
+        """Get full layer stats for a specific checkpoint."""
+        hero_id = query.get("hero_id", ["dio-qwen3-0.6b"])[0]
+        analysis_dir = self._get_analysis_dir(campaign_id, hero_id) / "layer_stats"
+
+        # Handle both "183000" and "ckpt-183000.layer_stats.json" formats
+        if checkpoint_name.isdigit():
+            filename = f"ckpt-{int(checkpoint_name):06d}.layer_stats.json"
+        else:
+            filename = checkpoint_name
+
+        filepath = analysis_dir / filename
+
+        if not filepath.exists():
+            self._send_json({"error": f"Not found: {filename}"}, 404)
+            return
+
+        try:
+            with open(filepath) as f:
+                data = json.load(f)
+            self._send_json(data)
+
+        except Exception as e:
+            logger.error(f"Layer stats detail error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_analysis_drift_timeline(self, campaign_id: str, query: dict):
+        """
+        Get drift time series for visualization.
+
+        Returns per-layer drift over checkpoints for heatmap/chart display.
+        """
+        hero_id = query.get("hero_id", ["dio-qwen3-0.6b"])[0]
+        layer_filter = query.get("layers", [None])[0]  # Comma-separated layer names
+        max_layers = int(query.get("max_layers", [30])[0])
+
+        analysis_dir = self._get_analysis_dir(campaign_id, hero_id) / "layer_stats"
+
+        if not analysis_dir.exists():
+            self._send_json({"error": "No analysis data found"}, 404)
+            return
+
+        try:
+            timeline = {
+                "checkpoints": [],
+                "layers": {},
+            }
+
+            # Collect all layer stats with drift data
+            for f in sorted(analysis_dir.glob("*.layer_stats.json")):
+                with open(f) as fp:
+                    data = json.load(fp)
+
+                if not data.get("drift_stats"):
+                    continue
+
+                step = data.get("checkpoint_step", 0)
+                timeline["checkpoints"].append(step)
+
+                for layer_name, drift in data["drift_stats"].items():
+                    # Apply layer filter if specified
+                    if layer_filter:
+                        allowed = layer_filter.split(",")
+                        if not any(a in layer_name for a in allowed):
+                            continue
+
+                    if layer_name not in timeline["layers"]:
+                        timeline["layers"][layer_name] = {
+                            "name": layer_name,
+                            "drift_l2": [],
+                            "drift_cosine": [],
+                        }
+
+                    timeline["layers"][layer_name]["drift_l2"].append(
+                        drift.get("total_l2", 0)
+                    )
+                    timeline["layers"][layer_name]["drift_cosine"].append(
+                        drift.get("avg_cosine", 1.0)
+                    )
+
+            # Limit number of layers (sort by total drift, keep top N)
+            if len(timeline["layers"]) > max_layers:
+                sorted_layers = sorted(
+                    timeline["layers"].items(),
+                    key=lambda x: sum(x[1]["drift_l2"]),
+                    reverse=True
+                )
+                timeline["layers"] = dict(sorted_layers[:max_layers])
+
+            self._send_json(timeline)
+
+        except Exception as e:
+            logger.error(f"Drift timeline error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_analysis_top_movers(self, campaign_id: str, query: dict):
+        """Get layers that changed the most across training."""
+        hero_id = query.get("hero_id", ["dio-qwen3-0.6b"])[0]
+        top_n = int(query.get("n", [10])[0])
+
+        analysis_dir = self._get_analysis_dir(campaign_id, hero_id) / "layer_stats"
+
+        if not analysis_dir.exists():
+            self._send_json({"error": "No analysis data found"}, 404)
+            return
+
+        try:
+            # Accumulate total drift per layer
+            layer_drift = {}
+            checkpoint_count = 0
+
+            for f in sorted(analysis_dir.glob("*.layer_stats.json")):
+                with open(f) as fp:
+                    data = json.load(fp)
+
+                if not data.get("drift_stats"):
+                    continue
+
+                checkpoint_count += 1
+
+                for layer_name, drift in data["drift_stats"].items():
+                    if layer_name not in layer_drift:
+                        layer_drift[layer_name] = 0
+                    layer_drift[layer_name] += drift.get("total_l2", 0)
+
+            # Sort by total drift
+            sorted_layers = sorted(
+                layer_drift.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
+
+            self._send_json({
+                "top_movers": [
+                    {"layer": name, "total_drift": drift}
+                    for name, drift in sorted_layers[:top_n]
+                ],
+                "most_stable": [
+                    {"layer": name, "total_drift": drift}
+                    for name, drift in sorted_layers[-top_n:][::-1]
+                ],
+                "total_layers": len(layer_drift),
+                "checkpoints_analyzed": checkpoint_count,
+                "campaign_id": campaign_id,
+                "hero_id": hero_id,
+            })
+
+        except Exception as e:
+            logger.error(f"Top movers error: {e}")
             self._send_json({"error": str(e)}, 500)
 
     def _create_campaign(self):

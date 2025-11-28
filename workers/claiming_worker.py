@@ -415,6 +415,10 @@ class ClaimingWorker:
                 result = self._execute_data_gen(payload)
             elif job_type == "inference":
                 result = self._execute_inference(payload)
+            elif job_type == "layer_stats":
+                result = self._execute_layer_stats(payload)
+            elif job_type == "layer_drift":
+                result = self._execute_layer_drift(payload)
             else:
                 raise ValueError(f"Unknown job type: {job_type}")
 
@@ -600,6 +604,159 @@ class ClaimingWorker:
 
         data = response.json()
         return data.get("text", data.get("response", ""))
+
+    def _execute_layer_stats(self, payload: Dict) -> Dict:
+        """
+        Execute a layer_stats job - Model Archaeology.
+
+        Computes weight norms, activation stats, and drift for a checkpoint.
+        """
+        from analysis import run_layer_stats_analysis
+        from analysis.probe_datasets import get_default_probes
+
+        campaign_id = payload["campaign_id"]
+        hero_id = payload["hero_id"]
+        checkpoint_path = payload["checkpoint_path"]
+        model_ref = payload.get("model_ref", "qwen3-0.6b")
+        reference_path = payload.get("reference_checkpoint_path")
+        probe_dataset = payload.get("probe_dataset", "default")
+        max_tokens = payload.get("max_probe_tokens", 4096)
+        compute_act = payload.get("compute_activations", True)
+
+        logger.info(f"Running layer_stats: campaign={campaign_id}, hero={hero_id}")
+        logger.info(f"  Checkpoint: {checkpoint_path}")
+        if reference_path:
+            logger.info(f"  Reference: {reference_path}")
+
+        # Load probes
+        if probe_dataset == "default":
+            probes = get_default_probes()
+        else:
+            from analysis.probe_datasets import load_probe_dataset
+            probes = load_probe_dataset(probe_dataset)
+
+        # Run analysis
+        result = run_layer_stats_analysis(
+            checkpoint_path=checkpoint_path,
+            campaign_id=campaign_id,
+            hero_id=hero_id,
+            model_ref=model_ref,
+            reference_checkpoint_path=reference_path,
+            probe_sequences=probes if compute_act else None,
+            max_probe_tokens=max_tokens,
+            compute_activations=compute_act,
+        )
+
+        # Save to campaign analysis dir
+        output_path = payload.get("output_path")
+        if not output_path:
+            output_path = self._get_analysis_path(campaign_id, hero_id, "layer_stats")
+
+        output_path = Path(output_path)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # Filename based on checkpoint step
+        filename = f"ckpt-{result.checkpoint_step:06d}.layer_stats.json"
+        filepath = output_path / filename
+
+        with open(filepath, "w") as f:
+            f.write(result.to_json())
+
+        logger.info(f"Saved layer stats to {filepath}")
+
+        return {
+            "success": True,
+            "output_path": str(filepath),
+            "checkpoint_step": result.checkpoint_step,
+            "num_layers": len(result.weight_stats),
+            "has_activations": bool(result.activation_stats),
+            "has_drift": bool(result.drift_stats),
+            "most_changed_layer": (
+                result.global_drift_stats.get("most_changed_layer")
+                if result.global_drift_stats else None
+            ),
+            "duration_sec": result.compute_duration_sec,
+        }
+
+    def _execute_layer_drift(self, payload: Dict) -> Dict:
+        """
+        Execute a layer_drift job - compare two checkpoints.
+
+        Lighter-weight than layer_stats - only computes weight drift.
+        """
+        from analysis.model_loader import load_reference_state_dict
+        import torch
+
+        campaign_id = payload["campaign_id"]
+        hero_id = payload["hero_id"]
+        base_path = payload["base_checkpoint_path"]
+        target_path = payload["target_checkpoint_path"]
+
+        logger.info(f"Computing layer drift: {base_path} -> {target_path}")
+
+        # Load both state dicts (CPU to save VRAM)
+        base_state = load_reference_state_dict(base_path, device="cpu")
+        target_state = load_reference_state_dict(target_path, device="cpu")
+
+        # Compute drift per layer
+        drift_stats = {}
+        all_l2 = []
+
+        for name in base_state:
+            if name not in target_state:
+                continue
+
+            base_param = base_state[name]
+            target_param = target_state[name]
+
+            l2 = (target_param.float() - base_param.float()).norm(2).item()
+            all_l2.append(l2)
+
+            # Group by layer
+            parts = name.split(".")
+            layer_name = ".".join(parts[:-1]) if len(parts) > 1 else name
+
+            if layer_name not in drift_stats:
+                drift_stats[layer_name] = {"l2_total": 0, "params": {}}
+
+            drift_stats[layer_name]["params"][name] = l2
+            drift_stats[layer_name]["l2_total"] += l2
+
+        # Find extremes
+        sorted_layers = sorted(
+            drift_stats.items(),
+            key=lambda x: x[1]["l2_total"],
+            reverse=True
+        )
+
+        result = {
+            "success": True,
+            "campaign_id": campaign_id,
+            "hero_id": hero_id,
+            "base_checkpoint": base_path,
+            "target_checkpoint": target_path,
+            "layer_count": len(drift_stats),
+            "avg_drift_l2": sum(all_l2) / len(all_l2) if all_l2 else 0,
+            "max_drift_l2": max(all_l2) if all_l2 else 0,
+            "most_changed_layer": sorted_layers[0][0] if sorted_layers else None,
+            "least_changed_layer": sorted_layers[-1][0] if sorted_layers else None,
+        }
+
+        # Save if output path specified
+        output_path = payload.get("output_path")
+        if output_path:
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, "w") as f:
+                json.dump({**result, "layer_drift": drift_stats}, f, indent=2)
+            result["output_path"] = str(output_path)
+
+        return result
+
+    def _get_analysis_path(self, campaign_id: str, hero_id: str, analysis_type: str) -> Path:
+        """Get the analysis directory path for a campaign."""
+        base = os.environ.get("TRAINING_BASE_DIR", "/path/to/training")
+        return Path(base) / "campaigns" / hero_id / campaign_id / "analysis" / analysis_type
 
     def _print_stats(self):
         """Print worker statistics."""

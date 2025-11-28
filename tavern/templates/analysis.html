@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Archaeology - Analysis</title>
+    <link rel="stylesheet" href="/static/css/game.css?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .analysis-main {
+            padding: 1.5rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .analysis-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .analysis-title {
+            font-family: var(--font-display);
+            font-size: 1.75rem;
+            color: var(--color-gold);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .analysis-subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-left: 2.5rem;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .control-select {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .control-select:focus {
+            outline: none;
+            border-color: var(--color-gold);
+        }
+
+        .refresh-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .refresh-btn:hover {
+            border-color: var(--color-gold);
+            color: var(--color-gold);
+        }
+
+        /* Summary Cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .summary-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+        }
+
+        .summary-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--color-gold);
+            font-family: 'Courier New', monospace;
+        }
+
+        .summary-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 0.25rem;
+        }
+
+        /* Main Grid */
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 1.5rem;
+        }
+
+        /* Heatmap Section */
+        .heatmap-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            color: var(--text-primary);
+        }
+
+        .heatmap-container {
+            position: relative;
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+
+        #driftHeatmap {
+            min-height: 400px;
+            background: var(--bg-dark);
+            border-radius: 8px;
+        }
+
+        .heatmap-legend {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .legend-gradient {
+            width: 120px;
+            height: 12px;
+            background: linear-gradient(90deg, #1e3a5f, #3b82f6, #22c55e, #f59e0b, #ef4444);
+            border-radius: 4px;
+        }
+
+        /* Top Movers Section */
+        .movers-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .movers-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+        }
+
+        .mover-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .mover-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem;
+            background: var(--bg-dark);
+            border-radius: 6px;
+        }
+
+        .mover-rank {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-highlight);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .mover-rank.top { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .mover-rank.stable { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+
+        .mover-name {
+            flex: 1;
+            font-size: 0.85rem;
+            font-family: monospace;
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mover-bar-container {
+            width: 80px;
+            height: 8px;
+            background: var(--bg-card);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .mover-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #f59e0b, #ef4444);
+            border-radius: 4px;
+        }
+
+        .mover-bar.stable {
+            background: linear-gradient(90deg, #22c55e, #3b82f6);
+        }
+
+        .mover-value {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            width: 50px;
+            text-align: right;
+        }
+
+        /* Checkpoints Section */
+        .checkpoints-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .checkpoint-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .checkpoint-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .checkpoint-item:hover {
+            background: var(--bg-highlight);
+            border-color: var(--border-gold);
+        }
+
+        .checkpoint-item.selected {
+            border: 1px solid var(--color-gold);
+            background: rgba(251, 191, 36, 0.1);
+        }
+
+        .checkpoint-step {
+            font-weight: 600;
+            color: var(--color-gold);
+            min-width: 70px;
+        }
+
+        .checkpoint-meta {
+            flex: 1;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .checkpoint-badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .checkpoint-badge.drift { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .checkpoint-badge.clean { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+
+        /* Layer Detail Panel */
+        .layer-detail {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            display: none;
+        }
+
+        .layer-detail.active {
+            display: block;
+        }
+
+        .layer-detail-header {
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .layer-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .layer-stat {
+            padding: 0.5rem;
+            background: var(--bg-dark);
+            border-radius: 6px;
+        }
+
+        .layer-stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .layer-stat-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+        }
+
+        .empty-state code {
+            display: block;
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: var(--bg-dark);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        /* Loading */
+        .loading-spinner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--color-gold);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.75rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .analysis-grid {
+                grid-template-columns: 1fr;
+            }
+            .movers-section {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .summary-row {
+                grid-template-columns: 1fr 1fr;
+            }
+            .movers-section {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- TITLE BAR -->
+    <header class="game-header">
+        <div class="header-left">
+            <a href="/" class="game-title">Realm of Training</a>
+        </div>
+        <nav class="header-nav">
+            <a href="/">Tavern</a>
+            <a href="/quests">Quests</a>
+            <a href="/guild">Guild</a>
+            <a href="/oracle">Oracle</a>
+            <a href="/campaign">Campaign</a>
+            <a href="/analysis" class="active">Analysis</a>
+            <a href="/settings">Settings</a>
+        </nav>
+        <div class="header-right">
+            <div class="time-display" id="timeDisplay">--:--:--</div>
+        </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="analysis-main">
+        <div class="analysis-header">
+            <div>
+                <h1 class="analysis-title">Model Archaeology</h1>
+                <p class="analysis-subtitle">Layer drift analysis and weight evolution tracking</p>
+            </div>
+            <div class="controls">
+                <select class="control-select" id="campaignSelect">
+                    <option value="">Loading campaigns...</option>
+                </select>
+                <select class="control-select" id="heroSelect">
+                    <option value="dio-qwen3-0.6b">DIO (Qwen3-0.6B)</option>
+                </select>
+                <button class="refresh-btn" onclick="loadData()">Refresh</button>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-row">
+            <div class="summary-card">
+                <div class="summary-value" id="statCheckpoints">--</div>
+                <div class="summary-label">Checkpoints Analyzed</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="statLayers">--</div>
+                <div class="summary-label">Layers Tracked</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="statMostChanged">--</div>
+                <div class="summary-label">Most Active Layer</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="statAvgDrift">--</div>
+                <div class="summary-label">Avg Drift (L2)</div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="analysis-grid">
+            <!-- Heatmap -->
+            <div class="heatmap-section">
+                <div class="section-header">
+                    <h3 class="section-title">Layer Drift Heatmap</h3>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">
+                        Hover for details &bull; Click to select layer
+                    </span>
+                </div>
+                <div class="heatmap-container">
+                    <canvas id="driftHeatmap"></canvas>
+                </div>
+                <div class="heatmap-legend">
+                    <span>Low drift</span>
+                    <div class="legend-gradient"></div>
+                    <span>High drift</span>
+                </div>
+
+                <!-- Layer Detail Panel -->
+                <div class="layer-detail" id="layerDetail">
+                    <div class="layer-detail-header" id="layerDetailName">--</div>
+                    <div class="layer-stats-grid">
+                        <div class="layer-stat">
+                            <div class="layer-stat-value" id="layerTotalDrift">--</div>
+                            <div class="layer-stat-label">Total Drift (L2)</div>
+                        </div>
+                        <div class="layer-stat">
+                            <div class="layer-stat-value" id="layerAvgCosine">--</div>
+                            <div class="layer-stat-label">Avg Cosine Similarity</div>
+                        </div>
+                        <div class="layer-stat">
+                            <div class="layer-stat-value" id="layerMaxDrift">--</div>
+                            <div class="layer-stat-label">Max Single-Step Drift</div>
+                        </div>
+                        <div class="layer-stat">
+                            <div class="layer-stat-value" id="layerCheckpoints">--</div>
+                            <div class="layer-stat-label">Checkpoints</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="movers-section">
+                <!-- Top Movers -->
+                <div class="movers-card">
+                    <div class="section-header">
+                        <h3 class="section-title">Most Changed Layers</h3>
+                    </div>
+                    <div class="mover-list" id="topMoversList">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Most Stable -->
+                <div class="movers-card">
+                    <div class="section-header">
+                        <h3 class="section-title">Most Stable Layers</h3>
+                    </div>
+                    <div class="mover-list" id="stableMoversList">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analyzed Checkpoints -->
+                <div class="checkpoints-section">
+                    <div class="section-header">
+                        <h3 class="section-title">Analyzed Checkpoints</h3>
+                    </div>
+                    <div class="checkpoint-list" id="checkpointList">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="game-nav" id="bottomNav"></nav>
+    <script src="/static/js/nav.js"></script>
+
+    <script>
+        // State
+        let campaignId = 'campaign-001';  // Default
+        let heroId = 'dio-qwen3-0.6b';
+        let timelineData = null;
+        let moversData = null;
+        let checkpointData = null;
+
+        // Time display
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('timeDisplay').textContent = now.toLocaleTimeString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Load campaigns for dropdown
+        async function loadCampaigns() {
+            try {
+                const resp = await fetch('/api/campaigns');
+                const data = await resp.json();
+                const select = document.getElementById('campaignSelect');
+
+                if (data.active) {
+                    campaignId = data.active.id;
+                }
+
+                // Build campaign list
+                const campaigns = [];
+                for (const [heroId, heroCampaigns] of Object.entries(data.campaigns || {})) {
+                    for (const c of heroCampaigns) {
+                        if (c.status !== 'archived') {
+                            campaigns.push(c);
+                        }
+                    }
+                }
+
+                select.innerHTML = campaigns.map(c => `
+                    <option value="${c.id}" ${c.id === campaignId ? 'selected' : ''}>
+                        ${c.name}
+                    </option>
+                `).join('');
+
+                if (campaigns.length === 0) {
+                    select.innerHTML = '<option value="">No campaigns</option>';
+                }
+
+            } catch (err) {
+                console.error('Failed to load campaigns:', err);
+            }
+        }
+
+        // Load all analysis data
+        async function loadData() {
+            campaignId = document.getElementById('campaignSelect').value || 'campaign-001';
+            heroId = document.getElementById('heroSelect').value || 'dio-qwen3-0.6b';
+
+            await Promise.all([
+                loadTimeline(),
+                loadMovers(),
+                loadCheckpoints()
+            ]);
+        }
+
+        // Load drift timeline for heatmap
+        async function loadTimeline() {
+            try {
+                const resp = await fetch(
+                    `/api/analysis/${campaignId}/drift_timeline?hero_id=${heroId}&max_layers=30`
+                );
+
+                if (!resp.ok) {
+                    if (resp.status === 404) {
+                        showEmptyState();
+                        return;
+                    }
+                    throw new Error(`HTTP ${resp.status}`);
+                }
+
+                timelineData = await resp.json();
+                renderHeatmap();
+                updateSummaryStats();
+
+            } catch (err) {
+                console.error('Failed to load timeline:', err);
+                showEmptyState();
+            }
+        }
+
+        // Load top movers
+        async function loadMovers() {
+            try {
+                const resp = await fetch(
+                    `/api/analysis/${campaignId}/top_movers?hero_id=${heroId}&n=8`
+                );
+
+                if (!resp.ok) return;
+
+                moversData = await resp.json();
+                renderMovers();
+
+            } catch (err) {
+                console.error('Failed to load movers:', err);
+            }
+        }
+
+        // Load checkpoint list
+        async function loadCheckpoints() {
+            try {
+                const resp = await fetch(
+                    `/api/analysis/${campaignId}/layer_stats?hero_id=${heroId}`
+                );
+
+                if (!resp.ok) return;
+
+                checkpointData = await resp.json();
+                renderCheckpoints();
+
+            } catch (err) {
+                console.error('Failed to load checkpoints:', err);
+            }
+        }
+
+        // Render heatmap using canvas
+        function renderHeatmap() {
+            const canvas = document.getElementById('driftHeatmap');
+            const ctx = canvas.getContext('2d');
+
+            if (!timelineData || !timelineData.checkpoints.length) {
+                showEmptyState();
+                return;
+            }
+
+            const layers = Object.keys(timelineData.layers);
+            const checkpoints = timelineData.checkpoints;
+
+            // Canvas sizing
+            const cellWidth = 40;
+            const cellHeight = 16;
+            const labelWidth = 180;
+            const topMargin = 60;
+
+            canvas.width = labelWidth + (checkpoints.length * cellWidth) + 20;
+            canvas.height = topMargin + (layers.length * cellHeight) + 20;
+
+            // Clear
+            ctx.fillStyle = getComputedStyle(document.documentElement)
+                .getPropertyValue('--bg-dark').trim() || '#0a0c10';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Find max drift for normalization
+            let maxDrift = 0;
+            for (const layer of Object.values(timelineData.layers)) {
+                for (const d of layer.drift_l2) {
+                    if (d > maxDrift) maxDrift = d;
+                }
+            }
+
+            // Draw checkpoint labels (rotated)
+            ctx.save();
+            ctx.font = '10px monospace';
+            ctx.fillStyle = '#6b7280';
+            for (let i = 0; i < checkpoints.length; i++) {
+                const x = labelWidth + (i * cellWidth) + cellWidth / 2;
+                ctx.save();
+                ctx.translate(x, topMargin - 5);
+                ctx.rotate(-Math.PI / 4);
+                ctx.textAlign = 'left';
+                ctx.fillText(`${checkpoints[i]}`, 0, 0);
+                ctx.restore();
+            }
+            ctx.restore();
+
+            // Draw layer labels and cells
+            ctx.font = '11px monospace';
+            let rowIndex = 0;
+
+            for (const [layerName, layerData] of Object.entries(timelineData.layers)) {
+                const y = topMargin + (rowIndex * cellHeight);
+
+                // Layer name (truncated)
+                ctx.fillStyle = '#9ca3af';
+                ctx.textAlign = 'right';
+                const displayName = layerName.length > 25
+                    ? '...' + layerName.slice(-22)
+                    : layerName;
+                ctx.fillText(displayName, labelWidth - 10, y + 12);
+
+                // Drift cells
+                for (let i = 0; i < layerData.drift_l2.length; i++) {
+                    const drift = layerData.drift_l2[i];
+                    const norm = maxDrift > 0 ? drift / maxDrift : 0;
+                    const color = getHeatmapColor(norm);
+
+                    const x = labelWidth + (i * cellWidth);
+
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x + 1, y + 1, cellWidth - 2, cellHeight - 2);
+                }
+
+                rowIndex++;
+            }
+
+            // Add tooltip handling
+            canvas.onmousemove = (e) => handleHeatmapHover(e, checkpoints, layers);
+            canvas.onclick = (e) => handleHeatmapClick(e, checkpoints, layers);
+        }
+
+        function getHeatmapColor(value) {
+            // Blue -> Cyan -> Green -> Yellow -> Red
+            const colors = [
+                [30, 58, 95],    // Dark blue
+                [59, 130, 246],  // Blue
+                [34, 197, 94],   // Green
+                [245, 158, 11],  // Yellow
+                [239, 68, 68]    // Red
+            ];
+
+            const idx = Math.min(Math.floor(value * (colors.length - 1)), colors.length - 2);
+            const t = (value * (colors.length - 1)) - idx;
+
+            const r = Math.round(colors[idx][0] + t * (colors[idx + 1][0] - colors[idx][0]));
+            const g = Math.round(colors[idx][1] + t * (colors[idx + 1][1] - colors[idx][1]));
+            const b = Math.round(colors[idx][2] + t * (colors[idx + 1][2] - colors[idx][2]));
+
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function handleHeatmapHover(e, checkpoints, layers) {
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Calculate cell
+            const labelWidth = 180;
+            const topMargin = 60;
+            const cellWidth = 40;
+            const cellHeight = 16;
+
+            const col = Math.floor((x - labelWidth) / cellWidth);
+            const row = Math.floor((y - topMargin) / cellHeight);
+
+            if (col >= 0 && col < checkpoints.length && row >= 0 && row < layers.length) {
+                const layerName = layers[row];
+                const step = checkpoints[col];
+                const layer = timelineData.layers[layerName];
+                const drift = layer?.drift_l2[col] || 0;
+
+                canvas.title = `${layerName}\nStep ${step}\nDrift: ${drift.toFixed(4)}`;
+            } else {
+                canvas.title = '';
+            }
+        }
+
+        function handleHeatmapClick(e, checkpoints, layers) {
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const labelWidth = 180;
+            const topMargin = 60;
+            const cellHeight = 16;
+
+            const row = Math.floor((y - topMargin) / cellHeight);
+
+            if (row >= 0 && row < layers.length) {
+                showLayerDetail(layers[row]);
+            }
+        }
+
+        function showLayerDetail(layerName) {
+            const detail = document.getElementById('layerDetail');
+            detail.classList.add('active');
+
+            document.getElementById('layerDetailName').textContent = layerName;
+
+            const layer = timelineData.layers[layerName];
+            if (!layer) return;
+
+            const driftL2 = layer.drift_l2;
+            const total = driftL2.reduce((a, b) => a + b, 0);
+            const max = Math.max(...driftL2);
+            const avgCosine = layer.drift_cosine.reduce((a, b) => a + b, 0) / layer.drift_cosine.length;
+
+            document.getElementById('layerTotalDrift').textContent = total.toFixed(4);
+            document.getElementById('layerAvgCosine').textContent = avgCosine.toFixed(4);
+            document.getElementById('layerMaxDrift').textContent = max.toFixed(4);
+            document.getElementById('layerCheckpoints').textContent = driftL2.length;
+        }
+
+        function renderMovers() {
+            if (!moversData) return;
+
+            // Top movers
+            const topList = document.getElementById('topMoversList');
+            const maxDrift = moversData.top_movers[0]?.total_drift || 1;
+
+            topList.innerHTML = moversData.top_movers.map((m, i) => `
+                <div class="mover-item">
+                    <div class="mover-rank top">${i + 1}</div>
+                    <div class="mover-name" title="${m.layer}">${formatLayerName(m.layer)}</div>
+                    <div class="mover-bar-container">
+                        <div class="mover-bar" style="width: ${(m.total_drift / maxDrift * 100)}%"></div>
+                    </div>
+                    <div class="mover-value">${m.total_drift.toFixed(2)}</div>
+                </div>
+            `).join('') || '<div style="color: var(--text-muted);">No data</div>';
+
+            // Stable layers
+            const stableList = document.getElementById('stableMoversList');
+            const minDrift = moversData.most_stable[0]?.total_drift || 0.01;
+
+            stableList.innerHTML = moversData.most_stable.map((m, i) => `
+                <div class="mover-item">
+                    <div class="mover-rank stable">${i + 1}</div>
+                    <div class="mover-name" title="${m.layer}">${formatLayerName(m.layer)}</div>
+                    <div class="mover-bar-container">
+                        <div class="mover-bar stable" style="width: ${Math.min(m.total_drift / (maxDrift * 0.1) * 100, 100)}%"></div>
+                    </div>
+                    <div class="mover-value">${m.total_drift.toFixed(4)}</div>
+                </div>
+            `).join('') || '<div style="color: var(--text-muted);">No data</div>';
+        }
+
+        function formatLayerName(name) {
+            // Shorten layer names for display
+            return name
+                .replace('model.layers.', 'L')
+                .replace('.self_attn.', '.attn.')
+                .replace('.mlp.', '.')
+                .replace('_proj', '');
+        }
+
+        function renderCheckpoints() {
+            const list = document.getElementById('checkpointList');
+
+            if (!checkpointData || !checkpointData.stats.length) {
+                list.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No checkpoints analyzed yet</div>';
+                return;
+            }
+
+            // Sort by step descending
+            const sorted = [...checkpointData.stats].sort((a, b) => b.checkpoint_step - a.checkpoint_step);
+
+            list.innerHTML = sorted.map(c => `
+                <div class="checkpoint-item" onclick="loadCheckpointDetail(${c.checkpoint_step})">
+                    <div class="checkpoint-step">${c.checkpoint_step.toLocaleString()}</div>
+                    <div class="checkpoint-meta">
+                        ${c.num_layers} layers
+                        ${c.compute_duration_sec ? `&bull; ${c.compute_duration_sec.toFixed(1)}s` : ''}
+                    </div>
+                    <div class="checkpoint-badge ${c.has_drift ? 'drift' : 'clean'}">
+                        ${c.has_drift ? 'DRIFT' : 'CLEAN'}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function loadCheckpointDetail(step) {
+            try {
+                const resp = await fetch(
+                    `/api/analysis/${campaignId}/layer_stats/${step}?hero_id=${heroId}`
+                );
+
+                if (!resp.ok) return;
+
+                const data = await resp.json();
+                console.log('Checkpoint detail:', data);
+
+                // Could show in a modal or panel
+                alert(`Checkpoint ${step}\n\n` +
+                    `Layers: ${Object.keys(data.weight_stats || {}).length}\n` +
+                    `Has drift: ${!!data.drift_stats}\n` +
+                    `Most changed: ${data.global_drift_stats?.most_changed_layer || 'N/A'}`);
+
+            } catch (err) {
+                console.error('Failed to load checkpoint detail:', err);
+            }
+        }
+
+        function updateSummaryStats() {
+            if (!timelineData) return;
+
+            const layers = Object.keys(timelineData.layers);
+            const checkpoints = timelineData.checkpoints;
+
+            document.getElementById('statCheckpoints').textContent = checkpoints.length;
+            document.getElementById('statLayers').textContent = layers.length;
+
+            // Calculate most changed layer
+            let maxTotalDrift = 0;
+            let mostChangedLayer = '--';
+
+            for (const [name, layer] of Object.entries(timelineData.layers)) {
+                const total = layer.drift_l2.reduce((a, b) => a + b, 0);
+                if (total > maxTotalDrift) {
+                    maxTotalDrift = total;
+                    mostChangedLayer = formatLayerName(name);
+                }
+            }
+
+            document.getElementById('statMostChanged').textContent = mostChangedLayer;
+
+            // Calculate average drift
+            let totalDrift = 0;
+            let driftCount = 0;
+            for (const layer of Object.values(timelineData.layers)) {
+                for (const d of layer.drift_l2) {
+                    totalDrift += d;
+                    driftCount++;
+                }
+            }
+            const avgDrift = driftCount > 0 ? totalDrift / driftCount : 0;
+            document.getElementById('statAvgDrift').textContent = avgDrift.toFixed(4);
+        }
+
+        function showEmptyState() {
+            const container = document.querySelector('.heatmap-container');
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🔬</div>
+                    <h3>No Analysis Data Yet</h3>
+                    <p>Run the layer stats analysis script to generate drift data.</p>
+                    <code>python3 scripts/run_layer_stats.py --checkpoint checkpoint-183000</code>
+                </div>
+            `;
+        }
+
+        // Campaign select change handler
+        document.getElementById('campaignSelect').addEventListener('change', loadData);
+        document.getElementById('heroSelect').addEventListener('change', loadData);
+
+        // Initial load
+        loadCampaigns().then(() => loadData());
+    </script>
+</body>
+</html>

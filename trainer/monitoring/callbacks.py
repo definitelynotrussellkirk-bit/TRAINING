@@ -535,6 +535,21 @@ class LiveMonitorCallback(TrainerCallback):
                 except Exception as e:
                     print(f"⚠️  Eval queue failed: {e}")
 
+                # =========================================================
+                # LAYER STATS JOB - Model Archaeology analysis
+                # Submit every N steps (configurable, default: every 5000 steps)
+                # =========================================================
+                try:
+                    layer_stats_interval = int(os.environ.get("LAYER_STATS_INTERVAL", "5000"))
+                    if state.global_step % layer_stats_interval == 0:
+                        self._submit_layer_stats_job(
+                            checkpoint_dir=checkpoint_dir,
+                            step=state.global_step,
+                            output_dir=args.output_dir,
+                        )
+                except Exception as e:
+                    print(f"⚠️  Layer stats job submission failed: {e}")
+
         except Exception as e:
             print(f"⚠️  Ledger recording failed: {e}")
 
@@ -646,6 +661,108 @@ class LiveMonitorCallback(TrainerCallback):
 
         except Exception as e:
             print(f"⚠️  Remote eval setup failed: {e}")
+
+    def _submit_layer_stats_job(
+        self,
+        checkpoint_dir: Path,
+        step: int,
+        output_dir: str,
+    ):
+        """
+        Submit a layer_stats job for Model Archaeology analysis.
+
+        Submits to the job server (VaultKeeper API) for async execution.
+        Finds the previous checkpoint for drift comparison.
+        """
+        import requests
+
+        # Get campaign info
+        try:
+            from core.hero import get_active_campaign
+            campaign = get_active_campaign()
+            campaign_id = campaign.get("campaign_id", "campaign-001")
+            hero_id = campaign.get("hero_id", "dio-qwen3-0.6b")
+        except Exception:
+            campaign_id = "campaign-001"
+            hero_id = "dio-qwen3-0.6b"
+
+        # Find the checkpoint path (may have been renamed)
+        checkpoint_path = checkpoint_dir
+        if not checkpoint_path.exists():
+            for candidate in Path(output_dir).glob(f"checkpoint-{step}*"):
+                if candidate.is_dir():
+                    checkpoint_path = candidate
+                    break
+
+        if not checkpoint_path.exists():
+            print(f"⚠️  Layer stats: checkpoint not found at {checkpoint_path}")
+            return
+
+        # Find reference checkpoint (previous one for drift comparison)
+        reference_path = None
+        try:
+            checkpoints = sorted(
+                Path(output_dir).glob("checkpoint-*"),
+                key=lambda x: self._extract_step_from_checkpoint(x.name),
+            )
+            # Find checkpoint with step < current step
+            for ckpt in reversed(checkpoints):
+                ckpt_step = self._extract_step_from_checkpoint(ckpt.name)
+                if ckpt_step > 0 and ckpt_step < step:
+                    reference_path = str(ckpt)
+                    break
+        except Exception as e:
+            print(f"⚠️  Could not find reference checkpoint: {e}")
+
+        # Build job payload
+        payload = {
+            "job_type": "layer_stats",
+            "payload": {
+                "campaign_id": campaign_id,
+                "hero_id": hero_id,
+                "checkpoint_path": str(checkpoint_path),
+                "model_ref": "qwen3-0.6b",
+                "compute_activations": True,
+            },
+            "priority": "normal",
+        }
+
+        if reference_path:
+            payload["payload"]["reference_checkpoint_path"] = reference_path
+
+        # Submit to job server
+        job_server = os.environ.get("JOB_SERVER_URL", "http://localhost:8767")
+
+        try:
+            response = requests.post(
+                f"{job_server}/api/jobs",
+                json=payload,
+                timeout=10,
+            )
+
+            result = response.json()
+
+            if result.get("accepted"):
+                print(f"🔬 Queued layer_stats job: {result['job_id']}")
+                if reference_path:
+                    ref_step = self._extract_step_from_checkpoint(Path(reference_path).name)
+                    print(f"   Reference: checkpoint-{ref_step}")
+            else:
+                print(f"⚠️  Layer stats job rejected: {result.get('message', 'unknown')}")
+
+        except requests.RequestException as e:
+            print(f"⚠️  Could not submit layer_stats job: {e}")
+
+    def _extract_step_from_checkpoint(self, name: str) -> int:
+        """Extract step number from checkpoint directory name."""
+        try:
+            # Handle formats like:
+            # - checkpoint-183000
+            # - checkpoint-183000-20251128-1430
+            parts = name.replace("checkpoint-", "").split("-")
+            return int(parts[0])
+        except (ValueError, IndexError):
+            return 0
 
 
 __all__ = ["LiveMonitorCallback"]

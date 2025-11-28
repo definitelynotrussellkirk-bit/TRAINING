@@ -55,6 +55,10 @@ class JobType(str, Enum):
     REPORT = "report"              # Generate reports
     HEALTH_CHECK = "health_check"  # System health check
 
+    # Model Archaeology jobs (interpretability)
+    LAYER_STATS = "layer_stats"    # Per-layer weight/activation stats
+    LAYER_DRIFT = "layer_drift"    # Compare weight drift between checkpoints
+
     @property
     def requires_gpu(self) -> bool:
         """Whether this job type requires GPU."""
@@ -62,6 +66,7 @@ class JobType(str, Enum):
             JobType.EVAL,
             JobType.SPARRING,
             JobType.INFERENCE,
+            JobType.LAYER_STATS,  # Needs GPU for activation computation
         }
 
     @property
@@ -89,6 +94,8 @@ class JobType(str, Enum):
             JobType.ANALYTICS: 300,
             JobType.REPORT: 120,
             JobType.HEALTH_CHECK: 60,
+            JobType.LAYER_STATS: 1800,   # 30 min (model loading is slow)
+            JobType.LAYER_DRIFT: 600,    # 10 min (CPU-only)
         }
         return timeouts.get(self, 300)
 

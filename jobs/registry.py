@@ -298,6 +298,58 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         max_running=5,
         queue_full_policy="allow",
     ),
+
+    # =========================================================================
+    # MODEL ARCHAEOLOGY JOBS (INTERPRETABILITY)
+    # =========================================================================
+
+    "layer_stats": JobTypeConfig(
+        name="layer_stats",
+        description="Compute per-layer weight and activation stats for a checkpoint",
+        required_fields=["campaign_id", "hero_id", "checkpoint_path"],
+        optional_fields=[
+            "model_ref",                  # e.g., 'qwen3-0.6b', 'qwen3-4b'
+            "reference_checkpoint_path",  # For drift calculation
+            "probe_dataset",              # e.g., 'probes/core_v1.jsonl'
+            "max_probe_tokens",           # Limit probe size (default: 4096)
+            "output_path",                # Override default analysis dir
+            "compute_activations",        # default: True
+            "compute_drift",              # default: True if reference provided
+        ],
+        payload_version=1,
+        default_timeout=1800,       # 30 min - model loading is slow
+        max_attempts=1,             # Don't retry - fix the issue
+        retryable_errors=[],
+        allowed_roles=["analytics"],
+        requires_gpu=True,          # Need GPU for activation computation
+        max_pending=10,
+        max_running=1,              # Only one at a time (VRAM constraint)
+        queue_full_policy="warn",
+    ),
+
+    "layer_drift": JobTypeConfig(
+        name="layer_drift",
+        description="Compare layer weight drift between two checkpoints",
+        required_fields=[
+            "campaign_id",
+            "hero_id",
+            "base_checkpoint_path",
+            "target_checkpoint_path",
+        ],
+        optional_fields=[
+            "metrics",              # ['l2', 'cosine', 'frobenius']
+            "output_path",
+        ],
+        payload_version=1,
+        default_timeout=600,        # 10 min - no inference needed
+        max_attempts=1,
+        retryable_errors=[],
+        allowed_roles=["analytics"],
+        requires_gpu=False,         # Can be CPU-only (loads state_dicts)
+        max_pending=20,
+        max_running=2,
+        queue_full_policy="allow",
+    ),
 }
 
 

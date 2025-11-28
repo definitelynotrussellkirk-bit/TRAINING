@@ -105,6 +105,207 @@ class JobStatus(str, Enum):
     TIMEOUT = "timeout"        # Timed out
 
 
+class JobErrorCode(str, Enum):
+    """
+    Structured error categories for debuggable failures.
+
+    Error codes enable analysis like:
+    - "eval jobs failing with inference_error 60% of the time"
+    - "sparring jobs hitting timeout"
+
+    Codes are grouped by category for easier triage.
+    """
+    # Success (no error)
+    NONE = "none"
+
+    # Transport/Network errors - usually retryable
+    TRANSPORT_ERROR = "transport_error"       # HTTP failures, timeouts to services
+    CONNECTION_REFUSED = "connection_refused" # Service unreachable
+
+    # Worker Setup errors - usually NOT retryable
+    WORKER_SETUP = "worker_setup"             # Missing dependencies, config errors
+    MODEL_NOT_FOUND = "model_not_found"       # Checkpoint/model doesn't exist
+    RESOURCE_UNAVAILABLE = "resource_unavailable"  # GPU OOM, disk full
+
+    # Execution errors - varies
+    GENERATOR_ERROR = "generator_error"       # Data generator raised exception
+    INFERENCE_ERROR = "inference_error"       # Inference API returned error
+    VALIDATION_ERROR = "validation_error"     # Output validation failed
+    EXECUTION_ERROR = "execution_error"       # Generic execution failure
+
+    # Job Contract errors - NOT retryable
+    PAYLOAD_INVALID = "payload_invalid"       # Required fields missing/wrong type
+    PAYLOAD_VERSION_MISMATCH = "payload_version"  # Old payload format
+
+    # Timeout errors - sometimes retryable
+    TIMEOUT = "timeout"                       # Exceeded job timeout
+    LEASE_EXPIRED = "lease_expired"           # Worker died/lost lease
+
+    # Cancellation - NOT retryable
+    CANCELLED = "cancelled"                   # User cancelled
+    SUPERSEDED = "superseded"                 # Replaced by newer job
+
+    # Unknown - investigate these!
+    UNKNOWN = "unknown"                       # Catch-all
+
+    @property
+    def is_retryable(self) -> bool:
+        """Whether this error type is generally retryable."""
+        return self in {
+            JobErrorCode.TRANSPORT_ERROR,
+            JobErrorCode.CONNECTION_REFUSED,
+            JobErrorCode.INFERENCE_ERROR,
+            JobErrorCode.TIMEOUT,
+            JobErrorCode.LEASE_EXPIRED,
+        }
+
+    @property
+    def category(self) -> str:
+        """Get the error category for grouping."""
+        categories = {
+            JobErrorCode.NONE: "success",
+            JobErrorCode.TRANSPORT_ERROR: "network",
+            JobErrorCode.CONNECTION_REFUSED: "network",
+            JobErrorCode.WORKER_SETUP: "setup",
+            JobErrorCode.MODEL_NOT_FOUND: "setup",
+            JobErrorCode.RESOURCE_UNAVAILABLE: "setup",
+            JobErrorCode.GENERATOR_ERROR: "execution",
+            JobErrorCode.INFERENCE_ERROR: "execution",
+            JobErrorCode.VALIDATION_ERROR: "execution",
+            JobErrorCode.EXECUTION_ERROR: "execution",
+            JobErrorCode.PAYLOAD_INVALID: "contract",
+            JobErrorCode.PAYLOAD_VERSION_MISMATCH: "contract",
+            JobErrorCode.TIMEOUT: "timeout",
+            JobErrorCode.LEASE_EXPIRED: "timeout",
+            JobErrorCode.CANCELLED: "user",
+            JobErrorCode.SUPERSEDED: "user",
+            JobErrorCode.UNKNOWN: "unknown",
+        }
+        return categories.get(self, "unknown")
+
+
+class JobEventType(str, Enum):
+    """
+    Event types for job audit trail.
+
+    Every state transition is recorded as an event, enabling:
+    - Full job history reconstruction
+    - Debugging failed jobs
+    - Performance analysis
+    """
+    # Lifecycle events
+    CREATED = "created"           # Job submitted
+    CLAIMED = "claimed"           # Worker claimed job
+    STARTED = "started"           # Execution began
+    COMPLETED = "completed"       # Finished successfully
+    FAILED = "failed"             # Failed with error
+
+    # Status changes
+    RETRIED = "retried"           # Moved back to pending for retry
+    CANCELLED = "cancelled"       # User cancelled
+    RELEASED = "released"         # Worker released without completing
+
+    # Timeout events
+    LEASE_EXPIRED = "lease_expired"  # Lease timeout, job returned to queue
+    TIMEOUT = "timeout"              # Job exceeded time limit
+
+    # Heartbeat/progress (optional, for long-running jobs)
+    HEARTBEAT = "heartbeat"       # Worker sent heartbeat
+    PROGRESS = "progress"         # Progress update
+
+
+@dataclass
+class JobEvent:
+    """
+    A single event in a job's history.
+
+    Events are immutable once recorded.
+    """
+    event_id: int
+    job_id: str
+    timestamp: datetime
+    event_type: JobEventType
+    actor: str  # worker_id, "system", "user"
+    message: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "event_id": self.event_id,
+            "job_id": self.job_id,
+            "timestamp": self.timestamp.isoformat(),
+            "event_type": self.event_type.value,
+            "actor": self.actor,
+            "message": self.message,
+            "details": self.details,
+        }
+
+
+@dataclass
+class JobError:
+    """
+    Structured error information for failed jobs.
+
+    Workers report errors as JobError objects, enabling:
+    - Consistent error categorization
+    - Retry decisions based on error type
+    - Error rate analysis by code/category
+    """
+    code: JobErrorCode
+    message: str
+    details: Optional[Dict[str, Any]] = None
+    retryable: Optional[bool] = None  # Override default retryability
+
+    def __post_init__(self):
+        # Default retryable from error code if not specified
+        if self.retryable is None:
+            self.retryable = self.code.is_retryable
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "code": self.code.value,
+            "message": self.message,
+            "details": self.details,
+            "retryable": self.retryable,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "JobError":
+        return cls(
+            code=JobErrorCode(data.get("code", "unknown")),
+            message=data.get("message", "Unknown error"),
+            details=data.get("details"),
+            retryable=data.get("retryable"),
+        )
+
+    @classmethod
+    def from_exception(cls, e: Exception, code: Optional[JobErrorCode] = None) -> "JobError":
+        """Create JobError from an exception."""
+        # Classify common exceptions
+        if code is None:
+            exc_type = type(e).__name__
+            if "ConnectionRefused" in exc_type or "ConnectionError" in str(type(e).__mro__):
+                code = JobErrorCode.CONNECTION_REFUSED
+            elif "Timeout" in exc_type:
+                code = JobErrorCode.TIMEOUT
+            elif "requests" in str(type(e).__module__):
+                code = JobErrorCode.TRANSPORT_ERROR
+            elif "FileNotFoundError" in exc_type:
+                code = JobErrorCode.MODEL_NOT_FOUND
+            elif "MemoryError" in exc_type or "CUDA" in str(e):
+                code = JobErrorCode.RESOURCE_UNAVAILABLE
+            elif "ValidationError" in exc_type:
+                code = JobErrorCode.VALIDATION_ERROR
+            else:
+                code = JobErrorCode.EXECUTION_ERROR
+
+        return cls(
+            code=code,
+            message=str(e),
+            details={"exception_type": type(e).__name__},
+        )
+
+
 class JobPriority(str, Enum):
     """Priority levels for jobs."""
     CRITICAL = "critical"      # Process immediately
@@ -234,6 +435,7 @@ class Job:
     attempts: int = 0
     max_attempts: int = 3
     result: Optional[JobResult] = None
+    error_code: JobErrorCode = JobErrorCode.NONE
 
     @classmethod
     def create(cls, spec: JobSpec) -> "Job":
@@ -282,6 +484,7 @@ class Job:
             "attempts": self.attempts,
             "max_attempts": self.max_attempts,
             "result": result_data,
+            "error_code": self.error_code.value,
         }
 
 

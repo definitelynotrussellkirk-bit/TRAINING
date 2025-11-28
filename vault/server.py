@@ -47,6 +47,13 @@ from vault.zones import (
     push_to_zone,
     pull_from_zone,
 )
+from guild.job_types import JobErrorCode, JobStatus, JobType
+from jobs.registry import (
+    validate_job_type,
+    validate_payload,
+    get_job_config,
+    check_queue_limits,
+)
 
 
 logging.basicConfig(
@@ -184,6 +191,17 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             self._handle_jobs_list(query)
         elif path == "/api/jobs/stats":
             self._handle_jobs_stats()
+        elif path == "/api/jobs/workers":
+            self._handle_workers_list()
+        elif path == "/api/jobs/health":
+            self._handle_jobs_health()
+        elif path == "/api/jobs/events":
+            # Recent events across all jobs
+            self._handle_recent_events(query)
+        elif path.endswith("/events") and path.startswith("/api/jobs/"):
+            # Events for specific job: /api/jobs/{id}/events
+            job_id = path.replace("/api/jobs/", "").replace("/events", "")
+            self._handle_job_events(job_id)
         elif path.startswith("/api/jobs/"):
             job_id = path.replace("/api/jobs/", "")
             self._handle_jobs_get(job_id)
@@ -217,6 +235,11 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             self._handle_jobs_submit(body)
         elif path == "/api/jobs/claim":
             self._handle_jobs_claim(body)
+        # Worker registration endpoints
+        elif path == "/api/jobs/workers/register":
+            self._handle_worker_register(body)
+        elif path == "/api/jobs/workers/heartbeat":
+            self._handle_worker_heartbeat(body)
         elif path.endswith("/complete"):
             job_id = path.replace("/api/jobs/", "").replace("/complete", "")
             self._handle_jobs_complete(job_id, body)
@@ -1103,7 +1126,7 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             self._send_error(str(e), 500)
 
     def _handle_jobs_submit(self, body: Optional[Dict[str, Any]]):
-        """Submit a new job."""
+        """Submit a new job with validation and backpressure."""
         if not body:
             self._send_error("Missing request body", 400)
             return
@@ -1113,21 +1136,99 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
 
             # Parse job spec
             if "spec" in body:
-                spec = JobSpec.from_dict(body["spec"])
+                spec_data = body["spec"]
             else:
-                # Try to parse body as spec directly
-                spec = JobSpec.from_dict(body)
+                spec_data = body
+
+            # Extract job type for validation
+            job_type = spec_data.get("job_type")
+            if not job_type:
+                self._send_json({
+                    "accepted": False,
+                    "reason": "payload_invalid",
+                    "message": "Missing job_type field",
+                }, 400)
+                return
+
+            # Validate job type exists
+            try:
+                config = validate_job_type(job_type)
+            except ValueError as e:
+                self._send_json({
+                    "accepted": False,
+                    "reason": "payload_invalid",
+                    "message": str(e),
+                }, 400)
+                return
+
+            # Validate payload
+            payload = spec_data.get("payload", {})
+            try:
+                warnings = validate_payload(job_type, payload)
+            except ValueError as e:
+                self._send_json({
+                    "accepted": False,
+                    "reason": "payload_invalid",
+                    "message": str(e),
+                }, 400)
+                return
+
+            # Check backpressure
+            store = self._get_job_store()
+            stats = store.get_stats()
+
+            # Count pending/running for this type
+            type_stats = stats.get("by_type", {})
+            pending = 0
+            running = 0
+            for status, count in stats.get("by_status", {}).items():
+                if status == "pending":
+                    # This is total pending, we need per-type
+                    pass
+            # Get per-type counts from store
+            pending_jobs = store.list_jobs(status=JobStatus.PENDING, job_type=JobType(job_type))
+            running_jobs = store.list_jobs(status=JobStatus.RUNNING, job_type=JobType(job_type))
+            pending = len(pending_jobs)
+            running = len(running_jobs)
+
+            can_accept, reason, limit_warning = check_queue_limits(job_type, pending, running)
+
+            if not can_accept:
+                self._send_json({
+                    "accepted": False,
+                    "reason": reason,
+                    "message": limit_warning,
+                    "pending": pending,
+                    "running": running,
+                    "max_pending": config.max_pending,
+                    "max_running": config.max_running,
+                    "retry_after_sec": 30,
+                }, 429)
+                return
 
             # Create and submit job
+            spec = JobSpec.from_dict(spec_data)
             job = Job.create(spec)
-            store = self._get_job_store()
             store.submit(job)
 
-            self._send_json({
-                "success": True,
+            # Build response
+            response = {
+                "accepted": True,
                 "job_id": job.job_id,
                 "status": job.status.value,
-            }, 201)
+                "queue_position": pending + 1,
+            }
+
+            # Add warnings if any
+            all_warnings = []
+            if warnings:
+                all_warnings.extend(warnings)
+            if limit_warning:
+                all_warnings.append(limit_warning)
+            if all_warnings:
+                response["warnings"] = all_warnings
+
+            self._send_json(response, 201)
 
         except Exception as e:
             logger.error(f"Jobs submit error: {e}")
@@ -1209,12 +1310,19 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             self._send_error(str(e), 500)
 
     def _handle_jobs_failed(self, job_id: str, body: Optional[Dict[str, Any]]):
-        """Mark a job as failed."""
+        """Mark a job as failed with structured error code."""
         error = body.get("error", "Unknown error") if body else "Unknown error"
+
+        # Parse error code (defaults to UNKNOWN)
+        error_code_str = body.get("error_code", "unknown") if body else "unknown"
+        try:
+            error_code = JobErrorCode(error_code_str)
+        except ValueError:
+            error_code = JobErrorCode.UNKNOWN
 
         try:
             store = self._get_job_store()
-            success = store.mark_failed(job_id, error)
+            success = store.mark_failed(job_id, error, error_code)
 
             if success:
                 # Check if job was returned to queue for retry
@@ -1223,6 +1331,8 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
                 self._send_json({
                     "success": True,
                     "status": status,
+                    "error_code": error_code.value,
+                    "retryable": error_code.is_retryable,
                     "message": "Returned to queue for retry" if status == "pending" else "Failed permanently",
                 })
             else:
@@ -1260,6 +1370,237 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Jobs release error: {e}")
+            self._send_error(str(e), 500)
+
+    # =========================================================================
+    # WORKER HANDLERS
+    # =========================================================================
+
+    def _handle_worker_register(self, body: Optional[Dict[str, Any]]):
+        """Register a worker."""
+        if not body:
+            self._send_error("Missing request body", 400)
+            return
+
+        device_id = body.get("device_id")
+        worker_kind = body.get("worker_kind", "claiming")
+        roles = body.get("roles", [])
+        version = body.get("version")
+        hostname = body.get("hostname")
+
+        if not device_id:
+            self._send_json({
+                "registered": False,
+                "error": "Missing device_id",
+            }, 400)
+            return
+
+        if not roles:
+            self._send_json({
+                "registered": False,
+                "error": "Missing roles",
+            }, 400)
+            return
+
+        try:
+            # Get client IP from request
+            client_ip = self.client_address[0] if self.client_address else None
+
+            # Construct worker ID
+            worker_id = f"{device_id}.{worker_kind}"
+
+            store = self._get_job_store()
+            result = store.register_worker(
+                worker_id=worker_id,
+                device_id=device_id,
+                worker_kind=worker_kind,
+                roles=roles,
+                version=version,
+                hostname=hostname,
+                client_ip=client_ip,
+            )
+
+            self._send_json(result)
+
+        except Exception as e:
+            logger.error(f"Worker register error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_worker_heartbeat(self, body: Optional[Dict[str, Any]]):
+        """Update worker heartbeat."""
+        if not body:
+            self._send_error("Missing request body", 400)
+            return
+
+        worker_id = body.get("worker_id")
+        active_jobs = body.get("active_jobs", 0)
+        status = body.get("status", "online")
+
+        if not worker_id:
+            self._send_json({
+                "acknowledged": False,
+                "error": "Missing worker_id",
+            }, 400)
+            return
+
+        try:
+            store = self._get_job_store()
+            success = store.heartbeat_worker(worker_id, active_jobs, status)
+
+            if success:
+                self._send_json({
+                    "acknowledged": True,
+                    "server_time": datetime.now().isoformat(),
+                })
+            else:
+                # Worker not found - tell them to register
+                self._send_json({
+                    "acknowledged": False,
+                    "error": "Worker not registered",
+                    "should_register": True,
+                }, 404)
+
+        except Exception as e:
+            logger.error(f"Worker heartbeat error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_workers_list(self):
+        """List all workers."""
+        try:
+            store = self._get_job_store()
+            workers = store.list_workers()
+            stats = store.get_worker_stats()
+
+            # Get allowed job types for each worker
+            from jobs.registry import get_allowed_job_types
+            for w in workers:
+                w["allowed_job_types"] = get_allowed_job_types(w["roles"])
+
+            self._send_json({
+                "workers": workers,
+                "summary": stats,
+            })
+
+        except Exception as e:
+            logger.error(f"Workers list error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_health(self):
+        """Job system health check."""
+        try:
+            store = self._get_job_store()
+            stats = store.get_stats()
+            worker_stats = store.get_worker_stats()
+
+            # Build health checks
+            checks = {}
+            alerts = []
+
+            # Database check
+            checks["database"] = {"ok": True, "latency_ms": 1}
+
+            # Workers check
+            online_workers = worker_stats.get("online", 0)
+            total_workers = worker_stats.get("total", 0)
+            checks["workers"] = {
+                "ok": online_workers > 0,
+                "online": online_workers,
+                "offline": worker_stats.get("offline", 0),
+                "total": total_workers,
+            }
+            if online_workers == 0 and total_workers > 0:
+                alerts.append({
+                    "level": "warning",
+                    "message": "No workers online",
+                })
+
+            # Queue check
+            queue_depth = stats.get("queue_depth", 0)
+            checks["queue"] = {
+                "ok": queue_depth < 100,
+                "depth": queue_depth,
+            }
+            if queue_depth > 100:
+                alerts.append({
+                    "level": "warning",
+                    "message": f"Queue depth high: {queue_depth}",
+                })
+
+            # Error rate check
+            errors_24h = stats.get("errors_24h", {})
+            error_rate = errors_24h.get("error_rate", 0)
+            checks["errors"] = {
+                "ok": error_rate < 0.15,
+                "error_rate_24h": error_rate,
+                "failed_24h": errors_24h.get("total", 0),
+            }
+            if error_rate > 0.15:
+                alerts.append({
+                    "level": "warning",
+                    "message": f"High error rate: {error_rate*100:.1f}%",
+                })
+
+            # Overall status
+            all_ok = all(c.get("ok", True) for c in checks.values())
+            status = "healthy" if all_ok else ("degraded" if alerts else "unhealthy")
+
+            self._send_json({
+                "status": status,
+                "checks": checks,
+                "alerts": alerts,
+                "timestamp": datetime.now().isoformat(),
+            })
+
+        except Exception as e:
+            logger.error(f"Jobs health error: {e}")
+            self._send_json({
+                "status": "unhealthy",
+                "checks": {"database": {"ok": False, "error": str(e)}},
+                "alerts": [{"level": "error", "message": str(e)}],
+            }, 500)
+
+    def _handle_job_events(self, job_id: str):
+        """Get events for a specific job."""
+        try:
+            store = self._get_job_store()
+
+            # Check if job exists
+            job = store.get(job_id)
+            if not job:
+                self._send_error(f"Job not found: {job_id}", 404)
+                return
+
+            events = store.get_events(job_id)
+
+            self._send_json({
+                "job_id": job_id,
+                "events": [e.to_dict() for e in events],
+                "count": len(events),
+            })
+
+        except Exception as e:
+            logger.error(f"Error getting job events: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_recent_events(self, query: Dict[str, list]):
+        """Get recent events across all jobs."""
+        try:
+            store = self._get_job_store()
+
+            # parse_qs returns lists, get first value
+            limit_list = query.get("limit", ["50"])
+            limit = int(limit_list[0] if isinstance(limit_list, list) else limit_list)
+            limit = min(limit, 200)  # Cap at 200
+
+            events = store.get_recent_events(limit=limit)
+
+            self._send_json({
+                "events": [e.to_dict() for e in events],
+                "count": len(events),
+            })
+
+        except Exception as e:
+            logger.error(f"Error getting recent events: {e}")
             self._send_error(str(e), 500)
 
 

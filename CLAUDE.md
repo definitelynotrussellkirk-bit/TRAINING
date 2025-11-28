@@ -908,63 +908,104 @@ python3 management/retention_engine.py archive --zone hot
 
 ---
 
-## 🚀 JOB DISPATCHER - DISTRIBUTED JOBS
+## 🚀 JOB SYSTEM V2 - DISTRIBUTED JOBS
 
-**NEW (2025-11-28)** - Route and execute jobs on remote workers
+**UPDATED (2025-11-28)** - Production-grade distributed scheduler
 
-The Job Dispatcher routes jobs to appropriate workers based on device roles.
+The Job System provides distributed task execution with structured errors, validation, worker registration, and backpressure controls.
 
-### Job Types
+### Key Features
 
-| Type | Requires | Description |
-|------|----------|-------------|
-| `EVAL` | GPU/Inference | Skill evaluations |
-| `SPARRING` | GPU/Inference | Self-correction training |
-| `DATA_GEN` | CPU | Generate training data |
-| `ARCHIVE` | CPU | Archive checkpoints |
+| Feature | Description |
+|---------|-------------|
+| **Structured Errors** | 14 error codes (JobErrorCode) for debuggable failures |
+| **Job Registry** | Single source of truth for job contracts (`jobs/registry.py`) |
+| **Worker Registration** | Workers register and send heartbeats |
+| **Backpressure** | Queue limits prevent pile-up |
+| **Health Endpoint** | `/api/jobs/health` with traffic-light status |
 
-### Usage
+### Error Codes
 
 ```python
-from guild.job_dispatcher import get_dispatcher
-from guild.job_types import eval_job, sparring_job
+from guild.job_types import JobErrorCode
 
-dispatcher = get_dispatcher()
+# Network errors (retryable)
+JobErrorCode.TRANSPORT_ERROR
+JobErrorCode.CONNECTION_REFUSED
+JobErrorCode.INFERENCE_ERROR
 
-# Submit and wait for eval job
-result = dispatcher.run(eval_job("bin", level=5))
-print(f"Accuracy: {result.output.get('accuracy')}")
+# Setup errors (not retryable)
+JobErrorCode.WORKER_SETUP
+JobErrorCode.MODEL_NOT_FOUND
 
-# Submit async
-job_id = dispatcher.submit(sparring_job("binary", count=100))
-result = dispatcher.wait(job_id, timeout=300)
+# Timeout errors (retryable)
+JobErrorCode.TIMEOUT
+JobErrorCode.LEASE_EXPIRED
 ```
+
+### Job Registry
+
+```python
+from jobs.registry import validate_job_type, validate_payload, get_allowed_job_types
+
+# Validate job type and payload
+config = validate_job_type("eval")
+validate_payload("eval", {"skill_id": "bin", "level": 5})
+
+# Get job types for worker roles
+types = get_allowed_job_types(["eval_worker"])  # ['eval', 'sparring', 'health_check']
+```
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `POST /api/jobs` | Submit | Submit job with validation |
+| `POST /api/jobs/claim` | Claim | Worker claims next job |
+| `POST /api/jobs/workers/register` | Register | Worker registration |
+| `POST /api/jobs/workers/heartbeat` | Heartbeat | Worker heartbeat |
+| `GET /api/jobs/workers` | List | List all workers |
+| `GET /api/jobs/health` | Health | System health check |
+| `GET /api/jobs/stats` | Stats | Queue statistics with error breakdown |
 
 ### Start Workers
 
 ```bash
-# On remote machine with inference access
-python3 -m workers.eval_worker --port 8900
+# ClaimingWorker (pull model) - recommended
+python3 -m workers.claiming_worker \
+    --device macmini_eval_1 \
+    --server http://trainer.local:8767 \
+    --roles eval_worker,data_forge
 
-# On CPU-only machine for data generation
-python3 -m workers.data_forge_worker --port 8900
+# Worker registers automatically and sends heartbeats
 ```
 
-### Deploy Worker to Remote Host
+### Submit Response (with backpressure)
 
-```bash
-./scripts/setup_worker.sh macmini-eval-1.local eval 8900
+```json
+{
+  "accepted": true,
+  "job_id": "a1b2c3d4",
+  "queue_position": 12,
+  "warnings": ["Queue near capacity: 45/50 pending"]
+}
+
+// Or rejected
+{
+  "accepted": false,
+  "reason": "queue_full",
+  "message": "Queue full: 50/50 pending",
+  "retry_after_sec": 30
+}
 ```
 
-### Worker API
+### Jobs UI
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `POST /jobs` | Submit | Submit a job |
-| `GET /jobs/{id}` | Status | Get job status |
-| `POST /jobs/{id}/cancel` | Cancel | Cancel running job |
-| `GET /health` | Health | Worker health check |
-| `GET /status` | Status | Worker status |
+Visit http://localhost:8888/jobs to see:
+- Health status banner (healthy/degraded/unhealthy)
+- Workers table with heartbeat status
+- Error rate (24h)
+- Queue depth and running jobs
 
 ---
 

@@ -48,6 +48,10 @@ from guild.job_types import (
     JobStatus,
     JobType,
     JobPriority,
+    JobErrorCode,
+    JobError,
+    JobEventType,
+    JobEvent,
 )
 
 logger = logging.getLogger("job_store")
@@ -110,8 +114,23 @@ class JobStore(ABC):
         pass
 
     @abstractmethod
-    def mark_failed(self, job_id: str, error: str) -> bool:
-        """Mark a job as failed with error."""
+    def mark_failed(
+        self,
+        job_id: str,
+        error: str,
+        error_code: Optional[JobErrorCode] = None,
+    ) -> bool:
+        """
+        Mark a job as failed with error.
+
+        Args:
+            job_id: Job ID
+            error: Error message string
+            error_code: Structured error code (defaults to UNKNOWN)
+
+        Returns:
+            True if updated, False if job not found
+        """
         pass
 
     @abstractmethod
@@ -151,7 +170,8 @@ class JobStore(ABC):
 # SQLITE IMPLEMENTATION
 # =============================================================================
 
-SCHEMA = """
+# Base table schema (no error_code - added via migration for existing DBs)
+SCHEMA_BASE = """
 CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL,
@@ -173,13 +193,64 @@ CREATE TABLE IF NOT EXISTS jobs (
     max_attempts INTEGER DEFAULT 3,
     tags TEXT
 );
+"""
 
+# Indexes created AFTER migrations ensure all columns exist
+SCHEMA_INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type);
 CREATE INDEX IF NOT EXISTS idx_jobs_priority ON jobs(priority);
 CREATE INDEX IF NOT EXISTS idx_jobs_claimed ON jobs(claimed_by);
 CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_lease ON jobs(lease_expires_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_error_code ON jobs(error_code);
+"""
+
+# Migration for existing databases
+MIGRATION_ADD_ERROR_CODE = """
+ALTER TABLE jobs ADD COLUMN error_code TEXT NOT NULL DEFAULT 'none';
+CREATE INDEX IF NOT EXISTS idx_jobs_error_code ON jobs(error_code);
+"""
+
+# Workers table schema
+WORKERS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS workers (
+    id TEXT PRIMARY KEY,
+    device_id TEXT NOT NULL,
+    worker_kind TEXT NOT NULL,
+    roles_json TEXT NOT NULL,
+    version TEXT,
+    hostname TEXT,
+    registered_at TEXT NOT NULL,
+    last_heartbeat_at TEXT NOT NULL,
+    last_seen_ip TEXT,
+    status TEXT NOT NULL DEFAULT 'online',
+    active_jobs INTEGER DEFAULT 0,
+    metadata_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_workers_status ON workers(status);
+CREATE INDEX IF NOT EXISTS idx_workers_heartbeat ON workers(last_heartbeat_at);
+CREATE INDEX IF NOT EXISTS idx_workers_device ON workers(device_id);
+"""
+
+# Job events table schema (audit trail)
+EVENTS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS job_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    message TEXT,
+    details_json TEXT,
+
+    FOREIGN KEY (job_id) REFERENCES jobs(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_events_job ON job_events(job_id);
+CREATE INDEX IF NOT EXISTS idx_job_events_time ON job_events(timestamp);
+CREATE INDEX IF NOT EXISTS idx_job_events_type ON job_events(event_type);
 """
 
 
@@ -246,8 +317,41 @@ class SQLiteJobStore(JobStore):
     def _init_db(self):
         """Initialize database schema."""
         conn = self._get_conn()
-        conn.executescript(SCHEMA)
+
+        # 1. Create base tables (without error_code for backwards compat)
+        conn.executescript(SCHEMA_BASE)
+        conn.executescript(WORKERS_SCHEMA)
+        conn.executescript(EVENTS_SCHEMA)
         conn.commit()
+
+        # 2. Run migrations (adds error_code column if missing)
+        self._migrate(conn)
+
+        # 3. Create indexes AFTER migrations (so error_code column exists)
+        conn.executescript(SCHEMA_INDEXES)
+        conn.commit()
+
+    def _migrate(self, conn: sqlite3.Connection):
+        """Run migrations on existing database."""
+        # Check if error_code column exists
+        cursor = conn.execute("PRAGMA table_info(jobs)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        if "error_code" not in columns:
+            logger.info("Running migration: adding error_code column")
+            try:
+                conn.execute(
+                    "ALTER TABLE jobs ADD COLUMN error_code TEXT NOT NULL DEFAULT 'none'"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_jobs_error_code ON jobs(error_code)"
+                )
+                conn.commit()
+                logger.info("Migration complete: error_code column added")
+            except sqlite3.OperationalError as e:
+                # Column might already exist (race condition)
+                if "duplicate column" not in str(e).lower():
+                    raise
 
     @contextmanager
     def _transaction(self):
@@ -299,6 +403,13 @@ class SQLiteJobStore(JobStore):
             target_device=row["target_device_id"],
         )
 
+        # Parse error_code (may be None for old rows)
+        error_code_str = row["error_code"] if "error_code" in row.keys() else "none"
+        try:
+            error_code = JobErrorCode(error_code_str or "none")
+        except ValueError:
+            error_code = JobErrorCode.UNKNOWN
+
         job = Job(
             job_id=row["id"],
             spec=spec,
@@ -306,6 +417,7 @@ class SQLiteJobStore(JobStore):
             created_at=datetime.fromisoformat(row["created_at"]),
             attempts=row["attempts"],
             max_attempts=row["max_attempts"],
+            error_code=error_code,
         )
 
         if row["queued_at"]:
@@ -353,6 +465,15 @@ class SQLiteJobStore(JobStore):
                 """,
                 row,
             )
+
+        # Record CREATED event
+        self.record_event(
+            job_id=job.job_id,
+            event_type=JobEventType.CREATED,
+            actor="system",
+            message=f"Job submitted: {job.spec.job_type.value}",
+            details={"job_type": job.spec.job_type.value, "priority": job.spec.priority.value},
+        )
 
         logger.info(f"Submitted job {job.job_id}: {job.spec.job_type.value}")
         return job
@@ -451,6 +572,16 @@ class SQLiteJobStore(JobStore):
             row = cursor.fetchone()
             if row:
                 job = self._row_to_job(row)
+
+                # Record CLAIMED event
+                self.record_event(
+                    job_id=job.job_id,
+                    event_type=JobEventType.CLAIMED,
+                    actor=device_id,
+                    message=f"Job claimed by {device_id}",
+                    details={"lease_expires": lease_expires},
+                )
+
                 logger.info(
                     f"Job {job.job_id} claimed by {device_id} "
                     f"(lease expires {lease_expires})"
@@ -475,15 +606,28 @@ class SQLiteJobStore(JobStore):
                 (now, now, job_id, device_id),
             )
             if cursor.rowcount > 0:
+                # Record STARTED event
+                self.record_event(
+                    job_id=job_id,
+                    event_type=JobEventType.STARTED,
+                    actor=device_id,
+                    message="Execution started",
+                )
                 logger.info(f"Job {job_id} now running on {device_id}")
                 return True
         return False
 
-    def mark_complete(self, job_id: str, result: Dict[str, Any]) -> bool:
+    def mark_complete(self, job_id: str, result: Dict[str, Any], worker_id: str = None) -> bool:
         """Mark a job as completed."""
         now = self._now()
 
         with self._transaction() as conn:
+            # Get worker_id from job if not provided
+            if not worker_id:
+                cursor = conn.execute("SELECT claimed_by FROM jobs WHERE id = ?", (job_id,))
+                row = cursor.fetchone()
+                worker_id = row["claimed_by"] if row else "unknown"
+
             cursor = conn.execute(
                 """
                 UPDATE jobs SET
@@ -497,16 +641,40 @@ class SQLiteJobStore(JobStore):
                 (json.dumps(result), now, now, job_id),
             )
             if cursor.rowcount > 0:
+                # Record COMPLETED event
+                self.record_event(
+                    job_id=job_id,
+                    event_type=JobEventType.COMPLETED,
+                    actor=worker_id or "unknown",
+                    message="Completed successfully",
+                    details={"result_keys": list(result.keys()) if result else []},
+                )
                 logger.info(f"Job {job_id} completed")
                 return True
         return False
 
-    def mark_failed(self, job_id: str, error: str) -> bool:
-        """Mark a job as failed."""
+    def mark_failed(
+        self,
+        job_id: str,
+        error: str,
+        error_code: Optional[JobErrorCode] = None,
+    ) -> bool:
+        """
+        Mark a job as failed with structured error.
+
+        Args:
+            job_id: Job ID
+            error: Error message
+            error_code: Structured error code (defaults to UNKNOWN)
+
+        If the error code indicates a retryable error AND attempts < max_attempts,
+        the job returns to pending. Otherwise it's marked terminal failed.
+        """
         now = self._now()
+        code = error_code or JobErrorCode.UNKNOWN
 
         with self._transaction() as conn:
-            # Get current attempts
+            # Get current attempts and max_attempts
             cursor = conn.execute(
                 "SELECT attempts, max_attempts FROM jobs WHERE id = ?",
                 (job_id,),
@@ -518,25 +686,34 @@ class SQLiteJobStore(JobStore):
             attempts = row["attempts"] + 1
             max_attempts = row["max_attempts"]
 
-            # If we can retry, go back to pending
-            if attempts < max_attempts:
+            # Decide whether to retry based on error code and attempt count
+            can_retry = code.is_retryable and attempts < max_attempts
+
+            if can_retry:
                 new_status = "pending"
                 logger.info(
-                    f"Job {job_id} failed (attempt {attempts}/{max_attempts}), "
-                    "returning to queue"
+                    f"Job {job_id} failed with {code.value} "
+                    f"(attempt {attempts}/{max_attempts}), returning to queue"
                 )
             else:
                 new_status = "failed"
+                reason = "not retryable" if not code.is_retryable else "max attempts"
                 logger.info(
-                    f"Job {job_id} failed (attempt {attempts}/{max_attempts}), "
-                    "no more retries"
+                    f"Job {job_id} failed with {code.value} "
+                    f"(attempt {attempts}/{max_attempts}), {reason}"
                 )
+
+            # Get worker_id for event
+            cursor = conn.execute("SELECT claimed_by FROM jobs WHERE id = ?", (job_id,))
+            worker_row = cursor.fetchone()
+            worker_id = worker_row["claimed_by"] if worker_row else "unknown"
 
             conn.execute(
                 """
                 UPDATE jobs SET
                     status = ?,
                     error = ?,
+                    error_code = ?,
                     attempts = ?,
                     completed_at = CASE WHEN ? = 'failed' THEN ? ELSE NULL END,
                     updated_at = ?,
@@ -544,15 +721,39 @@ class SQLiteJobStore(JobStore):
                     claimed_by = CASE WHEN ? = 'pending' THEN NULL ELSE claimed_by END
                 WHERE id = ?
                 """,
-                (new_status, error, attempts, new_status, now, now, new_status, job_id),
+                (new_status, error, code.value, attempts, new_status, now, now, new_status, job_id),
             )
+
+            # Record FAILED or RETRIED event
+            if can_retry:
+                self.record_event(
+                    job_id=job_id,
+                    event_type=JobEventType.RETRIED,
+                    actor=worker_id,
+                    message=f"Failed with {code.value}, returning to queue (attempt {attempts}/{max_attempts})",
+                    details={"error_code": code.value, "error": error, "attempt": attempts},
+                )
+            else:
+                self.record_event(
+                    job_id=job_id,
+                    event_type=JobEventType.FAILED,
+                    actor=worker_id,
+                    message=f"Failed with {code.value}",
+                    details={"error_code": code.value, "error": error, "attempt": attempts},
+                )
             return True
 
-    def release(self, job_id: str) -> bool:
+    def release(self, job_id: str, worker_id: str = None) -> bool:
         """Release a claimed job back to pending."""
         now = self._now()
 
         with self._transaction() as conn:
+            # Get worker_id if not provided
+            if not worker_id:
+                cursor = conn.execute("SELECT claimed_by FROM jobs WHERE id = ?", (job_id,))
+                row = cursor.fetchone()
+                worker_id = row["claimed_by"] if row else "unknown"
+
             cursor = conn.execute(
                 """
                 UPDATE jobs SET
@@ -565,11 +766,18 @@ class SQLiteJobStore(JobStore):
                 (now, job_id),
             )
             if cursor.rowcount > 0:
+                # Record RELEASED event
+                self.record_event(
+                    job_id=job_id,
+                    event_type=JobEventType.RELEASED,
+                    actor=worker_id or "unknown",
+                    message="Job released back to queue",
+                )
                 logger.info(f"Job {job_id} released back to queue")
                 return True
         return False
 
-    def cancel(self, job_id: str) -> bool:
+    def cancel(self, job_id: str, actor: str = "user") -> bool:
         """Cancel a job."""
         now = self._now()
 
@@ -586,6 +794,13 @@ class SQLiteJobStore(JobStore):
                 (now, now, job_id),
             )
             if cursor.rowcount > 0:
+                # Record CANCELLED event
+                self.record_event(
+                    job_id=job_id,
+                    event_type=JobEventType.CANCELLED,
+                    actor=actor,
+                    message="Job cancelled",
+                )
                 logger.info(f"Job {job_id} cancelled")
                 return True
         return False
@@ -599,7 +814,8 @@ class SQLiteJobStore(JobStore):
         Expire jobs with stale leases.
 
         Jobs whose lease has expired are returned to pending status
-        so they can be claimed by another worker.
+        so they can be claimed by another worker. Error code is set to
+        LEASE_EXPIRED for tracking.
 
         Returns:
             Number of jobs expired
@@ -607,19 +823,43 @@ class SQLiteJobStore(JobStore):
         now = self._now()
 
         with self._transaction() as conn:
+            # First get the jobs that will be expired (for event recording)
+            cursor = conn.execute(
+                """
+                SELECT id, claimed_by FROM jobs
+                WHERE status IN ('claimed', 'running')
+                AND lease_expires_at < ?
+                """,
+                (now,),
+            )
+            expired_jobs = [(row["id"], row["claimed_by"]) for row in cursor.fetchall()]
+
+            # Now update them
             cursor = conn.execute(
                 """
                 UPDATE jobs SET
                     status = 'pending',
                     claimed_by = NULL,
                     lease_expires_at = NULL,
+                    error_code = ?,
+                    error = 'Lease expired - worker may have crashed',
                     updated_at = ?
                 WHERE status IN ('claimed', 'running')
                 AND lease_expires_at < ?
                 """,
-                (now, now),
+                (JobErrorCode.LEASE_EXPIRED.value, now, now),
             )
             count = cursor.rowcount
+
+        # Record events for each expired job (outside transaction for performance)
+        for job_id, worker_id in expired_jobs:
+            self.record_event(
+                job_id=job_id,
+                event_type=JobEventType.LEASE_EXPIRED,
+                actor="system",
+                message=f"Lease expired, worker {worker_id or 'unknown'} may have crashed",
+                details={"original_worker": worker_id},
+            )
 
         if count > 0:
             logger.info(f"Expired {count} stale job leases")
@@ -696,7 +936,7 @@ class SQLiteJobStore(JobStore):
         return [self._row_to_job(row) for row in cursor.fetchall()]
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get job statistics."""
+        """Get job statistics including error breakdown."""
         conn = self._get_conn()
 
         # Status counts
@@ -762,6 +1002,48 @@ class SQLiteJobStore(JobStore):
         )
         active_workers = {row["claimed_by"]: row["count"] for row in cursor.fetchall()}
 
+        # Error code breakdown (last 24 hours)
+        cursor = conn.execute(
+            """
+            SELECT error_code, COUNT(*) as count
+            FROM jobs
+            WHERE status = 'failed'
+            AND completed_at > datetime('now', '-24 hours')
+            AND error_code IS NOT NULL
+            AND error_code != 'none'
+            GROUP BY error_code
+            """
+        )
+        errors_by_code = {row["error_code"]: row["count"] for row in cursor.fetchall()}
+
+        # Failed jobs by type (last 24 hours)
+        cursor = conn.execute(
+            """
+            SELECT type, COUNT(*) as count
+            FROM jobs
+            WHERE status = 'failed'
+            AND completed_at > datetime('now', '-24 hours')
+            GROUP BY type
+            """
+        )
+        errors_by_type = {row["type"]: row["count"] for row in cursor.fetchall()}
+
+        # Calculate error rate (last 24h)
+        cursor = conn.execute(
+            """
+            SELECT
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+            FROM jobs
+            WHERE completed_at > datetime('now', '-24 hours')
+            """
+        )
+        row = cursor.fetchone()
+        completed_24h = row["completed"] or 0
+        failed_24h = row["failed"] or 0
+        total_24h = completed_24h + failed_24h
+        error_rate_24h = (failed_24h / total_24h) if total_24h > 0 else 0
+
         return {
             "total_jobs": sum(status_counts.values()),
             "by_status": status_counts,
@@ -771,6 +1053,13 @@ class SQLiteJobStore(JobStore):
             "active_workers": active_workers,
             "submitted_last_hour": recent_hour,
             "completed_last_hour": completed_hour,
+            # New error tracking fields
+            "errors_24h": {
+                "by_code": errors_by_code,
+                "by_type": errors_by_type,
+                "total": failed_24h,
+                "error_rate": round(error_rate_24h, 4),
+            },
         }
 
     def get_queue_depth(self) -> int:
@@ -800,6 +1089,450 @@ class SQLiteJobStore(JobStore):
             )
 
         return [self._row_to_job(row) for row in cursor.fetchall()]
+
+    # =========================================================================
+    # WORKER MANAGEMENT
+    # =========================================================================
+
+    def register_worker(
+        self,
+        worker_id: str,
+        device_id: str,
+        worker_kind: str,
+        roles: List[str],
+        version: str = None,
+        hostname: str = None,
+        client_ip: str = None,
+        metadata: Dict[str, Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Register or update a worker.
+
+        Args:
+            worker_id: Unique worker ID (device_id.worker_kind)
+            device_id: Device ID from devices.json
+            worker_kind: Type of worker (claiming, eval, etc.)
+            roles: List of roles this worker can handle
+            version: Worker code version
+            hostname: Worker hostname
+            client_ip: IP address of worker
+            metadata: Additional metadata
+
+        Returns:
+            Registration result with allowed job types
+        """
+        now = self._now()
+
+        with self._transaction() as conn:
+            # Check if worker exists
+            cursor = conn.execute(
+                "SELECT id FROM workers WHERE id = ?",
+                (worker_id,),
+            )
+            exists = cursor.fetchone() is not None
+
+            if exists:
+                # Update existing worker
+                conn.execute(
+                    """
+                    UPDATE workers SET
+                        roles_json = ?,
+                        version = ?,
+                        hostname = ?,
+                        last_heartbeat_at = ?,
+                        last_seen_ip = ?,
+                        status = 'online',
+                        metadata_json = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        json.dumps(roles),
+                        version,
+                        hostname,
+                        now,
+                        client_ip,
+                        json.dumps(metadata) if metadata else None,
+                        worker_id,
+                    ),
+                )
+                logger.info(f"Worker {worker_id} re-registered")
+            else:
+                # Insert new worker
+                conn.execute(
+                    """
+                    INSERT INTO workers (
+                        id, device_id, worker_kind, roles_json,
+                        version, hostname, registered_at, last_heartbeat_at,
+                        last_seen_ip, status, active_jobs, metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', 0, ?)
+                    """,
+                    (
+                        worker_id,
+                        device_id,
+                        worker_kind,
+                        json.dumps(roles),
+                        version,
+                        hostname,
+                        now,
+                        now,
+                        client_ip,
+                        json.dumps(metadata) if metadata else None,
+                    ),
+                )
+                logger.info(f"Worker {worker_id} registered (device={device_id}, roles={roles})")
+
+        # Get allowed job types for this worker
+        from jobs.registry import get_allowed_job_types
+        allowed_types = get_allowed_job_types(roles)
+
+        return {
+            "worker_id": worker_id,
+            "registered": True,
+            "allowed_job_types": allowed_types,
+        }
+
+    def heartbeat_worker(
+        self,
+        worker_id: str,
+        active_jobs: int = 0,
+        status: str = "online",
+    ) -> bool:
+        """
+        Update worker heartbeat.
+
+        Args:
+            worker_id: Worker ID
+            active_jobs: Number of active jobs
+            status: Worker status (online, draining)
+
+        Returns:
+            True if worker exists and was updated
+        """
+        now = self._now()
+
+        with self._transaction() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE workers SET
+                    last_heartbeat_at = ?,
+                    active_jobs = ?,
+                    status = ?
+                WHERE id = ?
+                """,
+                (now, active_jobs, status, worker_id),
+            )
+            return cursor.rowcount > 0
+
+    def get_worker(self, worker_id: str) -> Optional[Dict[str, Any]]:
+        """Get worker by ID."""
+        conn = self._get_conn()
+        cursor = conn.execute(
+            "SELECT * FROM workers WHERE id = ?",
+            (worker_id,),
+        )
+        row = cursor.fetchone()
+        return self._row_to_worker(row) if row else None
+
+    def list_workers(
+        self,
+        status: Optional[str] = None,
+        max_age_sec: int = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        List workers with optional filters.
+
+        Args:
+            status: Filter by status (online, offline, draining)
+            max_age_sec: Only include workers seen within this many seconds
+
+        Returns:
+            List of worker dictionaries
+        """
+        conn = self._get_conn()
+        conditions = []
+        params = []
+
+        if status:
+            conditions.append("status = ?")
+            params.append(status)
+
+        if max_age_sec:
+            cutoff = (datetime.utcnow() - timedelta(seconds=max_age_sec)).isoformat()
+            conditions.append("last_heartbeat_at > ?")
+            params.append(cutoff)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+        cursor = conn.execute(
+            f"""
+            SELECT * FROM workers
+            WHERE {where_clause}
+            ORDER BY last_heartbeat_at DESC
+            """,
+            params,
+        )
+
+        return [self._row_to_worker(row) for row in cursor.fetchall()]
+
+    def get_online_workers(self, max_age_sec: int = 120) -> List[Dict[str, Any]]:
+        """Get workers that have heartbeated recently."""
+        return self.list_workers(status="online", max_age_sec=max_age_sec)
+
+    def mark_stale_workers_offline(self, max_age_sec: int = 120) -> int:
+        """
+        Mark workers as offline if they haven't heartbeated recently.
+
+        Args:
+            max_age_sec: Mark offline if no heartbeat within this time
+
+        Returns:
+            Number of workers marked offline
+        """
+        cutoff = (datetime.utcnow() - timedelta(seconds=max_age_sec)).isoformat()
+
+        with self._transaction() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE workers SET
+                    status = 'offline'
+                WHERE status = 'online'
+                AND last_heartbeat_at < ?
+                """,
+                (cutoff,),
+            )
+            count = cursor.rowcount
+
+        if count > 0:
+            logger.info(f"Marked {count} workers as offline (no heartbeat for {max_age_sec}s)")
+        return count
+
+    def get_worker_stats(self) -> Dict[str, Any]:
+        """Get worker statistics."""
+        conn = self._get_conn()
+
+        # Count by status
+        cursor = conn.execute(
+            """
+            SELECT status, COUNT(*) as count
+            FROM workers
+            GROUP BY status
+            """
+        )
+        by_status = {row["status"]: row["count"] for row in cursor.fetchall()}
+
+        # Count by role
+        cursor = conn.execute("SELECT roles_json FROM workers WHERE status = 'online'")
+        by_role: Dict[str, int] = {}
+        for row in cursor.fetchall():
+            roles = json.loads(row["roles_json"])
+            for role in roles:
+                by_role[role] = by_role.get(role, 0) + 1
+
+        # Total active jobs
+        cursor = conn.execute(
+            "SELECT SUM(active_jobs) as total FROM workers WHERE status = 'online'"
+        )
+        total_active = cursor.fetchone()["total"] or 0
+
+        return {
+            "total": sum(by_status.values()),
+            "by_status": by_status,
+            "by_role": by_role,
+            "total_active_jobs": total_active,
+            "online": by_status.get("online", 0),
+            "offline": by_status.get("offline", 0),
+        }
+
+    def _row_to_worker(self, row: sqlite3.Row) -> Dict[str, Any]:
+        """Convert database row to worker dict."""
+        heartbeat_at = datetime.fromisoformat(row["last_heartbeat_at"])
+        age_sec = (datetime.utcnow() - heartbeat_at).total_seconds()
+
+        return {
+            "worker_id": row["id"],
+            "device_id": row["device_id"],
+            "worker_kind": row["worker_kind"],
+            "roles": json.loads(row["roles_json"]),
+            "version": row["version"],
+            "hostname": row["hostname"],
+            "registered_at": row["registered_at"],
+            "last_heartbeat_at": row["last_heartbeat_at"],
+            "heartbeat_age_sec": int(age_sec),
+            "last_seen_ip": row["last_seen_ip"],
+            "status": row["status"],
+            "active_jobs": row["active_jobs"],
+            "metadata": json.loads(row["metadata_json"]) if row["metadata_json"] else None,
+        }
+
+    # =========================================================================
+    # JOB EVENTS (AUDIT TRAIL)
+    # =========================================================================
+
+    def record_event(
+        self,
+        job_id: str,
+        event_type: JobEventType,
+        actor: str = "system",
+        message: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """
+        Record an event in the job's audit trail.
+
+        Args:
+            job_id: ID of the job
+            event_type: Type of event
+            actor: Who/what caused the event (worker_id, "system", "user")
+            message: Human-readable description
+            details: Additional structured data
+
+        Returns:
+            Event ID
+        """
+        conn = self._get_conn()
+        cursor = conn.execute(
+            """
+            INSERT INTO job_events (job_id, timestamp, event_type, actor, message, details_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                job_id,
+                self._now(),
+                event_type.value,
+                actor,
+                message,
+                json.dumps(details) if details else None,
+            ),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+    def get_events(
+        self,
+        job_id: str,
+        limit: int = 100,
+        event_types: Optional[List[JobEventType]] = None,
+    ) -> List[JobEvent]:
+        """
+        Get events for a job.
+
+        Args:
+            job_id: ID of the job
+            limit: Maximum number of events to return
+            event_types: Filter to specific event types (optional)
+
+        Returns:
+            List of JobEvent objects, newest first
+        """
+        conn = self._get_conn()
+
+        if event_types:
+            type_values = [et.value for et in event_types]
+            placeholders = ",".join("?" * len(type_values))
+            cursor = conn.execute(
+                f"""
+                SELECT id, job_id, timestamp, event_type, actor, message, details_json
+                FROM job_events
+                WHERE job_id = ? AND event_type IN ({placeholders})
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ?
+                """,
+                [job_id] + type_values + [limit],
+            )
+        else:
+            cursor = conn.execute(
+                """
+                SELECT id, job_id, timestamp, event_type, actor, message, details_json
+                FROM job_events
+                WHERE job_id = ?
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ?
+                """,
+                (job_id, limit),
+            )
+
+        events = []
+        for row in cursor.fetchall():
+            try:
+                event_type = JobEventType(row["event_type"])
+            except ValueError:
+                # Unknown event type - skip or use a placeholder
+                continue
+
+            events.append(JobEvent(
+                event_id=row["id"],
+                job_id=row["job_id"],
+                timestamp=datetime.fromisoformat(row["timestamp"]),
+                event_type=event_type,
+                actor=row["actor"],
+                message=row["message"],
+                details=json.loads(row["details_json"]) if row["details_json"] else None,
+            ))
+
+        # Return in chronological order (oldest first)
+        return list(reversed(events))
+
+    def get_recent_events(
+        self,
+        limit: int = 50,
+        event_types: Optional[List[JobEventType]] = None,
+    ) -> List[JobEvent]:
+        """
+        Get recent events across all jobs.
+
+        Useful for monitoring/dashboard.
+
+        Args:
+            limit: Maximum number of events to return
+            event_types: Filter to specific event types (optional)
+
+        Returns:
+            List of JobEvent objects, newest first
+        """
+        conn = self._get_conn()
+
+        if event_types:
+            type_values = [et.value for et in event_types]
+            placeholders = ",".join("?" * len(type_values))
+            cursor = conn.execute(
+                f"""
+                SELECT id, job_id, timestamp, event_type, actor, message, details_json
+                FROM job_events
+                WHERE event_type IN ({placeholders})
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ?
+                """,
+                type_values + [limit],
+            )
+        else:
+            cursor = conn.execute(
+                """
+                SELECT id, job_id, timestamp, event_type, actor, message, details_json
+                FROM job_events
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+
+        events = []
+        for row in cursor.fetchall():
+            try:
+                event_type = JobEventType(row["event_type"])
+            except ValueError:
+                continue
+
+            events.append(JobEvent(
+                event_id=row["id"],
+                job_id=row["job_id"],
+                timestamp=datetime.fromisoformat(row["timestamp"]),
+                event_type=event_type,
+                actor=row["actor"],
+                message=row["message"],
+                details=json.loads(row["details_json"]) if row["details_json"] else None,
+            ))
+
+        return events  # Already newest first
 
 
 # =============================================================================

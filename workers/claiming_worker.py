@@ -29,20 +29,26 @@ import json
 import logging
 import os
 import signal
+import socket
 import sys
 import time
 import threading
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from guild.job_types import JobError, JobErrorCode
+
 logger = logging.getLogger("claiming_worker")
+
+# Version for registration
+VERSION = "2025.11.28"
 
 
 @dataclass
@@ -63,6 +69,48 @@ class JobStoreClient:
     def __init__(self, server_url: str):
         self.server_url = server_url.rstrip("/")
         self.session = requests.Session()
+
+    def register(
+        self,
+        device_id: str,
+        worker_kind: str,
+        roles: List[str],
+        version: str,
+        hostname: str,
+    ) -> Dict[str, Any]:
+        """Register worker with server."""
+        try:
+            response = self.session.post(
+                f"{self.server_url}/api/jobs/workers/register",
+                json={
+                    "device_id": device_id,
+                    "worker_kind": worker_kind,
+                    "roles": roles,
+                    "version": version,
+                    "hostname": hostname,
+                },
+                timeout=10,
+            )
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"Registration failed: {e}")
+            return {"registered": False, "error": str(e)}
+
+    def heartbeat(self, worker_id: str, active_jobs: int = 0) -> bool:
+        """Send heartbeat to server."""
+        try:
+            response = self.session.post(
+                f"{self.server_url}/api/jobs/workers/heartbeat",
+                json={
+                    "worker_id": worker_id,
+                    "active_jobs": active_jobs,
+                    "status": "online",
+                },
+                timeout=5,
+            )
+            return response.status_code == 200
+        except requests.RequestException:
+            return False
 
     def claim_next(
         self,
@@ -118,12 +166,21 @@ class JobStoreClient:
             logger.warning(f"Mark complete failed: {e}")
             return False
 
-    def mark_failed(self, job_id: str, error: str) -> bool:
-        """Mark job as failed."""
+    def mark_failed(
+        self,
+        job_id: str,
+        error: str,
+        error_code: Optional[JobErrorCode] = None,
+    ) -> bool:
+        """Mark job as failed with structured error code."""
         try:
+            payload = {
+                "error": error,
+                "error_code": (error_code or JobErrorCode.UNKNOWN).value,
+            }
             response = self.session.post(
                 f"{self.server_url}/api/jobs/{job_id}/failed",
-                json={"error": error},
+                json=payload,
                 timeout=5,
             )
             return response.status_code == 200
@@ -160,10 +217,11 @@ class ClaimingWorker:
     Worker that claims jobs from central store.
 
     Runs an infinite loop:
-    1. Claim next job from server
-    2. Execute job
-    3. Report result
-    4. Sleep and repeat
+    1. Register with server
+    2. Claim next job from server
+    3. Execute job
+    4. Report result
+    5. Sleep and repeat
 
     Handles graceful shutdown via SIGTERM/SIGINT.
     """
@@ -172,10 +230,15 @@ class ClaimingWorker:
         self.config = config
         self.client = JobStoreClient(config.server_url)
 
+        # Worker identity
+        self.worker_id = f"{config.device_id}.claiming"
+        self.allowed_job_types: List[str] = []
+
         self._running = False
         self._current_job: Optional[Dict] = None
         self._start_time = 0
         self._consecutive_errors = 0
+        self._last_heartbeat = 0
 
         # Statistics
         self._stats = {
@@ -204,8 +267,10 @@ class ClaimingWorker:
         """Run the worker loop."""
         self._running = True
         self._start_time = time.time()
+        self._last_heartbeat = time.time()
 
         logger.info(f"ClaimingWorker starting")
+        logger.info(f"  Worker ID: {self.worker_id}")
         logger.info(f"  Device: {self.config.device_id}")
         logger.info(f"  Roles: {self.config.roles}")
         logger.info(f"  Server: {self.config.server_url}")
@@ -219,8 +284,17 @@ class ClaimingWorker:
 
         logger.info("Connected to job server")
 
+        # Register with server
+        if not self._register():
+            logger.error("Failed to register with server")
+            return
+
         while self._running:
             try:
+                # Send heartbeat every 30 seconds
+                if time.time() - self._last_heartbeat > 30:
+                    self._send_heartbeat()
+
                 # Try to claim a job
                 job = self.client.claim_next(
                     self.config.device_id,
@@ -247,6 +321,33 @@ class ClaimingWorker:
 
         logger.info("Worker stopped")
         self._print_stats()
+
+    def _register(self) -> bool:
+        """Register worker with server."""
+        result = self.client.register(
+            device_id=self.config.device_id,
+            worker_kind="claiming",
+            roles=self.config.roles,
+            version=VERSION,
+            hostname=socket.gethostname(),
+        )
+
+        if result.get("registered"):
+            self.allowed_job_types = result.get("allowed_job_types", [])
+            logger.info(f"Registered as {self.worker_id}")
+            logger.info(f"  Allowed job types: {self.allowed_job_types}")
+            return True
+        else:
+            logger.error(f"Registration failed: {result.get('error')}")
+            return False
+
+    def _send_heartbeat(self):
+        """Send heartbeat to server."""
+        active_jobs = 1 if self._current_job else 0
+        if self.client.heartbeat(self.worker_id, active_jobs):
+            self._last_heartbeat = time.time()
+        else:
+            logger.warning("Heartbeat failed - may need to re-register")
 
     def _execute_job(self, job: Dict):
         """Execute a claimed job."""
@@ -287,14 +388,52 @@ class ClaimingWorker:
             logger.info(f"Job {job_id} completed in {duration:.1f}s")
 
         except Exception as e:
-            # Report failure
+            # Classify the error
+            error_code = self._classify_error(e, job_type)
             error_msg = str(e)
-            logger.error(f"Job {job_id} failed: {error_msg}")
-            self.client.mark_failed(job_id, error_msg)
+
+            logger.error(f"Job {job_id} failed [{error_code.value}]: {error_msg}")
+            self.client.mark_failed(job_id, error_msg, error_code)
             self._stats["jobs_failed"] += 1
 
         finally:
             self._current_job = None
+
+    def _classify_error(self, e: Exception, job_type: str) -> JobErrorCode:
+        """Classify an exception into a structured error code."""
+        exc_type = type(e).__name__
+        exc_str = str(e).lower()
+
+        # Connection errors
+        if isinstance(e, requests.exceptions.ConnectionError):
+            return JobErrorCode.CONNECTION_REFUSED
+        if isinstance(e, requests.exceptions.Timeout):
+            return JobErrorCode.TIMEOUT
+        if isinstance(e, requests.exceptions.RequestException):
+            return JobErrorCode.TRANSPORT_ERROR
+
+        # Resource errors
+        if "cuda" in exc_str or "out of memory" in exc_str:
+            return JobErrorCode.RESOURCE_UNAVAILABLE
+        if isinstance(e, FileNotFoundError) or "not found" in exc_str:
+            if "model" in exc_str or "checkpoint" in exc_str:
+                return JobErrorCode.MODEL_NOT_FOUND
+            return JobErrorCode.WORKER_SETUP
+
+        # Inference errors (from our _generate method)
+        if "inference failed" in exc_str:
+            return JobErrorCode.INFERENCE_ERROR
+
+        # Validation errors
+        if "validation" in exc_str:
+            return JobErrorCode.VALIDATION_ERROR
+
+        # Generator errors (for data_gen jobs)
+        if job_type == "data_gen":
+            return JobErrorCode.GENERATOR_ERROR
+
+        # Generic execution error
+        return JobErrorCode.EXECUTION_ERROR
 
     def _execute_eval(self, payload: Dict) -> Dict:
         """Execute an eval job."""

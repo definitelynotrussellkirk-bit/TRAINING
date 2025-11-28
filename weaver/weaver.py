@@ -253,6 +253,57 @@ class Weaver:
 
         return status
 
+    def restart_thread(self, thread_name: str) -> bool:
+        """
+        Force restart a specific thread.
+
+        This is the canonical way to restart a service after code changes.
+        The thread will be killed (if running) and then restarted.
+
+        Args:
+            thread_name: Name of thread to restart (training, tavern, vault, data_flow)
+
+        Returns:
+            True if restart succeeded, False otherwise
+        """
+        if thread_name not in self.threads:
+            logger.error(f"Unknown thread: {thread_name}")
+            logger.info(f"Available threads: {list(self.threads.keys())}")
+            return False
+
+        thread = self.threads[thread_name]
+        logger.info(f"Restarting thread: {thread.name}")
+
+        # Kill if running
+        if thread.pid_file:
+            pid_path = Path(thread.pid_file)
+            if pid_path.exists():
+                try:
+                    pid = int(pid_path.read_text().strip())
+                    if self._pid_alive(pid):
+                        logger.info(f"  Killing PID {pid}...")
+                        os.kill(pid, signal.SIGTERM)
+                        # Wait for graceful shutdown
+                        for _ in range(10):
+                            time.sleep(0.5)
+                            if not self._pid_alive(pid):
+                                break
+                        else:
+                            # Force kill if still running
+                            logger.warning(f"  Force killing PID {pid}...")
+                            os.kill(pid, signal.SIGKILL)
+                            time.sleep(0.5)
+                except (ValueError, ProcessLookupError):
+                    pass
+                pid_path.unlink(missing_ok=True)
+
+        # Wait a moment for cleanup
+        time.sleep(1)
+
+        # Start the thread
+        logger.info(f"  Starting {thread.name}...")
+        return self._start_thread(thread)
+
     def mend(self, dry_run: bool = False) -> Dict[str, str]:
         """Mend broken threads (restart dead daemons)"""
         results = {}
@@ -364,6 +415,174 @@ def is_weaver_running(base_dir: Path) -> tuple[bool, Optional[int]]:
         return False, None
 
 
+def force_shutdown(base_dir: Path) -> bool:
+    """
+    Force shutdown all services cleanly.
+
+    Order matters:
+    1. Signal training to finish current batch (graceful)
+    2. Stop weaver daemon (so it doesn't restart things)
+    3. Stop tavern (UI)
+    4. Stop vault (API)
+    5. Stop training daemon
+    6. Write shutdown marker
+
+    Returns:
+        True if all services stopped cleanly
+    """
+    print("\n" + "=" * 60)
+    print("FORCE SHUTDOWN - Stopping all services")
+    print("=" * 60 + "\n")
+
+    pids_dir = base_dir / ".pids"
+
+    # 1. Stop weaver daemon first (so it doesn't restart things)
+    weaver_pid = pids_dir / "weaver.pid"
+    if weaver_pid.exists():
+        try:
+            pid = int(weaver_pid.read_text().strip())
+            print(f"[1/5] Stopping Weaver daemon (PID {pid})...")
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(1)
+        except (ValueError, ProcessLookupError):
+            pass
+        weaver_pid.unlink(missing_ok=True)
+    else:
+        print("[1/5] Weaver daemon not running")
+
+    # 2. Signal training to pause (graceful)
+    control_dir = base_dir / "control"
+    pause_file = control_dir / ".pause"
+    print("[2/5] Signaling training to pause...")
+    pause_file.touch()
+    time.sleep(2)  # Give it time to finish current batch
+
+    # 3. Stop tavern
+    tavern_pid = pids_dir / "tavern.pid"
+    if tavern_pid.exists():
+        try:
+            pid = int(tavern_pid.read_text().strip())
+            print(f"[3/5] Stopping Tavern (PID {pid})...")
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(1)
+        except (ValueError, ProcessLookupError):
+            pass
+        tavern_pid.unlink(missing_ok=True)
+    else:
+        print("[3/5] Tavern not running (checking port)...")
+        subprocess.run(["fuser", "-k", "8888/tcp"], capture_output=True)
+
+    # 4. Stop vault
+    vault_pid = pids_dir / "vault.pid"
+    if vault_pid.exists():
+        try:
+            pid = int(vault_pid.read_text().strip())
+            print(f"[4/5] Stopping VaultKeeper (PID {pid})...")
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(1)
+        except (ValueError, ProcessLookupError):
+            pass
+        vault_pid.unlink(missing_ok=True)
+    else:
+        print("[4/5] VaultKeeper not running (checking port)...")
+        subprocess.run(["fuser", "-k", "8767/tcp"], capture_output=True)
+
+    # 5. Stop training daemon
+    daemon_pid = base_dir / ".daemon.pid"
+    if daemon_pid.exists():
+        try:
+            pid = int(daemon_pid.read_text().strip())
+            print(f"[5/5] Stopping Training Daemon (PID {pid})...")
+            os.kill(pid, signal.SIGTERM)
+            # Wait for graceful shutdown
+            for i in range(10):
+                time.sleep(1)
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    break
+            else:
+                print("      Force killing training daemon...")
+                os.kill(pid, signal.SIGKILL)
+        except (ValueError, ProcessLookupError):
+            pass
+        daemon_pid.unlink(missing_ok=True)
+    else:
+        print("[5/5] Training daemon not running")
+
+    # Remove pause file
+    pause_file.unlink(missing_ok=True)
+
+    # Write shutdown marker
+    shutdown_marker = control_dir / ".clean_shutdown"
+    shutdown_marker.write_text(datetime.now().isoformat())
+
+    print("\n" + "=" * 60)
+    print("✅ SHUTDOWN COMPLETE")
+    print("   All services stopped. Safe to make code changes.")
+    print("   Restart with: python3 weaver/weaver.py --start")
+    print("=" * 60 + "\n")
+
+    return True
+
+
+def start_fresh(base_dir: Path) -> bool:
+    """
+    Start all services from a clean state.
+
+    Order matters:
+    1. Check for clean shutdown marker
+    2. Start VaultKeeper (needed by others)
+    3. Start Tavern (UI)
+    4. Start Training Daemon
+    5. Optionally start Weaver daemon
+
+    Returns:
+        True if all services started
+    """
+    print("\n" + "=" * 60)
+    print("STARTING FRESH - Bringing up all services")
+    print("=" * 60 + "\n")
+
+    control_dir = base_dir / "control"
+    shutdown_marker = control_dir / ".clean_shutdown"
+
+    # Check for clean shutdown
+    if shutdown_marker.exists():
+        shutdown_time = shutdown_marker.read_text().strip()
+        print(f"✓ Clean shutdown detected at {shutdown_time}")
+        shutdown_marker.unlink()
+    else:
+        print("⚠ No clean shutdown marker - previous session may have crashed")
+
+    # Ensure dirs exist
+    (base_dir / ".pids").mkdir(parents=True, exist_ok=True)
+    (base_dir / "logs").mkdir(parents=True, exist_ok=True)
+
+    weaver = Weaver(str(base_dir))
+
+    # Start services in order
+    services = ["vault", "tavern", "training"]
+
+    for i, svc in enumerate(services, 1):
+        print(f"[{i}/{len(services)}] Starting {weaver.threads[svc].name}...")
+        success = weaver._start_thread(weaver.threads[svc])
+        if not success:
+            print(f"   ❌ Failed to start {svc}")
+            return False
+        print(f"   ✅ {svc} started")
+
+    print("\n" + "=" * 60)
+    print("✅ ALL SERVICES RUNNING")
+    print("   Tavern:      http://localhost:8888")
+    print("   VaultKeeper: http://localhost:8767")
+    print("")
+    print("   To run Weaver daemon: python3 weaver/weaver.py --daemon")
+    print("=" * 60 + "\n")
+
+    return True
+
+
 def main():
     import argparse
 
@@ -371,6 +590,9 @@ def main():
     parser.add_argument("--daemon", action="store_true", help="Run as daemon (continuous)")
     parser.add_argument("--status", action="store_true", help="Show tapestry status")
     parser.add_argument("--dry-run", action="store_true", help="Check but don't restart")
+    parser.add_argument("--restart", metavar="SERVICE", help="Restart a specific service (tavern, vault, training, data_flow)")
+    parser.add_argument("--shutdown", action="store_true", help="Force shutdown all services cleanly")
+    parser.add_argument("--start", action="store_true", help="Start all services fresh")
     parser.add_argument("--base-dir", default="/path/to/training", help="Base directory")
 
     args = parser.parse_args()
@@ -386,8 +608,25 @@ def main():
 
     weaver = Weaver(args.base_dir)
 
-    if args.status:
+    if args.shutdown:
+        force_shutdown(base_dir)
+        sys.exit(0)
+    elif args.start:
+        success = start_fresh(base_dir)
+        sys.exit(0 if success else 1)
+    elif args.status:
         print(weaver.status())
+    elif args.restart:
+        # Restart a specific service
+        service = args.restart.lower()
+        print(f"Restarting {service}...")
+        success = weaver.restart_thread(service)
+        if success:
+            print(f"  {service} restarted successfully")
+            sys.exit(0)
+        else:
+            print(f"  Failed to restart {service}")
+            sys.exit(1)
     elif args.daemon:
         weaver.weave()
     else:

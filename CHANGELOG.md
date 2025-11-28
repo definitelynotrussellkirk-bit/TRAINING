@@ -4,6 +4,151 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-11-27 - Critical Bug Fix: Packing + Masking
+
+### The Bug
+Model was outputting garbage like "You are happy. You enjoy helping others." - training on instruction text instead of responses.
+
+### Root Cause
+Packing combines multiple examples into one sequence, but the collator only masked the FIRST instruction segment. The model was being trained on ALL subsequent instructions, system prompts, and user messages.
+
+### Fix
+- `custom_collator.py` now finds ALL `<|im_start|>assistant` → `<|im_end|>` segments
+- New `masking_validators.py` with 5 validators to prevent recurrence:
+  1. `MaskingRatioValidator` - Ensures 30-85% masked
+  2. `ResponseTemplateCountValidator` - Verifies template count matches regions
+  3. `TrainedTokenContentValidator` - Checks for instruction markers in trained tokens
+  4. `PackedSequenceValidator` - Validates mask/train alternation pattern
+  5. `LabelDistributionValidator` - Detects anomalous label patterns
+- `train.py` now runs full validation suite before training
+- Training aborts if masking < 25%
+
+---
+
+## 2025-11-27 - Sparring with the Trainers + Task Master
+
+### Sparring System
+Self-correction training: DIO spars with skill trainers, learns from mistakes.
+
+Every wrong answer generates 3 training examples:
+1. Identify incorrect: "Is this correct?" → "It is incorrect."
+2. Correct it: "Find the correct solution." → [golden answer]
+3. Confirm correct: [fresh problem] "Is this correct?" → "It is correct."
+
+Sparring data always goes to HIGH priority queue (checkpoint-specific, becomes stale).
+
+### Task Master
+GPU-aware background task scheduler (`guild/task_master.py`):
+- Monitors 3090 GPU utilization
+- Runs tasks when utilization <40%
+- Task Registry (`guild/task_registry.py`) with 11 registered tasks
+- Usage: `--status`, `--once`, `--daemon`, `--run TASK`
+
+---
+
+## 2025-11-27 - The Weaver (Daemon Orchestrator)
+
+One daemon to rule them all - The Weaver watches all service threads:
+- Auto-restart dead daemons
+- Generates training data when queue runs low
+- Threads monitored: Training Daemon, Tavern, VaultKeeper, Data Flow
+- Simple startup: `./scripts/start_all.sh`
+- Status check: `python3 weaver/weaver.py --status`
+
+---
+
+## 2025-11-27 - Oracle + Checkpoint Ledger + Host Registry
+
+### Oracle (Talk to DIO)
+- Strict version checking - no fallback to wrong model
+- Chat API requires explicit step parameter
+- Response includes server-confirmed `model` and `model_path`
+- Multi-model display shows ALL loaded models
+
+### Checkpoint Ledger
+Single source of truth for checkpoint stats (`core/checkpoint_ledger.py`):
+- Canonical naming: `checkpoint-{step}-{YYYYMMDD}-{HHMM}`
+- Sidecar files: `.ledger.json` with stats at save time
+- Ledger API on VaultKeeper: `/api/ledger/*`
+
+### Host Registry
+Service discovery for distributed operation (`core/hosts.py`):
+- `config/hosts.json` is single source of truth
+- `get_service_url("inference")` instead of hardcoded IPs
+- Auto-detection of local host
+
+---
+
+## 2025-11-27 - Tavern UI Expansion
+
+### Quests Page (`/quests`)
+Full quest board with queue management:
+- View queued/processing/completed/failed quests
+- Change priority, delete, retry failed quests
+- Auto-refresh every 10 seconds
+
+### VRAM Calculator (`/settings`)
+Estimate GPU memory usage:
+- Based on batch size, max length, precision, gradient checkpointing
+- GPU presets (RTX 4090/3090/4080/4070)
+- Visual breakdown: model weights, optimizer, gradients, activations
+
+### Scheduler in Settings
+Full curriculum scheduler integration:
+- Quick presets (8 options)
+- Strategy selection (equal, focus, weighted, catch-up)
+- Per-skill enable/disable, priority, weight
+
+---
+
+## 2025-11-27 - Task Master UI Integration
+
+### API Endpoint
+- Added `/api/task-master` to Tavern server
+- Returns GPU status, last task, stats, daemon status
+
+### Guild Hall Card
+New "Task Master (3090)" section showing:
+- 3090 GPU status (idle/busy/offline)
+- Last task name + outcome + time
+- Task stats (run/succeeded/failed)
+- Daemon status (running/stopped)
+
+### Action Hints
+Smart contextual advice in main game UI:
+- Overfitting warnings (high val-train gap)
+- Queue status alerts
+- 3090 idle suggestions
+- Skill accuracy hints
+
+---
+
+## 2025-11-27 - VRAM Estimator Improvements
+
+### New Parameters
+`estimate_memory()` now accepts:
+- `max_length` - Sequence length (default: 2048)
+- `gradient_checkpointing` - Whether checkpointing enabled (default: True)
+
+### Updated Formula
+```
+activation_memory = batch_size × 0.8 GB × (max_length / 2048) × checkpoint_factor
+checkpoint_factor = 0.35 if gradient_checkpointing else 1.0
+```
+
+### Why This Matters
+- **Before:** Changing `max_length` from 2048→4096 showed no VRAM change
+- **After:** Properly shows ~2x activation memory for doubled sequence length
+- Gradient checkpointing now reflected (~65% activation reduction)
+
+### Validation
+Estimates match empirical data from TROUBLESHOOTING.md:
+- bs=16 → 13.6 GB estimated vs ~14 GB empirical
+- bs=12 → 10.4 GB estimated vs ~10 GB empirical
+- bs=8 → 7.2 GB estimated vs ~7 GB empirical
+
+---
+
 ## 2025-11-26 - Data Lineage System
 
 ### Overview

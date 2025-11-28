@@ -286,6 +286,7 @@
         <h1>🏰 Guild Hall</h1>
         <nav class="nav-links">
             <a href="/">Tavern</a>
+            <a href="/campaign">Campaign</a>
             <a href="/vault">Vault</a>
             <a href="/oracle">Oracle</a>
             <a href="/settings">Settings</a>
@@ -327,6 +328,59 @@
             </p>
             <div class="passives-grid" id="passivesGrid">
                 <div class="loading">Loading passives...</div>
+            </div>
+        </div>
+
+        <!-- Task Master (Background Tasks) -->
+        <div class="task-master-section" style="margin-top: 2rem;">
+            <h2 class="section-title">🤖 Task Master (3090)</h2>
+            <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.875rem;">
+                Background tasks running on the inference GPU when idle.
+            </p>
+            <div class="task-master-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                <!-- GPU Status Card -->
+                <div class="summary-card" id="taskMasterGpu">
+                    <div class="summary-value" id="gpuStatus">--</div>
+                    <div class="summary-label">3090 Status</div>
+                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.5rem;">
+                        <span id="gpuMemory">--</span> GB used
+                    </div>
+                </div>
+                <!-- Last Task Card -->
+                <div class="summary-card" id="taskMasterLast">
+                    <div class="summary-value" id="lastTaskName" style="font-size: 1rem;">--</div>
+                    <div class="summary-label">Last Task</div>
+                    <div style="font-size: 0.75rem; margin-top: 0.5rem;">
+                        <span id="lastTaskStatus">--</span>
+                        <span id="lastTaskTime" style="color: var(--text-dim);">--</span>
+                    </div>
+                </div>
+                <!-- Stats Card -->
+                <div class="summary-card" id="taskMasterStats">
+                    <div style="display: flex; justify-content: space-around;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);" id="tasksRun">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-dim);">RUN</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--success);" id="tasksSucceeded">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-dim);">OK</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--danger);" id="tasksFailed">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-dim);">FAIL</div>
+                        </div>
+                    </div>
+                    <div class="summary-label" style="margin-top: 0.5rem;">Task Stats</div>
+                </div>
+                <!-- Daemon Status Card -->
+                <div class="summary-card" id="taskMasterDaemon">
+                    <div class="summary-value" id="daemonStatus" style="font-size: 1rem;">--</div>
+                    <div class="summary-label">Daemon</div>
+                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.5rem;" id="lastCheck">
+                        Last check: --
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -474,11 +528,92 @@
             }
         }
 
+        // Task Master - Background task status
+        async function loadTaskMaster() {
+            try {
+                const res = await fetch('/api/task-master');
+                const data = await res.json();
+                renderTaskMaster(data);
+            } catch (err) {
+                console.error('Failed to load task master:', err);
+            }
+        }
+
+        function renderTaskMaster(data) {
+            // GPU Status
+            const gpu = data.gpus?.['3090'];
+            if (gpu) {
+                const statusEl = document.getElementById('gpuStatus');
+                if (!gpu.available) {
+                    statusEl.textContent = '❌ Offline';
+                    statusEl.style.color = 'var(--danger)';
+                } else if (gpu.is_idle) {
+                    statusEl.textContent = '✓ Idle';
+                    statusEl.style.color = 'var(--success)';
+                } else {
+                    statusEl.textContent = '⏳ Busy';
+                    statusEl.style.color = 'var(--warning)';
+                }
+                document.getElementById('gpuMemory').textContent =
+                    gpu.memory_used_gb?.toFixed(1) || '--';
+            } else if (!data.available) {
+                document.getElementById('gpuStatus').textContent = 'Not Run';
+                document.getElementById('gpuStatus').style.color = 'var(--text-dim)';
+            }
+
+            // Last Task
+            const lastTask = data.last_task;
+            if (lastTask && lastTask.name) {
+                document.getElementById('lastTaskName').textContent = lastTask.name;
+
+                const statusSpan = document.getElementById('lastTaskStatus');
+                if (lastTask.success) {
+                    statusSpan.textContent = '✅';
+                } else {
+                    statusSpan.textContent = '❌';
+                }
+
+                // Time ago
+                if (lastTask.timestamp) {
+                    const date = new Date(lastTask.timestamp);
+                    const ago = Math.round((Date.now() - date) / 60000);
+                    document.getElementById('lastTaskTime').textContent =
+                        ago < 60 ? `${ago}m ago` : `${Math.round(ago/60)}h ago`;
+                }
+            }
+
+            // Stats
+            const stats = data.stats || {};
+            document.getElementById('tasksRun').textContent = stats.tasks_run || 0;
+            document.getElementById('tasksSucceeded').textContent = stats.tasks_succeeded || 0;
+            document.getElementById('tasksFailed').textContent = stats.tasks_failed || 0;
+
+            // Daemon Status
+            const daemonEl = document.getElementById('daemonStatus');
+            if (data.daemon_running) {
+                daemonEl.textContent = '🟢 Running';
+                daemonEl.style.color = 'var(--success)';
+            } else {
+                daemonEl.textContent = '⚪ Stopped';
+                daemonEl.style.color = 'var(--text-dim)';
+            }
+
+            // Last check time
+            if (stats.last_check) {
+                const date = new Date(stats.last_check);
+                const ago = Math.round((Date.now() - date) / 60000);
+                document.getElementById('lastCheck').textContent =
+                    `Last check: ${ago < 60 ? `${ago}m ago` : `${Math.round(ago/60)}h ago`}`;
+            }
+        }
+
         // Load on page load
         loadGuildData();
+        loadTaskMaster();
 
         // Refresh every 30 seconds
         setInterval(loadGuildData, 30000);
+        setInterval(loadTaskMaster, 30000);
     </script>
 </body>
 </html>

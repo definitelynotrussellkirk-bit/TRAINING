@@ -1,0 +1,125 @@
+# =============================================================================
+# HERO TEMPLATE
+# =============================================================================
+# Copy this file to create a new hero profile.
+# Filename should be: {hero-id}.yaml (e.g., dio-qwen3-0.6b.yaml)
+#
+# RPG Flavor:
+#   Each hero is a unique soul inhabiting a model architecture.
+#   They bring their own strengths, weaknesses, and destiny.
+# =============================================================================
+
+id: hero-id                    # Unique identifier (lowercase, hyphens only)
+name: "Hero Display Name"      # Display name in UI
+rpg_name: "The Title"          # RPG epithet ("The Skeptic", "The Scholar")
+description: >
+  A brief description of this hero's nature, strengths, and purpose.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+# Core model specifications - immutable facts about the architecture
+model:
+  hf_name: "org/model-name"    # HuggingFace model ID (e.g., "Qwen/Qwen3-0.6B")
+  family: "qwen3"              # Model family: qwen3, llama, mistral, phi, gemma
+  architecture: "Qwen3ForCausalLM"  # Transformers architecture class
+  size_b: 0.6                  # Size in billions of parameters
+  vocab_size: 151936           # Vocabulary size
+  context_length: 4096         # Maximum context window
+  rope_scaling: "dynamic"      # RoPE style: dynamic, linear, null
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+# These are starting defaults - campaigns can override them
+training_defaults:
+  # Precision
+  precision: "bf16"            # fp16, bf16, fp32
+  load_in_4bit: false          # Enable 4-bit quantization
+
+  # Batch configuration
+  batch_size: 1                # Micro-batch size (VRAM-bound)
+  gradient_accumulation: 16    # Steps to accumulate (effective batch = batch_size * grad_accum)
+
+  # Learning rate
+  learning_rate: 0.0004        # Base learning rate
+  warmup_steps: 100            # LR warmup steps
+
+  # Context
+  max_length: 2048             # Training sequence length
+
+  # Memory optimization
+  gradient_checkpointing: true # Required for 24GB GPUs with larger models
+
+  # Checkpointing
+  save_steps: 10000            # Save checkpoint every N steps
+  save_total_limit: 40         # Keep last N checkpoints (retention)
+
+# =============================================================================
+# QLORA CONFIGURATION (Optional)
+# =============================================================================
+# For adapter/LoRA training instead of full fine-tuning
+qlora:
+  enabled: false               # Enable QLoRA training
+  r: 64                        # LoRA rank
+  alpha: 16                    # LoRA alpha
+  dropout: 0.05                # LoRA dropout
+  target_modules:              # Modules to apply LoRA to
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+# Tokenization format for conversations
+chat:
+  template: "qwen3_chat"       # Template identifier
+  system_token: "<|im_start|>system"
+  user_token: "<|im_start|>user"
+  assistant_token: "<|im_start|>assistant"
+  end_token: "<|im_end|>"
+  # For models without system message support:
+  # supports_system: false
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+# Memory estimates for the VRAM calculator
+# Calibrated at max_length=2048, bf16 precision
+vram:
+  base_memory_gb: 1.2          # Model weights in memory
+  per_batch_gb: 0.8            # Additional per micro-batch sample
+  optimizer_overhead_gb: 0.6   # AdamW optimizer states
+  # Note: gradient_checkpointing reduces activation memory by ~65%
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+# UI customization
+display:
+  icon: "path/to/icon.png"     # Small icon (32x32)
+  portrait: "path/to/portrait.png"  # Large portrait (256x256)
+  color: "#8B5CF6"             # Theme color (hex)
+  emoji: "emoji"               # Fallback emoji if no icon
+
+# =============================================================================
+# SKILLS AFFINITY (Optional)
+# =============================================================================
+# Which skills this hero is naturally suited for
+skills_affinity:
+  - bin                        # Binary Alchemy
+  - sy                         # Word Weaving
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  Additional notes about this hero:
+  - Known quirks or limitations
+  - Training tips
+  - Historical context

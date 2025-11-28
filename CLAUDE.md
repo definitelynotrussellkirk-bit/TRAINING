@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-11-27 (Sparring with the Trainers)
+**Last Updated:** 2025-11-27 (CHANGELOG split + Task Master UI)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 ---
@@ -189,125 +189,19 @@ The Tavern displays data. To feel like a **complete game**, we need:
 
 ## 📦 RECENT UPDATES
 
-**CRITICAL BUG FIX: Packing + Masking (2025-11-27)**
-- ❌ **Bug**: Model outputting garbage like "You are happy. You enjoy helping others."
-- ❌ **Cause**: Packing combines multiple examples, but collator only masked FIRST instruction
-- ❌ **Result**: Model trained on ALL subsequent instructions, system prompts, user messages
-- ✅ **Fix**: `custom_collator.py` now finds ALL `<|im_start|>assistant` → `<|im_end|>` segments
-- ✅ **Validation**: New `masking_validators.py` with 5 validators to prevent recurrence:
-  1. `MaskingRatioValidator` - Ensures 30-85% masked
-  2. `ResponseTemplateCountValidator` - Verifies template count matches regions
-  3. `TrainedTokenContentValidator` - Checks for instruction markers in trained tokens
-  4. `PackedSequenceValidator` - Validates mask/train alternation pattern
-  5. `LabelDistributionValidator` - Detects anomalous label patterns
-- ✅ **Integration**: `train.py` now runs full validation suite before training
-- ✅ **Fail-safe**: Training aborts if masking < 25%
+**See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
-**Sparring with the Trainers + Task Master (2025-11-27)**
-- ✅ **Self-correction system** - DIO spars with skill trainers, learns from mistakes
-- ✅ **3 training examples per wrong answer**:
-  1. Identify incorrect: "Is this correct?" → "It is incorrect."
-  2. Correct it: "Find the correct solution." → [golden answer]
-  3. Confirm correct: [fresh problem] "Is this correct?" → "It is correct."
-- ✅ **Always HIGH priority** - Sparring data is checkpoint-specific, becomes stale!
-- ✅ **Task Master** (`guild/task_master.py`) - GPU-aware task scheduler
-- ✅ **Task Registry** (`guild/task_registry.py`) - 11 registered tasks
-- ✅ **Monitors both GPUs** - Runs tasks when utilization <40%
-- ✅ **Usage**:
-  - `python3 guild/task_master.py --status` - Show GPU + task status
-  - `python3 guild/task_master.py --once` - Check and run one task
-  - `python3 guild/task_master.py --daemon` - Run continuously
-
-**Curriculum Fix (2025-11-27)**
-- ✅ **Fixed level mismatch** - `current_level` now correctly means "mastered level"
-- ✅ **Reset to 0** - Both skills reset to mastered=0, training on level 1
-- ✅ **Progress bar verified** - API returns correct `batch_total_steps`
-
-**The Weaver - Daemon Orchestrator (2025-11-27)**
-- ✅ **One daemon to rule them all** - The Weaver watches all threads
-- ✅ **Auto-restart** - Dead daemons automatically restarted
-- ✅ **Data flow** - Generates training data when queue runs low
-- ✅ **Threads monitored**: Training Daemon, Tavern, VaultKeeper, Data Flow
-- ✅ **Simple startup** - `./scripts/start_all.sh` starts The Weaver
-- ✅ **Status check** - `python3 weaver/weaver.py --status`
-
-**Oracle Strict Version Checking (2025-11-27)**
-- ✅ **No fallback** - Chat fails clearly if requested step not loaded
-- ✅ **Accurate status** - Uses `/models/info` (actual pool) not stale `/health`
-- ✅ **Step required** - Chat API requires explicit step parameter
-- ✅ **Version verification** - Response includes server-confirmed `model` and `model_path`
-- ✅ **Multi-model display** - Status shows ALL loaded models, not just "active"
-
-**Tavern UI Expansion (2025-11-27 Late)**
-- ✅ **Quests Page** (`/quests`) - Full quest board with queue management
-  - View queued/processing/completed/failed quests
-  - Change priority, delete, retry failed quests
-  - Auto-refresh every 10 seconds
-- ✅ **VRAM Calculator** (`/settings`) - Estimate GPU memory usage
-  - Based on batch size, max length, precision, gradient checkpointing
-  - GPU presets (RTX 4090/3090/4080/4070)
-  - Visual breakdown: model weights, optimizer, gradients, activations
-- ✅ **Scheduler in Settings** (`/settings`) - Full curriculum scheduler integration
-  - Quick presets (8 options)
-  - Strategy selection (equal, focus, weighted, catch-up)
-  - Per-skill enable/disable, priority, weight
-  - Next decision preview
-
-**Checkpoint Ledger & Distributed Architecture (2025-11-27)**
-- ✅ **Checkpoint Ledger** (`core/checkpoint_ledger.py`) - Single source of truth for checkpoint stats
-- ✅ **Canonical Naming** - Checkpoints named `checkpoint-{step}-{YYYYMMDD}-{HHMM}`
-- ✅ **Sidecar Files** - Each checkpoint has `.ledger.json` with stats at save time
-- ✅ **Host Registry** (`core/hosts.py`) - Service discovery for distributed operation
-- ✅ **Branch Officers** (`vault/branch_officer.py`) - Zone daemons for 3090/NAS
-- ✅ **Zone Federation** (`vault/zones.py`) - Transfer assets between zones
-- ✅ **Oracle Page** (`/oracle`) - "Talk to DIO" - chat with any checkpoint
-- ✅ **Ledger API** on VaultKeeper - `/api/ledger/*` endpoints
-- ✅ **Training API** on VaultKeeper - `/api/training/*` endpoints
-- ✅ **Save frequency** - Now every 10k steps (was saving every file)
-
-**Tavern Game UI (2025-11-26)**
-- ✅ Web-based game interface at port 8888
-- ✅ DIO hero display with ASCII art
-- ✅ Real-time battle status
-- ✅ Idle game mechanics (XP ticks, floating numbers)
-- ✅ Skill cards, vault summary, forge status
-
-**VaultKeeper (2025-11-26)**
-- ✅ Central asset registry across all devices
-- ✅ "Ask Vault First" pattern for asset location
-- ✅ API server on port 8767
-- ✅ SQLite catalog at `vault/catalog.db`
-
-**RPG Architecture (2025-11-26)**
-- ✅ Full RPG-themed module system implemented
-- ✅ `realm.py` - Unified entry point to all systems
-- ✅ `guild/` - Skills, quests, progression, dispatch
-- ✅ `arena/` - Training execution (QuestBoard, BattleControl, BattleLog)
-- ✅ `watchtower/` - Monitoring (ScryingPool, ChampionBoard, OracleClient)
-- ✅ `vault/` - Storage (Archivist, Chronicle, Treasury, StorageRegistry)
-- ✅ `sentinels/` - Protection (Guardian, HealthInspector)
-- ✅ `armory/` - Equipment/profiles wrapper
-- ✅ `scrolls/` - Utility scripts wrapper
-- ✅ StorageRegistry supports multiple Synology NAS strongholds
-
-**PREVIOUS UPDATE:** Data Lineage System (2025-11-26)
-- ✅ Generator versioning: `GENERATOR_ID` + `GENERATOR_VERSION` in all generators
-- ✅ Validator versioning: `VALIDATOR_NAME` + `VALIDATOR_VERSION` in all validators
-- ✅ `.meta.json` sidecar files for data provenance tracking
-- ✅ LineageTracker aggregates per-generator/validator rejection stats
-- ✅ New `/api/lineage` endpoint for dashboard
-- ✅ New "Data Lineage" card on master dashboard
-- ✅ Answers: "Which generator produces most rejections?", "Which validator is most aggressive?"
-
-**PREVIOUS UPDATE:** Code Review Validated Monitoring Systems (2025-11-25)
-- ✅ API authentication added to inference server
-- ✅ Test infrastructure cleaned up for CI
-- ✅ RetentionManager wired into daemon
-- ✅ Extracted daemon services: PIDManager, FileWatcher, SnapshotService, BackgroundWorker
-- ✅ Extracted training components: ModelLoader, DatasetPreparer, MonitoringBundle
-- ✅ Created pyproject.toml - GPU deps now optional `[training]` extra
-- ✅ DataValidator (QUICK/STANDARD/DEEP) - integrated into daemon for early rejection
-- ✅ Path auto-detection via get_base_dir() with resolution logging
+Latest updates (2025-11-27):
+- **Packing + Masking Bug Fix** - Critical fix for training on instruction text
+- **Sparring with Trainers** - Self-correction training system
+- **Task Master** - GPU-aware background task scheduler
+- **The Weaver** - Daemon orchestrator (one daemon to rule them all)
+- **Oracle** - Strict version checking for checkpoint chat
+- **Tavern UI** - Quests page, VRAM calculator, scheduler in settings
+- **Checkpoint Ledger** - Single source of truth for checkpoint stats
+- **Host Registry** - Service discovery for distributed operation
+- **Task Master UI** - Visible in Guild Hall with action hints
+- **VRAM Estimator** - Now accounts for max_length and gradient checkpointing
 
 ---
 

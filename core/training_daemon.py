@@ -575,11 +575,14 @@ class TrainingDaemon:
             except:
                 pass  # Invalid marker file, proceed with consolidation
 
-        # Check if there's a trained model to consolidate
-        # For full model training, check for checkpoints
-        checkpoints = list(self.current_model_dir.glob("checkpoint-*"))
-        if not self.current_model_dir.exists() or not checkpoints:
-            self.logger.info("No checkpoints to consolidate - skipping")
+        # Check if there's an adapter to consolidate (LoRA training)
+        # For full model training, consolidation is not needed
+        adapter_files = list(self.current_model_dir.glob("*/adapter_model.safetensors"))
+        if not adapter_files:
+            self.logger.info("No LoRA adapter found - full model training, skipping consolidation")
+            # Mark as done so we don't keep checking
+            self.consolidation_marker.write_text(datetime.now().isoformat())
+            self.last_consolidation_date = datetime.now().date()
             return
 
         self.logger.info("=" * 80)
@@ -589,7 +592,7 @@ class TrainingDaemon:
         try:
             # Run consolidation script
             import subprocess
-            consolidate_script = self.base_dir / 'consolidate_model.py'
+            consolidate_script = self.base_dir / 'management' / 'consolidate_model.py'
 
             # Generate description with current date
             description = f"Daily consolidation {datetime.now().strftime('%Y-%m-%d')}"

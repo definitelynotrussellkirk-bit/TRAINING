@@ -492,6 +492,10 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/weaver/status":
             self._serve_weaver_status()
 
+        # Task Master (background task scheduler) status
+        elif path == "/api/task-master":
+            self._serve_task_master_status()
+
         # Fresh game data API (replaces stale /api/unified)
         elif path == "/api/game":
             self._serve_game_data()
@@ -515,6 +519,16 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._serve_events_stream()
         elif path == "/api/events/stats":
             self._serve_events_stats()
+
+        # Campaign - Hero/Campaign management
+        elif path == "/campaign" or path == "/campaign.html":
+            self._serve_template("campaign.html")
+        elif path == "/api/campaigns":
+            self._serve_campaigns_data()
+        elif path == "/api/campaigns/active":
+            self._serve_active_campaign()
+        elif path == "/api/heroes":
+            self._serve_heroes_data()
 
         elif path.startswith("/api/"):
             self._proxy_api(path)
@@ -564,6 +578,13 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Generators - Toggle on/off
         elif path == "/api/generators/toggle":
             self._toggle_generator()
+        # Campaign - Create, activate, archive
+        elif path == "/api/campaigns":
+            self._create_campaign()
+        elif path == "/api/campaigns/activate":
+            self._activate_campaign()
+        elif path == "/api/campaigns/archive":
+            self._archive_campaign()
         else:
             self._send_error(404, "Endpoint not found")
 
@@ -1424,6 +1445,47 @@ class TavernHandler(SimpleHTTPRequestHandler):
             logger.error(f"Weaver status error: {e}")
             self._send_json({"error": str(e)}, 500)
 
+    def _serve_task_master_status(self):
+        """Get Task Master (background task scheduler) status."""
+        try:
+            status_file = BASE_DIR / "status" / "task_master.json"
+
+            if not status_file.exists():
+                self._send_json({
+                    "available": False,
+                    "message": "Task Master has not run yet",
+                    "gpus": {},
+                    "last_task": None,
+                    "stats": {}
+                })
+                return
+
+            with open(status_file) as f:
+                status = json.load(f)
+
+            # Check if Task Master daemon is running
+            pid_file = BASE_DIR / ".pids" / "task_master.pid"
+            daemon_running = False
+            daemon_pid = None
+
+            if pid_file.exists():
+                try:
+                    daemon_pid = int(pid_file.read_text().strip())
+                    os.kill(daemon_pid, 0)
+                    daemon_running = True
+                except (ValueError, ProcessLookupError, PermissionError):
+                    daemon_running = False
+
+            # Enrich with daemon status
+            status["daemon_running"] = daemon_running
+            status["daemon_pid"] = daemon_pid
+            status["available"] = True
+
+            self._send_json(status)
+        except Exception as e:
+            logger.error(f"Task Master status error: {e}")
+            self._send_json({"error": str(e), "available": False}, 500)
+
     def _daemon_control(self):
         """Control training daemon (start/stop/pause/resume)."""
         try:
@@ -1849,6 +1911,197 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Toggle generator error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
+    # ==========================================================================
+    # CAMPAIGN SYSTEM - Hero and Campaign Management
+    # ==========================================================================
+
+    def _serve_heroes_data(self):
+        """Serve list of available heroes."""
+        try:
+            from guild.heroes import list_heroes, get_hero
+
+            hero_ids = list_heroes()
+            heroes = []
+            for hero_id in hero_ids:
+                hero = get_hero(hero_id)
+                heroes.append({
+                    "id": hero.id,
+                    "name": hero.name,
+                    "rpg_name": hero.rpg_name,
+                    "description": hero.description,
+                    "model": {
+                        "hf_name": hero.model.hf_name,
+                        "family": hero.model.family,
+                        "size_b": hero.model.size_b,
+                    },
+                    "display": {
+                        "color": hero.display.color,
+                        "emoji": hero.display.emoji,
+                    },
+                    "skills_affinity": hero.skills_affinity,
+                })
+
+            self._send_json(heroes)
+
+        except ImportError as e:
+            logger.error(f"Hero module not available: {e}")
+            self._send_json({"error": "Hero system not installed"}, 503)
+        except Exception as e:
+            logger.error(f"Heroes data error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_campaigns_data(self):
+        """Serve campaigns list and active campaign."""
+        try:
+            from guild.campaigns import CampaignManager
+
+            mgr = CampaignManager(BASE_DIR)
+            active = mgr.get_active()
+
+            # Get all campaigns by hero
+            campaigns = {}
+            for hero_id in mgr.list_heroes():
+                hero_campaigns = mgr.list_campaigns(hero_id, include_archived=True)
+                campaigns[hero_id] = [c.to_dict() for c in hero_campaigns]
+
+            result = {
+                "active": active.to_dict() if active else None,
+                "campaigns": campaigns,
+            }
+
+            self._send_json(result)
+
+        except ImportError as e:
+            logger.error(f"Campaign module not available: {e}")
+            self._send_json({"error": "Campaign system not installed"}, 503)
+        except Exception as e:
+            logger.error(f"Campaigns data error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_active_campaign(self):
+        """Serve only the active campaign."""
+        try:
+            from guild.campaigns import get_active_campaign
+
+            active = get_active_campaign(BASE_DIR)
+            if active:
+                self._send_json(active.to_dict())
+            else:
+                self._send_json(None)
+
+        except ImportError as e:
+            logger.error(f"Campaign module not available: {e}")
+            self._send_json({"error": "Campaign system not installed"}, 503)
+        except Exception as e:
+            logger.error(f"Active campaign error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _create_campaign(self):
+        """Create a new campaign."""
+        try:
+            from guild.campaigns import CampaignManager
+
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length).decode())
+
+            hero_id = body.get("hero_id")
+            name = body.get("name")
+            description = body.get("description", "")
+            skills_focus = body.get("skills_focus", [])
+            config_overrides = body.get("config_overrides", {})
+
+            if not hero_id:
+                self._send_json({"success": False, "error": "Missing hero_id"}, 400)
+                return
+            if not name:
+                self._send_json({"success": False, "error": "Missing name"}, 400)
+                return
+
+            mgr = CampaignManager(BASE_DIR)
+            campaign = mgr.create_campaign(
+                hero_id=hero_id,
+                name=name,
+                description=description,
+                skills_focus=skills_focus,
+                config_overrides=config_overrides,
+            )
+
+            logger.info(f"Created campaign: {campaign.hero_id}/{campaign.id}")
+            self._send_json({
+                "success": True,
+                "campaign": campaign.to_dict(),
+            })
+
+        except ImportError as e:
+            logger.error(f"Campaign module not available: {e}")
+            self._send_json({"error": "Campaign system not installed"}, 503)
+        except Exception as e:
+            logger.error(f"Create campaign error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
+    def _activate_campaign(self):
+        """Activate a campaign."""
+        try:
+            from guild.campaigns import CampaignManager
+
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length).decode())
+
+            hero_id = body.get("hero_id")
+            campaign_id = body.get("campaign_id")
+
+            if not hero_id or not campaign_id:
+                self._send_json({"success": False, "error": "Missing hero_id or campaign_id"}, 400)
+                return
+
+            mgr = CampaignManager(BASE_DIR)
+            campaign = mgr.get_campaign(hero_id, campaign_id)
+            mgr.activate(campaign)
+
+            logger.info(f"Activated campaign: {hero_id}/{campaign_id}")
+            self._send_json({
+                "success": True,
+                "campaign": campaign.to_dict(),
+            })
+
+        except ImportError as e:
+            logger.error(f"Campaign module not available: {e}")
+            self._send_json({"error": "Campaign system not installed"}, 503)
+        except Exception as e:
+            logger.error(f"Activate campaign error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
+    def _archive_campaign(self):
+        """Archive a campaign to the Hall of Legends."""
+        try:
+            from guild.campaigns import CampaignManager
+
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length).decode())
+
+            hero_id = body.get("hero_id")
+            campaign_id = body.get("campaign_id")
+
+            if not hero_id or not campaign_id:
+                self._send_json({"success": False, "error": "Missing hero_id or campaign_id"}, 400)
+                return
+
+            mgr = CampaignManager(BASE_DIR)
+            campaign = mgr.archive(hero_id, campaign_id)
+
+            logger.info(f"Archived campaign: {hero_id}/{campaign_id}")
+            self._send_json({
+                "success": True,
+                "campaign": campaign.to_dict(),
+            })
+
+        except ImportError as e:
+            logger.error(f"Campaign module not available: {e}")
+            self._send_json({"error": "Campaign system not installed"}, 503)
+        except Exception as e:
+            logger.error(f"Archive campaign error: {e}")
             self._send_json({"success": False, "error": str(e)}, 500)
 
     def _serve_skill_apis_status(self):

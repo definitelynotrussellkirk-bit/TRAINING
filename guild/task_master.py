@@ -43,13 +43,17 @@ from guild.task_registry import (
     Task,
 )
 
+# Use centralized path and host configuration
+from core.paths import get_base_dir
+from core.hosts import get_service_url, get_host
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path("/path/to/training")
+# Note: BASE_DIR removed - now using get_base_dir() from core.paths
 
 
 @dataclass
@@ -81,14 +85,24 @@ class TaskMaster:
     # Memory thresholds (percent free)
     MIN_MEMORY_FREE = 30.0     # Need at least 30% free to start task
 
+    # GPU memory (hardware-specific, fallback if not in host config)
+    GPU_MEMORY_3090_GB = 24    # RTX 3090 = 24GB
+
     def __init__(
         self,
         base_dir: Path = None,
-        inference_url: str = "http://192.168.x.x:8765",
+        inference_url: str = None,
         check_interval: int = 60,
     ):
-        self.base_dir = base_dir or BASE_DIR
-        self.inference_url = inference_url
+        # Use centralized path detection
+        self.base_dir = base_dir or get_base_dir()
+
+        # Get 3090 host config from registry
+        self._host_3090 = get_host("3090")
+        self._host_3090_ip = self._host_3090.host if self._host_3090 else "192.168.x.x"
+
+        # Use centralized service URL or explicit override
+        self.inference_url = inference_url or get_service_url("inference") or f"http://{self._host_3090_ip}:8765"
         self.check_interval = check_interval
 
         self.status_file = self.base_dir / "status" / "task_master.json"
@@ -102,6 +116,8 @@ class TaskMaster:
             "started_at": None,
             "last_check": None,
         }
+
+        logger.debug(f"TaskMaster initialized: base_dir={self.base_dir}, inference={self.inference_url}")
 
     def get_4090_status(self) -> GPUStatus:
         """Get local 4090 GPU status via nvidia-smi"""
@@ -150,6 +166,10 @@ class TaskMaster:
 
     def get_3090_status(self) -> GPUStatus:
         """Get remote 3090 GPU status via inference API"""
+        # Use host config (set in __init__)
+        host_ip = self._host_3090_ip
+        mem_total = self.GPU_MEMORY_3090_GB
+
         try:
             resp = requests.get(f"{self.inference_url}/health", timeout=5)
             data = resp.json()
@@ -157,15 +177,14 @@ class TaskMaster:
             gpu = data.get("gpu", {})
             if not gpu.get("available", False):
                 return GPUStatus(
-                    name="3090", host="192.168.x.x", available=False,
-                    utilization=0, memory_used_gb=0, memory_total_gb=24,
+                    name="3090", host=host_ip, available=False,
+                    utilization=0, memory_used_gb=0, memory_total_gb=mem_total,
                     memory_free_pct=0, temperature=0, is_idle=False
                 )
 
             # Inference API doesn't report utilization directly
             # Use memory as proxy, and check if worker is busy
             mem_used = gpu.get("memory_allocated_gb", 0)
-            mem_total = 24  # RTX 3090 = 24GB
             mem_free_pct = ((mem_total - mem_used) / mem_total) * 100
 
             worker_busy = data.get("worker_busy", False)
@@ -175,7 +194,7 @@ class TaskMaster:
 
             return GPUStatus(
                 name="3090",
-                host="192.168.x.x",
+                host=host_ip,
                 available=True,
                 utilization=50 if worker_busy else 10,  # Estimate
                 memory_used_gb=mem_used,
@@ -188,8 +207,8 @@ class TaskMaster:
         except Exception as e:
             logger.warning(f"Failed to get 3090 status: {e}")
             return GPUStatus(
-                name="3090", host="192.168.x.x", available=False,
-                utilization=0, memory_used_gb=0, memory_total_gb=24,
+                name="3090", host=host_ip, available=False,
+                utilization=0, memory_used_gb=0, memory_total_gb=mem_total,
                 memory_free_pct=0, temperature=0, is_idle=False
             )
 
@@ -409,12 +428,12 @@ def main():
     parser.add_argument("--daemon", action="store_true", help="Run as daemon")
     parser.add_argument("--run", metavar="TASK", help="Force run specific task")
     parser.add_argument("--interval", type=int, default=60, help="Check interval in seconds")
-    parser.add_argument("--base-dir", default="/path/to/training")
+    parser.add_argument("--base-dir", default=None, help="Base directory (auto-detected if not specified)")
 
     args = parser.parse_args()
 
     master = TaskMaster(
-        base_dir=Path(args.base_dir),
+        base_dir=Path(args.base_dir) if args.base_dir else None,
         check_interval=args.interval,
     )
 

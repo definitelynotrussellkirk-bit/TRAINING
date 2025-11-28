@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign - Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/game.css?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .campaign-main {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            height: calc(100vh - 180px);
+            overflow: hidden;
+        }
+
+        .campaign-content {
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        /* Current Campaign Card */
+        .current-campaign {
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(139, 92, 246, 0.1) 100%);
+            border: 2px solid var(--color-gold);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .campaign-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .campaign-hero-portrait {
+            width: 80px;
+            height: 80px;
+            background: var(--bg-surface);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            border: 2px solid var(--border-color);
+        }
+
+        .campaign-hero-info h2 {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .campaign-hero-info .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .campaign-hero-info .hero-title {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .campaign-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .campaign-stat {
+            background: var(--bg-surface);
+            border-radius: 8px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+
+        .campaign-stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--color-gold);
+        }
+
+        .campaign-stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .campaign-skills {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .campaign-skill-badge {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        /* Campaign Actions */
+        .campaign-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        .campaign-btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .campaign-btn:hover {
+            border-color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .campaign-btn.primary {
+            background: linear-gradient(135deg, var(--color-gold) 0%, #D97706 100%);
+            border-color: var(--color-gold);
+            color: #000;
+            font-weight: 600;
+        }
+
+        .campaign-btn.primary:hover {
+            filter: brightness(1.1);
+        }
+
+        .campaign-btn.danger {
+            border-color: #EF4444;
+        }
+
+        .campaign-btn.danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #EF4444;
+        }
+
+        /* Campaign List */
+        .campaign-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .campaign-section h3 {
+            font-family: var(--font-display);
+            color: var(--text-primary);
+            margin: 0 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .campaign-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .campaign-item {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .campaign-item.clickable {
+            cursor: pointer;
+        }
+
+        .campaign-item.clickable:hover {
+            border-color: var(--color-gold);
+            background: rgba(139, 92, 246, 0.1);
+            transform: translateX(4px);
+        }
+
+        .campaign-item.active {
+            border-color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.1);
+            cursor: default;
+        }
+
+        .campaign-item.active .campaign-item-step {
+            color: var(--color-gold);
+            font-weight: 600;
+        }
+
+        .campaign-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .campaign-item-name {
+            font-weight: 500;
+        }
+
+        .campaign-item-step {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .campaign-item-date {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* Sidebar - Hero Selection */
+        .sidebar {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            height: fit-content;
+        }
+
+        .sidebar h3 {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            margin: 0 0 1rem 0;
+        }
+
+        .hero-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .hero-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .hero-item:hover {
+            border-color: var(--border-gold);
+        }
+
+        .hero-item.active {
+            border-color: var(--color-gold);
+        }
+
+        .hero-icon {
+            font-size: 1.5rem;
+        }
+
+        .hero-details {
+            flex: 1;
+        }
+
+        .hero-name {
+            font-weight: 500;
+        }
+
+        .hero-model {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Milestones */
+        .milestone-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .milestone-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.5rem;
+            background: var(--bg-surface);
+            border-radius: 6px;
+        }
+
+        .milestone-step {
+            font-weight: 600;
+            color: var(--color-gold);
+            min-width: 80px;
+        }
+
+        .milestone-note {
+            flex: 1;
+            color: var(--text-secondary);
+        }
+
+        .milestone-date {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal h3 {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            margin: 0 0 1rem 0;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--color-gold);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- TITLE BAR -->
+    <header class="game-header">
+        <div class="header-left">
+            <a href="/" class="game-title">Realm of Training</a>
+        </div>
+        <nav class="header-nav">
+            <a href="/">Tavern</a>
+            <a href="/quests">Quests</a>
+            <a href="/guild">Guild</a>
+            <a href="/oracle">Oracle</a>
+            <a href="/campaign" class="active">Campaign</a>
+            <a href="/settings">Settings</a>
+        </nav>
+        <div class="header-right">
+            <div class="time-display" id="timeDisplay">--:--:--</div>
+        </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="campaign-main">
+        <div class="campaign-content">
+            <!-- Current Campaign -->
+            <div class="current-campaign" id="currentCampaign">
+                <div class="campaign-header">
+                    <div class="campaign-hero-portrait" id="heroPortrait">emoji</div>
+                    <div class="campaign-hero-info">
+                        <h2 id="heroName">Loading...</h2>
+                        <div class="subtitle" id="campaignName">-</div>
+                        <div class="hero-title" id="heroTitle">-</div>
+                    </div>
+                </div>
+
+                <div class="campaign-stats">
+                    <div class="campaign-stat">
+                        <div class="campaign-stat-value" id="statStep">-</div>
+                        <div class="campaign-stat-label">Step</div>
+                    </div>
+                    <div class="campaign-stat">
+                        <div class="campaign-stat-value" id="statDays">-</div>
+                        <div class="campaign-stat-label">Days</div>
+                    </div>
+                    <div class="campaign-stat">
+                        <div class="campaign-stat-value" id="statCheckpoints">-</div>
+                        <div class="campaign-stat-label">Checkpoints</div>
+                    </div>
+                    <div class="campaign-stat">
+                        <div class="campaign-stat-value" id="statStatus">-</div>
+                        <div class="campaign-stat-label">Status</div>
+                    </div>
+                </div>
+
+                <div class="campaign-skills" id="campaignSkills">
+                    <!-- Skill badges populated by JS -->
+                </div>
+
+                <div class="campaign-actions">
+                    <button class="campaign-btn primary" onclick="showNewCampaignModal()">
+                        New Campaign
+                    </button>
+                    <button class="campaign-btn" onclick="switchCampaign()">
+                        Switch
+                    </button>
+                    <button class="campaign-btn danger" onclick="archiveCampaign()">
+                        Archive
+                    </button>
+                </div>
+            </div>
+
+            <!-- No Campaign State -->
+            <div class="campaign-section" id="noCampaign" style="display: none;">
+                <div class="empty-state">
+                    <div class="empty-state-icon">scroll</div>
+                    <h3>No Active Campaign</h3>
+                    <p>Run the migration script or create a new campaign to begin.</p>
+                    <button class="campaign-btn primary" onclick="showNewCampaignModal()" style="margin-top: 1rem;">
+                        Start New Campaign
+                    </button>
+                </div>
+            </div>
+
+            <!-- Milestones -->
+            <div class="campaign-section" id="milestonesSection">
+                <h3>Campaign Milestones</h3>
+                <div class="milestone-list" id="milestoneList">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- All Campaigns -->
+            <div class="campaign-section">
+                <h3>All Campaigns</h3>
+                <div class="campaign-list" id="campaignList">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Hall of Legends (Archived) -->
+            <div class="campaign-section" id="archiveSection">
+                <h3>Hall of Legends (Archived)</h3>
+                <div class="campaign-list" id="archiveList">
+                    <div class="empty-state">
+                        <p>No archived campaigns yet.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar - Heroes -->
+        <div class="sidebar">
+            <h3>Available Heroes</h3>
+            <div class="hero-list" id="heroList">
+                <!-- Populated by JS -->
+            </div>
+
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <h3>Quick Info</h3>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">
+                    <p><strong>Campaign</strong> = A training run for a hero</p>
+                    <p><strong>Hero</strong> = A model architecture</p>
+                    <p><strong>Archive</strong> = Move to Hall of Legends</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- New Campaign Modal -->
+    <div class="modal-overlay" id="newCampaignModal">
+        <div class="modal">
+            <h3>Start New Campaign</h3>
+            <form id="newCampaignForm">
+                <div class="form-group">
+                    <label>Hero</label>
+                    <select id="newHeroSelect">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Campaign Name</label>
+                    <input type="text" id="newCampaignName" placeholder="e.g., Binary Focus Training">
+                </div>
+                <div class="form-group">
+                    <label>Description (optional)</label>
+                    <textarea id="newCampaignDesc" rows="2" placeholder="What is this campaign about?"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Skills Focus</label>
+                    <div id="skillsCheckboxes" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="campaign-btn" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="campaign-btn primary">Create Campaign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let activeCampaign = null;
+        let heroes = [];
+        let campaigns = {};
+
+        // Time display
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('timeDisplay').textContent = now.toLocaleTimeString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Load data
+        async function loadData() {
+            try {
+                // Load heroes
+                const heroesResp = await fetch('/api/heroes');
+                heroes = await heroesResp.json();
+                renderHeroes();
+
+                // Load campaigns
+                const campaignsResp = await fetch('/api/campaigns');
+                const data = await campaignsResp.json();
+                activeCampaign = data.active;
+                campaigns = data.campaigns || {};
+
+                renderActiveCampaign();
+                renderCampaignList();
+                renderArchiveList();
+            } catch (err) {
+                console.error('Error loading data:', err);
+            }
+        }
+
+        function renderHeroes() {
+            const list = document.getElementById('heroList');
+            const select = document.getElementById('newHeroSelect');
+
+            list.innerHTML = heroes.map(h => `
+                <div class="hero-item ${activeCampaign?.hero_id === h.id ? 'active' : ''}" data-id="${h.id}">
+                    <div class="hero-icon">${h.display?.emoji || 'emoji'}</div>
+                    <div class="hero-details">
+                        <div class="hero-name">${h.name}</div>
+                        <div class="hero-model">${h.model?.hf_name || 'Unknown'}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            select.innerHTML = heroes.map(h => `
+                <option value="${h.id}">${h.name} - ${h.rpg_name}</option>
+            `).join('');
+
+            // Skills checkboxes
+            const skills = ['bin', 'sy'];
+            document.getElementById('skillsCheckboxes').innerHTML = skills.map(s => `
+                <label style="display: flex; align-items: center; gap: 0.25rem;">
+                    <input type="checkbox" name="skills" value="${s}" checked>
+                    ${s.toUpperCase()}
+                </label>
+            `).join('');
+        }
+
+        function renderActiveCampaign() {
+            const container = document.getElementById('currentCampaign');
+            const noCampaign = document.getElementById('noCampaign');
+
+            if (!activeCampaign) {
+                container.style.display = 'none';
+                noCampaign.style.display = 'block';
+                document.getElementById('milestonesSection').style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+            noCampaign.style.display = 'none';
+            document.getElementById('milestonesSection').style.display = 'block';
+
+            // Find hero
+            const hero = heroes.find(h => h.id === activeCampaign.hero_id) || {};
+
+            document.getElementById('heroPortrait').textContent = hero.display?.emoji || 'emoji';
+            document.getElementById('heroName').textContent = hero.name || activeCampaign.hero_id;
+            document.getElementById('campaignName').textContent = activeCampaign.name;
+            document.getElementById('heroTitle').textContent = hero.rpg_name || '';
+
+            document.getElementById('statStep').textContent = (activeCampaign.current_step || 0).toLocaleString();
+            document.getElementById('statStatus').textContent = activeCampaign.status || 'active';
+
+            // Calculate days
+            const created = new Date(activeCampaign.created_at);
+            const days = Math.floor((Date.now() - created) / (1000 * 60 * 60 * 24));
+            document.getElementById('statDays').textContent = days;
+
+            // Checkpoints - would need API
+            document.getElementById('statCheckpoints').textContent = '-';
+
+            // Skills
+            const skills = activeCampaign.skills_focus || [];
+            document.getElementById('campaignSkills').innerHTML = skills.map(s => `
+                <span class="campaign-skill-badge">${s.toUpperCase()}</span>
+            `).join('');
+
+            // Milestones
+            const milestones = activeCampaign.milestones || [];
+            document.getElementById('milestoneList').innerHTML = milestones.length ? milestones.map(m => `
+                <div class="milestone-item">
+                    <span class="milestone-step">Step ${m.step.toLocaleString()}</span>
+                    <span class="milestone-note">${m.note}</span>
+                    <span class="milestone-date">${m.date}</span>
+                </div>
+            `).join('') : '<div class="empty-state">No milestones recorded yet.</div>';
+        }
+
+        function renderCampaignList() {
+            const list = document.getElementById('campaignList');
+            const allCampaigns = [];
+
+            for (const [heroId, heroCampaigns] of Object.entries(campaigns)) {
+                for (const c of heroCampaigns) {
+                    if (c.status !== 'archived') {
+                        allCampaigns.push({...c, hero_id: heroId});
+                    }
+                }
+            }
+
+            if (allCampaigns.length === 0) {
+                list.innerHTML = '<div class="empty-state">No campaigns yet. Create one to start!</div>';
+                return;
+            }
+
+            list.innerHTML = allCampaigns.map(c => {
+                const isActive = activeCampaign?.id === c.id;
+                return `
+                <div class="campaign-item ${isActive ? 'active' : 'clickable'}"
+                     data-hero="${c.hero_id}" data-id="${c.id}"
+                     ${isActive ? '' : `onclick="activateCampaign('${c.hero_id}', '${c.id}')"`}
+                     ${isActive ? '' : 'title="Click to switch to this campaign"'}>
+                    <div class="campaign-item-header">
+                        <span class="campaign-item-name">${c.name}</span>
+                        <span class="campaign-item-step">${isActive ? '● Active' : `Step ${(c.current_step || 0).toLocaleString()}`}</span>
+                    </div>
+                    <div class="campaign-item-date">${c.hero_id} - Created ${new Date(c.created_at).toLocaleDateString()}</div>
+                </div>
+            `}).join('');
+        }
+
+        function renderArchiveList() {
+            const list = document.getElementById('archiveList');
+            const archived = [];
+
+            for (const [heroId, heroCampaigns] of Object.entries(campaigns)) {
+                for (const c of heroCampaigns) {
+                    if (c.status === 'archived') {
+                        archived.push({...c, hero_id: heroId});
+                    }
+                }
+            }
+
+            if (archived.length === 0) {
+                list.innerHTML = '<div class="empty-state">No archived campaigns.</div>';
+                return;
+            }
+
+            list.innerHTML = archived.map(c => `
+                <div class="campaign-item" data-hero="${c.hero_id}" data-id="${c.id}">
+                    <div class="campaign-item-header">
+                        <span class="campaign-item-name">${c.name}</span>
+                        <span class="campaign-item-step">Final Step ${(c.current_step || 0).toLocaleString()}</span>
+                    </div>
+                    <div class="campaign-item-date">${c.hero_id} - Archived ${new Date(c.archived_at).toLocaleDateString()}</div>
+                </div>
+            `).join('');
+        }
+
+        // Modal
+        function showNewCampaignModal() {
+            document.getElementById('newCampaignModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('newCampaignModal').classList.remove('active');
+        }
+
+        // Form submission
+        document.getElementById('newCampaignForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const heroId = document.getElementById('newHeroSelect').value;
+            const name = document.getElementById('newCampaignName').value;
+            const description = document.getElementById('newCampaignDesc').value;
+            const skillsInputs = document.querySelectorAll('input[name="skills"]:checked');
+            const skills = Array.from(skillsInputs).map(i => i.value);
+
+            try {
+                const resp = await fetch('/api/campaigns', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        hero_id: heroId,
+                        name: name,
+                        description: description,
+                        skills_focus: skills
+                    })
+                });
+
+                if (resp.ok) {
+                    closeModal();
+                    loadData();
+                } else {
+                    const err = await resp.json();
+                    alert('Error: ' + (err.error || 'Failed to create campaign'));
+                }
+            } catch (err) {
+                alert('Error creating campaign: ' + err.message);
+            }
+        });
+
+        // Actions
+        async function activateCampaign(heroId, campaignId) {
+            if (!confirm(`Switch to this campaign? Training will use the new campaign's status files.`)) {
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/campaigns/activate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        hero_id: heroId,
+                        campaign_id: campaignId
+                    })
+                });
+
+                if (resp.ok) {
+                    loadData();
+                } else {
+                    const err = await resp.json();
+                    alert('Error: ' + (err.error || 'Failed to activate'));
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function switchCampaign() {
+            // Scroll to campaign list
+            document.getElementById('campaignList').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function archiveCampaign() {
+            if (!activeCampaign) return;
+
+            if (!confirm(`Archive "${activeCampaign.name}"? This will move it to the Hall of Legends.`)) {
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/campaigns/archive', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        hero_id: activeCampaign.hero_id,
+                        campaign_id: activeCampaign.id
+                    })
+                });
+
+                if (resp.ok) {
+                    loadData();
+                } else {
+                    const err = await resp.json();
+                    alert('Error: ' + (err.error || 'Failed to archive'));
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        // Click outside modal to close
+        document.getElementById('newCampaignModal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                closeModal();
+            }
+        });
+
+        // Load on page load
+        loadData();
+    </script>
+
+    <!-- Bottom Navigation -->
+    <nav class="game-nav" id="bottomNav"></nav>
+    <script src="/static/js/nav.js"></script>
+</body>
+</html>

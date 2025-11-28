@@ -57,9 +57,16 @@ seconds_per_step = BENCHMARKS[gpu_type][model_size] × (actual_size / benchmark_
 model_memory = model_size_B × 0.5 GB
 optimizer_memory = model_size_B × 0.6 GB
 gradient_memory = model_size_B × 0.25 GB
-activation_memory = batch_size × 0.8 GB
+activation_memory = batch_size × 0.8 GB × (max_length / 2048) × checkpoint_factor
 total_memory = sum of above
+
+where:
+- checkpoint_factor = 0.35 if gradient_checkpointing else 1.0
+- 0.8 GB/batch coefficient was empirically calibrated at max_length=2048
 ```
+
+**Note:** VRAM depends on micro-batch size, NOT effective batch (batch × gradient_accumulation).
+gradient_accumulation only affects training time, not memory.
 
 === USAGE EXAMPLE ===
 ```python
@@ -193,7 +200,9 @@ class TimeEstimator:
     - Model: model_size_B × 0.5 GB
     - Optimizer (AdamW): model_size_B × 0.6 GB
     - Gradients: model_size_B × 0.25 GB
-    - Activations: batch_size × 0.8 GB
+    - Activations: batch_size × 0.8 GB × (max_length / 2048) × checkpoint_factor
+
+    checkpoint_factor = 0.35 if gradient_checkpointing else 1.0
 
     === USAGE ===
     ```python
@@ -315,7 +324,9 @@ class TimeEstimator:
     def estimate_memory(
         model_size_b: float,
         batch_size: int,
-        use_4bit: bool = True
+        use_4bit: bool = True,
+        max_length: int = 2048,
+        gradient_checkpointing: bool = True
     ) -> Dict[str, float]:
         """
         Estimate GPU memory usage for training.
@@ -325,8 +336,10 @@ class TimeEstimator:
 
         Args:
             model_size_b: Model size in billions of parameters (e.g., 1.0 for 1B model)
-            batch_size: Training batch size
+            batch_size: Training batch size (micro-batch, not effective batch)
             use_4bit: Whether using 4-bit quantization (default: True)
+            max_length: Maximum sequence length (default: 2048)
+            gradient_checkpointing: Whether gradient checkpointing is enabled (default: True)
 
         Returns:
             Dict[str, float]: Memory breakdown in GB
@@ -334,7 +347,7 @@ class TimeEstimator:
                 "model": float,      # Model weights
                 "optimizer": float,  # AdamW optimizer states
                 "gradients": float,  # Gradient tensors
-                "activations": float,# Activation memory (batch-dependent)
+                "activations": float,# Activation memory (batch × seq length dependent)
                 "total": float       # Sum of all components
             }
 
@@ -342,21 +355,23 @@ class TimeEstimator:
             model = model_size_b × 0.5 GB
             optimizer = model_size_b × 0.6 GB  (AdamW: momentum + variance)
             gradients = model_size_b × 0.25 GB
-            activations = batch_size × 0.8 GB
+            activations = batch_size × 0.8 GB × (max_length / 2048) × checkpoint_factor
             total = sum of above
 
-        Memory Formulas (fp16):
-            model = model_size_b × 2.0 GB
-            optimizer = model_size_b × 0.6 GB  (same)
-            gradients = model_size_b × 0.25 GB (same)
-            activations = batch_size × 0.8 GB  (same)
+        Note on gradient_accumulation:
+            VRAM is determined by micro-batch size (batch_size), not effective batch.
+            gradient_accumulation only affects training time, not memory usage.
 
         Example:
-            # 1B model, batch_size=4, 4-bit
-            mem = TimeEstimator.estimate_memory(1.0, 4, use_4bit=True)
+            # 0.6B model, batch_size=16, max_length=2048, 4-bit, checkpointing on
+            mem = TimeEstimator.estimate_memory(0.6, 16, use_4bit=True)
             print(mem)
-            # {'model': 0.5, 'optimizer': 0.6, 'gradients': 0.25,
-            #  'activations': 3.2, 'total': 4.6}
+            # {'model': 0.3, 'optimizer': 0.4, 'gradients': 0.2,
+            #  'activations': 4.5, 'total': 5.3}
+
+            # Same but max_length=4096 (activations ~double)
+            mem = TimeEstimator.estimate_memory(0.6, 16, max_length=4096)
+            # activations will be ~9.0 GB instead of ~4.5 GB
         """
 
         # Base model memory (4-bit quantized)
@@ -371,17 +386,25 @@ class TimeEstimator:
         # Gradients
         gradient_memory = model_size_b * 0.25
 
-        # Activations (depends on batch size and sequence length)
-        activation_memory = batch_size * 0.8  # Rough estimate
+        # Activations (depends on batch size AND sequence length)
+        # Base coefficient 0.8 GB/batch was empirically calibrated at max_length=2048
+        # Scale linearly with sequence length
+        seq_length_factor = max_length / 2048.0
+
+        # Gradient checkpointing reduces activation memory significantly
+        # Typical reduction is ~65% (stores only layer boundaries, recomputes forward)
+        checkpoint_factor = 0.35 if gradient_checkpointing else 1.0
+
+        activation_memory = batch_size * 0.8 * seq_length_factor * checkpoint_factor
 
         total = model_memory + optimizer_memory + gradient_memory + activation_memory
 
         return {
-            "model": round(model_memory, 1),
-            "optimizer": round(optimizer_memory, 1),
-            "gradients": round(gradient_memory, 1),
-            "activations": round(activation_memory, 1),
-            "total": round(total, 1)
+            "model": round(model_memory, 2),
+            "optimizer": round(optimizer_memory, 2),
+            "gradients": round(gradient_memory, 2),
+            "activations": round(activation_memory, 2),
+            "total": round(total, 2)
         }
 
     @classmethod

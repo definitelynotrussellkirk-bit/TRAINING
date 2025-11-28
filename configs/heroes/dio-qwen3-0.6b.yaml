@@ -1,0 +1,120 @@
+# =============================================================================
+# HERO: DIO - The Skeptic
+# =============================================================================
+# DIO is our first hero - a Qwen3-0.6B model learning to reason through
+# Binary Alchemy and Word Weaving. Named for his tendency to question
+# everything before committing to an answer.
+#
+# Started training: 2025-11-22
+# Current campaign: campaign-001 (Binary/Syllacrostic training)
+# =============================================================================
+
+id: dio-qwen3-0.6b
+name: "DIO"
+rpg_name: "The Skeptic"
+description: >
+  A cautious thinker who questions assumptions before acting.
+  DIO excels at careful reasoning but sometimes overthinks simple problems.
+  Currently training in the arts of Binary Alchemy and Word Weaving.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "Qwen/Qwen3-0.6B"
+  family: "qwen3"
+  architecture: "Qwen3ForCausalLM"
+  size_b: 0.6
+  vocab_size: 151936
+  context_length: 4096
+  rope_scaling: "dynamic"
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+# Calibrated for RTX 4090 (24GB VRAM)
+training_defaults:
+  # Precision
+  precision: "bf16"
+  load_in_4bit: false
+
+  # Batch configuration
+  batch_size: 1
+  gradient_accumulation: 16    # Effective batch = 16
+
+  # Learning rate
+  learning_rate: 0.0004
+  warmup_steps: 100
+
+  # Context
+  max_length: 2048
+
+  # Memory optimization
+  gradient_checkpointing: true
+
+  # Checkpointing
+  save_steps: 10000
+  save_total_limit: 40
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+# DIO uses full fine-tuning, not LoRA
+qlora:
+  enabled: false
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "qwen3_chat"
+  system_token: "<|im_start|>system"
+  user_token: "<|im_start|>user"
+  assistant_token: "<|im_start|>assistant"
+  end_token: "<|im_end|>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+# Empirically measured on RTX 4090
+# At batch_size=1, max_length=2048, bf16, gradient_checkpointing=true
+# Total VRAM usage: ~16.5GB
+vram:
+  base_memory_gb: 1.2
+  per_batch_gb: 0.8
+  optimizer_overhead_gb: 0.6
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/dio.png"
+  color: "#8B5CF6"             # Purple - wisdom and mystery
+  emoji: "emoji"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin                        # Binary Alchemy - computational reasoning
+  - sy                         # Word Weaving - syllacrostic puzzles
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  DIO (Qwen3-0.6B) Training Notes:
+
+  Strengths:
+  - Fast training speed (~0.18 steps/sec at batch=1, grad_accum=16)
+  - Small model, fits comfortably in 24GB VRAM
+  - Good at following structured formats
+
+  Quirks:
+  - Sometimes outputs thinking tokens when not needed
+  - Can struggle with very long sequences (>1500 tokens)
+
+  Historical:
+  - Training started 2025-11-22 from pure base model
+  - Currently at ~183k steps
+  - Focused on Binary (L1) and Syllacrostic (L1) skills

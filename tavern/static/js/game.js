@@ -105,6 +105,118 @@ function formatTime(date) {
 }
 
 // ============================================
+// ACTION HINTS - Contextual Advice
+// ============================================
+
+// Additional state for hints
+const HintState = {
+    queueTotal: 0,
+    queueHigh: 0,
+    queueNormal: 0,
+    queueLow: 0,
+    inboxCount: 0,
+    gpu3090Idle: false,
+    gpu3090Available: false,
+    taskMasterRunning: false,
+    lastTaskSuccess: null,
+    valTrainGap: 0,
+};
+
+// Fetch additional data for hints (called less frequently)
+async function fetchHintData() {
+    try {
+        // Fetch quests data
+        const questsRes = await fetch('/api/quests');
+        if (questsRes.ok) {
+            const quests = await questsRes.json();
+            HintState.queueTotal = (quests.high?.length || 0) + (quests.normal?.length || 0) + (quests.low?.length || 0);
+            HintState.queueHigh = quests.high?.length || 0;
+            HintState.queueNormal = quests.normal?.length || 0;
+            HintState.queueLow = quests.low?.length || 0;
+            HintState.inboxCount = quests.inbox_count || 0;
+        }
+
+        // Fetch task master data
+        const taskRes = await fetch('/api/task-master');
+        if (taskRes.ok) {
+            const task = await taskRes.json();
+            HintState.gpu3090Available = task.gpus?.['3090']?.available || false;
+            HintState.gpu3090Idle = task.gpus?.['3090']?.is_idle || false;
+            HintState.taskMasterRunning = task.daemon_running || false;
+            HintState.lastTaskSuccess = task.last_task?.success;
+        }
+    } catch (err) {
+        console.debug('Failed to fetch hint data:', err);
+    }
+}
+
+// Compute the best hint based on current state
+function computeActionHint() {
+    const hints = [];
+
+    // Priority 1: Training-specific hints
+    if (GameState.isTraining) {
+        // Check for overfitting (val loss significantly higher than train loss)
+        HintState.valTrainGap = GameState.valLoss - GameState.loss;
+        if (GameState.valLoss > 0 && GameState.loss > 0 && HintState.valTrainGap > 0.5) {
+            hints.push({ priority: 10, text: '⚠️ High val-train gap. Consider more diverse data.' });
+        }
+
+        // High loss warning
+        if (GameState.loss > 2.0) {
+            hints.push({ priority: 8, text: '💪 Strain is high. DIO is struggling with this material.' });
+        }
+
+        // Low queue warning during training
+        if (HintState.queueTotal < 3) {
+            hints.push({ priority: 7, text: '📦 Queue running low. Prepare more quests.' });
+        }
+
+        return hints.length > 0 ? hints.sort((a, b) => b.priority - a.priority)[0].text : '';
+    }
+
+    // Priority 2: Idle-specific hints
+    if (!GameState.isTraining) {
+        // Empty queue
+        if (HintState.queueTotal === 0 && HintState.inboxCount === 0) {
+            hints.push({ priority: 10, text: '📜 No quests queued. Drop training files in inbox/' });
+        } else if (HintState.queueTotal === 0 && HintState.inboxCount > 0) {
+            hints.push({ priority: 9, text: `📥 ${HintState.inboxCount} files in inbox awaiting processing.` });
+        } else if (HintState.queueTotal > 0) {
+            hints.push({ priority: 5, text: `📋 ${HintState.queueTotal} quests ready. Start training to continue.` });
+        }
+
+        // 3090 status hints
+        if (HintState.gpu3090Available && HintState.gpu3090Idle && !HintState.taskMasterRunning) {
+            hints.push({ priority: 6, text: '🤖 3090 is idle. Task Master could run sparring.' });
+        }
+
+        // Skill accuracy hints
+        if (GameState.currentSkillAcc < 50 && GameState.currentSkillAcc > 0) {
+            hints.push({ priority: 4, text: `📈 ${GameState.currentSkill} accuracy is ${GameState.currentSkillAcc.toFixed(0)}%. More training needed.` });
+        }
+    }
+
+    // Return highest priority hint
+    if (hints.length > 0) {
+        hints.sort((a, b) => b.priority - a.priority);
+        return hints[0].text;
+    }
+
+    return '';
+}
+
+// Update the action hint display
+function updateActionHint() {
+    const hint = computeActionHint();
+    const el = document.getElementById('actionHint');
+    if (el) {
+        el.textContent = hint;
+        el.style.display = hint ? 'block' : 'none';
+    }
+}
+
+// ============================================
 // LOSS CHART RENDERING
 // ============================================
 
@@ -733,6 +845,7 @@ function updateAll() {
     updateHeader();
     updateHeroStats();
     updateBattleStatus();
+    updateActionHint();
     updateSkills();
     updateVault();
     updateForge();
@@ -758,10 +871,16 @@ function init() {
     // Start data fetching (includes vault data)
     fetchGameData();
 
+    // Fetch hint data (quests, task master)
+    fetchHintData();
+
     setInterval(fetchGameData, CONFIG.UPDATE_INTERVAL);
 
     // Refresh saga every 5 seconds (incremental, won't wipe)
     setInterval(fetchSaga, 5000);
+
+    // Refresh hint data every 10 seconds (quests, task master status)
+    setInterval(fetchHintData, 10000);
 
     // Refresh skills every 30 seconds (reads YAML + curriculum state)
     setInterval(fetchSkills, 30000);

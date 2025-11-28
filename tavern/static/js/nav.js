@@ -6,6 +6,7 @@
 const NAV_ITEMS = [
     { href: '/', icon: '⚔️', label: 'Battle', id: 'battle' },
     { href: '/guild', icon: '🏰', label: 'Guild', id: 'guild' },
+    { href: '/campaign', icon: '🗺️', label: 'Campaign', id: 'campaign' },
     { href: '/quests', icon: '📜', label: 'Quests', id: 'quests' },
     { href: '/vault', icon: '🗃️', label: 'Vault', id: 'vault' },
     { href: '/oracle', icon: '🔮', label: 'Oracle', id: 'oracle' },
@@ -104,6 +105,8 @@ function autoRenderNav() {
         activeId = 'battle';
     } else if (path.startsWith('/guild') || path.startsWith('/skill')) {
         activeId = 'guild';
+    } else if (path.startsWith('/campaign')) {
+        activeId = 'campaign';
     } else if (path.startsWith('/quests')) {
         activeId = 'quests';
     } else if (path.startsWith('/vault') || path.startsWith('/checkpoint')) {

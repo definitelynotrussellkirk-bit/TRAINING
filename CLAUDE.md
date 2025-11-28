@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-11-27 (Quests Page + VRAM Calculator + Scheduler UI)
+**Last Updated:** 2025-11-27 (Sparring with the Trainers)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 ---
@@ -45,12 +45,16 @@ DROP QUEST → DIO BATTLES → GAIN XP → LEVEL UP → UNLOCK SKILLS → REPEAT
 ### Start Playing
 
 ```bash
-# Start the Tavern (game UI)
-python3 tavern/server.py --port 8888
+# Start everything (The Weaver manages all services)
+./scripts/start_all.sh
 
-# Or via Python
-from realm import open_tavern
-open_tavern()
+# Or manually check/start services
+python3 weaver/weaver.py --status   # Check tapestry
+python3 weaver/weaver.py            # Check and mend broken threads
+python3 weaver/weaver.py --daemon   # Run continuously
+
+# Stop everything
+./scripts/stop_all.sh
 ```
 
 ---
@@ -93,6 +97,9 @@ The realm is the entire game world - every location has an RPG name:
 ```
 REALM (realm.py) - The game world
 │
+├── weaver/         # 🧵 THE WEAVER - Daemon orchestrator (manages all threads)
+│   └── weaver.py           # Watches and restarts all services
+│
 ├── tavern/         # 🍺 MAIN GAME UI - Where you watch DIO (port 8888)
 │   ├── server.py           # Tavern server
 │   ├── templates/game.html # Game interface
@@ -101,7 +108,10 @@ REALM (realm.py) - The game world
 ├── guild/          # 🏰 Skills & progression
 │   ├── skills/             # Skill system (loads from configs/skills/*.yaml)
 │   ├── quests/             # Quest templates
-│   └── progression/        # XP, level-up logic
+│   ├── progression/        # XP, level-up logic
+│   ├── sparring.py         # ⚔️ Sparring with Trainers (self-correction)
+│   ├── sparring_validator.py # Validator for sparring data
+│   └── task_registry.py    # Available tasks for Task Master
 │
 ├── arena/          # ⚔️ Where battles happen (training)
 │   ├── quest_board.py      # Training queue
@@ -138,8 +148,10 @@ REALM (realm.py) - The game world
 
 | Game Location | Technical System | Port |
 |--------------|------------------|------|
+| **The Weaver** | Daemon orchestrator | - |
 | **Tavern** | Game UI | 8888 |
 | **Arena** | Training daemon | - |
+| **Sparring Ring** | Self-correction (guild/sparring.py) | 8765 (3090) |
 | **Watchtower** | Monitoring API | 8081 |
 | **Vault** | VaultKeeper API | 8767 |
 | **Oracle** | Inference server (3090) | 8765 |
@@ -176,6 +188,41 @@ The Tavern displays data. To feel like a **complete game**, we need:
 ---
 
 ## 📦 RECENT UPDATES
+
+**Sparring with the Trainers + Task Master (2025-11-27)**
+- ✅ **Self-correction system** - DIO spars with skill trainers, learns from mistakes
+- ✅ **3 training examples per wrong answer**:
+  1. Identify incorrect: "Is this correct?" → "It is incorrect."
+  2. Correct it: "Find the correct solution." → [golden answer]
+  3. Confirm correct: [fresh problem] "Is this correct?" → "It is correct."
+- ✅ **Always HIGH priority** - Sparring data is checkpoint-specific, becomes stale!
+- ✅ **Task Master** (`guild/task_master.py`) - GPU-aware task scheduler
+- ✅ **Task Registry** (`guild/task_registry.py`) - 11 registered tasks
+- ✅ **Monitors both GPUs** - Runs tasks when utilization <40%
+- ✅ **Usage**:
+  - `python3 guild/task_master.py --status` - Show GPU + task status
+  - `python3 guild/task_master.py --once` - Check and run one task
+  - `python3 guild/task_master.py --daemon` - Run continuously
+
+**Curriculum Fix (2025-11-27)**
+- ✅ **Fixed level mismatch** - `current_level` now correctly means "mastered level"
+- ✅ **Reset to 0** - Both skills reset to mastered=0, training on level 1
+- ✅ **Progress bar verified** - API returns correct `batch_total_steps`
+
+**The Weaver - Daemon Orchestrator (2025-11-27)**
+- ✅ **One daemon to rule them all** - The Weaver watches all threads
+- ✅ **Auto-restart** - Dead daemons automatically restarted
+- ✅ **Data flow** - Generates training data when queue runs low
+- ✅ **Threads monitored**: Training Daemon, Tavern, VaultKeeper, Data Flow
+- ✅ **Simple startup** - `./scripts/start_all.sh` starts The Weaver
+- ✅ **Status check** - `python3 weaver/weaver.py --status`
+
+**Oracle Strict Version Checking (2025-11-27)**
+- ✅ **No fallback** - Chat fails clearly if requested step not loaded
+- ✅ **Accurate status** - Uses `/models/info` (actual pool) not stale `/health`
+- ✅ **Step required** - Chat API requires explicit step parameter
+- ✅ **Version verification** - Response includes server-confirmed `model` and `model_path`
+- ✅ **Multi-model display** - Status shows ALL loaded models, not just "active"
 
 **Tavern UI Expansion (2025-11-27 Late)**
 - ✅ **Quests Page** (`/quests`) - Full quest board with queue management
@@ -641,9 +688,9 @@ print(host.models_dir)  # /path/to/models
 
 ## 🔮 ORACLE - TALK TO DIO
 
-**NEW (2025-11-27)** - Chat with any checkpoint version
+**UPDATED (2025-11-27)** - Strict version checking, no fallbacks
 
-The Oracle lets you load any checkpoint and chat with it.
+The Oracle lets you chat with any checkpoint loaded on the inference server.
 
 ### Access
 
@@ -651,30 +698,167 @@ Visit: **http://localhost:8888/oracle**
 
 ### Features
 
-1. **Select Checkpoint** - Pick from ledger (shows loss, skill, age)
-2. **Select Host** - Choose inference host (3090, etc.)
-3. **Load** - Load checkpoint on the selected host
-4. **Chat** - Talk to that version of DIO
+1. **View Loaded Models** - See ALL models currently in the inference pool
+2. **Select Checkpoint** - Pick from ledger OR from loaded models
+3. **Strict Chat** - Step parameter REQUIRED, no fallback to wrong model
+4. **Version Verification** - Response confirms which model was actually used
+
+### Strict Version Checking
+
+The Oracle enforces strict version verification:
+- **Step required** - Chat requests MUST specify which step to use
+- **No fallback** - If requested step not loaded, fails with 404 (not silent wrong model)
+- **Server verification** - Response includes `model` and `model_path` confirming what ran
+- **Accurate status** - Uses `/models/info` (actual loaded models) not stale `/health`
 
 ### API
 
 ```bash
-# List inference hosts
-curl http://localhost:8888/oracle/hosts
-
-# Get oracle status (what's loaded where)
+# Get oracle status (shows ALL loaded models)
 curl http://localhost:8888/oracle/status
+# Returns: {"hosts": {"3090": {"loaded_models": [...], "model_count": 3}}}
 
 # Load checkpoint on host
 curl -X POST http://localhost:8888/oracle/load \
   -H "Content-Type: application/json" \
-  -d '{"step": 190000, "host": "3090"}'
+  -d '{"step": 181865, "host": "3090"}'
 
-# Chat
+# Chat (step REQUIRED)
 curl -X POST http://localhost:8888/oracle/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "Hello DIO!", "host": "3090"}'
+  -d '{"message": "Hello DIO!", "host": "3090", "step": 181865}'
+# Returns: {"success": true, "model": "checkpoint-181865", "model_path": "..."}
+
+# Chat with base model (step 0)
+curl -X POST http://localhost:8888/oracle/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello!", "host": "3090", "step": 0}'
+
+# Request unloaded step (fails clearly)
+curl -X POST http://localhost:8888/oracle/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hi", "host": "3090", "step": 148000}'
+# Returns: {"success": false, "error": "Step 148000 not loaded. Available: [...]"}
 ```
+
+---
+
+## ⚔️ SPARRING WITH THE TRAINERS
+
+**NEW (2025-11-27)** - Learn from combat mistakes
+
+When DIO spars with skill trainers, every wrong answer generates 3 training examples:
+
+| # | Type | Prompt | Golden Answer |
+|---|------|--------|---------------|
+| 1 | Identify Wrong | `[problem + wrong answer] Is this correct?` | `It is incorrect.` |
+| 2 | Correct It | `[problem + wrong answer] This is incorrect. Find the correct solution.` | `[golden answer]` |
+| 3 | Confirm Right | `[fresh problem + golden] Is this correct?` | `It is correct.` |
+
+### Usage
+
+```bash
+# Run sparring session (100 problems)
+python3 guild/sparring.py --skill binary --count 100
+
+# Specific checkpoint
+python3 guild/sparring.py --skill binary --checkpoint checkpoint-180000
+
+# Validate sparring files
+python3 guild/sparring_validator.py --check-all
+```
+
+### Task Registry
+
+Tasks available for future Task Master scheduling:
+
+```bash
+# List all tasks
+python3 guild/task_registry.py list
+
+# Show tasks ready to run on 3090
+python3 guild/task_registry.py available --gpu 3090
+
+# Run a task manually
+python3 guild/task_registry.py run --task sparring_binary
+```
+
+### Key Points
+
+- **Always HIGH priority queue** - Sparring data is checkpoint-specific, becomes stale when model advances
+- **Requires 3090** - Uses inference API for testing
+- **Auto-queued** - Results go directly to `queue/high/`
+- **Status**: `status/sparring.json`
+
+### Files
+
+```
+guild/
+├── sparring.py           # Main sparring system
+├── sparring_validator.py # Dedicated validator
+├── task_registry.py      # Task definitions
+└── task_master.py        # GPU-aware scheduler
+```
+
+---
+
+## 🤖 TASK MASTER - GPU-AWARE SCHEDULER
+
+**NEW (2025-11-27)** - Runs tasks when GPU resources are available
+
+The Task Master monitors GPU utilization on both 4090 and 3090, running tasks opportunistically when resources are idle (<40% utilization).
+
+### Usage
+
+```bash
+# Check status
+python3 guild/task_master.py --status
+
+# Run one task (if GPU idle)
+python3 guild/task_master.py --once
+
+# Run as daemon (continuous)
+python3 guild/task_master.py --daemon --interval 60
+
+# Force run specific task
+python3 guild/task_master.py --run sparring_binary
+```
+
+### Registered Tasks (by priority)
+
+| Pri | Task | GPU | Description |
+|-----|------|-----|-------------|
+| **10** | `process_eval_queue` | 3090 | Process pending evals (from checkpoint saves) |
+| 9 | `sparring_binary` | 3090 | Sparring session (100 problems) |
+| 9 | `sparring_sy` | 3090 | SYLLO sparring (disabled) |
+| 8 | `sparring_binary_large` | 3090 | Extended sparring (500 problems) |
+| 6 | `generate_binary` | none | Generate training data |
+| 4 | `health_check` | none | System health check |
+| 4 | `validate_queue` | none | Validate queue files |
+| 3 | `checkpoint_cleanup` | none | Clean old checkpoints |
+| 3 | `vault_scan` | none | Scan VaultKeeper assets |
+| 2 | `model_warmup` | 3090 | Warm up inference model |
+| 2 | `lineage_report` | none | Data lineage report |
+
+**Note**: Evals are ONLY run once per checkpoint. The `process_eval_queue` task checks for pending evals (queued when checkpoints are saved) and processes them. It does NOT re-run evals.
+
+### Task Registry CLI
+
+```bash
+# List all tasks
+python3 guild/task_registry.py list
+
+# Show available tasks for GPU
+python3 guild/task_registry.py available --gpu 3090
+
+# Check task status/cooldowns
+python3 guild/task_registry.py status
+```
+
+### Status Files
+
+- `status/task_master.json` - Current GPU status, last task run
+- `status/task_state.json` - Task execution history, cooldowns
 
 ---
 

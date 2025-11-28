@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class CurriculumSkillState:
     """State of a skill in the curriculum system."""
     skill_id: str
-    current_level: int = 1
+    current_level: int = 0  # 0 = nothing mastered, training on level 1
     accuracy_history: List[Dict[str, Any]] = field(default_factory=list)
     progression_history: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -86,7 +86,7 @@ class CurriculumState:
         for skill_id, skill_data in skills_data.items():
             state.skills[skill_id] = CurriculumSkillState(
                 skill_id=skill_id,
-                current_level=skill_data.get("current_level", 1),
+                current_level=skill_data.get("current_level", 0),  # 0 = nothing mastered
                 accuracy_history=skill_data.get("accuracy_history", []),
                 progression_history=skill_data.get("progression_history", []),
             )

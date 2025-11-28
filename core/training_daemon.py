@@ -105,25 +105,31 @@ from data_file_impact import DataFileImpactTracker
 sys.path.insert(0, str(Path(__file__).parent.parent / "data_manager"))
 from data_manager import DataManager
 
+# Events system (global announcements)
+sys.path.insert(0, str(Path(__file__).parent.parent))
+try:
+    from events import (
+        emit, announce, EventType, Severity,
+        queue_empty_event, data_need_event, training_started_event,
+        training_completed_event, daemon_heartbeat_event
+    )
+    EVENTS_AVAILABLE = True
+except ImportError:
+    EVENTS_AVAILABLE = False
+    def emit(*args, **kwargs): pass
+    def announce(*args, **kwargs): pass
+
 # Add format variety support
 import random
 REPO_ROOT = Path(__file__).parent.parent / "singleSKILL"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-try:
-    from skill_syllo_variant.scripts.export_training_data import (
-        DEFAULT_OUTPUT_VARIANT_DISTRIBUTION,
-        OUTPUT_VARIANTS,
-        choose_output_variant
-    )
-    FORMAT_VARIETY_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Format variety not available: {e}")
-    FORMAT_VARIETY_AVAILABLE = False
-    DEFAULT_OUTPUT_VARIANT_DISTRIBUTION = {"standard": 1.0}
-    OUTPUT_VARIANTS = {"standard": {"prompt_note": "", "transform": lambda p: p}}
-    choose_output_variant = lambda rng, dist: "standard"
+# Format variety - optional, fails silently
+FORMAT_VARIETY_AVAILABLE = False
+DEFAULT_OUTPUT_VARIANT_DISTRIBUTION = {"standard": 1.0}
+OUTPUT_VARIANTS = {"standard": {"prompt_note": "", "transform": lambda p: p}}
+choose_output_variant = lambda rng, dist: "standard"
 
 
 class TrainingDaemon:
@@ -1539,9 +1545,20 @@ class TrainingDaemon:
             if total_queued >= min_queue_depth:
                 return  # Quest Board has enough items
 
+            # Emit queue low event
+            emit(queue_empty_event(total_queued, min_queue_depth))
+
             self.logger.info(f"📜 Quest Board low ({total_queued} < {min_queue_depth}), asking Quest Master for more...")
 
-            # Data Manager handles all generation logic
+            # Emit data need event before calling DataManager
+            count = auto_cfg.get("count", 5000)
+            emit(data_need_event(
+                skill=self.data_manager.get_active_skill() if hasattr(self.data_manager, 'get_active_skill') else "unknown",
+                count=count,
+                reason="queue_low"
+            ))
+
+            # Data Manager handles all generation logic (and emits its own events)
             success = self.data_manager.generate_and_queue(force=False)
 
             if success:

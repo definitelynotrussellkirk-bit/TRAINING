@@ -3,6 +3,10 @@
 Self-Correction Impact Monitor
 ==============================
 
+NOTE: Consider using guild/sparring.py for new self-correction workflows.
+This module can still be used to measure impact of ANY correction data,
+including the new Sparring system.
+
 Tracks whether correction training data reduces targeted error rates.
 
 Answers the question: "Are our self-correction efforts actually working?"
@@ -15,6 +19,8 @@ How it works:
 
 GPU Usage: None (uses 3090 API)
 ROI: Provides visibility into self-correction effectiveness
+
+See also: guild/sparring.py for generating correction training data
 """
 
 import json

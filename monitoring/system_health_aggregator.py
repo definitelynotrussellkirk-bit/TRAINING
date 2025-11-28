@@ -90,7 +90,6 @@ EXPECTED_PROCESSES = {
     "4090": [
         {"name": "training_daemon", "pattern": "training_daemon.py", "critical": True},
         {"name": "deployment_orchestrator", "pattern": "deployment_orchestrator.py", "critical": False},
-        {"name": "model_comparison_engine", "pattern": "model_comparison_engine.py", "critical": False},
     ],
     "3090": [
         # Note: inference server runs as main.py in /home/user/llm

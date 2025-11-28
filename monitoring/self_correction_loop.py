@@ -1,8 +1,30 @@
 #!/usr/bin/env python3
 """
-Self-Correction Loop - Learn from model mistakes
+DEPRECATED - Use guild/sparring.py instead
+
+This module is superseded by the new Sparring system (2025-11-27).
+See: guild/sparring.py - "Sparring with the Trainers"
+
+The new system:
+- Cleaner 3-example-per-mistake format
+- Always HIGH priority queue (data becomes stale)
+- Dedicated validator: guild/sparring_validator.py
+- Task registry for scheduling: guild/task_registry.py
+
+Usage of new system:
+    python3 guild/sparring.py --skill binary --count 100
+
+---
+ORIGINAL: Self-Correction Loop - Learn from model mistakes
 Creates high-value training data from errors via automated correction
 """
+
+import warnings
+warnings.warn(
+    "self_correction_loop.py is DEPRECATED. Use guild/sparring.py instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import json
 import os

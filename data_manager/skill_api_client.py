@@ -29,13 +29,12 @@ from typing import Dict, Any, List, Optional
 
 # Skill API configuration
 SKILL_APIS = {
-    # DISABLED: Re-enable when Sy trainer is ready
-    # "syllo": {
-    #     "name": "SYLLO Puzzles",
-    #     "base_url": "http://127.0.0.1:8080",
-    #     "levels": 5,
-    #     "server_script": "/path/to/skills/skill_syllo_variant/api_server.py",
-    # },
+    "syllo": {
+        "name": "SYLLO Puzzles",
+        "base_url": "http://127.0.0.1:8080",
+        "levels": 50,
+        "server_script": "/path/to/skills/skill_syllo_variant/api_server.py",
+    },
     "binary": {
         "name": "Binary Arithmetic",
         "base_url": "http://127.0.0.1:8090",
@@ -95,26 +94,24 @@ def syllo_to_training_format(puzzle: Dict[str, Any], puzzle_index: int = 1) -> D
     """
     Convert SYLLO puzzle to training messages format.
 
-    The SYLLO API now returns `prompt` and `solution` directly in the
-    correct training format (matching the 1M+ training examples).
-
-    Just use them directly - no local formatting needed.
+    The SYLLO API returns user_prompt and assistant_response fields.
     """
-    # The API now returns these fields directly
-    user_content = puzzle.get("prompt")
-    assistant_content = puzzle.get("solution")
+    # API returns user_prompt and assistant_response
+    user_content = puzzle.get("user_prompt") or puzzle.get("prompt")
+    assistant_content = puzzle.get("assistant_response") or puzzle.get("solution")
 
-    # Fallback if API doesn't have new fields (shouldn't happen)
+    # Fallback if API doesn't have the fields
     if not user_content or not assistant_content:
         raise ValueError(
-            f"SYLLO API response missing prompt/solution fields. "
-            f"Make sure the SYLLO API (singleSKILL) is updated."
+            f"SYLLO API response missing user_prompt/assistant_response fields. "
+            f"Got keys: {list(puzzle.keys())}"
         )
 
-    # Extract metadata
+    # Extract metadata from puzzle
     puzzle_id = puzzle.get("puzzle_id", f"syllo_api_{puzzle_index:05d}")
-    rules = puzzle.get("rules", {})
-    word_count = rules.get("word_count", len(puzzle.get("words", [])))
+    metadata = puzzle.get("metadata", {})
+    puzzle_params = puzzle.get("puzzle_params", {})
+    word_count = metadata.get("num_words", puzzle_params.get("num_words", 0))
 
     return {
         "messages": [

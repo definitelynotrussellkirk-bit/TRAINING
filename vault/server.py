@@ -28,7 +28,7 @@ import logging
 import os
 import sys
 from datetime import datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
@@ -1015,8 +1015,8 @@ def run_server(port: int = 8767, base_dir: str = "/path/to/training"):
     # Set base directory for training API
     VaultKeeperHandler.base_dir = base_path
 
-    # Start server
-    server = HTTPServer(("0.0.0.0", port), VaultKeeperHandler)
+    # Start server - use ThreadingHTTPServer to handle concurrent requests without blocking
+    server = ThreadingHTTPServer(("0.0.0.0", port), VaultKeeperHandler)
     logger.info(f"VaultKeeper server starting on port {port}")
     logger.info(f"Base directory: {base_dir}")
     logger.info(f"Catalog: {keeper.catalog_path}")

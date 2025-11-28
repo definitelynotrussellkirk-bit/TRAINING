@@ -107,13 +107,35 @@
                 </div>
 
                 <div class="battle-stats" id="battleStats">
+                    <div class="battle-stat" title="Current training step">
+                        <span class="bs-label">Step</span>
+                        <span class="bs-value" id="battleStep">--</span>
+                    </div>
+                    <div class="battle-stat" title="Training speed (steps per second)">
+                        <span class="bs-label">Speed</span>
+                        <span class="bs-value" id="battleSpeed">--</span>
+                    </div>
                     <div class="battle-stat" title="Current training strain (loss). Lower = learning more easily.">
                         <span class="bs-label">Strain</span>
                         <span class="bs-value" id="battleStrain">--</span>
                     </div>
-                    <div class="battle-stat" title="Validation strain (val loss). Lower = generalizing better.">
-                        <span class="bs-label">Val Strain</span>
-                        <span class="bs-value" id="battleValStrain">--</span>
+                    <div class="battle-stat" title="Estimated time remaining">
+                        <span class="bs-label">ETA</span>
+                        <span class="bs-value" id="battleETA">--</span>
+                    </div>
+                </div>
+
+                <!-- LOSS GRAPH -->
+                <div class="loss-graph-container">
+                    <div class="loss-graph-header">
+                        <span class="loss-graph-title">Strain History</span>
+                        <span class="loss-graph-range" id="lossGraphRange">Last 200 steps</span>
+                    </div>
+                    <canvas id="lossChart" width="280" height="80"></canvas>
+                    <div class="loss-graph-footer">
+                        <span class="loss-min" id="lossMin">--</span>
+                        <span class="loss-trend" id="lossTrend">--</span>
+                        <span class="loss-max" id="lossMax">--</span>
                     </div>
                 </div>
             </div>
@@ -193,12 +215,13 @@
     <!-- NAVIGATION (dynamic) -->
     <nav class="game-nav" id="bottomNav"></nav>
     <script src="/static/js/nav.js"></script>
+    <script src="/static/js/events.js"></script>
 
     <!-- FLOATING NOTIFICATIONS -->
     <div class="notifications" id="notifications">
         <!-- Notifications will be injected here -->
     </div>
 
-    <script src="/static/js/game.js?v=13"></script>
+    <script src="/static/js/game.js?v=15"></script>
 </body>
 </html>

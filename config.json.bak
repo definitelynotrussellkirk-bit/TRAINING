@@ -28,7 +28,7 @@
   "auto_generate": {
     "enabled": true,
     "_comment": "Quest Master maintains at least min_queue_depth items on Quest Board",
-    "count": 5000,
+    "count": 100,
     "priority": "normal",
     "threshold": 0,
     "cooldown_sec": 180,

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guild Hall - DIO's Skills</title>
+    <link rel="stylesheet" href="/static/css/game.css">
     <style>
         :root {
             --bg-dark: #0a0a0f;
@@ -330,6 +331,11 @@
         </div>
     </div>
 
+    <!-- NAVIGATION (dynamic) -->
+    <nav class="game-nav" id="bottomNav"></nav>
+    <script src="/static/js/nav.js"></script>
+    <script src="/static/js/events.js"></script>
+
     <script>
         async function loadGuildData() {
             try {
@@ -375,12 +381,12 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="skill-level">L${skill.current_level || 1}</div>
+                        <div class="skill-level">L${skill.current_level}</div>
                     </div>
                     <div class="skill-progress">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                             <span style="font-size: 0.75rem; color: var(--text-dim);">
-                                Progress to L${(skill.current_level || 1) + 1}
+                                Training L${skill.training_level || skill.current_level + 1}
                             </span>
                             <span style="font-size: 0.75rem;">
                                 ${skill.progress_pct || 0}%
@@ -392,7 +398,7 @@
                     </div>
                     <div class="skill-stats">
                         <div class="stat">
-                            <div class="stat-value">${(skill.accuracy * 100 || 0).toFixed(0)}%</div>
+                            <div class="stat-value">${((skill.accuracy || 0) * 100).toFixed(0)}%</div>
                             <div class="stat-label">Accuracy</div>
                         </div>
                         <div class="stat">

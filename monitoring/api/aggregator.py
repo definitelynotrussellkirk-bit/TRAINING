@@ -18,7 +18,6 @@ from .plugins.gpu_stats import GPU4090Plugin, GPU3090Plugin
 from .plugins.adversarial import AdversarialPlugin
 from .plugins.checkpoints import CheckpointSyncPlugin
 from .plugins.regression import RegressionPlugin
-from .plugins.model_comparison import ModelComparisonPlugin
 from .plugins.confidence import ConfidencePlugin
 from .plugins.testing import TestingPlugin
 from .plugins.self_correction import SelfCorrectionPlugin
@@ -89,10 +88,6 @@ class DataAggregator:
 
             self.registry.register(RegressionPlugin(
                 config=self.config.get('regression', {})
-            ))
-
-            self.registry.register(ModelComparisonPlugin(
-                config=self.config.get('model_comparison', {})
             ))
 
             self.registry.register(ConfidencePlugin(

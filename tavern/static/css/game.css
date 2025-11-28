@@ -901,6 +901,30 @@ body {
     font-weight: 500;
 }
 
+/* Weaver Status Indicator */
+.weaver-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    margin-left: auto;
+    cursor: default;
+    opacity: 0.8;
+}
+
+.weaver-indicator:hover {
+    opacity: 1;
+}
+
+.weaver-icon {
+    font-size: 1rem;
+}
+
+.weaver-status {
+    font-size: 0.75rem;
+    color: #6B7280; /* Default gray */
+}
+
 /* ========================================
    NOTIFICATIONS
    ======================================== */
@@ -942,6 +966,78 @@ body {
 .notification-text {
     font-size: 0.85rem;
     color: var(--text-secondary);
+}
+
+/* ========================================
+   LOSS GRAPH
+   ======================================== */
+
+.loss-graph-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.loss-graph-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.loss-graph-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.loss-graph-range {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+#lossChart {
+    width: 100%;
+    height: 80px;
+    background: var(--bg-dark);
+    border-radius: 4px;
+}
+
+.loss-graph-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+    font-size: 0.7rem;
+    font-family: monospace;
+}
+
+.loss-min {
+    color: var(--color-success);
+}
+
+.loss-max {
+    color: var(--color-danger);
+}
+
+.loss-trend {
+    color: var(--text-muted);
+}
+
+.loss-trend.improving {
+    color: var(--color-success);
+}
+
+.loss-trend.degrading {
+    color: var(--color-danger);
+}
+
+.loss-trend.stable {
+    color: var(--color-warning);
 }
 
 /* ========================================

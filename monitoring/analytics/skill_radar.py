@@ -230,16 +230,6 @@ class SkillRadarGenerator:
                         acc = result.get('accuracy', 0)
                         scores[f"{skill}_L{level}"] = acc
 
-        # Try model comparisons
-        model_comparisons = self.base_dir / "status" / "model_comparisons.json"
-        if model_comparisons.exists() and not scores:
-            with open(model_comparisons) as f:
-                data = json.load(f)
-                if 'evaluations' in data and data['evaluations']:
-                    latest = data['evaluations'][0]
-                    if 'accuracy' in latest:
-                        scores['overall'] = latest['accuracy']
-
         # Fallback: generate demo data
         if not scores:
             logger.warning("No skill data found, using demo values")

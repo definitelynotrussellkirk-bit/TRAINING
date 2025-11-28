@@ -109,7 +109,8 @@ class CurriculumManager:
 
             # Migrate old format (single skill) to new format (multi-skill)
             if "skills" not in state:
-                old_level = state.get("current_level", 1)
+                # NOTE: Default to 0 (nothing mastered), not 1!
+                old_level = state.get("current_level", 0)
                 old_history = state.get("accuracy_history", [])
                 old_progressions = state.get("progression_history", [])
 
@@ -120,7 +121,7 @@ class CurriculumManager:
                             "accuracy_history": old_history,
                             "progression_history": old_progressions
                         },
-                        "binary": {"current_level": 1, "accuracy_history": [], "progression_history": []},
+                        "binary": {"current_level": 0, "accuracy_history": [], "progression_history": []},
                     },
                     "active_skill": state.get("current_skill", "syllo"),
                     "started_at": state.get("started_at", datetime.now().isoformat()),
@@ -214,7 +215,7 @@ class CurriculumManager:
         """
         if skill not in self.state["skills"]:
             self.state["skills"][skill] = {
-                "current_level": 1,
+                "current_level": 0,  # 0 = nothing mastered yet, train on level 1
                 "accuracy_history": [],
                 "progression_history": []
             }
@@ -357,7 +358,7 @@ class CurriculumManager:
 
     def _get_skill_status(self, skill: str) -> Dict[str, Any]:
         """Get status for a single skill."""
-        skill_state = self.state["skills"].get(skill, {"current_level": 1, "accuracy_history": []})
+        skill_state = self.state["skills"].get(skill, {"current_level": 0, "accuracy_history": []})
         skill_config = self.get_skill_config(skill)
         current_level = self.get_current_level(skill)
 
@@ -393,15 +394,15 @@ class CurriculumManager:
         logger.info(f"Active skill set to: {skill}")
 
     def reset_skill(self, skill: str):
-        """Reset a skill to level 1."""
+        """Reset a skill to level 0 (nothing mastered, train on level 1)."""
         self.state["skills"][skill] = {
-            "current_level": 1,
+            "current_level": 0,  # 0 = nothing mastered, training_level = 1
             "accuracy_history": [],
             "progression_history": [],
             "reset_at": datetime.now().isoformat()
         }
         self._save_state()
-        logger.info(f"[{skill}] Reset to Level 1")
+        logger.info(f"[{skill}] Reset to mastered=0 (training on level 1)")
 
 
 def main():

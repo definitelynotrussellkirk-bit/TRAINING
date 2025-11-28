@@ -608,8 +608,10 @@ class TrainingStatus:
     accuracy_percent: float = 0.0
 
     # Metrics
-    train_loss_history: List[float] = None
+    train_loss_history: List[Dict[str, Any]] = None  # [{step, loss, lr}, ...]
     accuracy_history: List[float] = None
+    steps_per_second: Optional[float] = None  # Training speed
+    eta_seconds: Optional[int] = None  # Estimated time to finish current file
 
     # NEW: Fixed evaluation metrics
     fixed_eval_em: Optional[float] = None          # Exact Match on fixed set
@@ -784,6 +786,14 @@ class TrainingStatusWriter:
         self.length_bin_last_seen = {}
         self.pattern_loss_history = {}
         self.pattern_loss_summary = {}
+        self.loss_history = []  # Track last 200 loss values for graph
+        self.loss_history_max = 200  # Keep last N losses
+        # Steps/second tracking for ETA
+        self.last_step = 0
+        self.last_step_time = None
+        self.steps_per_second = 0.0
+        self.steps_history = []  # Track recent step times for smoothing
+        self.steps_history_max = 10
         self.queue_velocity_snapshot = None
         self.vram_samples = []
         self.penalty_stats_snapshot = None
@@ -957,6 +967,32 @@ class TrainingStatusWriter:
         if protocol_stats is not None:
             self.protocol_stats_snapshot = protocol_stats
 
+        # Track loss history for graphing
+        self.loss_history.append({"step": step, "loss": loss, "lr": lr})
+        if len(self.loss_history) > self.loss_history_max:
+            self.loss_history = self.loss_history[-self.loss_history_max:]
+
+        # Calculate steps/second and ETA
+        now = datetime.now()
+        if self.last_step_time and step > self.last_step:
+            elapsed = (now - self.last_step_time).total_seconds()
+            if elapsed > 0:
+                instant_rate = (step - self.last_step) / elapsed
+                self.steps_history.append(instant_rate)
+                if len(self.steps_history) > self.steps_history_max:
+                    self.steps_history = self.steps_history[-self.steps_history_max:]
+                # Smoothed average
+                self.steps_per_second = sum(self.steps_history) / len(self.steps_history)
+        self.last_step = step
+        self.last_step_time = now
+
+        # Calculate ETA for current file
+        eta_seconds = None
+        if self.steps_per_second > 0 and batch_total_steps and batch_step:
+            remaining_steps = batch_total_steps - batch_step
+            if remaining_steps > 0:
+                eta_seconds = int(remaining_steps / self.steps_per_second)
+
         status = TrainingStatus(
             status="training",
             current_step=step,
@@ -1009,6 +1045,9 @@ class TrainingStatusWriter:
             queue_velocity=self.queue_velocity_snapshot,
             logit_penalty_stats=self.penalty_stats_snapshot,
             protocol_stats=self.protocol_stats_snapshot,
+            train_loss_history=self.loss_history[-200:] if self.loss_history else None,
+            steps_per_second=round(self.steps_per_second, 2) if self.steps_per_second else None,
+            eta_seconds=eta_seconds,
         )
         self.write(status)
 

@@ -31,6 +31,17 @@ from data_manager.curriculum_manager import CurriculumManager
 from data_manager.quality_checker import QualityChecker
 from core.training_queue import TrainingQueue
 
+# Events system (global announcements)
+try:
+    from events import (
+        emit, data_generating_event, data_generated_event,
+        data_queued_event, quality_pass_event, quality_fail_event
+    )
+    EVENTS_AVAILABLE = True
+except ImportError:
+    EVENTS_AVAILABLE = False
+    def emit(*args, **kwargs): pass
+
 logger = logging.getLogger(__name__)
 
 
@@ -226,16 +237,23 @@ class DataManager:
             logger.debug(traceback.format_exc())
             return False, [], {"error": str(e)}
 
-    def test_quality(self, data: List[Dict]) -> Tuple[bool, Dict]:
+    def test_quality(self, data: List[Dict], skill: str) -> Tuple[bool, Dict]:
         """
-        Run quality tests on generated data
+        Run quality tests on generated data using skill-specific profile.
+
+        Args:
+            data: List of training examples
+            skill: Skill name (e.g., "binary", "syllo") - REQUIRED
 
         Returns:
             (approved, report)
-        """
-        logger.info(f"🧪 Running quality tests on {len(data):,} examples...")
 
-        passed, report = self.quality_checker.check_all(data)
+        Raises:
+            UnknownSkillError: If skill has no validation profile
+        """
+        logger.info(f"🧪 Running quality tests on {len(data):,} {skill} examples...")
+
+        passed, report = self.quality_checker.check_all(data, skill=skill)
 
         if passed:
             logger.info(f"✅ Quality tests PASSED")
@@ -311,14 +329,28 @@ class DataManager:
         seed = auto_cfg.get("seed")
         priority = auto_cfg.get("priority", "normal")
 
+        # Get active skill and level for event emission
+        active_skill = self.curriculum.state.get("active_skill", "syllo")
+        level_info = self.curriculum.get_current_level(active_skill)
+        level = level_info.get("level", 1)
+
+        # Emit generation starting event
+        emit(data_generating_event(skill=active_skill, count=count, level=level))
+
         # Step 1: Generate
+        start_time = time.time()
         success, data, metadata = self.generate_batch(count, seed)
+        duration = time.time() - start_time
+
         if not success or not data:
             logger.error("Generation failed or returned no data")
             return False
 
-        # Step 2: Test quality
-        approved, report = self.test_quality(data)
+        # Emit generation complete event
+        emit(data_generated_event(skill=active_skill, count=len(data), duration=duration))
+
+        # Step 2: Test quality (skill-aware validation)
+        approved, report = self.test_quality(data, skill=active_skill)
 
         # Save quality report
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -329,12 +361,26 @@ class DataManager:
         metadata["quality_report"] = report
         metadata["approved"] = approved
 
+        # Emit quality test result event
+        tests_passed = report.get("tests_passed", 0)
+        total_tests = report.get("total_tests", 0)
+        if approved:
+            emit(quality_pass_event(tests_passed, total_tests))
+        else:
+            failures = report.get("failed_tests", [])
+            emit(quality_fail_event(tests_passed, total_tests, failures))
+
         # Step 3: Queue if approved
         if approved:
             queued = self.queue_data(data, metadata, priority)
             if queued:
                 self.last_gen_time = time.time()
                 self.generation_count += 1
+
+                # Emit queued event
+                filename = metadata.get("filename", f"batch_{self.generation_count}")
+                emit(data_queued_event(filename=filename, count=len(data), priority=priority))
+
                 logger.info(f"🎉 Successfully generated, tested, and queued batch #{self.generation_count}")
                 return True
         else:
@@ -351,6 +397,10 @@ class DataManager:
             logger.info(f"📁 Rejected data saved to {reject_file} for analysis")
 
         return False
+
+    def get_active_skill(self) -> str:
+        """Get the currently active skill from curriculum."""
+        return self.curriculum.state.get("active_skill", "syllo")
 
     def get_stats(self) -> Dict:
         """Get data manager statistics including curriculum status."""

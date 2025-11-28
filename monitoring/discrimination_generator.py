@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
 """
+DEPRECATED - Use guild/sparring.py instead
+
+This module is superseded by the new Sparring system (2025-11-27).
+See: guild/sparring.py - "Sparring with the Trainers"
+
+The new system:
+- Tests against actual checkpoint (not random wrong answers)
+- Generates 3 training examples per REAL mistake
+- Always queues with HIGH priority (data becomes stale)
+- Has dedicated validator: guild/sparring_validator.py
+
+Usage of new system:
+    python3 guild/sparring.py --skill binary --count 100
+
+---
+ORIGINAL DOCSTRING (for reference):
+
 Discrimination + Correction Training Generator
 
 Creates training data that teaches the model to:
@@ -18,6 +35,13 @@ Ratio Mode (--ratio):
 - Calculates discrimination needed to reach TARGET_RATIO (20%)
 - Generates deficit in batches (respects --max-per-run cap)
 """
+
+import warnings
+warnings.warn(
+    "discrimination_generator.py is DEPRECATED. Use guild/sparring.py instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import json
 import requests

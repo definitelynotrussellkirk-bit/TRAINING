@@ -1,38 +1,68 @@
 #!/bin/bash
-# Start all Ultimate Trainer services
+# Start the Realm of Training
+#
+# The Weaver manages all daemon threads:
+# - Training daemon (the heart)
+# - Tavern server (the face)
+# - VaultKeeper (the memory)
+# - Data flow (the fuel)
 
-echo "Starting Ultimate Trainer services..."
+set -e
+
+BASE_DIR="/path/to/training"
+cd "$BASE_DIR"
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║           REALM OF TRAINING - Startup                      ║"
+echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
-cd /path/to/training
+# Check if Weaver is already running
+WEAVER_PID_FILE="$BASE_DIR/.pids/weaver.pid"
+if [ -f "$WEAVER_PID_FILE" ]; then
+    PID=$(cat "$WEAVER_PID_FILE")
+    if kill -0 "$PID" 2>/dev/null; then
+        echo "⚠️  The Weaver is already running (PID: $PID)"
+        echo "   Use: python3 weaver/weaver.py --status"
+        exit 0
+    else
+        echo "🧹 Cleaning stale PID file..."
+        rm -f "$WEAVER_PID_FILE"
+    fi
+fi
 
-# Start disk space manager (CRITICAL - prevents out of space crashes)
-echo "▶️  Starting disk space manager..."
-nohup python3 auto_disk_manager.py > /dev/null 2>&1 &
-sleep 1
+# Ensure log directory exists
+mkdir -p "$BASE_DIR/logs"
+mkdir -p "$BASE_DIR/.pids"
 
-# Start training daemon
-echo "▶️  Starting training daemon..."
-nohup python3 training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &
-sleep 1
+# First, do a single check-and-mend to start all services
+echo "🔍 Checking tapestry and starting services..."
+python3 weaver/weaver.py 2>&1 | head -30
 
-# Start monitors
-echo "▶️  Starting live monitor (port 8080)..."
-nohup python3 launch_live_monitor.py > /dev/null 2>&1 &
-sleep 1
-
-echo "▶️  Starting memory API (port 8081)..."
-nohup python3 memory_stats_api.py > /dev/null 2>&1 &
-sleep 1
-
-echo "▶️  Starting enhanced monitor (port 8082)..."
-nohup python3 enhanced_monitor.py > /dev/null 2>&1 &
+echo ""
+echo "🧵 Starting The Weaver daemon..."
+nohup python3 weaver/weaver.py --daemon > "$BASE_DIR/logs/weaver.log" 2>&1 &
+WEAVER_PID=$!
+echo "$WEAVER_PID" > "$WEAVER_PID_FILE"
 sleep 2
 
-echo ""
-echo "✅ All services started!"
-echo ""
-echo "Running health check..."
-echo ""
+# Verify
+if kill -0 "$WEAVER_PID" 2>/dev/null; then
+    echo "✅ The Weaver is now watching over the realm (PID: $WEAVER_PID)"
+else
+    echo "❌ The Weaver failed to start - check logs/weaver.log"
+    exit 1
+fi
 
-./check_health.sh
+echo ""
+echo "🎮 Access points:"
+echo "   Tavern (Game UI):  http://localhost:8888"
+echo "   VaultKeeper API:   http://localhost:8767"
+echo ""
+echo "📊 Check status:"
+echo "   python3 weaver/weaver.py --status"
+echo ""
+echo "🛑 Stop all:"
+echo "   ./scripts/stop_all.sh"
+echo ""

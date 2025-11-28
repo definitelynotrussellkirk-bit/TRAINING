@@ -14,7 +14,7 @@
 
 const CONFIG = {
     API_BASE: '/api',
-    UPDATE_INTERVAL: 3000,      // Main update every 3 seconds
+    UPDATE_INTERVAL: 1000,      // Main update every 1 second
 };
 
 // ============================================
@@ -38,9 +38,14 @@ const GameState = {
     isTraining: false,
     currentQuest: null,
     questProgress: 0,
+    totalSteps: 0,
     loss: 0,            // Strain
     valLoss: 0,         // Val Strain
     perplexity: 0,      // For Clarity calculation
+    lossHistory: [],    // Loss history for graph
+    stepsPerSecond: 0,
+    etaSeconds: 0,
+    learningRate: 0,
 
     // Skills (real curriculum data) - MASTERED levels
     sylloMastered: 0,
@@ -86,8 +91,125 @@ function formatClarity(perplexity) {
     return clarity.toFixed(3);
 }
 
+function formatETA(seconds) {
+    if (!seconds || seconds <= 0) return '--';
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${mins}m`;
+}
+
 function formatTime(date) {
     return date.toLocaleTimeString('en-US', { hour12: false });
+}
+
+// ============================================
+// LOSS CHART RENDERING
+// ============================================
+
+function renderLossChart(lossHistory) {
+    const canvas = document.getElementById('lossChart');
+    if (!canvas || !lossHistory || lossHistory.length === 0) return;
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 4;
+
+    // Clear canvas
+    ctx.fillStyle = '#0a0c10';
+    ctx.fillRect(0, 0, width, height);
+
+    // Extract loss values
+    const losses = lossHistory.map(h => h.loss || 0);
+    const minLoss = Math.min(...losses);
+    const maxLoss = Math.max(...losses);
+    const range = maxLoss - minLoss || 1;
+
+    // Update footer stats
+    const minEl = document.getElementById('lossMin');
+    const maxEl = document.getElementById('lossMax');
+    const trendEl = document.getElementById('lossTrend');
+    const rangeEl = document.getElementById('lossGraphRange');
+
+    if (minEl) minEl.textContent = `Min: ${minLoss.toFixed(3)}`;
+    if (maxEl) maxEl.textContent = `Max: ${maxLoss.toFixed(3)}`;
+    if (rangeEl) rangeEl.textContent = `Last ${losses.length} updates`;
+
+    // Calculate trend (compare first half vs second half average)
+    if (losses.length >= 4) {
+        const halfIdx = Math.floor(losses.length / 2);
+        const firstHalfAvg = losses.slice(0, halfIdx).reduce((a, b) => a + b, 0) / halfIdx;
+        const secondHalfAvg = losses.slice(halfIdx).reduce((a, b) => a + b, 0) / (losses.length - halfIdx);
+        const diff = secondHalfAvg - firstHalfAvg;
+
+        if (trendEl) {
+            trendEl.classList.remove('improving', 'degrading', 'stable');
+            if (diff < -0.05) {
+                trendEl.textContent = '↓ Improving';
+                trendEl.classList.add('improving');
+            } else if (diff > 0.05) {
+                trendEl.textContent = '↑ Degrading';
+                trendEl.classList.add('degrading');
+            } else {
+                trendEl.textContent = '→ Stable';
+                trendEl.classList.add('stable');
+            }
+        }
+    }
+
+    // Draw threshold line at loss=1.0 (good target)
+    const thresholdY = height - padding - ((1.0 - minLoss) / range) * (height - 2 * padding);
+    if (thresholdY > padding && thresholdY < height - padding) {
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(padding, thresholdY);
+        ctx.lineTo(width - padding, thresholdY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // Draw loss line
+    ctx.strokeStyle = '#ef4444';  // Red for high loss
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+
+    const stepX = (width - 2 * padding) / (losses.length - 1 || 1);
+    losses.forEach((loss, i) => {
+        const x = padding + i * stepX;
+        const y = height - padding - ((loss - minLoss) / range) * (height - 2 * padding);
+
+        // Color based on loss value
+        if (loss < 1.0) {
+            ctx.strokeStyle = '#22c55e';  // Green for low loss
+        } else if (loss < 2.0) {
+            ctx.strokeStyle = '#f59e0b';  // Yellow for medium
+        } else {
+            ctx.strokeStyle = '#ef4444';  // Red for high
+        }
+
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+    ctx.stroke();
+
+    // Draw current value marker (last point)
+    if (losses.length > 0) {
+        const lastLoss = losses[losses.length - 1];
+        const lastX = width - padding;
+        const lastY = height - padding - ((lastLoss - minLoss) / range) * (height - 2 * padding);
+
+        ctx.fillStyle = lastLoss < 1.0 ? '#22c55e' : lastLoss < 2.0 ? '#f59e0b' : '#ef4444';
+        ctx.beginPath();
+        ctx.arc(lastX, lastY, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
 // ============================================
@@ -155,8 +277,10 @@ function updateBattleStatus() {
         setWidth('#questProgressBar', GameState.questProgress);
         setText('#questProgressText', `${GameState.questProgress.toFixed(1)}%`);
 
+        setText('#battleStep', `${GameState.currentStep.toLocaleString()}/${GameState.totalSteps.toLocaleString()}`);
+        setText('#battleSpeed', GameState.stepsPerSecond > 0 ? `${GameState.stepsPerSecond.toFixed(2)}/s` : '--');
         setText('#battleStrain', formatStrain(GameState.loss));
-        setText('#battleValStrain', formatStrain(GameState.valLoss));
+        setText('#battleETA', formatETA(GameState.etaSeconds));
 
     } else {
         // Idle mode
@@ -172,8 +296,10 @@ function updateBattleStatus() {
         setWidth('#questProgressBar', 0);
         setText('#questProgressText', '0%');
 
+        setText('#battleStep', '--');
+        setText('#battleSpeed', '--');
         setText('#battleStrain', '--');
-        setText('#battleValStrain', '--');
+        setText('#battleETA', '--');
     }
 }
 
@@ -492,10 +618,19 @@ function processGameData(data) {
     if (training) {
         GameState.isTraining = training.status === 'training';
         GameState.currentStep = training.current_step || 0;
+        GameState.totalSteps = training.total_steps || 0;
         GameState.loss = training.loss || 0;
         GameState.valLoss = training.validation_loss || 0;
         GameState.currentQuest = training.current_file || null;
         GameState.questProgress = training.progress_percent || 0;
+        GameState.stepsPerSecond = training.steps_per_second || 0;
+        GameState.etaSeconds = training.eta_seconds || 0;
+        GameState.learningRate = training.learning_rate || 0;
+        // Loss history for graph
+        if (training.train_loss_history) {
+            GameState.lossHistory = training.train_loss_history;
+            renderLossChart(GameState.lossHistory);
+        }
     }
 
     // GPU stats

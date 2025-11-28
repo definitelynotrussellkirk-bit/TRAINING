@@ -39,7 +39,7 @@ import sqlite3
 import sys
 import threading
 from datetime import datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
@@ -722,8 +722,8 @@ def run_server(
         result = scanner.scan()
         logger.info(f"Found {result['registered']} assets")
 
-    # Start server
-    server = HTTPServer(("0.0.0.0", port), BranchOfficerHandler)
+    # Start server - use ThreadingHTTPServer to handle concurrent requests without blocking
+    server = ThreadingHTTPServer(("0.0.0.0", port), BranchOfficerHandler)
 
     logger.info(f"Branch Officer '{zone_id}' starting on port {port}")
     logger.info(f"Base directory: {base_dir}")

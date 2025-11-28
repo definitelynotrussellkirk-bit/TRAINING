@@ -1344,6 +1344,7 @@ class UltimateTrainer:
                 gradient_accumulation_steps=self._get_hyperparam('gradient_accumulation', 1),
                 learning_rate=self._get_hyperparam('learning_rate', 2e-4),
                 warmup_steps=self.args.warmup_steps,
+                lr_scheduler_type="constant",  # FIX: Don't decay LR for continuous training on varied files
                 logging_steps=10,
                 save_steps=save_steps,
                 eval_steps=self.args.eval_steps,
@@ -1362,6 +1363,11 @@ class UltimateTrainer:
                 report_to="none",
                 remove_unused_columns=False,
             )
+
+            # Log active hyperparameters so we know what's running
+            active_lr = training_args.learning_rate
+            active_scheduler = training_args.lr_scheduler_type
+            print(f"⚡ ACTIVE CONFIG: lr={active_lr}, scheduler={active_scheduler}, warmup={training_args.warmup_steps}")
 
             if should_enable_saving:
                 print(f"💾 Checkpoints enabled: next save at step {next_checkpoint_at}")
@@ -1436,11 +1442,7 @@ class UltimateTrainer:
                     self.last_remote_eval_step = 0
                     self.last_update_time = time.time()
                     self.last_prompt_snapshot_time = time.time()
-                    self.update_interval = 2  # Status JSON refresh cadence (seconds)
-                    self.prompt_snapshot_interval = 20  # Update prompt/golden cache without inference
-                    # Keep inference lightweight: short outputs, frequent previews
-                    self.inference_interval_steps = max(10, (self.eval_steps or 200) // 10)
-                    self.last_inference_step = 0
+                    self.update_interval = 1  # Status JSON refresh cadence (seconds)
                     # Micro-eval settings
                     self.micro_eval_inputs = micro_eval_inputs
                     self.micro_eval_interval = micro_eval_interval
@@ -1494,7 +1496,9 @@ class UltimateTrainer:
                 def on_step_end(self, args, state, control, **kwargs):
                     current_time = time.time()
                     current_loss = state.log_history[-1].get('loss', 0.0) if state.log_history else 0.0
-                    current_lr = state.log_history[-1].get('learning_rate', args.learning_rate) if state.log_history else args.learning_rate
+                    # Use configured LR for constant scheduler
+                    # Don't rely on log_history which has stale values from checkpoint resume
+                    current_lr = args.learning_rate
                     current_epoch = state.epoch if state.epoch else 0
                     # Track loss stability
                     self.loss_window.append(current_loss)
@@ -1602,26 +1606,8 @@ class UltimateTrainer:
 
                     self.prev_step_time = current_time
 
-                    # Lightweight micro-eval on tiny fixed set
+                    # Micro-eval DISABLED - use 3090 for all evaluation
                     val_loss = self.last_val_loss
-                    if (
-                        self.micro_eval_inputs is not None
-                        and state.global_step > 0
-                        and state.global_step % self.micro_eval_interval == 0
-                        and state.global_step != self.last_micro_eval_step
-                    ):
-                        try:
-                            self.model_ref.eval()
-                            with torch.no_grad():
-                                micro_inputs = {k: v.to(self.model_ref.device) for k, v in self.micro_eval_inputs.items()}
-                                outputs = self.model_ref(**micro_inputs, labels=micro_inputs["input_ids"])
-                                val_loss = outputs.loss.item()
-                                self.last_val_loss = val_loss
-                                self.last_micro_eval_step = state.global_step
-                        except Exception as e:
-                            print(f"Warning: Micro-eval failed at step {state.global_step}: {e}")
-                        finally:
-                            self.model_ref.train()
 
                     # Build simple alerts within the 10% overhead budget
                     alerts = []
@@ -1712,183 +1698,7 @@ class UltimateTrainer:
                         )
                         self.last_update_time = current_time
 
-                    # Inference updates (periodic) - show a live example with golden/model output
-                    if (
-                        self.raw_train_examples
-                        and state.global_step > 0
-                        and (state.global_step - self.last_inference_step) >= self.inference_interval_steps
-                        and state.global_step != self.last_inference_step
-                    ):
-                        try:
-                            print(f"[InferencePreview] step={state.global_step} interval={self.inference_interval_steps} last={self.last_inference_step}")
-                            # Get the raw example from ORIGINAL dataset (before tokenization)
-                            if self.raw_train_examples and len(self.raw_train_examples) > 0:
-                                # Get example based on current step (with wraparound)
-                                dataset_idx = state.global_step % len(self.raw_train_examples)
-                                current_example = self.raw_train_examples[dataset_idx]
-
-                                # Extract messages
-                                if 'messages' in current_example:
-                                    # Extract from messages
-                                    messages = current_example['messages']
-                                    system_msg = next((m['content'] for m in messages if m['role'] == 'system'), None)
-                                    user_msg = next((m['content'] for m in messages if m['role'] == 'user'), None)
-                                    golden_msg = next((m['content'] for m in messages if m['role'] == 'assistant'), None)
-
-                                    if user_msg and golden_msg:
-                                        # Run inference on this exact example
-                                        self.model_ref.eval()
-                                        with torch.no_grad():
-                                            # Format prompt
-                                            prompt_messages = [{"role": "user", "content": user_msg}]
-                                            text = self.tokenizer.apply_chat_template(
-                                                prompt_messages,
-                                                tokenize=False,
-                                                add_generation_prompt=True
-                                            )
-
-                                            # Generate
-                                            inputs = self.tokenizer(text, return_tensors="pt").to(self.model_ref.device)
-                                            reset_processor_states(self.logits_processor)
-                                            outputs = self.model_ref.generate(
-                                                **inputs,
-                                                max_new_tokens=2048,  # Full output for reasoning tasks
-                                                temperature=0.1,
-                                                do_sample=False,
-                                                pad_token_id=self.tokenizer.eos_token_id,
-                                                eos_token_id=self.tokenizer.eos_token_id,
-                                                logits_processor=self.logits_processor,
-                                                min_new_tokens=1
-                                            )
-
-                                            # Decode model output
-                                            model_output = self.tokenizer.decode(
-                                                outputs[0][inputs['input_ids'].shape[1]:],
-                                                skip_special_tokens=True
-                                            ).strip()
-
-                                        # Calculate loss on this specific example
-                                        example_loss = None
-                                        try:
-                                            # Tokenize the full conversation (user + golden assistant)
-                                            full_messages = [
-                                                {"role": "user", "content": user_msg},
-                                                {"role": "assistant", "content": golden_msg}
-                                            ]
-                                            full_text = self.tokenizer.apply_chat_template(
-                                                full_messages,
-                                                tokenize=False,
-                                                add_generation_prompt=False
-                                            )
-
-                                            # Tokenize
-                                            full_inputs = self.tokenizer(full_text, return_tensors="pt").to(self.model_ref.device)
-
-                                            # Get model logits
-                                            with torch.no_grad():
-                                                outputs = self.model_ref(**full_inputs, labels=full_inputs['input_ids'])
-                                                example_loss = outputs.loss.item()
-                                        except Exception as e:
-                                            print(f"Warning: Could not calculate loss for this example: {e}")
-
-                                        self.model_ref.train()
-
-                                        # Clear GPU cache after inference to prevent OOM
-                                        if torch.cuda.is_available():
-                                            torch.cuda.empty_cache()
-
-                                        # Estimate token lengths for metadata/analysis
-                                        golden_token_len = None
-                                        model_token_len = None
-                                        try:
-                                            golden_token_len = len(self.tokenizer.encode(golden_msg, add_special_tokens=False))
-                                        except Exception:
-                                            pass
-                                        try:
-                                            model_token_len = len(self.tokenizer.encode(model_output, add_special_tokens=False))
-                                        except Exception:
-                                            pass
-
-                                        # Check if match
-                                        matches = golden_msg.strip() == model_output.strip()
-
-                                        # Update pattern tracker for heatmap coverage
-                                        pattern_matrix = None
-                                        pattern_id = None
-                                        bin_name = None
-                                        if self.pattern_tracker:
-                                            try:
-                                                response_tokens = model_token_len if model_token_len is not None else 0
-                                                pattern_id, bin_name = self.pattern_tracker.classify(
-                                                    user_msg or "",
-                                                    response_tokens
-                                                )
-                                                self.pattern_tracker.record(pattern_id, bin_name, matches)
-                                                pattern_matrix = self.pattern_tracker.get_matrix()
-                                            except Exception as e:
-                                                print(f"Warning: Pattern tracker update failed: {e}")
-                                        pattern_metadata = None
-                                        if pattern_id:
-                                            pattern_metadata = {
-                                                "pattern_id": pattern_id,
-                                                "length_bin": bin_name,
-                                                "timestamp": datetime.now().isoformat(),
-                                                "loss": example_loss,
-                                            }
-
-                                        layer_summary = None
-                                        if self.layer_monitor:
-                                            try:
-                                                layer_summary = self.layer_monitor.snapshot()
-                                            except Exception as e:
-                                                print(f"Warning: Layer monitor snapshot failed: {e}")
-
-                                        # Display in terminal
-                                        print("\n" + "=" * 80)
-                                        print(f"🔍 CURRENT TRAINING EXAMPLE - Step {state.global_step:,}")
-                                        print("=" * 80)
-                                        print(f"📝 PROMPT:\n{user_msg[:500]}...")
-                                        print(f"\n✅ GOLDEN:\n{golden_msg[:200]}...")
-                                        print(f"\n🤖 MODEL:\n{model_output[:200]}...")
-                                        status = "✅ MATCH" if matches else "❌ NO MATCH"
-                                        print(f"\n{status}")
-                                        if example_loss is not None:
-                                            print(f"📉 LOSS ON THIS EXAMPLE: {example_loss:.4f}")
-                                        print("=" * 80 + "\n")
-
-                                        # Calculate batch-relative step
-                                        batch_step = state.global_step - self.current_global_step
-
-                                        # Update status JSON (use example-specific loss if available)
-                                        display_loss = example_loss if example_loss is not None else current_loss
-                                        self.status_writer.update_inference(
-                                            step=state.global_step,
-                                            total_steps=self.total_steps,
-                                            epoch=int(current_epoch),
-                                            loss=display_loss,
-                                            lr=current_lr,
-                                            prompt=user_msg,
-                                            golden=golden_msg,
-                                            model_output=model_output,
-                                            matches=matches,
-                                            system_prompt=system_msg,
-                                            batch_step=batch_step,
-                                            batch_total_steps=self.batch_total_steps,
-                                            batch_number=self.batch_number,
-                                            batch_queue_size=self.batch_queue_size,
-                                            current_file=self.current_file,
-                                            golden_output_length=golden_token_len,
-                                            model_output_length=model_token_len,
-                                            pattern_heatmap=pattern_matrix,
-                                            layer_activity_summary=layer_summary,
-                                            pattern_metadata=pattern_metadata
-                                        )
-                                        self.last_update_time = current_time
-                                        self.last_inference_step = state.global_step
-                        except Exception as e:
-                            print(f"Warning: Could not display current training example at step {state.global_step}: {e}")
-                            import traceback
-                            traceback.print_exc()
+                    # NOTE: Inference preview removed - use 3090 for inference, not 4090 during training
 
                     # Evolution tracking (at special steps only)
                     # DISABLED: Takes 60-300s per snapshot (too slow)
@@ -2165,12 +1975,6 @@ class UltimateTrainer:
             # Train!
             self.training_start_time = time.time()
 
-            # Run a quick initial preview to seed status/logs
-            try:
-                self.run_initial_preview(current_global_step=current_global_step, total_steps=max_steps)
-            except Exception as e:
-                print(f"Warning: Initial preview failed: {e}")
-
             # Check for existing checkpoint to resume from (preserves optimizer state)
             resume_from_checkpoint = None
             if Path(self.args.output_dir).exists():
@@ -2200,8 +2004,27 @@ class UltimateTrainer:
                             "trainer_state.json (optimizer state will be reinitialized)."
                         )
 
+            # Delete old scheduler state to force fresh constant scheduler
+            # This prevents the decayed LR from being restored on resume
+            if resume_from_checkpoint:
+                old_scheduler = Path(resume_from_checkpoint) / "scheduler.pt"
+                if old_scheduler.exists():
+                    old_scheduler.unlink()
+                    print(f"🔄 Deleted old scheduler.pt to force fresh constant LR")
+
             # Train with checkpoint resumption if available
             trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+
+            # CRITICAL: Save checkpoint at end of each file to preserve progress
+            # Without this, next file resumes from last save_steps checkpoint (loses progress)
+            final_step = trainer.state.global_step
+            checkpoint_dir = Path(self.args.output_dir) / f"checkpoint-{final_step}"
+            if not checkpoint_dir.exists():
+                print(f"💾 Saving end-of-file checkpoint: {checkpoint_dir.name}")
+                # Use internal method to save FULL checkpoint (model + optimizer + scheduler + state)
+                trainer._save_checkpoint(model=trainer.model, trial=None)
+            else:
+                print(f"✅ Checkpoint already exists: {checkpoint_dir.name}")
 
             # Save final adapter model (for inference/deployment)
             # NOTE: Checkpoints are auto-managed by Trainer via save_total_limit
@@ -2298,82 +2121,6 @@ class UltimateTrainer:
         except Exception:
             # Do not let summary collection crash training flow
             self.training_summary = None
-
-    def run_initial_preview(self, current_global_step: int, total_steps: int):
-        """Run a lightweight preview on the first example to seed status/logs."""
-        if not self.raw_train_examples:
-            print("Initial preview skipped: no raw_train_examples.")
-            return
-        try:
-            example = self.raw_train_examples[0]
-            messages = example.get('messages', [])
-            system_msg = next((m['content'] for m in messages if m.get('role') == 'system'), None)
-            user_msg = next((m['content'] for m in messages if m.get('role') == 'user'), None)
-            golden_msg = next((m['content'] for m in messages if m.get('role') == 'assistant'), None)
-            if not user_msg or not golden_msg:
-                print("Initial preview skipped: missing user/golden.")
-                return
-            self.model.eval()
-            with torch.no_grad():
-                prompt_messages = [{"role": "user", "content": user_msg}]
-                text = self.tokenizer.apply_chat_template(
-                    prompt_messages,
-                    tokenize=False,
-                    add_generation_prompt=True
-                )
-                inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
-                reset_processor_states(self.logits_processor)
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=2048,
-                    temperature=0.1,
-                    do_sample=False,
-                    pad_token_id=self.tokenizer.eos_token_id,
-                    eos_token_id=self.tokenizer.eos_token_id,
-                    logits_processor=self.logits_processor,
-                    min_new_tokens=1
-                )
-                model_output = self.tokenizer.decode(
-                    outputs[0][inputs['input_ids'].shape[1]:],
-                    skip_special_tokens=True
-                ).strip()
-            self.model.train()
-
-            # Clear GPU cache after initial inference to prevent OOM
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-
-            batch_step = 0
-            layer_summary = None
-            if self.layer_monitor:
-                try:
-                    layer_summary = self.layer_monitor.snapshot()
-                except Exception as exc:
-                    print(f"Warning: Layer monitor snapshot failed (initial preview): {exc}")
-            self.status_writer.update_inference(
-                step=current_global_step,
-                total_steps=total_steps,
-                epoch=0,
-                loss=0.0,
-                lr=self._get_hyperparam('learning_rate', 2e-4),
-                prompt=user_msg,
-                golden=golden_msg,
-                model_output=model_output,
-                matches=(golden_msg.strip() == model_output.strip()),
-                system_prompt=system_msg,
-                batch_step=batch_step,
-                batch_total_steps=total_steps,
-                batch_number=getattr(self.args, 'batch_number', None),
-                batch_queue_size=getattr(self.args, 'batch_queue_size', None),
-                current_file=getattr(self.args, 'current_file', None),
-                golden_output_length=len(golden_msg),
-                model_output_length=len(model_output),
-                layer_activity_summary=layer_summary
-            )
-            self.last_inference_step = current_global_step
-            print("[InitialPreview] Completed initial inference preview.")
-        except Exception as e:
-            print(f"Initial preview error: {e}")
 
 def parse_args():
     """Parse command line arguments."""

@@ -382,6 +382,11 @@
         </div>
     </div>
 
+    <!-- NAVIGATION (dynamic) -->
+    <nav class="game-nav" id="bottomNav"></nav>
+    <script src="/static/js/nav.js"></script>
+    <script src="/static/js/events.js"></script>
+
     <script>
         const $ = (sel) => document.querySelector(sel);
         const $$ = (sel) => document.querySelectorAll(sel);
@@ -497,19 +502,25 @@
 
                 if (hostInfo && hostInfo.status === 'online') {
                     dot.classList.add('online');
-                    if (hostInfo.loaded_step) {
-                        text.textContent = `Online - Step ${hostInfo.loaded_step.toLocaleString()} loaded`;
-                        loadedCheckpoint = hostInfo.loaded_step;
-                        $('#loadedModel').textContent = `Step ${hostInfo.loaded_step.toLocaleString()}`;
-                        enableChat();
+                    const models = hostInfo.loaded_models || [];
+                    if (models.length > 0) {
+                        // Show all loaded models
+                        const modelLabels = models.map(m =>
+                            m.step === 0 ? 'Base' : `${m.step.toLocaleString()}`
+                        ).join(', ');
+                        text.textContent = `Online - ${models.length} models: ${modelLabels}`;
 
-                        // Mark loaded checkpoint in list
+                        // Mark loaded checkpoints in list
+                        const loadedSteps = new Set(models.map(m => m.step));
                         $$('.checkpoint-item').forEach(item => {
                             item.classList.remove('loaded');
-                            if (parseInt(item.dataset.step) === hostInfo.loaded_step) {
+                            if (loadedSteps.has(parseInt(item.dataset.step))) {
                                 item.classList.add('loaded');
                             }
                         });
+
+                        // Don't auto-select - user must explicitly choose
+                        $('#loadedModel').textContent = 'Select a checkpoint';
                     } else {
                         text.textContent = 'Online - No model loaded';
                     }
@@ -602,7 +613,7 @@
             const input = $('#messageInput');
             const message = input.value.trim();
 
-            if (!message || !loadedCheckpoint) return;
+            if (!message || loadedCheckpoint === null || loadedCheckpoint === undefined) return;
 
             input.value = '';
             addMessage('user', message);
@@ -618,6 +629,7 @@
                     body: JSON.stringify({
                         message: message,
                         host: currentHost,
+                        step: loadedCheckpoint,
                         max_tokens: 512
                     })
                 });

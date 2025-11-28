@@ -2,12 +2,11 @@
 """
 Deployment Orchestrator - Automated checkpoint deployment to 3090
 
-Monitors model_comparisons.json and automatically deploys best checkpoints
-to the 3090 inference server.
+Uses checkpoint ledger to find best checkpoint and deploy to 3090.
 
 Architecture:
 - Runs on 4090 (training machine)
-- Reads local model_comparisons.json
+- Uses ledger get_best() for checkpoint selection
 - rsync checkpoints to 3090
 - Triggers reload via API
 - Logs all deployments
@@ -64,9 +63,8 @@ class DeploymentOrchestrator:
         self.check_interval = check_interval
 
         # Paths
-        self.comparisons_file = self.base_dir / "status" / "model_comparisons.json"
         self.deployment_log = self.base_dir / "status" / "deployment_status.json"
-        self.checkpoint_dir = self.base_dir / "current_model"
+        self.checkpoint_dir = self.base_dir / "models" / "current_model"
 
         # State
         self.last_deployed_step = None
@@ -79,67 +77,45 @@ class DeploymentOrchestrator:
 
     def get_best_checkpoint(self) -> Optional[Dict[str, Any]]:
         """
-        Read model_comparisons.json and extract best checkpoint info.
+        Get best checkpoint from ledger (by lowest train_loss).
 
         Returns:
             {
                 'step': 156000,
                 'checkpoint_path': Path('/home/user/.../checkpoint-156000'),
                 'checkpoint_name': 'checkpoint-156000',
-                'score': 0.87,
                 'loss': 0.12,
-                'accuracy': 0.85
             }
             or None if no valid checkpoint found
         """
-        if not self.comparisons_file.exists():
-            logger.debug(f"Comparisons file not found: {self.comparisons_file}")
-            return None
-
         try:
-            with open(self.comparisons_file) as f:
-                data = json.load(f)
-
-            # Get latest comparison
-            comparisons = data.get("comparisons", [])
-            if not comparisons:
-                logger.debug("No comparisons in file")
-                return None
-
-            latest = comparisons[-1]
-            best = latest.get("best_checkpoint")
+            from core.checkpoint_ledger import get_ledger
+            ledger = get_ledger()
+            best = ledger.get_best(metric="train_loss")
 
             if not best:
-                logger.debug("No best_checkpoint in latest comparison")
+                logger.debug("No checkpoints in ledger")
                 return None
 
-            metrics = best.get("metrics", {})
-
-            # Validate checkpoint exists
-            checkpoint_path = Path(metrics.get("checkpoint", ""))
+            # Find checkpoint path
+            checkpoint_path = self.checkpoint_dir / f"checkpoint-{best.step}"
             if not checkpoint_path.exists():
-                logger.warning(f"Checkpoint path does not exist: {checkpoint_path}")
-                return None
-
-            # Validate metrics (skip if inf/NaN)
-            loss = metrics.get("avg_loss")
-            accuracy = metrics.get("accuracy", 0)
-
-            if loss is None or loss == float('inf') or accuracy <= 0:
-                logger.warning(f"Invalid metrics: loss={loss}, accuracy={accuracy}")
-                return None
+                # Try canonical name format
+                if best.canonical_name:
+                    checkpoint_path = self.checkpoint_dir / best.canonical_name
+                if not checkpoint_path.exists():
+                    logger.warning(f"Checkpoint not found: step {best.step}")
+                    return None
 
             return {
-                'step': metrics.get('step'),
+                'step': best.step,
                 'checkpoint_path': checkpoint_path,
                 'checkpoint_name': checkpoint_path.name,
-                'score': best.get('score', 0),
-                'loss': loss,
-                'accuracy': accuracy
+                'loss': best.train_loss,
             }
 
         except Exception as e:
-            logger.error(f"Error reading comparisons file: {e}")
+            logger.error(f"Error getting best checkpoint from ledger: {e}")
             return None
 
     def get_deployment_metadata(self) -> Dict[str, str]:

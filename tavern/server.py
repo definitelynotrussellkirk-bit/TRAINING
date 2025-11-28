@@ -35,7 +35,7 @@ import os
 import signal
 import sys
 from datetime import datetime
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse, parse_qs
@@ -48,6 +48,13 @@ BASE_DIR = TAVERN_DIR.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from watchtower.chronicle import get_chronicle
+
+# Import events system
+try:
+    from events import get_broadcaster, get_recent, subscribe, Event
+    EVENTS_AVAILABLE = True
+except ImportError:
+    EVENTS_AVAILABLE = False
 
 # Import Saga reader (lazy to avoid circular imports)
 _saga_reader = None
@@ -439,6 +446,10 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Guild - Skills and Passives
         elif path == "/guild" or path == "/guild.html" or path == "/guildhall.html":
             self._serve_template("guild.html")
+        elif path == "/api/skills":
+            self._serve_skills()
+        elif path == "/api/curriculum":
+            self._serve_curriculum()
         elif path == "/api/passives/definitions":
             self._serve_passives_definitions()
         elif path == "/api/passives/summary":
@@ -461,6 +472,9 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._serve_template("quests.html")
         elif path == "/api/quests":
             self._serve_quests_data()
+        elif path.startswith("/api/quests/preview/"):
+            filename = path.replace("/api/quests/preview/", "")
+            self._serve_quest_preview(filename, query)
 
         # Generators - Data generation control
         elif path == "/api/generators":
@@ -469,6 +483,14 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Skill APIs status
         elif path == "/api/skill-apis/status":
             self._serve_skill_apis_status()
+
+        # Training daemon status
+        elif path == "/api/daemon/status":
+            self._serve_daemon_status()
+
+        # Weaver (orchestrator) status
+        elif path == "/api/weaver/status":
+            self._serve_weaver_status()
 
         # Fresh game data API (replaces stale /api/unified)
         elif path == "/api/game":
@@ -485,6 +507,14 @@ class TavernHandler(SimpleHTTPRequestHandler):
             skill_id = path.replace("/api/validation/", "").strip("/")
             level = query.get("level", ["1"])[0]
             self._serve_validation_set(skill_id, level)
+
+        # Events API - Global announcement channel
+        elif path == "/api/events":
+            self._serve_events_list(query)
+        elif path == "/api/events/stream":
+            self._serve_events_stream()
+        elif path == "/api/events/stats":
+            self._serve_events_stats()
 
         elif path.startswith("/api/"):
             self._proxy_api(path)
@@ -519,6 +549,11 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._apply_scheduler_preset()
         elif path == "/api/scheduler/config":
             self._save_scheduler_config()
+        elif path.startswith("/api/scheduler/skill/"):
+            self._toggle_skill()
+        # Daemon control
+        elif path == "/api/daemon/control":
+            self._daemon_control()
         # Quests - Queue management
         elif path == "/api/quests/priority":
             self._change_quest_priority()
@@ -613,6 +648,98 @@ class TavernHandler(SimpleHTTPRequestHandler):
     def _send_error(self, status: int, message: str):
         """Send an error response."""
         self._send_json({"error": message, "status": status}, status)
+
+    # =========================================
+    # Events API - Global Announcement Channel
+    # =========================================
+
+    def _serve_events_list(self, query: dict):
+        """Serve recent events as JSON list.
+
+        Reads directly from the events.jsonl file to see events
+        from all processes (daemon, data_manager, etc.).
+        """
+        try:
+            limit = int(query.get("limit", [50])[0])
+
+            # Read directly from events file for cross-process visibility
+            events_file = BASE_DIR / "status" / "events.jsonl"
+            events = []
+
+            if events_file.exists():
+                with open(events_file, "r") as f:
+                    lines = f.readlines()
+                    # Get last N lines
+                    recent_lines = lines[-limit:]
+                    for line in reversed(recent_lines):  # Most recent first
+                        line = line.strip()
+                        if line:
+                            try:
+                                events.append(json.loads(line))
+                            except json.JSONDecodeError:
+                                pass
+
+            self._send_json({
+                "events": events,
+                "count": len(events),
+            })
+        except Exception as e:
+            logger.error(f"Events list error: {e}")
+            self._send_json({"events": [], "error": str(e)})
+
+    def _serve_events_stream(self):
+        """Serve Server-Sent Events stream for real-time updates."""
+        if not EVENTS_AVAILABLE:
+            self._send_error(503, "Events system not available")
+            return
+
+        # Limit concurrent SSE connections to prevent thread explosion
+        try:
+            broadcaster = get_broadcaster()
+            if broadcaster.subscriber_count() > 20:
+                logger.warning(f"Too many SSE subscribers ({broadcaster.subscriber_count()}), rejecting")
+                self._send_error(503, "Too many connections, try again later")
+                return
+        except Exception:
+            pass  # Continue if we can't check
+
+        try:
+            # Send SSE headers
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+
+            # Stream events (5s timeout for faster disconnect detection)
+            for event in subscribe(timeout=5):
+                if event is None:
+                    # Keepalive
+                    self.wfile.write(b": keepalive\n\n")
+                else:
+                    # Send event in SSE format
+                    self.wfile.write(event.to_sse().encode("utf-8"))
+                self.wfile.flush()
+
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected
+            logger.debug("SSE client disconnected")
+        except Exception as e:
+            logger.error(f"Events stream error: {e}")
+
+    def _serve_events_stats(self):
+        """Serve event system statistics."""
+        if not EVENTS_AVAILABLE:
+            self._send_json({"error": "Events system not available"}, 503)
+            return
+
+        try:
+            broadcaster = get_broadcaster()
+            self._send_json(broadcaster.stats())
+        except Exception as e:
+            logger.error(f"Events stats error: {e}")
+            self._send_json({"error": str(e)}, 500)
 
     def _serve_chronicle(self, query: dict):
         """Serve chronicle entries."""
@@ -720,7 +847,17 @@ class TavernHandler(SimpleHTTPRequestHandler):
             if training_file.exists():
                 try:
                     with open(training_file) as f:
-                        response["training"] = json.load(f)
+                        training_data = json.load(f)
+
+                    # Calculate progress_percent from batch_step / batch_total_steps
+                    batch_step = training_data.get("batch_step", 0)
+                    batch_total = training_data.get("batch_total_steps", 0)
+                    if batch_total > 0:
+                        training_data["progress_percent"] = (batch_step / batch_total) * 100
+                    else:
+                        training_data["progress_percent"] = 0
+
+                    response["training"] = training_data
                 except Exception as e:
                     logger.warning(f"Failed to read training status: {e}")
 
@@ -777,18 +914,19 @@ class TavernHandler(SimpleHTTPRequestHandler):
             except Exception as e:
                 logger.warning(f"Failed to get vault data: {e}")
 
-            # 5. Model comparison (best checkpoint)
-            comparison_file = BASE_DIR / "status" / "model_comparisons.json"
-            if comparison_file.exists():
-                try:
-                    with open(comparison_file) as f:
-                        comparisons = json.load(f)
+            # 5. Best checkpoint (from ledger)
+            try:
+                from core.checkpoint_ledger import get_ledger
+                ledger = get_ledger()
+                best = ledger.get_best(metric="train_loss")
+                if best:
                     response["comparison"] = {
-                        "best_checkpoint": comparisons.get("latest_summary", {}).get("best_checkpoint"),
-                        "total_compared": comparisons.get("latest_summary", {}).get("total_compared", 0),
+                        "best_checkpoint": f"checkpoint-{best.step}",
+                        "best_step": best.step,
+                        "best_loss": best.train_loss,
                     }
-                except Exception as e:
-                    logger.warning(f"Failed to read comparisons: {e}")
+            except Exception as e:
+                logger.warning(f"Failed to get best checkpoint: {e}")
 
             self._send_json(response)
 
@@ -949,11 +1087,29 @@ class TavernHandler(SimpleHTTPRequestHandler):
             skill_state = curriculum.get("skills", {}).get(curriculum_id, {})
 
             # Build response
-            # current_level = level being TRAINED on (not mastered)
+            # current_level = highest level MASTERED (0 = nothing mastered)
+            # training_level = mastered + 1
             max_level = config.get("max_level", 30)
-            training = skill_state.get("current_level", 1)
-            training = min(training, max_level)
-            mastered = max(0, training - 1)
+            mastered = skill_state.get("current_level", 0)
+            training = min(mastered + 1, max_level)
+
+            # Fill in missing levels in level_progression (extrapolate from last defined)
+            level_prog = config.get("level_progression", {})
+            if level_prog and len(level_prog) < max_level:
+                # Find highest defined level (keys may be int or str from YAML)
+                defined_levels = [int(k) for k in level_prog.keys() if str(k).isdigit()]
+                if defined_levels:
+                    last_level = max(defined_levels)
+                    # Try both int and str keys
+                    last_data = level_prog.get(last_level, level_prog.get(str(last_level), {}))
+                    # Fill in missing levels
+                    for lvl in range(last_level + 1, max_level + 1):
+                        level_prog[str(lvl)] = {
+                            "name": f"Level {lvl}",
+                            "desc": f"Beyond L{last_level} - extrapolated",
+                            **{k: v for k, v in last_data.items() if k != "name"}
+                        }
+                    config["level_progression"] = level_prog
 
             # Get accuracy history
             history = skill_state.get("accuracy_history", [])
@@ -1119,6 +1275,220 @@ class TavernHandler(SimpleHTTPRequestHandler):
             logger.error(f"Save scheduler config error: {e}")
             self._send_json({"success": False, "error": str(e)}, 500)
 
+    def _toggle_skill(self):
+        """Toggle a skill's enabled status."""
+        try:
+            import yaml
+            # Extract skill_id from path: /api/scheduler/skill/sy -> sy
+            skill_id = self.path.split("/")[-1]
+
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length).decode())
+            enabled = body.get("enabled", True)
+
+            config_path = BASE_DIR / "configs" / "schedule.yaml"
+
+            # Load current config
+            current_config = {}
+            if config_path.exists():
+                with open(config_path) as f:
+                    current_config = yaml.safe_load(f) or {}
+
+            # Update skill enabled status
+            if "skills" not in current_config:
+                current_config["skills"] = {}
+            if skill_id not in current_config["skills"]:
+                current_config["skills"][skill_id] = {}
+            current_config["skills"][skill_id]["enabled"] = enabled
+
+            # Save
+            with open(config_path, "w") as f:
+                yaml.dump(current_config, f, default_flow_style=False)
+
+            # Reload scheduler
+            from guild.dispatch.scheduler import get_scheduler
+            scheduler = get_scheduler()
+            scheduler.config = scheduler._load_config()
+
+            self._send_json({
+                "success": True,
+                "skill_id": skill_id,
+                "enabled": enabled,
+            })
+        except Exception as e:
+            logger.error(f"Toggle skill error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
+    # ==========================================
+    # TRAINING DAEMON Handlers
+    # ==========================================
+
+    def _serve_daemon_status(self):
+        """Get training daemon status."""
+        try:
+            import subprocess
+
+            # Check if daemon process is running
+            pid_file = BASE_DIR / ".daemon.pid"
+            daemon_running = False
+            daemon_pid = None
+
+            if pid_file.exists():
+                try:
+                    daemon_pid = int(pid_file.read_text().strip())
+                    # Check if process exists
+                    import os
+                    os.kill(daemon_pid, 0)
+                    daemon_running = True
+                except (ValueError, ProcessLookupError, PermissionError):
+                    daemon_running = False
+
+            # Get training status from status file
+            status_file = BASE_DIR / "status" / "training_status.json"
+            training_status = "unknown"
+            current_step = 0
+            current_file = None
+            last_update = None
+
+            if status_file.exists():
+                try:
+                    with open(status_file) as f:
+                        status_data = json.load(f)
+                    training_status = status_data.get("status", "unknown")
+                    current_step = status_data.get("current_step", 0)
+                    current_file = status_data.get("current_file")
+                    last_update = status_data.get("timestamp")
+                except:
+                    pass
+
+            # Get control signals
+            control_dir = BASE_DIR / "control"
+            signals = {
+                "pause": (control_dir / ".pause").exists(),
+                "stop": (control_dir / ".stop").exists(),
+                "resume": (control_dir / ".resume").exists(),
+            }
+
+            self._send_json({
+                "daemon_running": daemon_running,
+                "daemon_pid": daemon_pid,
+                "training_status": training_status,
+                "current_step": current_step,
+                "current_file": current_file,
+                "last_update": last_update,
+                "signals": signals,
+            })
+        except Exception as e:
+            logger.error(f"Daemon status error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_weaver_status(self):
+        """Get Weaver (daemon orchestrator) status."""
+        try:
+            pid_file = BASE_DIR / ".pids" / "weaver.pid"
+            weaver_running = False
+            weaver_pid = None
+
+            if pid_file.exists():
+                try:
+                    weaver_pid = int(pid_file.read_text().strip())
+                    os.kill(weaver_pid, 0)
+                    weaver_running = True
+                except (ValueError, ProcessLookupError, PermissionError):
+                    weaver_running = False
+
+            # Get thread status from weaver if it's running
+            threads = {}
+            if weaver_running:
+                try:
+                    from weaver.weaver import Weaver
+                    w = Weaver(str(BASE_DIR))
+                    tapestry = w.check_tapestry()
+                    for name, info in tapestry.items():
+                        threads[name] = {
+                            "name": info["name"],
+                            "alive": info["alive"],
+                            "restarts": info.get("restarts", 0)
+                        }
+                except Exception as e:
+                    logger.debug(f"Could not get thread status: {e}")
+
+            self._send_json({
+                "weaver_running": weaver_running,
+                "weaver_pid": weaver_pid,
+                "threads": threads,
+                "healthy_count": sum(1 for t in threads.values() if t.get("alive", False)),
+                "total_threads": len(threads)
+            })
+        except Exception as e:
+            logger.error(f"Weaver status error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _daemon_control(self):
+        """Control training daemon (start/stop/pause/resume)."""
+        try:
+            import subprocess
+
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length).decode())
+            action = body.get("action")
+
+            if action not in ["start", "stop", "pause", "resume", "kill"]:
+                self._send_json({"success": False, "error": f"Invalid action: {action}"}, 400)
+                return
+
+            control_dir = BASE_DIR / "control"
+            control_dir.mkdir(exist_ok=True)
+
+            if action == "start":
+                # Start daemon in background
+                daemon_script = BASE_DIR / "core" / "training_daemon.py"
+                log_file = BASE_DIR / "logs" / "training_daemon.log"
+                subprocess.Popen(
+                    ["nohup", "python3", str(daemon_script)],
+                    stdout=open(log_file, "a"),
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                    cwd=str(BASE_DIR)
+                )
+                self._send_json({"success": True, "action": "start", "message": "Daemon starting..."})
+
+            elif action == "stop":
+                # Create stop signal
+                (control_dir / ".stop").touch()
+                # Remove pause if exists
+                (control_dir / ".pause").unlink(missing_ok=True)
+                self._send_json({"success": True, "action": "stop", "message": "Stop signal sent"})
+
+            elif action == "pause":
+                (control_dir / ".pause").touch()
+                (control_dir / ".resume").unlink(missing_ok=True)
+                self._send_json({"success": True, "action": "pause", "message": "Pause signal sent"})
+
+            elif action == "resume":
+                (control_dir / ".resume").touch()
+                (control_dir / ".pause").unlink(missing_ok=True)
+                self._send_json({"success": True, "action": "resume", "message": "Resume signal sent"})
+
+            elif action == "kill":
+                # Force kill daemon
+                pid_file = BASE_DIR / ".daemon.pid"
+                if pid_file.exists():
+                    try:
+                        pid = int(pid_file.read_text().strip())
+                        import os
+                        os.kill(pid, 9)  # SIGKILL
+                        pid_file.unlink()
+                        self._send_json({"success": True, "action": "kill", "message": f"Killed daemon (PID {pid})"})
+                    except Exception as e:
+                        self._send_json({"success": False, "error": str(e)}, 500)
+                else:
+                    self._send_json({"success": False, "error": "No daemon PID file found"}, 404)
+
+        except Exception as e:
+            logger.error(f"Daemon control error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
     # ==========================================
     # QUESTS (Training Queue) Handlers
     # ==========================================
@@ -1147,11 +1517,11 @@ class TavernHandler(SimpleHTTPRequestHandler):
                         "progress": 0,  # Would need to read training status for actual progress
                     })
 
-            # Get recently completed (last 50)
+            # Get recently completed (last 100)
             recently_completed = []
             completed_dir = BASE_DIR / "queue" / "recently_completed"
             if completed_dir.exists():
-                files = sorted(completed_dir.glob("*.jsonl"), key=lambda x: x.stat().st_mtime, reverse=True)[:50]
+                files = sorted(completed_dir.glob("*.jsonl"), key=lambda x: x.stat().st_mtime, reverse=True)[:100]
                 for f in files:
                     recently_completed.append({
                         "file": f.name,
@@ -1182,6 +1552,94 @@ class TavernHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Quests data error: {e}")
             self._send_json({"error": str(e)}, 500)
+
+    def _serve_quest_preview(self, filename: str, query: dict):
+        """Serve preview examples from a queue file."""
+        import random
+        from urllib.parse import unquote
+
+        try:
+            filename = unquote(filename)  # Handle URL-encoded filenames
+            count = min(int(query.get("count", ["5"])[0]), 20)
+
+            # Find the file in queue directories
+            file_path = None
+            for location in ("high", "normal", "low", "processing", "recently_completed", "failed"):
+                candidate = BASE_DIR / "queue" / location / filename
+                if candidate.exists():
+                    file_path = candidate
+                    break
+
+            # Also check inbox
+            if not file_path:
+                candidate = BASE_DIR / "inbox" / filename
+                if candidate.exists():
+                    file_path = candidate
+
+            if not file_path:
+                self._send_json({"error": f"File not found: {filename}", "filename": filename}, 404)
+                return
+
+            # Read all examples
+            examples = []
+            with open(file_path, "r") as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            examples.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+
+            if not examples:
+                self._send_json({"error": "No valid examples in file", "filename": filename, "total_examples": 0}, 400)
+                return
+
+            # Select random examples
+            selected = random.sample(examples, min(count, len(examples)))
+
+            # Extract prompt and response for display
+            previews = []
+            for ex in selected:
+                # Handle different formats (messages array or prompt/response)
+                if "messages" in ex:
+                    messages = ex["messages"]
+                    prompt = None
+                    response = None
+                    for msg in messages:
+                        role = msg.get("role", "")
+                        content = msg.get("content", "")
+                        if role == "user" and not prompt:
+                            prompt = content
+                        elif role == "assistant":
+                            response = content
+                    previews.append({
+                        "prompt": prompt or "(no prompt)",
+                        "response": response or "(no response)",
+                        "format": "messages"
+                    })
+                elif "prompt" in ex:
+                    previews.append({
+                        "prompt": ex.get("prompt", "(no prompt)"),
+                        "response": ex.get("response", ex.get("completion", "(no response)")),
+                        "format": "prompt_response"
+                    })
+                else:
+                    # Unknown format - show raw
+                    previews.append({
+                        "prompt": str(ex)[:500],
+                        "response": "(unknown format)",
+                        "format": "raw"
+                    })
+
+            self._send_json({
+                "filename": filename,
+                "total_examples": len(examples),
+                "preview_count": len(previews),
+                "previews": previews
+            })
+        except Exception as e:
+            logger.error(f"Quest preview error: {e}")
+            self._send_json({"error": str(e), "filename": filename}, 500)
 
     def _change_quest_priority(self):
         """Change priority of a queued quest."""
@@ -1397,7 +1855,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
         """Check health of skill API servers (SY on 8080, BIN on 8090)."""
         import socket
 
-        def check_api(host: str, port: int, timeout: float = 1.0) -> dict:
+        def check_api(host: str, port: int, timeout: float = 3.0) -> dict:
             """Quick check if API is responding."""
             try:
                 # First check if port is open
@@ -1600,19 +2058,18 @@ class TavernHandler(SimpleHTTPRequestHandler):
             if assets["checkpoints"]:
                 assets["checkpoints"][0]["is_latest"] = True
 
-            # Try to get best checkpoint from model comparison status
-            comparison_file = BASE_DIR / "status" / "model_comparisons.json"
-            if comparison_file.exists():
-                try:
-                    with open(comparison_file) as f:
-                        comparisons = json.load(f)
-                    best = comparisons.get("latest_summary", {}).get("best_checkpoint", "")
+            # Mark best checkpoint from ledger
+            try:
+                from core.checkpoint_ledger import get_ledger
+                ledger = get_ledger()
+                best_record = ledger.get_best(metric="train_loss")
+                if best_record:
                     for cp in assets["checkpoints"]:
-                        if cp["name"] == best or f"checkpoint-{cp['step']}" == best:
+                        if cp.get("step") == best_record.step:
                             cp["is_champion"] = True
                             break
-                except Exception:
-                    pass
+            except Exception:
+                pass
 
             self._send_json(assets)
 
@@ -1621,44 +2078,52 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": str(e)}, 500)
 
     def _serve_vault_zones(self, refresh: bool = False):
-        """Serve zone status from VaultKeeper API."""
+        """Serve zone status by querying Zone Wardens."""
         try:
-            from vault.zones import get_zone_registry, ZoneClient, ZoneStatus
+            from vault.warden_client import get_zone_summary
 
-            registry = get_zone_registry()
+            # Query all zone wardens (parallel, with timeout)
+            zone_summary = get_zone_summary()
 
-            # Optionally refresh all statuses
-            if refresh:
-                registry.check_all_status()
+            # Map role to type for backward compatibility
+            role_to_type = {
+                "trainer": "central",
+                "inference": "inference",
+                "storage": "storage",
+            }
 
             zones = []
-            for zone in registry.list():
+            for zone in zone_summary:
                 zone_data = {
-                    "zone_id": zone.zone_id,
-                    "name": zone.name,
-                    "type": zone.zone_type.value,
-                    "host": zone.host,
-                    "port": zone.port,
-                    "status": zone.status.value,
-                    "asset_count": zone.asset_count,
-                    "total_size_gb": zone.total_size_gb,
-                    "disk_free_gb": zone.disk_free_gb,
-                    "can_train": zone.can_train,
-                    "can_infer": zone.can_infer,
-                    "last_checked": zone.last_checked.isoformat() if zone.last_checked else None,
+                    "zone_id": zone["zone_id"],
+                    "name": zone["name"],
+                    "type": role_to_type.get(zone.get("role"), zone.get("role", "unknown")),
+                    "host": zone["host"],
+                    "port": zone["port"],
+                    "status": zone["status"],
+                    "reachable": zone.get("reachable", False),
                 }
 
-                # For non-central zones, try to get live status
-                if zone.zone_type.value != "central":
-                    client = ZoneClient(zone)
-                    live = client.get_status()
-                    if live:
-                        zone_data["status"] = "online"
-                        zone_data["live"] = live
-                        zone_data["asset_count"] = live.get("catalog", {}).get("total_assets", 0)
-                        zone_data["disk_free_gb"] = live.get("disk", {}).get("free_gb", 0)
-                else:
-                    zone_data["status"] = "online"  # Central is always online
+                # Add service summary if available
+                if "services" in zone:
+                    s = zone["services"]
+                    zone_data["services_online"] = s.get("online", 0)
+                    zone_data["services_total"] = s.get("total", 0)
+                    zone_data["services_offline"] = s.get("offline", 0)
+
+                # Add capabilities based on role
+                zone_data["can_train"] = zone.get("role") == "trainer"
+                zone_data["can_infer"] = zone.get("role") == "inference"
+
+                # Add warden info
+                if zone.get("warden_version"):
+                    zone_data["warden_version"] = zone["warden_version"]
+                if zone.get("last_patrol"):
+                    zone_data["last_patrol"] = zone["last_patrol"]
+                if zone.get("response_ms"):
+                    zone_data["response_ms"] = zone["response_ms"]
+                if zone.get("error"):
+                    zone_data["error"] = zone["error"]
 
                 zones.append(zone_data)
 
@@ -1666,19 +2131,21 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 "zones": zones,
                 "count": len(zones),
                 "online": sum(1 for z in zones if z["status"] == "online"),
+                "reachable": sum(1 for z in zones if z.get("reachable", False)),
             })
 
         except ImportError as e:
-            logger.warning(f"Zone module not available: {e}")
+            logger.warning(f"Warden client not available: {e}")
             # Return default zones without live status
             self._send_json({
                 "zones": [
-                    {"zone_id": "4090", "name": "Training Server", "status": "online", "type": "central"},
+                    {"zone_id": "4090", "name": "Training Server", "status": "unknown", "type": "central"},
                     {"zone_id": "3090", "name": "Inference Server", "status": "unknown", "type": "inference"},
                     {"zone_id": "nas", "name": "Synology NAS", "status": "unknown", "type": "storage"},
                 ],
                 "count": 3,
-                "online": 1,
+                "online": 0,
+                "note": "Warden client not available - start zone wardens for live status"
             })
         except Exception as e:
             logger.error(f"Zone status error: {e}")
@@ -1940,33 +2407,13 @@ class TavernHandler(SimpleHTTPRequestHandler):
             except ImportError:
                 pass
 
-            # 2. Model comparison scores
-            comparison_file = BASE_DIR / "status" / "model_comparisons.json"
-            if comparison_file.exists():
-                try:
-                    with open(comparison_file) as f:
-                        comparisons = json.load(f)
-
-                    # Find this checkpoint in comparisons
-                    for comp in comparisons.get("comparisons", []):
-                        if comp.get("checkpoint_step") == step:
-                            response["comparison"] = {
-                                "composite_score": comp.get("composite_score"),
-                                "ranking": comp.get("ranking"),
-                                "metrics": comp.get("metrics", {}),
-                                "is_best": comp.get("is_best", False),
-                            }
-                            break
-
-                    # Check if it's the current best
-                    best = comparisons.get("latest_summary", {}).get("best_checkpoint", "")
-                    if f"checkpoint-{step}" in best or f"-{step}-" in best:
-                        if response["comparison"]:
-                            response["comparison"]["is_best"] = True
-                        else:
-                            response["comparison"] = {"is_best": True}
-                except Exception as e:
-                    logger.warning(f"Failed to load model comparisons: {e}")
+            # 2. Check if this is the best checkpoint (from ledger)
+            try:
+                best_record = ledger.get_best(metric="train_loss")
+                if best_record and best_record.step == step:
+                    response["is_best"] = True
+            except Exception:
+                pass
 
             # 3. Deployment history
             deployment_file = BASE_DIR / "status" / "deployment_status.json"
@@ -2313,34 +2760,55 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 "hosts": {},
             }
 
-            # Check each host
+            # Check each host - use /models/info for ACCURATE loaded models
             for host_id, config in self.INFERENCE_HOSTS.items():
                 try:
-                    url = f"http://{config['host']}:{config['port']}/models/info"
-                    with self._make_inference_request(url, timeout=5) as response:
-                        data = json.loads(response.read().decode())
-                        loaded_step = None
-                        for model_id, info in data.get("pool", {}).items():
-                            if info.get("is_active"):
-                                loaded_step = info.get("checkpoint_step")
-                                break
+                    import re
+                    # Get ACTUAL loaded models from /models/info (not stale /health)
+                    models_url = f"http://{config['host']}:{config['port']}/models/info"
+                    with self._make_inference_request(models_url, timeout=5) as response:
+                        models_data = json.loads(response.read().decode())
 
-                        # Get ledger info for loaded checkpoint
+                    loaded_models = []
+                    for model in models_data.get("models", []):
+                        model_id = model.get("model_id", "")
+                        step = None
                         ledger_info = None
-                        if loaded_step:
-                            record = ledger.get(loaded_step)
-                            if record:
-                                ledger_info = {
-                                    "train_loss": record.train_loss,
-                                    "skill_name": record.skill_name,
-                                    "canonical_name": record.canonical_name,
-                                }
 
-                        status["hosts"][host_id] = {
-                            "status": "online",
-                            "loaded_step": loaded_step,
+                        # Check if it's the base model
+                        if model_id in ["Qwen3-0.6B-base", "Qwen3-0.6B", "base"]:
+                            step = 0
+                            ledger_info = {
+                                "train_loss": None,
+                                "skill_name": None,
+                                "canonical_name": "Qwen3-0.6B (Base)",
+                            }
+                        else:
+                            # Extract step from model_id
+                            match = re.search(r'(?:checkpoint-?|step)(\d+)(k)?', model_id, re.IGNORECASE)
+                            if match:
+                                step = int(match.group(1))
+                                if match.group(2):  # 'k' suffix means thousands
+                                    step *= 1000
+                                record = ledger.get(step)
+                                if record:
+                                    ledger_info = {
+                                        "train_loss": record.train_loss,
+                                        "skill_name": record.skill_name,
+                                        "canonical_name": record.canonical_name,
+                                    }
+
+                        loaded_models.append({
+                            "model_id": model_id,
+                            "step": step,
                             "ledger_info": ledger_info,
-                        }
+                        })
+
+                    status["hosts"][host_id] = {
+                        "status": "online",
+                        "loaded_models": loaded_models,
+                        "model_count": len(loaded_models),
+                    }
                 except Exception as e:
                     status["hosts"][host_id] = {
                         "status": "offline",
@@ -2351,6 +2819,130 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Oracle status error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    # =========================================================================
+    # SKILLS API - Active skills and curriculum
+    # =========================================================================
+
+    def _serve_skills(self):
+        """Get all skills with current level and progress from curriculum state."""
+        try:
+            import yaml
+            from pathlib import Path
+
+            skills_dir = BASE_DIR / "configs" / "skills"
+            curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
+
+            # Load curriculum state
+            curriculum_state = {}
+            if curriculum_file.exists():
+                with open(curriculum_file) as f:
+                    curriculum_state = json.load(f)
+
+            skills = []
+            for yaml_file in skills_dir.glob("*.yaml"):
+                if yaml_file.name.startswith("_"):
+                    continue  # Skip template
+
+                with open(yaml_file) as f:
+                    config = yaml.safe_load(f)
+
+                skill_id = config.get("id")
+                # Map skill IDs (syllo -> sy in some places)
+                state_key = skill_id
+                if skill_id == "sy" and "sy" not in curriculum_state.get("skills", {}):
+                    state_key = "syllo"
+                elif skill_id == "bin" and "bin" not in curriculum_state.get("skills", {}):
+                    state_key = "binary"
+
+                skill_state = curriculum_state.get("skills", {}).get(state_key, {})
+                accuracy_history = skill_state.get("accuracy_history", [])
+
+                # Get latest accuracy
+                latest_accuracy = 0.0
+                if accuracy_history:
+                    latest_accuracy = accuracy_history[-1].get("accuracy", 0.0)
+
+                # current_level = mastered level (0 = hasn't mastered anything yet)
+                # training_level = current_level + 1 (what they're working on)
+                mastered_level = skill_state.get("current_level", 0)
+                training_level = mastered_level + 1
+
+                # Count evals at training level
+                evals_at_level = sum(
+                    1 for h in accuracy_history[-10:]  # Last 10 evals
+                    if h.get("level") == training_level
+                )
+
+                # Calculate progress (3 passing evals at 80%+ = level up)
+                passing_evals = sum(
+                    1 for h in accuracy_history[-10:]
+                    if h.get("level") == training_level and h.get("accuracy", 0) >= 0.8
+                )
+                progress_pct = min(100, int((passing_evals / 3) * 100))
+
+                display = config.get("display", {})
+                skills.append({
+                    "id": skill_id,
+                    "name": config.get("name", skill_id.upper()),
+                    "short_name": display.get("short_name", skill_id.upper()),
+                    "rpg_name": config.get("name", skill_id.upper()),
+                    "description": config.get("description", ""),
+                    "icon": display.get("icon", "⚔️"),
+                    "color": display.get("color", "#7c3aed"),
+                    "current_level": mastered_level,  # Mastered level (0 = none)
+                    "mastered_level": mastered_level,  # Alias for frontend
+                    "training_level": training_level,  # What they're working on
+                    "max_level": config.get("levels", {}).get("max", 30),
+                    "accuracy": latest_accuracy * 100,  # Convert to percentage
+                    "evals_at_level": min(evals_at_level, 3),
+                    "eval_count": len(accuracy_history),
+                    "progress_pct": progress_pct,
+                })
+
+            # Calculate total mastered
+            total_mastered = sum(s.get("mastered_level", 0) for s in skills)
+
+            # Return in format frontend expects
+            self._send_json({
+                "skills": skills,
+                "total_mastered": total_mastered
+            })
+
+        except Exception as e:
+            logger.error(f"Skills API error: {e}")
+            import traceback
+            traceback.print_exc()
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_curriculum(self):
+        """Get curriculum state including last eval time."""
+        try:
+            curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
+
+            if not curriculum_file.exists():
+                self._send_json({"error": "Curriculum state not found"}, 404)
+                return
+
+            with open(curriculum_file) as f:
+                state = json.load(f)
+
+            # Find last eval time across all skills
+            last_eval_time = None
+            for skill_data in state.get("skills", {}).values():
+                for h in skill_data.get("accuracy_history", []):
+                    ts = h.get("timestamp")
+                    if ts and (not last_eval_time or ts > last_eval_time):
+                        last_eval_time = ts
+
+            self._send_json({
+                "skills": state.get("skills", {}),
+                "last_eval_time": last_eval_time,
+            })
+
+        except Exception as e:
+            logger.error(f"Curriculum API error: {e}")
             self._send_json({"error": str(e)}, 500)
 
     # =========================================================================
@@ -2439,9 +3031,9 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
             # Special handling for base model (step 0)
             if int(step) == 0:
-                checkpoint_name = "Qwen3-0.6B"
+                checkpoint_name = "Qwen3-0.6B-base"
                 local_path = BASE_DIR / "models" / "Qwen3-0.6B"
-                remote_path = f"{models_dir}/Qwen3-0.6B"
+                remote_path = f"{models_dir}/Qwen3-0.6B-base"
 
                 # Check if base model exists on remote
                 if not self._check_remote_checkpoint(host_config, checkpoint_name):
@@ -2617,16 +3209,65 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
             host_config = self.INFERENCE_HOSTS[host_id]
 
-            # Get model name from loaded model info
-            model_name = "default"
+            # Determine which model to use
+            # Query the inference server for available models and match by step
+            step = body.get("step")
+            model_name = None
+
+            # Get list of available models from inference server
+            available_model_ids = set()
             try:
-                info_url = f"http://{host_config['host']}:{host_config['port']}/models/info"
-                with self._make_inference_request(info_url, timeout=5) as resp:
-                    info = json.loads(resp.read().decode())
-                    if info.get("models"):
-                        model_name = info["models"][0].get("model_id", "default")
-            except Exception:
-                pass  # Use default
+                models_url = f"http://{host_config['host']}:{host_config['port']}/models/info"
+                with self._make_inference_request(models_url, timeout=5) as resp:
+                    models_info = json.loads(resp.read().decode())
+                    # models_info has format: {"loaded": true, "models": [{"model_id": "...", ...}, ...]}
+                    for model in models_info.get("models", []):
+                        available_model_ids.add(model.get("model_id", ""))
+            except Exception as e:
+                logger.warning(f"Could not get models list: {e}")
+
+            if step is not None:
+                step = int(step)
+                if step == 0:
+                    # Base model - try various naming patterns
+                    base_patterns = ["Qwen3-0.6B-base", "base", "Qwen3-0.6B"]
+                    for pattern in base_patterns:
+                        if pattern in available_model_ids:
+                            model_name = pattern
+                            break
+                else:
+                    # Find model matching this step - try various patterns
+                    step_patterns = [
+                        f"checkpoint-{step}",          # canonical
+                        f"Qwen3-0.6B-step{step//1000}k",  # legacy naming
+                        f"step{step}",
+                        f"checkpoint_{step}",
+                    ]
+                    for pattern in step_patterns:
+                        if pattern in available_model_ids:
+                            model_name = pattern
+                            break
+
+                    # If no exact match, FAIL - never silently use wrong model
+                    if not model_name:
+                        logger.error(f"STRICT: No model found for step {step}. Available: {list(available_model_ids)}")
+                        self._send_json({
+                            "success": False,
+                            "error": f"Step {step} not loaded. Available: {sorted(available_model_ids)}",
+                            "available_models": sorted(available_model_ids),
+                            "requested_step": step,
+                        }, 404)
+                        return
+
+            # NO FALLBACK - step is REQUIRED for chat
+            if not model_name:
+                self._send_json({
+                    "success": False,
+                    "error": "Step parameter is required. No fallback allowed.",
+                }, 400)
+                return
+
+            logger.info(f"Oracle chat: step={step}, resolved model={model_name}")
 
             # Build chat completion request (OpenAI-compatible format)
             chat_request = {
@@ -2645,15 +3286,30 @@ class TavernHandler(SimpleHTTPRequestHandler):
             with self._make_inference_request(url, method="POST", data=req_data, timeout=120) as response:
                 result = json.loads(response.read().decode())
 
+            # VERSION VERIFICATION: Confirm server used the model we requested
+            actual_model = result.get("model", "")
+            if model_name and actual_model and actual_model != model_name:
+                logger.warning(f"Model mismatch! Requested '{model_name}' but server used '{actual_model}'")
+                self._send_json({
+                    "success": False,
+                    "error": f"Model mismatch: requested '{model_name}' but server used '{actual_model}'",
+                    "requested_model": model_name,
+                    "actual_model": actual_model,
+                }, 409)  # 409 Conflict
+                return
+
             # Extract response
             assistant_message = ""
             if result.get("choices"):
                 assistant_message = result["choices"][0].get("message", {}).get("content", "")
 
+            # Include verified model info in response
             self._send_json({
                 "success": True,
                 "response": assistant_message,
                 "host": host_id,
+                "model": actual_model,  # Server-confirmed model
+                "model_path": result.get("model_path", ""),  # Full path on server
                 "usage": result.get("usage", {}),
             })
 
@@ -2768,7 +3424,8 @@ def run_tavern(
     ProcessManager.write_pid()
     ProcessManager.register_cleanup()
 
-    server = HTTPServer(("0.0.0.0", port), TavernHandler)
+    # Use ThreadingHTTPServer to handle SSE streams without blocking
+    server = ThreadingHTTPServer(("0.0.0.0", port), TavernHandler)
     ProcessManager.setup_signals(server)
 
     logger.info("=" * 60)

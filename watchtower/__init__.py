@@ -5,14 +5,12 @@ The Watchtower stands at the highest point of the training citadel,
 providing a commanding view of all operations:
 
     Scrying Pool    - Real-time battle observation
-    Champion Board  - Model checkpoint rankings
     Oracle Client   - Communication with inference
     Heralds         - Alert notifications
     Task Sentries   - GPU task coordination
 
 RPG Mapping:
     Live Monitor        → Scrying Pool
-    Model Comparison    → Champion Board
     Inference Client    → Oracle
     Alerts              → Heralds
     Task Scheduler      → Task Sentries
@@ -20,17 +18,12 @@ RPG Mapping:
     API Server          → Crystal Network
 
 Quick Start:
-    from watchtower import ScryingPool, ChampionBoard, OracleClient
+    from watchtower import ScryingPool, OracleClient
 
     # Observe current training
     pool = ScryingPool(base_dir)
     vision = pool.gaze()
     print(f"Battle: {vision.battle_state}, Damage: {vision.damage_taken}")
-
-    # Check champion rankings
-    board = ChampionBoard(base_dir)
-    champion = board.get_current_champion()
-    print(f"Champion: {champion.checkpoint_name}")
 
     # Get a prophecy from the Oracle
     oracle = OracleClient()
@@ -48,9 +41,6 @@ from watchtower.types import (
     # Watcher states
     WatcherState,
     AlertLevel,
-    # Champion Board
-    ChampionRank,
-    ChampionBoardStatus,
     # Oracle
     OracleResponse,
     # Scrying Pool
@@ -69,14 +59,6 @@ from watchtower.scrying_pool import (
     get_scrying_pool,
 )
 
-# Champion Board (model rankings)
-from watchtower.champion_board import (
-    ChampionBoard,
-    get_champion_board,
-    # Backward compat
-    ModelComparisonEngine,
-)
-
 # Oracle Client (inference)
 from watchtower.oracle_client import (
     OracleClient,
@@ -90,9 +72,6 @@ __all__ = [
     # Types - Watcher
     "WatcherState",
     "AlertLevel",
-    # Types - Champion Board
-    "ChampionRank",
-    "ChampionBoardStatus",
     # Types - Oracle
     "OracleResponse",
     # Types - Scrying Pool
@@ -106,10 +85,6 @@ __all__ = [
     # Scrying Pool
     "ScryingPool",
     "get_scrying_pool",
-    # Champion Board
-    "ChampionBoard",
-    "get_champion_board",
-    "ModelComparisonEngine",  # Backward compat
     # Oracle
     "OracleClient",
     "get_oracle_client",

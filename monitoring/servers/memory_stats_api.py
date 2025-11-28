@@ -5,7 +5,7 @@ Runs on port 8081
 """
 import json
 import psutil
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 class MemoryStatsHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -67,6 +67,7 @@ class MemoryStatsHandler(BaseHTTPRequestHandler):
         pass  # Silent
 
 if __name__ == '__main__':
-    server = HTTPServer(('0.0.0.0', 8081), MemoryStatsHandler)
+    # Use ThreadingHTTPServer to handle concurrent requests without blocking
+    server = ThreadingHTTPServer(('0.0.0.0', 8081), MemoryStatsHandler)
     print("Memory stats API running on http://0.0.0.0:8081/api/memory_stats")
     server.serve_forever()

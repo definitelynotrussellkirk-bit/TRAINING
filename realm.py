@@ -14,7 +14,7 @@ locations and systems through a single import:
     r.sentinels.inspector.full_patrol()
 
 Or use the global convenience functions:
-    from realm import gaze, patrol, get_champion, invoke_scroll
+    from realm import gaze, patrol, invoke_scroll
 
 Locations:
     Guild       - Skills, quests, dispatch, progression
@@ -234,7 +234,6 @@ class WatchtowerAccess:
     def __init__(self, base_dir: Path):
         self.base_dir = base_dir
         self._pool = None
-        self._champions = None
         self._oracle = None
 
     @property
@@ -244,14 +243,6 @@ class WatchtowerAccess:
             from watchtower import ScryingPool
             self._pool = ScryingPool(self.base_dir)
         return self._pool
-
-    @property
-    def champions(self):
-        """Champion Board (model rankings)."""
-        if self._champions is None:
-            from watchtower import ChampionBoard
-            self._champions = ChampionBoard(str(self.base_dir))
-        return self._champions
 
     @property
     def oracle(self):
@@ -356,12 +347,24 @@ def patrol() -> Dict[str, Any]:
 
 def get_champion() -> Optional[Dict[str, Any]]:
     """
-    Get current champion (best checkpoint).
+    Get current champion (best checkpoint by train_loss).
 
     Returns champion info or None.
     """
-    champion = get_realm().watchtower.champions.get_current_champion()
-    return champion.to_dict() if champion else None
+    try:
+        from core.checkpoint_ledger import get_ledger
+        ledger = get_ledger()
+        best = ledger.get_best(metric="train_loss")
+        if best:
+            return {
+                "step": best.step,
+                "train_loss": best.train_loss,
+                "canonical_name": best.canonical_name,
+                "saved_at": best.saved_at,
+            }
+    except Exception:
+        pass
+    return None
 
 
 def invoke_scroll(scroll_name: str, args: list = None) -> Dict[str, Any]:

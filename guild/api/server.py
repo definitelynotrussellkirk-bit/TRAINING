@@ -17,7 +17,7 @@ Usage:
 import json
 import logging
 import re
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from typing import Optional, Dict, Any
 from urllib.parse import urlparse, parse_qs
 
@@ -195,14 +195,15 @@ class GuildServer:
         self.host = host
         self.port = port
         self.endpoints = endpoints or get_endpoints()
-        self._server: Optional[HTTPServer] = None
+        self._server: Optional[ThreadingHTTPServer] = None
 
     def start(self):
         """Start the server (blocking)."""
         # Configure handler with endpoints
         GuildRequestHandler.endpoints = self.endpoints
 
-        self._server = HTTPServer((self.host, self.port), GuildRequestHandler)
+        # Use ThreadingHTTPServer to handle concurrent requests without blocking
+        self._server = ThreadingHTTPServer((self.host, self.port), GuildRequestHandler)
         logger.info(f"Guild API server starting on http://{self.host}:{self.port}")
 
         print(f"Guild API Server")

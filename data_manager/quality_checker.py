@@ -3,11 +3,13 @@
 Quality Checker - Test suite to gauge data quality and training readiness
 
 Evaluates generated data against quality criteria before queuing for training.
+Each skill has its own validation profile with appropriate thresholds.
 """
 
 import json
 import logging
-from typing import Dict, List, Any, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Any, Tuple, Optional
 from pathlib import Path
 from collections import Counter
 import statistics
@@ -15,30 +17,123 @@ import statistics
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class SkillProfile:
+    """Validation profile for a specific skill"""
+    name: str
+    # Length thresholds
+    min_tokens: int = 10
+    max_tokens: int = 4096
+    short_tolerance: float = 0.05  # Max % allowed to be too short
+    long_tolerance: float = 0.05   # Max % allowed to be too long
+    # Diversity thresholds
+    min_diversity: float = 0.70    # Min % unique responses
+    # Content checks
+    min_content_length: int = 5    # Min chars per message
+    max_issue_rate: float = 0.05   # Max % content issues
+    # Which checks to run (all True by default)
+    check_length: bool = True
+    check_diversity: bool = True
+
+
+# Skill-specific profiles - every skill MUST have a profile
+SKILL_PROFILES: Dict[str, SkillProfile] = {
+    # SYLLO - Natural language puzzles, expect longer diverse responses
+    "syllo": SkillProfile(
+        name="syllo",
+        min_tokens=20,
+        max_tokens=2048,
+        short_tolerance=0.10,
+        min_diversity=0.80,
+    ),
+    # BINARY - Symbolic math, short formulaic responses are expected
+    "binary": SkillProfile(
+        name="binary",
+        min_tokens=5,           # Binary responses can be very short
+        max_tokens=512,
+        short_tolerance=0.50,   # 50% can be "short" - that's fine for math
+        min_diversity=0.05,     # Very low diversity OK - 2-bit has only 4 values
+        check_diversity=False,  # Disable diversity check - fundamentally constrained
+    ),
+    # SPARRING - Self-correction training data
+    # Uses dedicated sparring_validator.py for detailed checks
+    "sparring": SkillProfile(
+        name="sparring",
+        min_tokens=5,           # "It is correct." is short
+        max_tokens=2048,
+        short_tolerance=0.50,   # Half are just "It is correct/incorrect"
+        min_diversity=0.10,     # Low diversity OK - many identical correctness responses
+        check_diversity=False,  # Disable - intentionally repetitive
+    ),
+}
+
+
+class UnknownSkillError(Exception):
+    """Raised when validation is attempted for a skill without a profile"""
+    pass
+
+
+def get_skill_profile(skill: str) -> SkillProfile:
+    """
+    Get validation profile for a skill.
+
+    Raises:
+        UnknownSkillError: If skill has no profile defined
+        ValueError: If skill is None or empty
+    """
+    if not skill:
+        raise ValueError("skill parameter is required - no fallbacks allowed")
+    if skill not in SKILL_PROFILES:
+        raise UnknownSkillError(
+            f"No validation profile for skill '{skill}'. "
+            f"Available profiles: {list(SKILL_PROFILES.keys())}. "
+            f"Add a profile in quality_checker.py SKILL_PROFILES."
+        )
+    return SKILL_PROFILES[skill]
+
+
 class QualityChecker:
-    """Test suite for data quality assessment"""
+    """Test suite for data quality assessment with skill-aware profiles"""
 
     def __init__(self, min_length: int = 10, max_length: int = 4096):
+        # Legacy defaults (used when no skill specified)
         self.min_length = min_length
         self.max_length = max_length
         self.test_results = []
 
-    def check_all(self, data: List[Dict[str, Any]]) -> Tuple[bool, Dict[str, Any]]:
+    def check_all(self, data: List[Dict[str, Any]], skill: str) -> Tuple[bool, Dict[str, Any]]:
         """
-        Run all quality checks on data
+        Run all quality checks on data using skill-specific profile.
+
+        Args:
+            data: List of training examples
+            skill: Skill name (e.g., "binary", "syllo") - REQUIRED
 
         Returns:
             (passed, report) - True if all checks pass, plus detailed report
+
+        Raises:
+            UnknownSkillError: If skill has no profile defined
+            ValueError: If skill is None or empty
         """
         self.test_results = []
 
+        # Get skill-specific profile (will raise if unknown)
+        profile = get_skill_profile(skill)
+        logger.info(f"Using validation profile: {profile.name} for skill: {skill}")
+
+        # Build check list based on profile
         checks = [
-            ("format", self._check_format),
-            ("length", self._check_length),
-            ("diversity", self._check_diversity),
-            ("balance", self._check_balance),
-            ("content", self._check_content_quality),
+            ("format", lambda d: self._check_format(d, profile)),
+            ("balance", lambda d: self._check_balance(d, profile)),
+            ("content", lambda d: self._check_content_quality(d, profile)),
         ]
+
+        # Optionally add length/diversity checks
+        if profile.check_length:
+            checks.insert(1, ("length", lambda d: self._check_length(d, profile)))
+        if profile.check_diversity:
+            checks.insert(2, ("diversity", lambda d: self._check_diversity(d, profile)))
 
         all_passed = True
         results = {}
@@ -69,12 +164,14 @@ class QualityChecker:
             "failed_checks": sum(1 for r in results.values() if not r["passed"]),
             "overall_pass": all_passed,
             "results": results,
+            "skill": skill,
+            "profile": profile.name,
             "recommendation": self._get_recommendation(results)
         }
 
         return all_passed, summary
 
-    def _check_format(self, data: List[Dict]) -> Tuple[bool, Dict]:
+    def _check_format(self, data: List[Dict], profile: SkillProfile) -> Tuple[bool, Dict]:
         """Check if data has correct conversation format"""
         if not data:
             return False, {"reason": "Empty dataset", "count": 0}
@@ -119,8 +216,8 @@ class QualityChecker:
             "total_examples": len(data)
         }
 
-    def _check_length(self, data: List[Dict]) -> Tuple[bool, Dict]:
-        """Check if conversation lengths are within bounds"""
+    def _check_length(self, data: List[Dict], profile: SkillProfile) -> Tuple[bool, Dict]:
+        """Check if conversation lengths are within bounds (skill-aware)"""
         lengths = []
         too_short = 0
         too_long = 0
@@ -135,16 +232,19 @@ class QualityChecker:
 
             lengths.append(estimated_tokens)
 
-            if estimated_tokens < self.min_length:
+            if estimated_tokens < profile.min_tokens:
                 too_short += 1
-            elif estimated_tokens > self.max_length:
+            elif estimated_tokens > profile.max_tokens:
                 too_long += 1
 
         if not lengths:
             return False, {"reason": "No valid examples to measure"}
 
-        passed = (too_short / len(lengths) < 0.05 and  # <5% too short
-                 too_long / len(lengths) < 0.05)       # <5% too long
+        # Use profile-specific tolerances
+        short_rate = too_short / len(lengths)
+        long_rate = too_long / len(lengths)
+        passed = (short_rate <= profile.short_tolerance and
+                  long_rate <= profile.long_tolerance)
 
         return passed, {
             "mean_tokens": statistics.mean(lengths),
@@ -153,11 +253,17 @@ class QualityChecker:
             "max_tokens": max(lengths),
             "too_short": too_short,
             "too_long": too_long,
+            "short_rate": short_rate,
+            "long_rate": long_rate,
+            "threshold_min": profile.min_tokens,
+            "threshold_max": profile.max_tokens,
+            "tolerance_short": profile.short_tolerance,
+            "tolerance_long": profile.long_tolerance,
             "sampled": len(lengths)
         }
 
-    def _check_diversity(self, data: List[Dict]) -> Tuple[bool, Dict]:
-        """Check diversity of responses"""
+    def _check_diversity(self, data: List[Dict], profile: SkillProfile) -> Tuple[bool, Dict]:
+        """Check diversity of responses (skill-aware)"""
         assistant_responses = []
 
         for example in data[:1000]:
@@ -185,17 +291,19 @@ class QualityChecker:
 
         most_common = word_counter.most_common(10)
 
-        passed = diversity_ratio >= 0.7  # At least 70% unique
+        # Use profile-specific diversity threshold
+        passed = diversity_ratio >= profile.min_diversity
 
         return passed, {
             "unique_responses": unique_responses,
             "total_responses": total_responses,
             "diversity_ratio": diversity_ratio,
+            "threshold": profile.min_diversity,
             "most_common_words": most_common,
             "sampled": len(assistant_responses)
         }
 
-    def _check_balance(self, data: List[Dict]) -> Tuple[bool, Dict]:
+    def _check_balance(self, data: List[Dict], profile: SkillProfile) -> Tuple[bool, Dict]:
         """Check if dataset is balanced (user/assistant ratio)"""
         user_count = 0
         assistant_count = 0
@@ -235,7 +343,7 @@ class QualityChecker:
             "total_messages": total
         }
 
-    def _check_content_quality(self, data: List[Dict]) -> Tuple[bool, Dict]:
+    def _check_content_quality(self, data: List[Dict], profile: SkillProfile) -> Tuple[bool, Dict]:
         """Check content quality (no empty, malformed, or gibberish)"""
         issues = {
             "empty_content": 0,
@@ -255,7 +363,8 @@ class QualityChecker:
                     issues["empty_content"] += 1
                     continue
 
-                if len(content.strip()) < 5:
+                # Use profile-specific min content length
+                if len(content.strip()) < profile.min_content_length:
                     issues["too_short_content"] += 1
                     continue
 
@@ -271,13 +380,15 @@ class QualityChecker:
         sampled = min(1000, len(data)) * 2  # Rough estimate of messages
 
         issue_rate = total_issues / sampled if sampled > 0 else 0
-        passed = issue_rate < 0.05  # Less than 5% issues
+        # Use profile-specific max issue rate
+        passed = issue_rate < profile.max_issue_rate
 
         return passed, {
             "issues": issues,
             "total_issues": total_issues,
             "sampled_messages": sampled,
-            "issue_rate": issue_rate
+            "issue_rate": issue_rate,
+            "threshold": profile.max_issue_rate
         }
 
     def _get_recommendation(self, results: Dict) -> str:

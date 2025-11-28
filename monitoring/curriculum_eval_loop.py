@@ -86,7 +86,12 @@ class CurriculumEvalLoop:
         self.status_file.parent.mkdir(parents=True, exist_ok=True)
 
     def _get_current_model(self) -> str:
-        """Get currently loaded model from inference server"""
+        """
+        Get currently loaded model from inference server.
+
+        MUST return exact model ID (e.g. "checkpoint-181865", "Qwen3-0.6B-base").
+        Never returns "current" - that's meaningless for tracking.
+        """
         try:
             resp = requests.get(
                 f"{self.inference_url}/models/info",
@@ -98,17 +103,35 @@ class CurriculumEvalLoop:
                 # New pool API returns list of models
                 models = data.get("models", [])
                 if models:
-                    model_id = models[0].get("model_id", "current")
-                    logger.info(f"Detected model from inference server: {model_id}")
-                    return model_id
+                    # Get the first (most recently used) model
+                    model_id = models[0].get("model_id")
+                    if model_id:
+                        logger.info(f"Detected model from inference server: {model_id}")
+                        return model_id
+                    # Try path-based fallback
+                    path = models[0].get("path", "")
+                    if path:
+                        model_id = Path(path).name
+                        logger.info(f"Extracted model ID from path: {model_id}")
+                        return model_id
                 # Fallback to old format
-                model = data.get("model_name", data.get("loaded_model", "current"))
-                logger.info(f"Detected model from inference server: {model}")
-                return model
+                model = data.get("model_name") or data.get("loaded_model")
+                if model:
+                    logger.info(f"Detected model from inference server: {model}")
+                    return model
         except Exception as e:
-            logger.debug(f"Could not query model info: {e}")
-        # Fallback to environment or default
-        return os.environ.get("INFERENCE_MODEL", "current")
+            logger.warning(f"Could not query model info: {e}")
+
+        # Check environment - must be explicit
+        env_model = os.environ.get("INFERENCE_MODEL")
+        if env_model and env_model != "current":
+            return env_model
+
+        # FAIL if we can't determine the model - don't use "current"
+        raise RuntimeError(
+            "Cannot determine model ID from inference server. "
+            "Specify --model explicitly or ensure inference server is running."
+        )
 
     def check_services(self) -> Tuple[bool, str]:
         """Check if required services are running."""
@@ -462,9 +485,10 @@ class CurriculumEvalLoop:
                 "level": level_num,
                 "problems": total,
                 "correct": correct,
+                "model": self.model_name,  # ALWAYS record exact model ID
             }
         )
-        logger.info(f"Recorded accuracy in curriculum (step {step})")
+        logger.info(f"Recorded accuracy in curriculum (step {step}, model={self.model_name})")
 
         # Check for progression
         should_advance, reason = self.curriculum.should_progress(skill)

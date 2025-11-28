@@ -75,7 +75,6 @@ TASK_TYPE_PRIORITIES = {
     "critical_eval": Priority.CRITICAL,
     "curriculum_eval": Priority.HIGH,
     "regression_check": Priority.HIGH,
-    "model_comparison": Priority.HIGH,
     "baseline_test": Priority.NORMAL,
     "automated_test": Priority.NORMAL,
     "checkpoint_eval": Priority.NORMAL,
@@ -539,43 +538,14 @@ class TaskExecutor:
     def _handle_checkpoint_eval(self, params: Dict) -> Dict:
         """Evaluate a specific checkpoint against validation data"""
         checkpoint_path = params.get("checkpoint_path")
-        base_dir = params.get("base_dir", "/path/to/training")
-        num_examples = params.get("num_examples", 50)
 
-        try:
-            # Use the model comparison engine to evaluate
-            spec = importlib.util.spec_from_file_location(
-                "model_comparison",
-                f"{base_dir}/monitoring/model_comparison_engine.py"
-            )
-            if spec and spec.loader:
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-
-                engine = module.ModelComparisonEngine(
-                    base_dir=base_dir,
-                    api_url=self.inference_url
-                )
-
-                # Evaluate checkpoint
-                results = engine.evaluate_checkpoint(checkpoint_path, num_examples)
-
-                return {
-                    "task": "checkpoint_eval",
-                    "checkpoint": checkpoint_path,
-                    "loss": results.get("loss", 0),
-                    "accuracy": results.get("accuracy", 0),
-                    "score": results.get("score", 0),
-                    "timestamp": datetime.now().isoformat()
-                }
-        except Exception as e:
-            logger.error(f"Checkpoint eval failed: {e}")
-            return {
-                "task": "checkpoint_eval",
-                "checkpoint": checkpoint_path,
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            }
+        # Note: model_comparison_engine was removed - use curriculum eval instead
+        return {
+            "task": "checkpoint_eval",
+            "checkpoint": checkpoint_path,
+            "error": "Use curriculum_eval or ledger for checkpoint evaluation",
+            "timestamp": datetime.now().isoformat()
+        }
 
     def _handle_idle_warmup(self, params: Dict) -> Dict:
         """Keep GPU warm with light work"""

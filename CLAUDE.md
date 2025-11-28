@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-11-27 (4B Full Fine-Tune + System Optimization)
+**Last Updated:** 2025-11-28 (TrainerEngine Refactor Complete)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 ---
@@ -200,7 +200,14 @@ The Tavern displays data. To feel like a **complete game**, we need:
 
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
-Latest updates (2025-11-27):
+Latest updates (2025-11-28):
+- **TrainerEngine Refactor** - Complete 5-phase refactor of training architecture
+  - TrainerEngine now owns full HF training pipeline (model loading, dataset prep, training)
+  - LiveMonitorCallback extracted to `trainer/monitoring/callbacks.py`
+  - `core/train.py` reduced from ~2400 to 1881 lines
+  - `USE_ENGINE=1` flag for gradual migration
+
+Previous updates (2025-11-27):
 - **Muon Optimizer** - Alternative to AdamW with orthogonalized momentum (faster convergence)
 - **Packing + Masking Bug Fix** - Critical fix for training on instruction text
 - **Sparring with Trainers** - Self-correction training system
@@ -210,8 +217,6 @@ Latest updates (2025-11-27):
 - **Tavern UI** - Quests page, VRAM calculator, scheduler in settings
 - **Checkpoint Ledger** - Single source of truth for checkpoint stats
 - **Host Registry** - Service discovery for distributed operation
-- **Task Master UI** - Visible in Guild Hall with action hints
-- **VRAM Estimator** - Now accounts for max_length, gradient checkpointing, and Flash Attention 2
 
 ---
 
@@ -882,12 +887,16 @@ $TRAINING_BASE_DIR/
 │   ├── profiles/                # Layer 3: Pluggable data profiles
 │   │   ├── base.py              # DataProfile ABC interface
 │   │   ├── emoji_think.py       # Emoji thinking/stop profile
-│   │   └── regime3.py           # Symbolic reasoning profile (NEW!)
+│   │   └── regime3.py           # Symbolic reasoning profile
 │   ├── monitoring/              # Layer 3: Monitoring callbacks
 │   │   ├── status_writer.py     # TrainingStatusWriter
-│   │   └── callbacks.py         # LiveMonitorCallback
+│   │   └── callbacks.py         # LiveMonitorCallback (with on_save, ledger, remote eval)
 │   ├── core/                    # Layer 1: Engine API
-│   │   └── engine.py            # TrainerEngine.run_job() (proof-of-concept)
+│   │   └── engine.py            # TrainerEngine - full HF training pipeline
+│   ├── optimizers/              # Optimizer factory (Muon + AdamW)
+│   │   ├── factory.py           # create_optimizer() entry point
+│   │   ├── param_groups.py      # split_transformer_params()
+│   │   └── muon.py              # SingleDeviceMuonWithAuxAdam
 │   └── cli_main.py              # CLI demonstration
 │
 ├── README.md                    # System overview
@@ -900,7 +909,7 @@ $TRAINING_BASE_DIR/
 ├── pyproject.toml               # 🆕 Package config (pip install -e .)
 │
 ├── core/                        # Core training system
-│   ├── train.py                 # Main training script (HuggingFace Trainer)
+│   ├── train.py                 # UltimateTrainer - CLI orchestrator (delegates to TrainerEngine)
 │   ├── training_daemon.py       # File watcher + orchestrator
 │   ├── training_controller.py   # Control commands (pause/resume/stop)
 │   ├── training_queue.py        # Queue management
@@ -1080,6 +1089,70 @@ guild/skills/
 ├── registry.py      # SkillRegistry
 ├── contract.py      # SkillClient (API client)
 └── state_manager.py # Runtime state tracking
+```
+
+---
+
+## 🔧 TRAINERENGINE - TRAINING PIPELINE (Updated 2025-11-28)
+
+**Complete refactor** - TrainerEngine now owns the full HuggingFace training pipeline.
+
+### Architecture
+
+```
+UltimateTrainer (core/train.py)
+├── CLI parsing, config loading
+├── Data validation
+├── Time estimation
+└── Delegates to TrainerEngine (USE_ENGINE=1)
+
+TrainerEngine (trainer/core/engine.py)
+├── run_job(config) → TrainingResult
+├── Model loading (Qwen3VL, Flash Attention 2)
+├── Dataset preparation (profiles, packing)
+├── Checkpoint resumption
+├── Trainer creation (Muon/AdamW, collators)
+├── Masking validation
+└── Training execution
+
+LiveMonitorCallback (trainer/monitoring/callbacks.py)
+├── on_step_end() - Progress, alerts, throughput
+├── on_evaluate() - Validation loss tracking
+└── on_save() - Checkpoint ledger, eval queuing, remote sync
+```
+
+### Usage
+
+```bash
+# Enable new engine path (gradual migration)
+USE_ENGINE=1 python3 core/train.py \
+    --dataset data/train.jsonl \
+    --model qwen3_0.6b \
+    --output-dir outputs/run \
+    --yes
+```
+
+### Key Files
+
+| File | Lines | Description |
+|------|-------|-------------|
+| `trainer/core/engine.py` | ~970 | TrainerEngine - full HF pipeline |
+| `trainer/monitoring/callbacks.py` | ~630 | LiveMonitorCallback with all features |
+| `core/train.py` | ~1880 | UltimateTrainer - CLI orchestrator |
+| `tests/test_trainer_engine.py` | ~350 | 19 unit tests |
+
+### TrainingResult
+
+```python
+from trainer.core.engine import TrainerEngine, TrainingResult
+
+result = engine.run_job(config)
+if result.success:
+    print(f"Completed at step {result.global_step}")
+    print(f"Final loss: {result.final_loss}")
+    print(f"Checkpoint: {result.last_checkpoint_path}")
+else:
+    print(f"Failed: {result.error_message}")
 ```
 
 ---

@@ -4,6 +4,55 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-11-28 - TrainerEngine Refactor Complete
+
+### What
+Complete 5-phase refactor of the training architecture. TrainerEngine now owns the full HuggingFace training pipeline while UltimateTrainer becomes a thin CLI orchestration shell.
+
+### Changes
+
+**Phase 1: Enhanced TrainerEngine** (`trainer/core/engine.py`)
+- Qwen3VL model loading with vision tower freezing
+- Flash Attention 2 detection and auto-selection
+- Response-only masking via DataCollatorForCompletionOnly
+- Dataset packing via trl.pack_dataset
+- Muon optimizer support
+- Checkpoint resumption with scheduler management
+- Masking validation
+
+**Phase 2: Config Schema Updates** (`trainer/config/schema.py`)
+- Added `DataConfig.enable_packing`, `packing_strategy`
+- Added `ModelConfig.prefer_flash_attention`, `freeze_vision_towers`, `try_vision_model_first`
+
+**Phase 3: UltimateTrainer Delegation** (`core/train.py`)
+- Added `USE_ENGINE=1` environment variable for gradual migration
+- Added `_run_with_engine()` method for delegation
+- Existing code path preserved as default
+
+**Phase 4: LiveMonitorCallback Extraction** (`trainer/monitoring/callbacks.py`)
+- Added `on_save()` for checkpoint ledger, eval queuing, remote sync
+- Added `remote_eval_config` support
+- Removed 526 lines from `core/train.py`
+- `core/train.py` reduced from ~2400 to 1881 lines
+
+**Phase 5: Tests** (`tests/test_trainer_engine.py`)
+- 19 unit tests for TrainingResult, MonitorContext, config, helpers
+- All tests passing
+
+### Stats
+- Net change: **-492 lines** (253 additions - 745 deletions)
+- `core/train.py`: 2400 → 1881 lines
+- `trainer/core/engine.py`: 250 → 970 lines
+- `trainer/monitoring/callbacks.py`: 603 → 631 lines
+
+### Usage
+```bash
+# Enable new engine path
+USE_ENGINE=1 python3 core/train.py --dataset data.jsonl --model qwen3_0.6b --output-dir output --yes
+```
+
+---
+
 ## 2025-11-27 - 4B Full Fine-Tune on Single GPU
 
 ### What

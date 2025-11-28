@@ -1,0 +1,92 @@
+{
+  "level": 43,
+  "level_name": "Expert",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L43_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 9 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nun, scionable, eye, milt, wal, le, balls, by, leeks, gal, old, ut, est, ter, trust, ances, con, let, grub\n\n## Clues\nA. (3 syllables) \u2014 the use of uttered sounds for auditory communication\nB. (2 syllables) \u2014 Paper in sheets 8\u00bd in \u00d7 14 in (215.9 mm \u00d7 355.6 mm).\nC. (1 syllables) \u2014 related to onions; white cylindrical bulb and flat dark-green leaves\nD. (2 syllables) \u2014 thickly covered with ingrained dirt or soot\nE. (2 syllables) \u2014 the ball-shaped capsule containing the vertebrate eye\nF. (3 syllables) \u2014 greatly exceeding bounds of reason or moderation\nG. (2 syllables) \u2014 (used especially of persons) having lived for a relatively long time or attained a specific age\nH. (2 syllables) \u2014 An e-wallet or digital wallet.\nI. (1 syllables) \u2014 That upon which confidence is reposed; ground of reliance; hope.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 9,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "antonym",
+      "num_words": 9,
+      "num_distractors": 4,
+      "difficulty_score": 13
+    },
+    {
+      "problem_id": "eval_L43_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 10 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nfire, las, cose, balls, stylist, down, clos, peanuts, urls, low, est, co, vari, mim, ril, go, ette, travis, mur, ics, tabas, iary\n\n## Clues\nA. (2 syllables) \u2014 SYN: red pepper\nB. (2 syllables) \u2014 Unfairly; dishonourably; in a deceitful or mean manner.\nC. (2 syllables) \u2014 abnormally swollen or knotty\nD. (1 syllables) \u2014 SYN: hairdresser\nE. (1 syllables) \u2014 Lying across, traverse.\nF. (3 syllables) \u2014 SYN: Gorilla gorilla\nG. (2 syllables) \u2014 SYN: ball of fire\nH. (2 syllables) \u2014 SYN: mime\nI. (1 syllables) \u2014 SYN: URL\nJ. (2 syllables) \u2014 SYN: airless\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 10,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 10,
+      "num_distractors": 5,
+      "difficulty_score": 15
+    },
+    {
+      "problem_id": "eval_L43_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 10 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nsin, nip, gon, tales, un, ta, er, jar, lieu, sneeze, kauai, mined, gon, treme, posed, fairy, cere, op, riche, ac, i, sneak, quin, pen\n\n## Clues\nA. (2 syllables) \u2014 a characteristic language of a particular group (as among thieves)\nB. (2 syllables) \u2014 a story about fairies; told to amuse children\nC. (3 syllables) \u2014 DOM: closed shape with five si\nD. (1 syllables) \u2014 To expel or displace (air, snot, etc) from the nose or mouth by the process above.\nE. (3 syllables) \u2014 Without an opponent.\nF. (2 syllables) \u2014 DOM: athletic shoe\nG. (2 syllables) \u2014 Genuine; meaning what one says or does; heartfelt.\nH. (1 syllables) \u2014 extracted from a source of supply as of minerals from the earth\nI. (2 syllables) \u2014 French prelate and statesman; principal minister to Louis XIII (1585-1642)\nJ. (4 syllables) \u2014 A Native American nation of the Algonquian family who inhabited the Wampanoki region, including present-day Connecticut.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 10,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "domain",
+      "num_words": 10,
+      "num_distractors": 5,
+      "difficulty_score": 15
+    },
+    {
+      "problem_id": "eval_L43_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 11 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nuser, de, tanker, he, mit, stand, rood, be, sweeps, ing, ed, hadur, i, bard, duce, ing, cmb, moth, gat, cat, u, off, bom, ed, breathe, blush, ba, fix, suf\n\n## Clues\nA. (1 syllables) \u2014 Member of a tank crew, or of an armoured unit.\nB. (1 syllables) \u2014 force into some kind of situation, condition, or course of action\nC. (2 syllables) \u2014 To append (something) to the end of something else.\nD. (3 syllables) \u2014 someone or something that is abnormally large and powerful\nE. (3 syllables) \u2014 bombardment\nF. (4 syllables) \u2014 make less severe or harsh\nG. (2 syllables) \u2014 To obtain (something) from some source; to derive.\nH. (1 syllables) \u2014 (cosmology) the cooled remnant of the hot big bang that fills the entire universe and can be observed today with an average temperature of about 2.725 kelvin\nI. (2 syllables) \u2014 A warrior, especially a Turko-Mongol.\nJ. (4 syllables) \u2014 give an education to\nK. (2 syllables) \u2014 For use at a distance sufficient from the target to allow defensive fire to be evaded.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 11,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "antonym",
+      "num_words": 11,
+      "num_distractors": 6,
+      "difficulty_score": 17
+    },
+    {
+      "problem_id": "eval_L43_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 11 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nfil, gu, line, cre, mads, ish, ingston, earthed, cle, brat, ipino, dence, ni, vi, wales, atms, un, ti, brack, ing, nanopar, fy, tillas, jarat, liv, mag, life, ards\n\n## Clues\nA. (2 syllables) \u2014 SYN: acceptance\nB. (2 syllables) \u2014 SYN: excavate\nC. (3 syllables) \u2014 SYN: hover\nD. (2 syllables) \u2014 SYN: briny\nE. (2 syllables) \u2014 SYN: life line\nF. (2 syllables) \u2014 SYN: Philippine\nG. (1 syllables) \u2014 SYN: ATM\nH. (2 syllables) \u2014 SYN: Gujerat\nI. (3 syllables) \u2014 Any microscopic particle less than about 100 nanometers (nm) in diameter.\nJ. (2 syllables) \u2014 American Revolutionary leader who served in the Continental Congress and as minister to France (1746-1813)\nK. (3 syllables) \u2014 SYN: amplify\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 11,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 11,
+      "num_distractors": 6,
+      "difficulty_score": 17
+    }
+  ]
+}

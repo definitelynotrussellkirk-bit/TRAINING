@@ -104,11 +104,14 @@ class StorageResolver:
         # Get device ID
         self.device_id = device_id or os.environ.get("TRAINING_DEVICE_ID")
         if not self.device_id:
-            # Try to infer from base_dir for backward compatibility
-            base_dir = Path(__file__).parent.parent
-            if str(base_dir) == "/path/to/training":
+            # Try to infer from hostname or default to local_gpu_1
+            import socket
+            hostname = socket.gethostname().lower()
+            if "trainer" in hostname or "4090" in hostname:
                 self.device_id = "trainer4090"
-                logger.debug("Inferred device_id=trainer4090 from base_dir")
+            else:
+                self.device_id = "local_gpu_1"
+            logger.debug(f"Inferred device_id={self.device_id} from hostname")
 
         self._config: Dict[str, Any] = {}
         self._zones: Dict[str, Dict] = {}
@@ -385,7 +388,7 @@ def ask_storage(kind: StorageKind, key: str) -> Path:
 
     Example:
         path = ask_storage(StorageKind.CHECKPOINT, "checkpoint-182000")
-        # Returns: /path/to/training/models/current_model/checkpoint-182000
+        # Returns: $TRAINING_BASE_DIR/models/current_model/checkpoint-182000
     """
     return get_resolver().resolve_default(kind, key)
 

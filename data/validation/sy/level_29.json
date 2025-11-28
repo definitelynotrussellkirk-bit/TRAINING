@@ -1,0 +1,92 @@
+{
+  "level": 29,
+  "level_name": "Intermediate",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L29_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nin, net, dent, ton, ms, per, su, ten, toral, ball, elec, sleep, clin, steak\n\n## Clues\n1. ___ ___ \u2014 Relation hint: Example usage: [masked] process \u2014 of or relating to elections\n2. ___ \u2014 Relation hint: Found in/at grill \u2014 Beef[masked]: a slice of beef, broiled or cut for broiling.\n3. ___ ___ ___ ___ ___ \u2014 Relation hint: Topic domain: noun.person \u2014 A police rank used in Commonwealth countries, ranking above chief inspector, and below chief [masked].\n4. ___ ___ \u2014 Relation hint: Property: dishonest \u2014 United States politician who as governor of New York supported the project to build the Erie Canal (1769-1828)\n5. ___ \u2014 Relation hint: Related form: profit \u2014 remaining after all deductions\n6. ___ \u2014 Relation hint: Topic domain: noun.location \u2014 a unit of information equal to 1000 kilobytes or 10^6 (1,000,000) bytes\n7. ___ \u2014 Relation hint: Example usage: he felt better after a little [masked] \u2014 To have sexual intercourse (see [masked] with).\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 7,
+      "num_distractors": 1,
+      "difficulty_score": 8
+    },
+    {
+      "problem_id": "eval_L29_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 8 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nform, duces, archer, ho, steps, re, eign, lizard, mo, per, wis, bic, pho, dom, ev, gy, e, er, strat\n\n## Clues\n1. ___ ___ \u2014 To behave theatrically so as to give the impression of (a quality, character trait, etc.); to feign.\n2. ___ \u2014 Structure hint: (suffix: -er) \u2014 (astrology) a person who is born while the sun is in Sagittarius\n3. ___ ___ \u2014 Structure hint: (prefix: re-) \u2014 be cooked until very little liquid is left\n4. ___ ___ \u2014 Structure hint: (suffix: -dom) \u2014 the quality of being prudent and sensible\n5. ___ ___ \u2014 , once; has or have (done something) before.\n6. ___ ___ ___ \u2014 The act of strategizing; the development of effective strategies.\n7. ___ ___ ___ ___ \u2014 Structure hint: (suffix: -ic) \u2014 A homophobe.\n8. ___ \u2014 A hand forming a \"D\" shape with the tips of the thumb and index finger touching (a handshape resembling a [masked]), that beats paper and Spock and loses to rock and scissors in rock-paper-scissors-[masked]-Spock.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 8,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "morphology",
+      "num_words": 8,
+      "num_distractors": 2,
+      "difficulty_score": 10
+    },
+    {
+      "problem_id": "eval_L29_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 8 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nwound, en, my, ing, tidy, rel, feel, shift, maine, tive, ed, a, e, ruth\n\n## Clues\n1. ___ ___ ___ \u2014 Word origin: From from frm:relatif, from , from la:rel\u0101tus, perfect passive participle of la:refer\u014d, from la:re-  \u2014 Capable to be changed by other beings or circumstance; conditional.\n2. ___ \u2014 Word origin: From from enm:[masked], enm:tydy, enm:tidi, from . Cognate with , , , , , . \u2014 A cover, often of tatting, drawn work, or other ornamental work, for the back of a chair, the arms of a sofa, etc.\n3. ___ \u2014 Word origin: Borrowed from . \u2014 a state in New England\n4. ___ \u2014 Word origin: From from enm:felen, from ang:f\u0113lan, from . \u2014 examine (a body part) by palpation\n5. ___ ___ \u2014 move and exchange for another\n6. ___ ___ ___ \u2014 Word origin: From from enm:[masked], enm:[masked]e, enm:enmy, borrowed from fro:enemi, fro:anemi (Modern ), from la:ini \u2014 Of, by, relating to, or belonging to an [masked].\n7. ___ ___ \u2014 suffering from physical injury especially that suffered in battle\n8. ___ \u2014 Word origin: From [masked] the Moabite, from he:\u05e8\u05d5\u05ea, of uncertain origin, possibly meaning \"companion\". Also associat \u2014 Something which causes regret or sorrow; a pitiful sight.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 8,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "etymology",
+      "num_words": 8,
+      "num_distractors": 2,
+      "difficulty_score": 10
+    },
+    {
+      "problem_id": "eval_L29_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 9 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\ncra, paint, lu, ploy, tics, i, clin, ners, ed, man, mines, tiff, sires, plas, clair, cal, em, ment, sin, tive, de, jerome\n\n## Clues\n1. ___ ___ ___ \u2014 SYN: moneymaking\n2. ___ ___ ___ \u2014 Of or pertaining to a clinic, such as a medical clinic or law clinic.\n3. ___ ___ ___ \u2014 SYN: employ\n4. ___ ___ \u2014 SYN: desire\n5. ___ ___ \u2014 SYN: charge card\n6. ___ \u2014 SYN: Eusebius Hieronymus\n7. ___ ___ \u2014 United States writer whose novels argued for social reform (1878-1968)\n8. ___ ___ \u2014 SYN: calico\n9. ___ ___ \u2014 SYN: fashion\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 9,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 9,
+      "num_distractors": 3,
+      "difficulty_score": 12
+    },
+    {
+      "problem_id": "eval_L29_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 9 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\ntant, deep, i, als, tard, atroc, al, sul, pen, shady, ga, rit, u, le, tion, ee, ny, bas, con, or, ties\n\n## Clues\n1. ___ ___ ___ \u2014 Relation hint: Category: inhuman treatment \u2014 the quality of being shockingly cruel and inhumane\n2. ___ ___ \u2014 Relation hint: Property: nice to have \u2014 In the United Kingdom and Ireland and many other countries, a unit of currency worth of a pound sterling or Irish pound before decimalisation, or a copper coin worth this amount. Abbreviation: d.\n3. ___ ___ ___ ___ \u2014 Relation hint: Synonym: allegement \u2014 The act of alleging.\n4. ___ ___ \u2014 Relation hint: Synonym: dickhead \u2014 A writing paper of a particular size.\n5. ___ \u2014 Relation hint: Synonym: cryptical \u2014 A [masked] or innermost part of something in general.\n6. ___ ___ ___ \u2014 Relation hint: Can charge fee to client \u2014 an expert who gives advice\n7. ___ \u2014 Relation hint: Synonym: operating theatre \u2014 Earlier, previously.\n8. ___ ___ ___ \u2014 Relation hint: Topic domain: noun.act \u2014 stereotyped behavior\n9. ___ \u2014 Relation hint: Category: technology \u2014 Enantiomeric excess.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 9,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 9,
+      "num_distractors": 3,
+      "difficulty_score": 12
+    }
+  ]
+}

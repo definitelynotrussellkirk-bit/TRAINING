@@ -1,0 +1,92 @@
+{
+  "level": 8,
+  "level_name": "Beginner",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L8_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 3 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\ncern, con, ex, ly, spent, treme\n\n## Clues\n1. ___ \u2014 pass time in a specific way\n2. ___ ___ \u2014 a feeling of sympathy for someone or something\n3. ___ ___ ___ \u2014 to a high degree or extent; favorably or with much respect\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 3,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 3,
+      "num_distractors": 0,
+      "difficulty_score": 3
+    },
+    {
+      "problem_id": "eval_L8_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 4 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nchine, cial, coun, ma, pri, spe, ty, vate\n\n## Clues\n1. ___ ___ \u2014 The genitals.\n2. ___ ___ \u2014 Supernatural agency in a poem, or a superhuman being introduced to perform some exploit.\n3. ___ ___ \u2014 An administrative or geographical region of various countries, including Bhutan, Canada, China, Croatia, Ireland, Japan, New Zealand, Norway, Poland, Romania, South Korea, Sweden, the United Kingdom, and 47 of the 50 United States (excluding Alaska, Connecticut, and Louisiana).\n4. ___ ___ \u2014 having a specific function or scope\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 4,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 4,
+      "num_distractors": 0,
+      "difficulty_score": 4
+    },
+    {
+      "problem_id": "eval_L8_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 4 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nmains, re, switch, telling, weapons\n\n## Clues\n1. ___ ___ \u2014 Sound hint: Rhymes with 'contains' \u2014 Historical or archaeological relics.\n2. ___ \u2014 Sound hint: Rhymes with 'questions' \u2014 any instrument or instrumentality used in fighting or hunting\n3. ___ \u2014 Sound hint: Rhymes with 'going' \u2014 producing a strong effect\n4. ___ \u2014 Sound hint: Rhymes with 'watch' \u2014 The process of the currently fronting headmate changing; an instance of this.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 4,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "rhyme",
+      "num_words": 4,
+      "num_distractors": 0,
+      "difficulty_score": 4
+    },
+    {
+      "problem_id": "eval_L8_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 5 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nbe, de, emp, op, served, tail, tions, tween, ty\n\n## Clues\n1. ___ ___ \u2014 Audio: \"A kind of needle, shorter than a sharp, with a small rounded eye, used for making fine stitches on heavy fabrics.\"\n2. ___ ___ \u2014 Audio: \"a small part that can be considered separately from the whole\"\n3. ___ \u2014 Audio: \"mate with\"\n4. ___ ___ \u2014 Audio: \"Destitute of, or lacking, sense, knowledge, or courtesy.\"\n5. ___ ___ \u2014 Audio: \"one of a number of things from which only one can be chosen\"\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 5,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "audio",
+      "num_words": 5,
+      "num_distractors": 0,
+      "difficulty_score": 5
+    },
+    {
+      "problem_id": "eval_L8_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 5 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nbook, col, dow, face, la, lege, lunch, win\n\n## Clues\n1. ___ ___ \u2014 Alt-text: [Illustration hinting at: A group sharing common purposes or goals.]\n2. ___ \u2014 Alt-text: [Illustration hinting at: Any small meal, especially one eaten at a social gathering.]\n3. ___ \u2014 Alt-text: [Illustration hinting at: a white soft metallic element that tarnishes readily; occurs in rare earth minerals and is usually c[masked]ssified as a rare earth]\n4. ___ ___ \u2014 Alt-text: [Illustration hinting at: To send a message or leave a comment on [masked].]\n5. ___ ___ \u2014 Alt-text: [Illustration hinting at: A figure formed of lines crossing each other.]\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 5,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "alt_text",
+      "num_words": 5,
+      "num_distractors": 0,
+      "difficulty_score": 5
+    }
+  ]
+}

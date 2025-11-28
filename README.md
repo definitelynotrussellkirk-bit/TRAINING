@@ -1,5 +1,7 @@
 # The Realm of Training
 
+> **Contributing/Forking?** See [`SHARING.md`](SHARING.md) before pushing to public repos.
+
 > *We propose a surjective morphism* **T: ML** *&rarr;* **RPG** *which maps the high-dimensional manifold of machine learning operations onto the more cognitively tractable space of role-playing game mechanics. This transformation preserves essential structure while minimizing the Kolmogorov complexity of the user's mental model. Empirically, we observe that framing gradient descent as "battle damage" and checkpoint management as "treasure vaults" yields a mass reduction in the probability of the developer staring blankly at terminal output wondering if anything is actually happening.*
 >
 > *&mdash; Definitely Not A Real Paper, 2025*
@@ -28,20 +30,56 @@
 
 ---
 
-## Quick Start
+## Quick Start (Single Machine)
 
 ```bash
-# Start the realm
-./scripts/start_all.sh
+# 1. Clone and bootstrap
+git clone https://github.com/YOUR_USERNAME/TRAINING.git
+cd TRAINING
+./scripts/bootstrap_dev.sh
 
-# Visit the Tavern
+# 2. Run diagnostics
+python3 -m training doctor
+
+# 3. Start services
+python3 -m training start-all
+
+# 4. Open the Tavern
 open http://localhost:8888
-
-# Watch DIO battle
-# (Training runs automatically when quests are in the queue)
 ```
 
-See `QUICKSTART.md` for full setup.
+**That's it.** You now have a working training environment.
+
+---
+
+## First 30 Minutes Walkthrough
+
+Once services are running, here's what you can do:
+
+| Step | What | Where |
+|------|------|-------|
+| 1 | See DIO's stats | http://localhost:8888 (Tavern home) |
+| 2 | View the quest board | http://localhost:8888/quests |
+| 3 | Check the job queue | http://localhost:8888/jobs |
+| 4 | Browse checkpoints | http://localhost:8888/vault |
+| 5 | Talk to DIO | http://localhost:8888/oracle (requires inference server) |
+
+### To Start Training
+
+1. Drop a `.jsonl` file into `inbox/`
+2. The daemon will pick it up within 30 seconds
+3. Watch the battle unfold in the Tavern
+
+### Commands
+
+```bash
+python3 -m training doctor      # Health check
+python3 -m training start-all   # Start all services
+python3 -m training stop-all    # Stop all services
+python3 -m training status      # Show current status
+```
+
+See `QUICKSTART.md` for full setup including multi-machine configurations.
 
 ---
 

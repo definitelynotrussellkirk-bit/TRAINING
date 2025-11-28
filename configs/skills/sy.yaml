@@ -1,6 +1,6 @@
 # =============================================================================
 # SKILL: SY (Syllacrostic Word Puzzles)
-# Source: /path/to/skills/skill_syllo_variant/
+# Source: $SKILL_SERVERS_PATH/skill_syllo_variant/
 # =============================================================================
 
 id: sy
@@ -37,7 +37,7 @@ api:
 
   # Server location and startup
   source_dir: skill_syllo_variant             # Relative to $SKILL_SERVERS_PATH
-  working_dir: ${SKILL_SERVERS_PATH}          # /path/to/skills
+  working_dir: ${SKILL_SERVERS_PATH}          # Set in .env file
   start_command: python3 skill_syllo_variant/api_server.py --port 8080
 
   # Health and timing
@@ -119,7 +119,7 @@ training:
     - red_herring_count
 
   generate_command: |
-    cd /path/to/skills
+    cd $SKILL_SERVERS_PATH
     python skill_syllo_variant/scripts/export_training_data.py \
       --count 200 --output data/syllo_training.jsonl
 

@@ -393,8 +393,8 @@ def ask_vault_first(
         Path to the asset (local), or None if not found
 
     Example:
-        # Old way (hardcoded path):
-        model_path = "/path/to/training/models/checkpoint-175000"
+        # Old way (hardcoded path) - don't do this:
+        model_path = "/path/to/TRAINING/models/checkpoint-175000"
 
         # New way (ask vault first):
         from core.paths import get_base_dir

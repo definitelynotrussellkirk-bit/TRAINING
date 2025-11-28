@@ -12,8 +12,8 @@ Responsibilities:
     - Accept pushed files via /receive endpoint
 
 Usage:
-    # On 3090
-    python3 vault/branch_officer.py --zone 3090 --port 8768 --base-dir /path/to/models
+    # On inference server
+    python3 vault/branch_officer.py --zone 3090 --port 8768 --base-dir ~/llm/models
 
     # On NAS (if SSH accessible)
     python3 vault/branch_officer.py --zone nas --port 8768 --base-dir /volume1/data/llm_training

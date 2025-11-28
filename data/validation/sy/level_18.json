@@ -1,0 +1,92 @@
+{
+  "level": 18,
+  "level_name": "Elementary",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L18_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 5 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nless, i, the, nev, er, ru, jay, er, owned, in, eas\n\n## Clues\n1. ___ ___ ___ \u2014 affording comfort\n2. ___ ___ ___ ___ \u2014 In spite of what preceded; yet.\n3. ___ ___ \u2014 A fall or tumble.\n4. ___ \u2014 United States diplomat and jurist who negotiated peace treaties with Britain and served as the first chief justice of the United States Supreme Court (1745-1829)\n5. ___ \u2014 having an owner; often used in combination\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 5,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 5,
+      "num_distractors": 0,
+      "difficulty_score": 5
+    },
+    {
+      "problem_id": "eval_L18_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 6 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nrea, ko, var, er, ied, tor, achieved, deal, ports, sec, sup\n\n## Clues\n1. ___ ___ \u2014 Sound hint: Rhymes with 'sports' \u2014 be behind; approve of\n2. ___ ___ \u2014 Sound hint: Rhymes with 'area' \u2014 an Asian peninsula (off Manchuria) separating the Yellow Sea and the Sea of Japan; the [masked]n name is Dae-Han-Min-Gook or Han-Gook\n3. ___ ___ \u2014 Sound hint: Rhymes with 'tried' \u2014 characterized by variety\n4. ___ \u2014 Sound hint: Rhymes with 'received' \u2014 Having been reached, attained or accomplished.\n5. ___ ___ \u2014 Sound hint: Rhymes with 'director' \u2014 An area of a crag, consisting of various routes\n6. ___ ___ \u2014 Sound hint: Rhymes with 'smaller' \u2014 The person who deals the cards in a card game.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 6,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "rhyme",
+      "num_words": 6,
+      "num_distractors": 0,
+      "difficulty_score": 6
+    },
+    {
+      "problem_id": "eval_L18_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 6 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\ngrant, scribe, chase, collins, rent, cook, pur, sub, ed, ing\n\n## Clues\n1. ___ ___ \u2014 be willing to concede\n2. ___ \u2014 Word origin: From from enm:[masked], enm:[masked]e, from fro:[masked]e, from , from , from la:reddo. \u2014 To grant a lease in return for [masked].\n3. ___ \u2014 Word origin: See en:Tom [masked]. \u2014 English writer noted for early detective novels (1824-1889)\n4. ___ ___ \u2014 Word origin: From . The noun and adjective follow from the verb. The use of the word ''[masked]'' to describe chea \u2014 The cheapest available beer for sale in a public house.\n5. ___ ___ \u2014 Word origin: From from enm:[masked]n, enm:subskryben, from la:subscr\u012bb\u014d. Compare its native equivalent en:underw \u2014 adopt as a belief\n6. ___ ___ \u2014 Word origin: From from enm:[masked]n, from xno:purchacer from fro:pur- (from la:pro-) + fro:chacier. Compare , wh \u2014 To obtain by any outlay, as of labor, danger, or sacrifice, etc.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 6,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "etymology",
+      "num_words": 6,
+      "num_distractors": 0,
+      "difficulty_score": 6
+    },
+    {
+      "problem_id": "eval_L18_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\npar, ing, com, tive, ture, pha, sis, pet, mine, jack, em, i, de, ter, de, son, sell, texts\n\n## Clues\n1. ___ ___ \u2014 Relation hint: Can piece puzzle together \u2014 English film actress who later became a member of British Parliament (born in 1936)\n2. ___ ___ ___ \u2014 Relation hint: Type of change of location \u2014 The desertion by a party to any pleading of the ground taken by him in his last antecedent pleading, and the adoption of another\n3. ___ \u2014 Relation hint: Category: passage \u2014 a passage from the Bible that is used as the subject of a sermon\n4. ___ ___ \u2014 Relation hint: Topic domain: verb.communication \u2014 Action of the verb ''to sell''.\n5. ___ ___ ___ \u2014 Relation hint: Example usage: the red light gave the central figure increased [masked] \u2014 Prominence given to a syllable or words, by raising the voice or printing in italic or underlined type.\n6. ___ ___ ___ ___ \u2014 Relation hint: Has suffix '-itive' \u2014 Cheap, especially used of quality products.\n7. ___ ___ ___ \u2014 Relation hint: Category: cause \u2014 To ascertain definitely; to figure out, find out, or conclude by analyzing, calculating, or investigating.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 7,
+      "num_distractors": 1,
+      "difficulty_score": 8
+    },
+    {
+      "problem_id": "eval_L18_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nex, tick, tiger, er, ing, i, prom, tions, ris, sta, nent, et, when, tongue, ev, it\n\n## Clues\n1. ___ ___ \u2014 Audio: \"A visiting card.\"\n2. ___ ___ \u2014 Audio: \"proper or designated social situation\"\n3. ___ ___ ___ \u2014 Audio: \"conspicuous in position or importance\"\n4. ___ ___ \u2014 Audio: \"become heartened or elated\"\n5. ___ ___ ___ \u2014 Audio: \"At any time.\"\n6. ___ \u2014 Audio: \"large feline of forests in most of Asia having a tawny coat with black stripes; endangered\"\n7. ___ ___ \u2014 Audio: \"The act of departing from life; death.\"\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "audio",
+      "num_words": 7,
+      "num_distractors": 1,
+      "difficulty_score": 8
+    }
+  ]
+}

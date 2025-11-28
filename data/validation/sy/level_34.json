@@ -1,0 +1,92 @@
+{
+  "level": 34,
+  "level_name": "Advanced",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L34_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 8 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nacids, pitch, ri, tons, ing, scam, in, leash, edge, fairest, pho, or, te, mers\n\n## Clues\nA. (1 syllables) \u2014 A set of three animals (especially greyhounds, foxes, bucks, and hares;)\nB. (2 syllables) \u2014 a quantum of electromagnetic radiation; an elementary particle that is its own antiparticle\nC. (1 syllables) \u2014 street name for lysergic acid diethylamide\nD. (1 syllables) \u2014 Structure hint: (suffix: -est) \u2014 lacking exceptional quality or ability\nE. (4 syllables) \u2014 Structure hint: (prefix: inter-) \u2014 The set of all [masked] points of a set.\nF. (1 syllables) \u2014 To form a border to; to enclose, to border.\nG. (2 syllables) \u2014 Structure hint: (suffix: -ing) \u2014 hit (a golf ball) in a high arc with a backspin\nH. (2 syllables) \u2014 a person who swindles you by means of deception or fraud\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 8,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "morphology",
+      "num_words": 8,
+      "num_distractors": 2,
+      "difficulty_score": 10
+    },
+    {
+      "problem_id": "eval_L34_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 9 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nta, va, sym, less, po, spec, nized, side, gal, phine, tors, de, pa, ness, bed, mor, voured, dress, er, stinky, sium, home\n\n## Clues\nA. (2 syllables) \u2014 space by the side of a bed (especially the bed of a sick or dying person)\nB. (2 syllables) \u2014 SYN: morphia\nC. (2 syllables) \u2014 SYN: consume\nD. (3 syllables) \u2014 SYN: galvanise\nE. (3 syllables) \u2014 SYN: looker\nF. (2 syllables) \u2014 SYN: actor's assistant\nG. (1 syllables) \u2014 SYN: Keystone State\nH. (3 syllables) \u2014 The state of being homeless.\nI. (3 syllables) \u2014 A collection of essays, articles or papers on a particular subject by a number of contributors.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 9,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 9,
+      "num_distractors": 3,
+      "difficulty_score": 12
+    },
+    {
+      "problem_id": "eval_L34_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 9 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nself, de, mon, him, rep, es, tion, braves, tim, ap, u, hawkins, tan, proach, ta, train, spar\n\n## Clues\nA. (4 syllables) \u2014 Relation hint: Category: honour \u2014 the general estimation that the public has for a person\nB. (2 syllables) \u2014 Relation hint: Category: Greek \u2014 unsparing and uncompromising in discipline or judgment; - H.G.Wells\nC. (3 syllables) \u2014 Relation hint: Category: airway \u2014 the final path followed by an aircraft as it is landing\nD. (1 syllables) \u2014 Relation hint: Synonym: coach \u2014 a procession (of wagons or mules or camels) traveling together in single file\nE. (1 syllables) \u2014 Relation hint: Category: people \u2014 people who are brave\nF. (2 syllables) \u2014 Relation hint: Etymology: From . \u2014 A neutral supernatural spirit.\nG. (1 syllables) \u2014 Relation hint: Etymology: . \u2014 A Catholic.\nH. (1 syllables) \u2014 Relation hint: Synonym: Hawkyns \u2014 United States jazz saxophonist (1904-1969)\nI. (2 syllables) \u2014 Relation hint: Etymology: From from enm:hymself, from ang:him selfum. Equivalent to . \u2014 he [masked].\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 9,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 9,
+      "num_distractors": 3,
+      "difficulty_score": 12
+    },
+    {
+      "problem_id": "eval_L34_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 10 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nble, cour, es, sofia, ther, aged, team, formed, coach, bulk, livia, ing, al, syl, grand, know, met, dubai, fa, dis, mates, la, plank\n\n## Clues\nA. (1 syllables) \u2014 capital and largest city of Bulgaria located in western Bulgaria\nB. (3 syllables) \u2014 A small part of a sentence or discourse; anything concise or short; a particle.\nC. (1 syllables) \u2014 Being large in size, mass or volume (of goods, etc.).\nD. (2 syllables) \u2014 perceive as familiar\nE. (3 syllables) \u2014 try to prevent; show opposition to\nF. (3 syllables) \u2014 To retain discontinued laws or rules for (an object, individual or organization previously affected by them).\nG. (2 syllables) \u2014 a fellow member of a team\nH. (1 syllables) \u2014 port city in the United Arab Emirates on the Persian Gulf\nI. (2 syllables) \u2014 a carriage pulled by four horses with one driver\nJ. (2 syllables) \u2014 A category of rock music encompassing a number of genres (including thrash metal, death metal, heavy metal, etc.) characterized by strong drumbeats and distorted guitars.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 10,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "antonym",
+      "num_words": 10,
+      "num_distractors": 4,
+      "difficulty_score": 14
+    },
+    {
+      "problem_id": "eval_L34_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 10 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nde, tankers, jock, strut, verb, ter, globes, serves, ba, low, fect, ers, noo, ob, cle, ri, isle, bly, de, fr, dles\n\n## Clues\nA. (1 syllables) \u2014 SYN: Earth\nB. (2 syllables) \u2014 SYN: blemish\nC. (3 syllables) \u2014 SYN: abominably\nD. (1 syllables) \u2014 An island, usually very small.\nE. (3 syllables) \u2014 SYN: drubbing\nF. (2 syllables) \u2014 SYN: bring down\nG. (1 syllables) \u2014 SYN: cock\nH. (2 syllables) \u2014 SYN: abide by\nI. (1 syllables) \u2014 An action as opposed to a trait or thing.\nJ. (2 syllables) \u2014 SYN: attic\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 10,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 10,
+      "num_distractors": 4,
+      "difficulty_score": 14
+    }
+  ]
+}

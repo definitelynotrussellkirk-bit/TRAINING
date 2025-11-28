@@ -1,0 +1,92 @@
+{
+  "level": 27,
+  "level_name": "Intermediate",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L27_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 6 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nmus, sound, dicts, en, ad, ro, poul, try, ics, gage, bot, ing, tang\n\n## Clues\n1. ___ ___ \u2014 Relation hint: Has vowel sequence 'ou' \u2014 announce by means of a sound\n2. ___ ___ \u2014 Relation hint: Related form: addiction \u2014 someone who is physiologically dependent on a substance; abrupt deprivation of the substance produces withdrawal symptoms\n3. ___ ___ ___ \u2014 Relation hint: Topic domain: noun.cognition \u2014 The science and technology of robots, their design, manufacture, and application\n4. ___ ___ \u2014 Relation hint: Has prefix 'en-' \u2014 keep [masked]d\n5. ___ ___ \u2014 Relation hint: Usage: American English \u2014 small hardy range horse of the western plains descended from horses brought by the Spanish\n6. ___ ___ \u2014 Relation hint: Category: gallinaceous bird \u2014 a domesticated gallinaceous bird thought to be descended from the red jungle fowl\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 6,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 6,
+      "num_distractors": 1,
+      "difficulty_score": 7
+    },
+    {
+      "problem_id": "eval_L27_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nsin, bin, sons, ing, the, cils, plat, go, speak, cere, tem, ly, con, coun, simp\n\n## Clues\n1. ___ \u2014 For each; per.\n2. ___ ___ \u2014 United States divorcee whose marriage to Edward VIII created a constitutional crisis leading to his abdication\n3. ___ ___ ___ ___ \u2014 Structure hint: (prefix: co-, suffix: -ing) \u2014 think intently and at length, as for spiritual purposes\n4. ___ ___ ___ \u2014 Structure hint: (suffix: -ly) \u2014 written formula for ending a letter\n5. ___ ___ \u2014 Structure hint: (prefix: co-) \u2014 a meeting of people for consultation\n6. ___ ___ \u2014 Structure hint: (prefix: bi-) \u2014 To play the game of [masked].\n7. ___ \u2014 To address; to accost; to [masked] to.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "morphology",
+      "num_words": 7,
+      "num_distractors": 2,
+      "difficulty_score": 9
+    },
+    {
+      "problem_id": "eval_L27_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nblack, ters, dured, ports, ter, perime, is, paint, slow, min, shops, air, tears\n\n## Clues\n1. ___ ___ \u2014 Word origin: From from la:perimetros, . Equivalent to . \u2014 the boundary line or the area immediately inside the boundary\n2. ___ ___ \u2014 an airfield equipped with control tower and hangars as well as accommodations for passengers and cargo\n3. ___ \u2014 strip of feathers\n4. ___ \u2014 Word origin: From from enm:[masked], enm:slaw, from ang:sl\u0101w, from , from , possibly from . Cognate with , , , , , de \u2014 cause to proceed more [masked]ly\n5. ___ ___ ___ \u2014 attend to the wants and needs of others\n6. ___ \u2014 shop around; not necessarily buying\n7. ___ \u2014 Word origin: From from enm:peynten, from fro:peintier, fro:paincter, itself from fro:[masked], the past participle o \u2014 (basketball) a space (including the foul line) in front of the basket at each end of a basketball court; usually [masked]ed a different color from the rest of the court\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "etymology",
+      "num_words": 7,
+      "num_distractors": 2,
+      "difficulty_score": 9
+    },
+    {
+      "problem_id": "eval_L27_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 8 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\ner, ed, de, rich, en, ment, who, men, par, warns, tempt, evans, ev, ture, clint, detri, tal, grad\n\n## Clues\n1. ___ \u2014 United States anatomist who identified four pituitary hormones and discovered vitamin E (1882-1971)\n2. ___ ___ ___ \u2014 SYN: deviation\n3. ___ ___ ___ \u2014 The act of enriching or something enriched.\n4. ___ \u2014 SYN: admonish\n5. ___ \u2014 The relatively flat part of a limestone pavement between the grikes\n6. ___ ___ ___ \u2014 The person that (no matter who).\n7. ___ ___ \u2014 SYN: allure\n8. ___ ___ ___ \u2014 SYN: damaging\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 8,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 8,
+      "num_distractors": 3,
+      "difficulty_score": 11
+    },
+    {
+      "problem_id": "eval_L27_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 8 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\npar, ent, ap, tion, mice, noth, cer, b, tain, ass, un, ty, ver, ti, charg, cal, dum, ly, pre, net, scrip, queen, er\n\n## Clues\n1. ___ ___ ___ ___ \u2014 Relation hint: Category: cognitive state \u2014 the state of being unsure of something\n2. ___ ___ ___ \u2014 Relation hint: Example usage: an erect stature \u2014 at right angles to the plane of the horizon or a base line\n3. ___ \u2014 Relation hint: Used for catching fish \u2014 a trap made of [masked]ting to catch fish or birds or insects\n4. ___ ___ \u2014 Relation hint: Can charge battery \u2014 formerly a strong swift horse ridden into battle\n5. ___ ___ ___ ___ \u2014 Relation hint: Example usage: irrigation often produces bumper crops from [masked] desert land \u2014 Plainly; clearly; manifestly; evidently.\n6. ___ \u2014 Relation hint: Type of small animals \u2014 a hand-operated electronic device that controls the coordinates of a cursor on your computer screen as you move it around on a pad; on the bottom of the device is a ball that rolls on the surface of the pad\n7. ___ ___ ___ \u2014 Relation hint: Example usage: I tried to follow her [masked] for success \u2014 , the act of establishing a law, regulation, etc., particularly in writing; an instance of this.\n8. ___ ___ ___ \u2014 Relation hint: Synonym: fuckhead \u2014 a stupid person; these words are used to express a low opinion of someone's intelligence\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 8,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 8,
+      "num_distractors": 3,
+      "difficulty_score": 11
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "level": 19,
+  "level_name": "Elementary",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L19_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 5 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nes, cal, nec, in, nia, est, tor, spec, tain, re, mod, sary, for, i\n\n## Clues\n1. ___ ___ ___ \u2014 unavoidably determined by prior circumstances\n2. ___ ___ ___ \u2014 A software tool used to examine something.\n3. ___ ___ ___ ___ \u2014 a state in the western United States on the Pacific; the 3rd largest state; known for earthquakes\n4. ___ ___ \u2014 An act of holding or keeping something; a possession, a retention.\n5. ___ ___ \u2014 not offensive to sexual mores in conduct or appearance\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 5,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 5,
+      "num_distractors": 0,
+      "difficulty_score": 5
+    },
+    {
+      "problem_id": "eval_L19_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 6 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nes, ranged, proach, ly, cells, fam, pro, ar, es, i, ap, bye, good, cess\n\n## Clues\n1. ___ ___ ___ \u2014 Sound hint: Rhymes with 'easily' \u2014 A (close-knit) group of people related by blood, friendship, marriage, law, or custom, especially if they live or work together.\n2. ___ ___ ___ \u2014 Sound hint: Rhymes with 'cases' \u2014 perform mathematical and logical operations on (data) according to programmed instructions in order to obtain the required information\n3. ___ ___ ___ \u2014 Sound hint: Rhymes with 'matches' \u2014 make advances to someone, usually with a proposal or suggestion\n4. ___ \u2014 Sound hint: Rhymes with 'calls' \u2014 any small compartment\n5. ___ ___ \u2014 a farewell remark\n6. ___ ___ \u2014 Sound hint: Rhymes with 'managed' \u2014 adapt for performance in a different way\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 6,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "rhyme",
+      "num_words": 6,
+      "num_distractors": 0,
+      "difficulty_score": 6
+    },
+    {
+      "problem_id": "eval_L19_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 6 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\npainful, rus, ei, pol, sians, teens, suit, ther, able, ish\n\n## Clues\n1. ___ ___ \u2014 Word origin: From from enm:[masked]en, from fro:- ''poliss-'', stem of some of the conjugated forms of fro:polir, f \u2014 bring to a highly developed, finished, or refined state\n2. ___ ___ \u2014 Word origin: From . \u2014 meant or adapted for an occasion or use\n3. ___ ___ \u2014 the Slavic language that is the official language of Russia\n4. ___ \u2014 Word origin: From from enm:paynful, enm:peinful, enm:peynful, enm:paynefull, enm:peynefull, equivalent to . Compa \u2014 causing misery or pain or distress\n5. ___ ___ \u2014 Word origin: From from enm:[masked], from ang:\u01e3\u0121hw\u00e6\u00feer, from + . Akin to , osx:iahwethar (); , odt:*iowether, odt:* \u2014 after a negative statement used as an intensive meaning something like `likewise' or `also'\n6. ___ \u2014 Word origin: The final syllable of the numbers from en:thirteen to en:nineteen. More at en:teen. \u2014 The second decade of a century: the 1910s, 2010s, etc. The oneties, the tens.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 6,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "etymology",
+      "num_words": 6,
+      "num_distractors": 0,
+      "difficulty_score": 6
+    },
+    {
+      "problem_id": "eval_L19_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\ndis, re, emer, i, hill, cov, er, or, pub, jews, tin, lic, guished, flames, ty, may\n\n## Clues\n1. ___ ___ \u2014 Relation hint: Category: civil officer \u2014 A local VIP, a muckamuck or big shot reckoned to lead some local group.\n2. ___ ___ ___ ___ \u2014 Relation hint: Category: quality \u2014 a message issued in behalf of some product or cause or idea or person or institution\n3. ___ ___ ___ \u2014 Relation hint: Related form: differentiation \u2014 make conspicuous or noteworthy\n4. ___ \u2014 Relation hint: Property: people \u2014 a person belonging to the worldwide group claiming descent from Jacob (or converted to it) and connected by cultural or religious ties\n5. ___ \u2014 Relation hint: Type of mound of earth \u2014 United States railroad tycoon (1838-1916)\n6. ___ \u2014 Relation hint: Related form: flame \u2014 criticize harshly, usually via an electronic medium\n7. ___ ___ ___ \u2014 Relation hint: Synonym: find \u2014 get over an illness or shock\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 7,
+      "num_distractors": 1,
+      "difficulty_score": 8
+    },
+    {
+      "problem_id": "eval_L19_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\neh, ing, in, ers, tained, laugh, the, o, flow, ries, sus, viewed, ner, re\n\n## Clues\n1. ___ ___ \u2014 Audio: \"supply with necessities and support\"\n2. ___ ___ ___ \u2014 Audio: \"a tentative insight into the natural world; a concept that is not yet verified but that if true would explain certain facts or phenomena\"\n3. ___ ___ \u2014 Audio: \"the period of greatest prosperity or productivity\"\n4. ___ \u2014 Audio: \"Of mediocre quality; unremarkable.\"\n5. ___ ___ \u2014 Audio: \"produce laughter\"\n6. ___ ___ \u2014 Audio: \"refresh one's memory\"\n7. ___ ___ \u2014 Audio: \"exclusive to a center; especially a center of influence\"\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "audio",
+      "num_words": 7,
+      "num_distractors": 1,
+      "difficulty_score": 8
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "_comment": "Storage zones - Copy to storage_zones.json and customize",
+  "zones": [
+    {
+      "zone_id": "hot",
+      "root": "./vault/hot",
+      "kind": "local",
+      "notes": "Fast local storage for active checkpoints. Uses relative path."
+    },
+    {
+      "zone_id": "warm",
+      "root": "./vault/warm",
+      "kind": "local",
+      "notes": "Medium-term storage for recent checkpoints."
+    }
+  ],
+  "_notes": [
+    "SETUP INSTRUCTIONS:",
+    "1. Copy this file to config/storage_zones.json",
+    "2. Modify paths as needed for your setup",
+    "",
+    "Zone types:",
+    "  hot  - Fast local NVMe (active training)",
+    "  warm - Medium-term storage (recent checkpoints)",
+    "  cold - Long-term archive (compressed, NAS)",
+    "",
+    "For NAS storage, add:",
+    "{",
+    "  \"zone_id\": \"cold\",",
+    "  \"root\": \"/mnt/nas/training/archive\",",
+    "  \"kind\": \"nas\",",
+    "  \"host\": \"nas.local\",",
+    "  \"notes\": \"Long-term archive on NAS\"",
+    "}"
+  ]
+}

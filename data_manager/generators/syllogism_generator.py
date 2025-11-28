@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import tempfile
 from datetime import datetime
@@ -24,23 +25,55 @@ GENERATOR_ID = "syllo_local"
 GENERATOR_VERSION = "1.0.0"
 
 
+def _get_skill_servers_path() -> Path:
+    """Get the path to singleSKILL skill servers from environment or auto-detect."""
+    # Check environment variable first
+    env_path = os.environ.get("SKILL_SERVERS_PATH")
+    if env_path:
+        return Path(env_path)
+
+    # Try to auto-detect via core.paths
+    try:
+        from core.paths import get_external_tool_path
+        return get_external_tool_path("singleSKILL")
+    except (ImportError, RuntimeError):
+        pass
+
+    # Check common sibling locations
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        sibling = parent.parent / "singleSKILL"
+        if sibling.exists():
+            return sibling
+
+    # Fallback - will fail at runtime if not found
+    return Path("singleSKILL")
+
+
 class SyllogismGenerator:
     """
     Generate syllogism training data using the local export script
 
-    Wraps: /path/to/skills/skill_syllo_variant/scripts/export_training_data.py
+    Wraps: $SKILL_SERVERS_PATH/skill_syllo_variant/scripts/export_training_data.py
+
+    Set SKILL_SERVERS_PATH environment variable to point to your singleSKILL clone.
     """
 
-    DEFAULT_SCRIPT = Path("/path/to/skills/skill_syllo_variant/scripts/export_training_data.py")
-    DEFAULT_WORD_DB = Path("/path/to/skills/skill_syllo_variant/HELPERS/resources/word_syllable_db.jsonl")
+    @classmethod
+    def _default_script(cls) -> Path:
+        return _get_skill_servers_path() / "skill_syllo_variant" / "scripts" / "export_training_data.py"
+
+    @classmethod
+    def _default_word_db(cls) -> Path:
+        return _get_skill_servers_path() / "skill_syllo_variant" / "HELPERS" / "resources" / "word_syllable_db.jsonl"
 
     def __init__(
         self,
         script_path: Optional[Path] = None,
         word_db: Optional[Path] = None
     ):
-        self.script_path = script_path or self.DEFAULT_SCRIPT
-        self.word_db = word_db or self.DEFAULT_WORD_DB
+        self.script_path = script_path or self._default_script()
+        self.word_db = word_db or self._default_word_db()
 
         # Validate paths
         if not self.script_path.exists():

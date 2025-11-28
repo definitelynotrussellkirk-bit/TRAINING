@@ -67,6 +67,7 @@ llm-train = "core.train:main"
 llm-daemon = "core.training_daemon:main"
 llm-queue = "core.training_queue:main"
 llm-controller = "core.training_controller:main"
+realm = "training.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/user/llm-training"
@@ -79,6 +80,7 @@ include-package-data = true
 include = [
     "core*",
     "trainer*",
+    "training*",
     "management*",
     "monitoring*",
     "inference*",

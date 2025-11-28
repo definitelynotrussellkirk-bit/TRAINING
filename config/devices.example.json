@@ -1,0 +1,33 @@
+{
+  "_comment": "Device registry - Copy to devices.json and customize for your setup",
+  "devices": [
+    {
+      "device_id": "local_gpu_1",
+      "roles": ["trainer", "eval_worker", "analytics"],
+      "host": "localhost",
+      "gpu_type": "auto-detect",
+      "notes": "Single-machine dev GPU - handles all roles"
+    }
+  ],
+  "_notes": [
+    "SETUP INSTRUCTIONS:",
+    "1. Copy this file to config/devices.json",
+    "2. Modify device_id and roles as needed",
+    "",
+    "Available roles:",
+    "  - trainer: Can run training jobs",
+    "  - eval_worker: Can run evaluation/sparring jobs",
+    "  - inference: Can serve inference API",
+    "  - analytics: Can run analysis jobs",
+    "  - data_forge: Can generate training data",
+    "",
+    "For multi-machine setups, add additional devices:",
+    "{",
+    "  \"device_id\": \"inference_server\",",
+    "  \"roles\": [\"inference\", \"eval_worker\"],",
+    "  \"host\": \"192.168.x.x\",",
+    "  \"gpu_type\": \"RTX 3090\",",
+    "  \"notes\": \"Remote inference server\"",
+    "}"
+  ]
+}

@@ -1,8 +1,9 @@
 {
+  "_comment": "Default configuration - paths are relative to TRAINING_BASE_DIR",
   "model_name": "qwen3_0.6b",
-  "model_display_name": "PURE BASE - Qwen3-0.6B (2025-11-22)",
-  "model_path": "/path/to/training/models/Qwen3-0.6B",
-  "current_model_dir": "/path/to/training/current_model",
+  "model_display_name": "PURE BASE - Qwen3-0.6B",
+  "model_path": "models/Qwen3-0.6B",
+  "current_model_dir": "models/current_model",
   "batch_size": 1,
   "gradient_accumulation": 16,
   "learning_rate": 0.0004,
@@ -16,7 +17,7 @@
   "poll_interval": 30,
   "snapshot_time": "03:00",
   "max_length": 2048,
-  "base_model": "/path/to/training/models/Qwen3-0.6B",
+  "base_model": "models/Qwen3-0.6B",
   "eval_max_tokens": 4096,
   "eval_timeout_seconds": 120,
   "self_correction": {
@@ -37,11 +38,12 @@
     "min_queue_depth": 2
   },
   "remote_eval": {
-    "enabled": true,
-    "host": "192.168.x.x",
+    "enabled": false,
+    "_comment": "Configure host/port in .env or set enabled=true with your values",
+    "host": "localhost",
     "port": 8765,
-    "remote_user": "user",
-    "remote_models_dir": "/path/to/models",
+    "remote_user": "",
+    "remote_models_dir": "~/llm/models",
     "eval_dataset": "data/validation/eval_dataset.jsonl",
     "eval_interval_steps": 5000,
     "sync_checkpoints": true,

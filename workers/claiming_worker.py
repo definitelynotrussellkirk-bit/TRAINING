@@ -755,8 +755,12 @@ class ClaimingWorker:
 
     def _get_analysis_path(self, campaign_id: str, hero_id: str, analysis_type: str) -> Path:
         """Get the analysis directory path for a campaign."""
-        base = os.environ.get("TRAINING_BASE_DIR", "/path/to/training")
-        return Path(base) / "campaigns" / hero_id / campaign_id / "analysis" / analysis_type
+        try:
+            from core.paths import get_base_dir
+            base = get_base_dir()
+        except ImportError:
+            base = Path(os.environ.get("TRAINING_BASE_DIR", "."))
+        return base / "campaigns" / hero_id / campaign_id / "analysis" / analysis_type
 
     def _print_stats(self):
         """Print worker statistics."""

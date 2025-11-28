@@ -88,7 +88,7 @@ training:
   fields: ["list", "of", "required", "fields"]
 
   generate_command: |
-    cd /path/to/skills
+    cd $SKILL_SERVERS_PATH
     python skill_xxx/scripts/generate.py --count 1000 --output data.jsonl
 
   validate_command: |

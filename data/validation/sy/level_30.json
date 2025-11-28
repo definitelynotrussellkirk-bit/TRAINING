@@ -1,0 +1,92 @@
+{
+  "level": 30,
+  "level_name": "Intermediate",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L30_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nsole, ad, der, ly, songs, sus, c, vice, al, catch, el, con, horse, pect\n\n## Clues\nA. ___ ___ \u2014 Relation hint: Category: church officer \u2014 : older, greater than another in age or seniority.\nB. ___ \u2014 Relation hint: Synonym: knight \u2014 a chessman shaped to resemble the head of a [masked]; can move two squares horizontally and one vertically (or vice versa)\nC. ___ ___ \u2014 Relation hint: Related form: consolation \u2014 an ornamental scroll-shaped bracket (especially one used to support a wall fixture)\nD. ___ ___ \u2014 Relation hint: Topic domain: noun.communication \u2014 Counseling to perform a specific illegal act.\nE. ___ ___ \u2014 Relation hint: Category: guess \u2014 To have suspicion.\nF. ___ \u2014 Relation hint: Can be used as noun or verb \u2014 the act of apprehending (especially apprehending a criminal)\nG. ___ ___ \u2014 Relation hint: Contains double 'l' \u2014 a friendly nation\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 7,
+      "num_distractors": 2,
+      "difficulty_score": 9
+    },
+    {
+      "problem_id": "eval_L30_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 8 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\ni, arise, ad, eas, der, di, tion, cry, inch, was, ly, ing, use, cc, boul\n\n## Clues\nA. ___ \u2014 to burn ; to speak in a cocky and cheeky manner\nB. ___ ___ \u2014 Structure hint: (suffix: -ing) \u2014 the process of shedding tears (usually accompanied by sobs or other inarticulate sounds)\nC. ___ ___ \u2014 Structure hint: (suffix: -er) \u2014 a town in north central Colorado; Rocky Mountains resort center and university town\nD. ___ \u2014 To spring up; to come into action, being, or notice; to become operative, sensible, or visible; to begin to act a part; to present itself.\nE. ___ \u2014 occupy a certain position or area; be somewhere\nF. ___ ___ ___ \u2014 Structure hint: (suffix: -ly) \u2014 without question\nG. ___ ___ ___ \u2014 Structure hint: (suffix: -ition) \u2014 something added to what you already have\nH. ___ \u2014 To habitually do; to be wont to do. (Now chiefly in past-tense forms; see .)\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 8,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "morphology",
+      "num_words": 8,
+      "num_distractors": 3,
+      "difficulty_score": 11
+    },
+    {
+      "problem_id": "eval_L30_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 8 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\ning, vis, madame, cies, par, pore, it, ga, jokes, cur, ed, ren, sin, um, edit, ing, com, mini, alu\n\n## Clues\nA. ___ \u2014 a humorous anecdote or remark intended to provoke laughter\nB. ___ ___ ___ \u2014 Word origin: . \u2014 A light, silvery metal extracted from bauxite, and a chemical element (''symbol'' Al) with an atomic number of 13.\nC. ___ ___ ___ \u2014 the act of examining resemblances\nD. ___ ___ ___ \u2014 come to see in an official or professional capacity\nE. ___ ___ ___ \u2014 Word origin: From from ms:Singapura, from sa:\u0938\u093f\u0902\u0939\u092a\u0941\u0930, from . \u2014 the capital of [masked]; one of the world's biggest ports\nF. ___ ___ \u2014 cut and assemble the components of\nG. ___ ___ ___ \u2014 general acceptance or use\nH. ___ \u2014 Word origin: Capitalization of fr:[masked]. \u2014 title used for a married Frenchwoman\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 8,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "etymology",
+      "num_words": 8,
+      "num_distractors": 3,
+      "difficulty_score": 11
+    },
+    {
+      "problem_id": "eval_L30_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 9 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nrf, sponds, com, usa, po, pics, a, dec, i, o, tive, rub, bridges, w, line, co, tive, bing, nent, op, er, phys, outs, ra, cal\n\n## Clues\nA. ___ ___ ___ \u2014 SYN: forcible\nB. ___ ___ \u2014 SYN: chafe\nC. ___ \u2014 SYN: exposure\nD. ___ ___ ___ ___ ___ \u2014 SYN: accommodative\nE. ___ ___ ___ ___ \u2014 SYN: cosmetic\nF. ___ ___ ___ \u2014 SYN: constituent\nG. ___ \u2014 SYN: Unq\nH. ___ \u2014 SYN: come out\nI. ___ \u2014 SYN: atomic number 74\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 9,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 9,
+      "num_distractors": 4,
+      "difficulty_score": 13
+    },
+    {
+      "problem_id": "eval_L30_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 9 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nviews, poi, tight, ra, load, stall, bless, tion, dro, ing, bust, ter, ipad, up, du, tamil, in, in\n\n## Clues\nA. ___ ___ \u2014 Relation hint: Topic domain: verb.contact \u2014 To establish or settle in.\nB. ___ \u2014 Relation hint: Property: thin \u2014 Any lightweight low-power tablet computer.\nC. ___ \u2014 Relation hint: Opposite of: leaky \u2014 pulled or drawn [masked]\nD. ___ ___ \u2014 Relation hint: Synonym: boon \u2014 Something someone is glad of.\nE. ___ \u2014 Relation hint: Topic domain: noun.person \u2014 A person who originates from [masked] Nadu, India or Sri Lanka or has [masked] origins.\nF. ___ ___ \u2014 Relation hint: Category: transfer \u2014 To transfer data to a computer on a network, especially to a server on the Internet.\nG. ___ ___ ___ \u2014 Relation hint: Related form: lengthy \u2014 An amount of time or a particular time interval.\nH. ___ ___ ___ \u2014 Relation hint: Synonym: interview \u2014 a conference (usually with someone important)\nI. ___ \u2014 Relation hint: Example usage: The rope snapped \u2014 To shoot (a gun).\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 9,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 9,
+      "num_distractors": 4,
+      "difficulty_score": 13
+    }
+  ]
+}

@@ -33,19 +33,37 @@ __pycache__/
 
 # Runtime/generated files
 .daemon.pid
+.pids/
 .config_lock.json
 .system_state.json
 .last_consolidation
 .train_now.sh
 training_output.log
 reports/
-tools/
-control/state.json
+control/
 skill_syllo_variant/.autogen_seed
+
+# Vault databases (created on first run)
+vault/catalog.db
+vault/catalog.db-*
+vault/jobs.db
+vault/jobs.db-*
+
+# Generated reports and outputs
+data_manager/reports/
+outputs/
 
 # Backup files
 .gitignore.backup
 *.backup
+*.bak
+config.json.bak
+
+# Prediction history (generated data with paths)
+data/prediction_history/
+
+# Archive configs (old personal configs)
+archive/configs/*.json
 
 # Quick reference files (user-specific)
 .QUICK_REFERENCE.txt
@@ -64,10 +82,16 @@ configs/facilities/local.yaml
 configs/**/*.local.yaml
 *.local.yaml
 
-# Host registry (contains actual LAN IPs - use hosts.example.json as template)
+# Personal environment (use .env.example as template)
+.env
+
+# Config files with personal data (use *.example.json as templates)
 config/hosts.json
+config/devices.json
+config/storage_zones.json
 config/storage_registry.json
 config/secrets.json
+config/workers.json
 
 # Guild runtime state
 status/hero_state.json

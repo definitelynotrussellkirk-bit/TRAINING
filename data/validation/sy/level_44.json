@@ -1,0 +1,92 @@
+{
+  "level": 44,
+  "level_name": "Expert",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L44_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 9 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nri, chlo, in, di, ing, pinned, lot, rine, di, ra, to, cu, tor, rats, rate, nige, a, fails, an, cat\n\n## Clues\nA. (3 syllables) \u2014 A person from Nigeria or of [masked] descent.\nB. (2 syllables) \u2014 A single atom of this element.\nC. (2 syllables) \u2014 To apply selectivity and taste to, as a collection of fashion items or web pages.\nD. (4 syllables) \u2014 heater consisting of a series of pipes for circulating steam or hot water to heat rooms or buildings\nE. (4 syllables) \u2014 to state or express briefly\nF. (1 syllables) \u2014 to hold fast or prevent from moving\nG. (1 syllables) \u2014 give away information about somebody\nH. (2 syllables) \u2014 a game in which numbered balls are drawn at random and players cover the corresponding numbers on their cards\nI. (1 syllables) \u2014 get worse\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 9,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "antonym",
+      "num_words": 9,
+      "num_distractors": 4,
+      "difficulty_score": 13
+    },
+    {
+      "problem_id": "eval_L44_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 10 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\ntusk, less, er, re, faith, just, ad, ter, uni, lat, hat, man, al, locum, runs, over, ly, sted, places, fines\n\n## Clues\nA. (1 syllables) \u2014 SYN: horn\nB. (1 syllables) \u2014 someone (physician or clergyman) who substitutes temporarily for another member of the same profession\nC. (2 syllables) \u2014 SYN: adapt\nD. (2 syllables) \u2014 SYN: brim over\nE. (1 syllables) \u2014 SYN: amercement\nF. (2 syllables) \u2014 SYN: hatmaker\nG. (2 syllables) \u2014 A change ringing method on an odd number of bells.\nH. (5 syllables) \u2014 SYN: one-sidedly\nI. (2 syllables) \u2014 SYN: exchange\nJ. (2 syllables) \u2014 SYN: traitorous\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 10,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 10,
+      "num_distractors": 5,
+      "difficulty_score": 15
+    },
+    {
+      "problem_id": "eval_L44_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 10 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\npack, phies, threes, pes, line, ju, bib, li, sworn, carr, lizard, side, tle, do, sabine, ogra, back\n\n## Clues\nA. (2 syllables) \u2014 hike with a [masked]\nB. (1 syllables) \u2014 DOM: saying reptile\nC. (2 syllables) \u2014 To remove or keep out of circulation or out of the focus.\nD. (1 syllables) \u2014 Ardent, devout.\nE. (1 syllables) \u2014 Any marsh; marshy ground, swampland.\nF. (2 syllables) \u2014 a club-shaped hand tool for grinding and mixing substances in a mortar\nG. (1 syllables) \u2014 A pair of threes.\nH. (1 syllables) \u2014 a river in eastern Texas that flows south into the Gulf of Mexico\nI. (2 syllables) \u2014 DOM: self defence\nJ. (4 syllables) \u2014 a list of writings with time and place of publication (such as the writings of a single author or the works referred to in preparing a document etc.)\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 10,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "domain",
+      "num_words": 10,
+      "num_distractors": 5,
+      "difficulty_score": 15
+    },
+    {
+      "problem_id": "eval_L44_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 11 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nsquirm, in, col, pol, ly, hos, fi, suer, de, ac, ing, cent, pitable, state, or, miles, ish, in, lasts, lps, clud, seals, brob, ed\n\n## Clues\nA. (2 syllables) \u2014 an outward or token appearance or form that is deliberately misleading\nB. (3 syllables) \u2014 Generally unacceptable for public broadcasting but not legally obscene.\nC. (1 syllables) \u2014 a unit of length used in navigation; exactly 1,852 meters; historically based on the distance spanned by one minute of arc in latitude\nD. (2 syllables) \u2014 disposed to treat guests and strangers with cordiality and generosity\nE. (1 syllables) \u2014 a finishing coat applied to exclude moisture\nF. (3 syllables) \u2014 That makes shiny or smooth.\nG. (3 syllables) \u2014 allow participation in or the right to be part of; permit to exercise the rights, functions, and responsibilities of\nH. (3 syllables) \u2014 a cell from which connective tissue develops\nI. (2 syllables) \u2014 In a stately manner.\nJ. (1 syllables) \u2014 an electric current that reverses direction sinusoidally\nK. (1 syllables) \u2014 a long-playing phonograph record; designed to be played at 33.3 rpm\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 11,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "antonym",
+      "num_words": 11,
+      "num_distractors": 6,
+      "difficulty_score": 17
+    },
+    {
+      "problem_id": "eval_L44_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 11 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nless, fore, for, cast, ed, bizarrely, host, pro, wards, pulsed, axy, doubt, ten, an, duran, re, thith, gal, er, phy, na, ed, is, swelled, lax\n\n## Clues\nA. (2 syllables) \u2014 SYN: ahead\nB. (1 syllables) \u2014 In a bizarre manner.\nC. (2 syllables) \u2014 SYN: beat back\nD. (3 syllables) \u2014 SYN: aerial\nE. (1 syllables) \u2014 SYN: big\nF. (2 syllables) \u2014 SYN: host\nG. (2 syllables) \u2014 SYN: undoubtedly\nH. (2 syllables) \u2014 SYN: there\nI. (3 syllables) \u2014 SYN: augur\nJ. (4 syllables) \u2014 Prevention of, or protective treatment for, disease.\nK. (2 syllables) \u2014 SYN: Galax urceolata\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 11,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 11,
+      "num_distractors": 6,
+      "difficulty_score": 17
+    }
+  ]
+}

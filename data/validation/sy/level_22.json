@@ -1,0 +1,92 @@
+{
+  "level": 22,
+  "level_name": "Intermediate",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L22_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 5 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nsmith, el, flaws, un, cru, cov, sade, cru, ered\n\n## Clues\n1. ___ ___ \u2014 Sound hint: Rhymes with 'made' \u2014 Any of a series of religious campaigns by Christian forces from the 11th to the 13th century, mostly to capture the Holy Land from the Muslims who occupied it.\n2. ___ \u2014 Sound hint: Rhymes with 'faith' \u2014 English explorer who helped found the colony at Jamestown, Virginia; was said to have been saved by Pocahontas (1580-1631)\n3. ___ ___ \u2014 Sound hint: Rhymes with 'fuel' \u2014 To violently provoke (a child) in the belief that this will make them more assertive.\n4. ___ ___ ___ \u2014 Sound hint: Rhymes with 'red' \u2014 Not covered or protected from the weather, etc.\n5. ___ \u2014 Sound hint: Rhymes with 'draws' \u2014 defect or weakness in a person's character\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 5,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "rhyme",
+      "num_words": 5,
+      "num_distractors": 0,
+      "difficulty_score": 5
+    },
+    {
+      "problem_id": "eval_L22_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 6 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\npop, thir, opened, ship, ping, sanc, ty, walk, ers, rhetoric\n\n## Clues\n1. ___ \u2014 start to operate or function or cause to start operating or functioning\n2. ___ \u2014 Word origin: From from enm:[masked], enm:schip, from ang:s\u010bip, from , from , from , . More at en:shift. Cognate with  \u2014 hire for work on a [masked]\n3. ___ ___ \u2014 put or thrust suddenly and forcefully\n4. ___ \u2014 Word origin: From from enm:rethorik, from la:r\u0113thoricus, la:rh\u0113toricus, from grc:\u1fe5\u03b7\u03c4\u03bf\u03c1\u1fd0\u03ba\u03cc\u03c2. . \u2014 using language effectively to please or persuade\n5. ___ ___ \u2014 New Zealand runner who in 1975 became the first person to run a mile in less that 3 minutes and 50 seconds (born in 1952)\n6. ___ ___ \u2014 Word origin: From from enm:[masked], metathetic alternant of from enm:thriti, enm:\u00feritti\u021d, from ang:\u00fer\u012bti\u0121, from ,  \u2014 A rack of [masked] beers.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 6,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "etymology",
+      "num_words": 6,
+      "num_distractors": 1,
+      "difficulty_score": 7
+    },
+    {
+      "problem_id": "eval_L22_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 6 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nal, ber, en, ma, black, greed, refers, ry, na, fright, tray, be, ri, ing\n\n## Clues\n1. ___ ___ ___ \u2014 Relation hint: Category: chase away \u2014 drive out by [masked]\n2. ___ ___ ___ \u2014 Relation hint: Category: dock \u2014 A harbour for small boats.\n3. ___ \u2014 Relation hint: Related form: avaricious \u2014 excessive desire to acquire or possess more (especially more material wealth) than one needs or deserves\n4. ___ ___ ___ \u2014 Relation hint: Category: berry \u2014 bramble with sweet edible black or dark purple berries that usually do not separate from the receptacle\n5. ___ \u2014 Relation hint: Synonym: advert \u2014 make reference to\n6. ___ ___ ___ \u2014 Relation hint: Topic domain: noun.attribute \u2014 the quality of aiding an enemy\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 6,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 6,
+      "num_distractors": 1,
+      "difficulty_score": 7
+    },
+    {
+      "problem_id": "eval_L22_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nquirky, beast, steven, tiny, dads, firm, theo, des\n\n## Clues\n1. ___ \u2014 The amount of a gambler's [masked]retical losses based on typical play.\n2. ___ ___ \u2014 Structure hint: (prefix: de-) \u2014 an event (or a course of events) that will inevitably happen in the future\n3. ___ \u2014 Mentally resistant to hurt or stress.\n4. ___ \u2014 informal terms; strikingly unconventional\n5. ___ \u2014 an informal term for a father; probably derived from baby talk\n6. ___ \u2014 Structure hint: (prefix: be-) \u2014 Something unpleasant and difficult.\n7. ___ \u2014 Structure hint: (suffix: -en) \u2014 A time, occasion.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "morphology",
+      "num_words": 7,
+      "num_distractors": 2,
+      "difficulty_score": 9
+    },
+    {
+      "problem_id": "eval_L22_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nfol, pist, ment, u, doc, lows, skies, ther, ti, a, ports, proven, role, ed, bet, air\n\n## Clues\n1. ___ ___ \u2014 Relation hint: Topic domain: noun.location \u2014 an autonomous region of the Peoples Republic of China; located in the Himalayas\n2. ___ ___ \u2014 Relation hint: Topic domain: noun.artifact \u2014 an airfield equipped with control tower and hangars as well as accommodations for passengers and cargo\n3. ___ \u2014 Relation hint: Type of part in performance work \u2014 An ancient unit of quantity, 72 sheets of parchment.\n4. ___ ___ ___ \u2014 Relation hint: Can put at ease \u2014 A psycho[masked] specifically.\n5. ___ \u2014 Relation hint: Synonym: toss \u2014 move along on skis\n6. ___ ___ \u2014 Relation hint: Synonym: accompany \u2014 keep informed\n7. ___ ___ ___ ___ \u2014 Relation hint: Category: enter \u2014 established as genuine\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 7,
+      "num_distractors": 2,
+      "difficulty_score": 9
+    }
+  ]
+}

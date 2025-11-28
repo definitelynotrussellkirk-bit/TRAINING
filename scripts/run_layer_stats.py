@@ -50,7 +50,11 @@ logger = logging.getLogger("run_layer_stats")
 
 def get_base_dir() -> Path:
     """Get training base directory."""
-    return Path(os.environ.get("TRAINING_BASE_DIR", "/path/to/training"))
+    try:
+        from core.paths import get_base_dir as _get_base_dir
+        return _get_base_dir()
+    except ImportError:
+        return Path(os.environ.get("TRAINING_BASE_DIR", "."))
 
 
 def submit_job(args):

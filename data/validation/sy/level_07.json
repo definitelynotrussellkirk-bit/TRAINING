@@ -1,0 +1,92 @@
+{
+  "level": 7,
+  "level_name": "Beginner",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L7_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 3 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\ncare, dad, ful, show\n\n## Clues\n1. ___ ___ \u2014 Taking care; attentive to potential danger, error or harm; cautious.\n2. ___ \u2014 To throw against something; to dash.\n3. ___ \u2014 Mere display or pomp with no substance. (Usually seen in the phrases \"all [masked]\" and \"for [masked]\".)\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 3,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 3,
+      "num_distractors": 0,
+      "difficulty_score": 3
+    },
+    {
+      "problem_id": "eval_L7_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 4 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nbest, ing, is, lands, pre, sav\n\n## Clues\n1. ___ ___ \u2014 a land mass (smaller than a continent) that is surrounded by water\n2. ___ \u2014 One's [masked] behavior.\n3. ___ ___ \u2014 That saves someone from damnation; redemptive.\n4. ___ \u2014 (something significant).\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 4,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 4,
+      "num_distractors": 0,
+      "difficulty_score": 4
+    },
+    {
+      "problem_id": "eval_L7_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 4 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nport, skills, smile, who\n\n## Clues\n1. ___ \u2014 Sound hint: Starts with 'sm' sound \u2014 A facial expression comprised by flexing the muscles of both ends of one's mouth, often showing the front teeth, without vocalisation, and in humans is a common involuntary or voluntary expression of happiness, pleasure, amusement, goodwill, or anxiety.\n2. ___ \u2014 Sound hint: Starts with 'sk' sound \u2014 ability to produce solutions in some problem domain\n3. ___ \u2014 What person or people; which person or people; .\n4. ___ \u2014 Sound hint: Rhymes with 'sup[masked]' \u2014 To hold or carry (a weapon) with both hands so that it lies diagonally across the front of the body, with the barrel or similar part near the left shoulder and the right hand grasping the small of the stock; or, to throw (the weapon) into this position on command.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 4,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "rhyme",
+      "num_words": 4,
+      "num_distractors": 0,
+      "difficulty_score": 4
+    },
+    {
+      "problem_id": "eval_L7_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 5 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nable, et, glad, ian, ital, learned, tick, un\n\n## Clues\n1. ___ ___ \u2014 Audio: \"To render [masked]; to disable.\"\n2. ___ ___ \u2014 Audio: \"Pertaining to Italy.\"\n3. ___ \u2014 Audio: \"Having a bright or cheerful appearance; expressing or exciting joy; producing [masked]ness.\"\n4. ___ \u2014 Audio: \"find out, learn, or determine with certainty, usually by making an inquiry or other effort\"\n5. ___ ___ \u2014 Audio: \"A visiting card.\"\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 5,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "audio",
+      "num_words": 5,
+      "num_distractors": 0,
+      "difficulty_score": 5
+    },
+    {
+      "problem_id": "eval_L7_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 5 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nar, big, ger, ly, mal, nor, rest, tonight, track\n\n## Clues\n1. ___ ___ \u2014 Alt-text: [Illustration hinting at: generous and understanding and tolerant]\n2. ___ ___ \u2014 Alt-text: [Illustration hinting at: A device to physically [masked] motion.]\n3. ___ \u2014 Alt-text: [Illustration hinting at: The nighttime of the current day or date; this night.]\n4. ___ ___ ___ \u2014 Alt-text: [Illustration hinting at: Under normal conditions or circumstances; usually; most of the time]\n5. ___ \u2014 Alt-text: [Illustration hinting at: The way or rails along which a train moves.]\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 5,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "alt_text",
+      "num_words": 5,
+      "num_distractors": 0,
+      "difficulty_score": 5
+    }
+  ]
+}

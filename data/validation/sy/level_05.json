@@ -1,0 +1,92 @@
+{
+  "level": 5,
+  "level_name": "Beginner",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L5_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 3 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nemp, mote, pro, troops, ty\n\n## Clues\n1. ___ ___ \u2014 To elevate to a higher league.\n2. ___ ___ \u2014 holding or containing nothing\n3. ___ \u2014 soldiers collectively\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 3,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 3,
+      "num_distractors": 0,
+      "difficulty_score": 3
+    },
+    {
+      "problem_id": "eval_L5_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 3 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nclient, en, led, wom\n\n## Clues\n1. ___ ___ \u2014 [masked] as a class\n2. ___ \u2014 (computer science) any computer that is hooked up to a computer network\n3. ___ \u2014 travel in front of; go in advance of others\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 3,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 3,
+      "num_distractors": 0,
+      "difficulty_score": 3
+    },
+    {
+      "problem_id": "eval_L5_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 3 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nnorth, roof, york\n\n## Clues\n1. ___ \u2014 The top external level of a building.\n2. ___ \u2014 Toward the [masked]; [masked]ward.\n3. ___ \u2014 to bowl a [masked]er at a batsman, especially to get a batsman out in this way.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 3,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 3,
+      "num_distractors": 0,
+      "difficulty_score": 3
+    },
+    {
+      "problem_id": "eval_L5_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 4 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nest, horse, lat, re, spect, stephen\n\n## Clues\n1. ___ \u2014 To take or carry on the back.\n2. ___ ___ \u2014 To take notice of; to regard as worthy of special consideration; to heed.\n3. ___ ___ \u2014 At the [masked].\n4. ___ \u2014 English writer (1832-1904)\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 4,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 4,
+      "num_distractors": 0,
+      "difficulty_score": 4
+    },
+    {
+      "problem_id": "eval_L5_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 4 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nes, list, match, stick, two\n\n## Clues\n1. ___ \u2014 being one more than one\n2. ___ \u2014 enumerate\n3. ___ ___ \u2014 satisfy or fulfill\n4. ___ \u2014 cover and decorate with objects that pierce the surface\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 4,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "plain",
+      "num_words": 4,
+      "num_distractors": 0,
+      "difficulty_score": 4
+    }
+  ]
+}

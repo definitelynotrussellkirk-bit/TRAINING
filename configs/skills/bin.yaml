@@ -1,6 +1,6 @@
 # =============================================================================
 # SKILL: BIN (Binary Arithmetic)
-# Source: /path/to/skills/skill_binary/
+# Source: $SKILL_SERVERS_PATH/skill_binary/
 # =============================================================================
 
 id: bin
@@ -37,7 +37,7 @@ api:
 
   # Server location and startup
   source_dir: skill_binary                    # Relative to $SKILL_SERVERS_PATH
-  working_dir: ${SKILL_SERVERS_PATH}          # /path/to/skills
+  working_dir: ${SKILL_SERVERS_PATH}          # Set in .env file
   start_command: python3 skill_binary/api_server.py --port 8090
 
   # Health and timing
@@ -201,7 +201,7 @@ training:
   fields: ["id", "skill", "scenario", "user_prompt", "assistant_response", "rubric", "tags"]
 
   generate_command: |
-    cd /path/to/skills
+    cd $SKILL_SERVERS_PATH
     python skill_binary/scripts/generate_training_batch.py \
       --count 1000 --level 10 \
       --difficulty easy:0.4,medium:0.35,hard:0.2,expert:0.05 \

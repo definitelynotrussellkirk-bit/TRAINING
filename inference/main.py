@@ -293,7 +293,7 @@ async def get_model_info():
         raise HTTPException(status_code=500, detail=f"Failed to get model info: {str(e)}")
 
 class ReloadRequest(BaseModel):
-    model_path: str  # Full path to checkpoint, e.g. /path/to/models/checkpoint-175000
+    model_path: str  # Full path to checkpoint, e.g. ~/llm/models/checkpoint-175000
 
 @app.post("/models/reload", dependencies=[Depends(require_admin)])
 async def reload_model(req: ReloadRequest):

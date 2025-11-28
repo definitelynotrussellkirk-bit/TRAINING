@@ -120,7 +120,7 @@ class DeploymentOrchestrator:
         Returns:
             {
                 'step': 156000,
-                'checkpoint_path': Path('/home/user/.../checkpoint-156000'),
+                'checkpoint_path': Path('/path/to/checkpoint-156000'),
                 'checkpoint_name': 'checkpoint-156000',
                 'loss': 0.12,
             }

@@ -264,7 +264,7 @@ class Lab:
         Get rsync target string for a device.
 
         Returns:
-            String like "user@xxx.xxx.88.149:/path/to/models" or None
+            String like "user@host:/path/to/models" or None
         """
         host = self.get_host_for_device(device_id)
         if host and host.ssh_user:

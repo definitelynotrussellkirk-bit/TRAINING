@@ -1,0 +1,92 @@
+{
+  "level": 31,
+  "level_name": "Advanced",
+  "eval_version": "1.0",
+  "pass_threshold": 0.8,
+  "passing_score": "4/5",
+  "scoring_rule": "Each problem: ALL words must be correct. Level: 80% of problems must pass.",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "answers"
+    ],
+    "properties": {
+      "answers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "UPPERCASE words in clue order"
+      }
+    },
+    "example": "{\"answers\": [\"TEACHERS\", \"SURFACE\", \"PAY\", \"CONNECTION\"]}"
+  },
+  "num_problems": 5,
+  "problems": [
+    {
+      "problem_id": "eval_L31_P1",
+      "problem_index": 0,
+      "prompt": "# Syllable Puzzle\n\nFind 7 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\njury, men, forth, lary, in, router, tions, ode, groovy, lessons, cath\n\n## Clues\nA. (1 syllables) \u2014 [masked] from; out of.\nB. (1 syllables) \u2014 Structure hint: (suffix: -er) \u2014 a power tool with a shaped cutter; used in carpentry for cutting grooves\nC. (2 syllables) \u2014 Structure hint: (prefix: in-) \u2014 a casualty to military personnel resulting from combat\nD. (1 syllables) \u2014 Cool, neat, interesting.\nE. (2 syllables) \u2014 make reference to\nF. (1 syllables) \u2014 the significance of a story or event\nG. (2 syllables) \u2014 That electrode of a semiconductor device which is connected to the n-type material of a p-n junction.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 7,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "morphology",
+      "num_words": 7,
+      "num_distractors": 2,
+      "difficulty_score": 9
+    },
+    {
+      "problem_id": "eval_L31_P2",
+      "problem_index": 1,
+      "prompt": "# Syllable Puzzle\n\nFind 8 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nple, am, cor, hand, feats, nell, day, napped, ti, duchess, out, prac, to, dria, tion, er, rect, kid\n\n## Clues\nA. (2 syllables) \u2014 United States actress noted for her performances in Broadway plays (1893-1974)\nB. (2 syllables) \u2014 SYN: press release\nC. (1 syllables) \u2014 SYN: effort\nD. (1 syllables) \u2014 The female ruler of a duchy.\nE. (2 syllables) \u2014 SYN: now\nF. (2 syllables) \u2014 SYN: abduct\nG. (2 syllables) \u2014 SYN: copious\nH. (4 syllables) \u2014 SYN: practician\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 8,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 8,
+      "num_distractors": 3,
+      "difficulty_score": 11
+    },
+    {
+      "problem_id": "eval_L31_P3",
+      "problem_index": 2,
+      "prompt": "# Syllable Puzzle\n\nFind 8 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nty, tow, pro, er, ship, knox, tras, cie, gra, nounced, yard, uli, i, malay, tweaked, stress, com, plex, ing\n\n## Clues\nA. (1 syllables) \u2014 Relation hint: Example usage: he put the [masked] on the wrong syllable \u2014 (physics) force that produces strain on a physical body\nB. (2 syllables) \u2014 Relation hint: Synonym: Allen \u2014 United States comedienne remembered as the confused but imperturbable partner of her husband, George Burns (1906-1964)\nC. (1 syllables) \u2014 Relation hint: Can be used as adjective or noun \u2014 Of or related to [masked]sia, its people and/or culture.\nD. (4 syllables) \u2014 Relation hint: Topic domain: noun.attribute \u2014 That which is and renders complex; intricacy; complication.\nE. (1 syllables) \u2014 Relation hint: Topic domain: noun.person \u2014 Scottish theologian who founded Presbyterianism in Scotland and wrote a history of the Reformation in Scotland (1514-1572)\nF. (2 syllables) \u2014 Relation hint: Has vowel sequence 'ou' \u2014 strongly marked; assertive\nG. (3 syllables) \u2014 Relation hint: Topic domain: adj.all \u2014 of imposing height; especially standing out above others\nH. (2 syllables) \u2014 Relation hint: Starts with 'sh' \u2014 A place where ships are built and repaired.\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 8,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "semantic",
+      "num_words": 8,
+      "num_distractors": 3,
+      "difficulty_score": 11
+    },
+    {
+      "problem_id": "eval_L31_P4",
+      "problem_index": 3,
+      "prompt": "# Syllable Puzzle\n\nFind 9 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nwaist, ideals, tains, od, sal, door, melvin, mis, va, carthage, tion, moun, chievous, autism\n\n## Clues\nA. (2 syllables) \u2014 mountain range\nB. (1 syllables) \u2014 A part of a piece of clothing that covers the [masked].\nC. (1 syllables) \u2014 A wedgie performed from in front of the victim.\nD. (1 syllables) \u2014 A pervasive neurological condition that is observable in early childhood and persists throughout the lifespan, characterised by atypical communication patterns (e.g., differences in body language or eye contact), delayed language development, and sensory processing sensitivities.\nE. (2 syllables) \u2014 Troublesome, cheeky, badly behaved, impish, naughty, disobedient; showing a fondness for causing trouble in a playful way and liking to have fun by playing harmless tricks on people or doing things they are not supposed to do.\nF. (1 syllables) \u2014 a structure where people live or work (usually ordered along a street or road)\nG. (1 syllables) \u2014 an ancient city state on the north African coast near modern Tunis; founded by Phoenicians; destroyed and rebuilt by Romans; razed by Arabs in 697\nH. (1 syllables) \u2014 the idea of something that is perfect; something that one hopes to attain\nI. (3 syllables) \u2014 The process of being saved, the state of having been saved (from hell).\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 9,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "antonym",
+      "num_words": 9,
+      "num_distractors": 4,
+      "difficulty_score": 13
+    },
+    {
+      "problem_id": "eval_L31_P5",
+      "problem_index": 4,
+      "prompt": "# Syllable Puzzle\n\nFind 9 words using the syllables from the bank.\nEach syllable is used exactly once (extras are distractors).\n\n## Syllable Bank\nly, mil, ton, lus, i, acro, for, mon, re, gie, nym, mal, sty, searched, hu, ed, ty, joined, hold, ings, dog\n\n## Clues\nA. (4 syllables) \u2014 SYN: humbleness\nB. (2 syllables) \u2014 SYN: barker\nC. (2 syllables) \u2014 SYN: explore\nD. (2 syllables) \u2014 SYN: style\nE. (2 syllables) \u2014 SYN: belongings\nF. (3 syllables) \u2014 the capital of the province of Alberta\nG. (1 syllables) \u2014 SYN: bring together\nH. (2 syllables) \u2014 To form into an acronym.\nI. (3 syllables) \u2014 SYN: officially\n\n## Answer Format\nReturn JSON: {\"answers\": [\"WORD1\", \"WORD2\", ...]}\nWords must be UPPERCASE and in clue order.",
+      "expected_answer_count": 9,
+      "answer_format": "{\"answers\": [\"WORD1\", \"WORD2\", ...]}",
+      "answer_case": "UPPERCASE",
+      "answer_order": "must match clue order",
+      "hint_channel": "synonym",
+      "num_words": 9,
+      "num_distractors": 4,
+      "difficulty_score": 13
+    }
+  ]
+}

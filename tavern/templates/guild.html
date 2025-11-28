@@ -341,7 +341,8 @@
             try {
                 // Load skills
                 const skillsRes = await fetch('/api/skills');
-                const skills = await skillsRes.json();
+                const skillsData = await skillsRes.json();
+                const skills = skillsData.skills || skillsData;  // Handle both formats
                 renderSkills(skills);
 
                 // Load passives
@@ -352,7 +353,7 @@
                 // Load curriculum state for summary
                 const curriculumRes = await fetch('/api/curriculum');
                 const curriculum = await curriculumRes.json();
-                renderSummary(skills, passives, curriculum);
+                renderSummary(skills, passives, curriculum, skillsData.total_mastered || 0);
 
             } catch (err) {
                 console.error('Failed to load guild data:', err);
@@ -448,9 +449,9 @@
             });
         }
 
-        function renderSummary(skills, passives, curriculum) {
+        function renderSummary(skills, passives, curriculum, totalMastered) {
             // Total level = sum of all skill levels
-            const totalLevel = skills.reduce((sum, s) => sum + (s.current_level || 1), 0);
+            const totalLevel = skills.reduce((sum, s) => sum + (s.current_level || 0), 0);
             document.getElementById('totalLevel').textContent = totalLevel;
 
             // Active skills count

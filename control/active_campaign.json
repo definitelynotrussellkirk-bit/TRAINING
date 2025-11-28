@@ -1,7 +1,7 @@
 {
-  "hero_id": "dio-qwen3-0.6b",
+  "hero_id": "titan-qwen3-4b",
   "campaign_id": "campaign-001",
-  "campaign_path": "campaigns/dio-qwen3-0.6b/campaign-001",
-  "activated_at": "2025-11-27T21:29:13.204549",
+  "campaign_path": "campaigns/titan-qwen3-4b/campaign-001",
+  "activated_at": "2025-11-27T23:30:31.115814",
   "_comment": "Scroll of Destiny - Points to the currently active campaign"
 }

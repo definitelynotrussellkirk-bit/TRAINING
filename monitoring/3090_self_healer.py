@@ -13,6 +13,9 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import logging
 
+from core.paths import get_base_dir
+from core.hosts import get_host
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -25,13 +28,16 @@ class SelfHealer:
 
     def __init__(
         self,
-        remote_host: str = "192.168.x.x",
-        api_port: int = 8765,
-        base_dir: str = "/path/to/training"
+        remote_host: str = None,
+        api_port: int = None,
+        base_dir: str = None
     ):
-        self.remote_host = remote_host
-        self.api_port = api_port
-        self.base_dir = Path(base_dir)
+        # Get inference host info
+        inference_host = get_host("3090")
+        self.remote_host = remote_host if remote_host else inference_host.host
+        self.api_port = api_port if api_port else inference_host.services.get("inference", {}).get("port", 8765)
+
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
 
         # Recovery stats
         self.recovery_attempts = 0
@@ -384,14 +390,26 @@ class SelfHealer:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='3090 Self-Healing System')
+    parser.add_argument('--remote-host', default=None,
+                       help='Remote host (default: from hosts.json)')
+    parser.add_argument('--api-port', type=int, default=None,
+                       help='API port (default: from hosts.json)')
+    parser.add_argument('--base-dir', default=None,
+                       help='Base directory (default: auto-detect)')
+    parser.add_argument('--interval', type=int, default=300,
+                       help='Check interval in seconds')
+    args = parser.parse_args()
+
     healer = SelfHealer(
-        remote_host="192.168.x.x",
-        api_port=8765,
-        base_dir="/path/to/training"
+        remote_host=args.remote_host,
+        api_port=args.api_port,
+        base_dir=args.base_dir
     )
 
-    # Run healing check every 5 minutes
-    healer.run_forever(interval=300)
+    # Run healing check
+    healer.run_forever(interval=args.interval)
 
 
 if __name__ == "__main__":

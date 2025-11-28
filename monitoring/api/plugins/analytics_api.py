@@ -14,17 +14,17 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
+import sys
 
 from flask import Blueprint, jsonify
+
+# Add core to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "core"))
+from paths import get_base_dir
 
 logger = logging.getLogger(__name__)
 
 analytics_bp = Blueprint('analytics', __name__, url_prefix='/api/analytics')
-
-
-def get_base_dir() -> Path:
-    """Get the base directory."""
-    return Path("/path/to/training")
 
 
 def read_json_file(filepath: Path) -> Optional[Dict]:

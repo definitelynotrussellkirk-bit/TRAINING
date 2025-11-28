@@ -301,6 +301,84 @@ def __getattr__(name):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
+def require_base_dir() -> Path:
+    """
+    Get the base training directory, failing clearly if not found.
+
+    Unlike get_base_dir() which has fallbacks, this function will raise
+    a clear error if the base directory cannot be determined. Use this
+    in production code to fail fast rather than silently using wrong paths.
+
+    Returns:
+        Path to the base training directory
+
+    Raises:
+        RuntimeError: If base directory cannot be determined
+    """
+    try:
+        return get_base_dir()
+    except RuntimeError:
+        raise RuntimeError(
+            "Training base directory not found.\n"
+            "Please either:\n"
+            "  1. Set TRAINING_BASE_DIR environment variable\n"
+            "  2. Run from the training repository root\n"
+            "  3. Ensure CLAUDE.md exists in the project root\n"
+            "\n"
+            "Example: export TRAINING_BASE_DIR=/path/to/training"
+        )
+
+
+def get_external_tool_path(tool_name: str) -> Path:
+    """
+    Get path to an external tool (e.g., singleSKILL).
+
+    Resolution order:
+    1. Environment variable: {TOOL_NAME}_PATH (e.g., SINGLESKILL_PATH)
+    2. Sibling directory to base_dir
+    3. Home directory
+
+    Args:
+        tool_name: Name of the tool (e.g., "singleSKILL")
+
+    Returns:
+        Path to the tool directory
+
+    Raises:
+        RuntimeError: If tool path cannot be found
+    """
+    env_var = f"{tool_name.upper().replace('-', '_')}_PATH"
+    env_path = os.environ.get(env_var)
+    if env_path:
+        path = Path(env_path)
+        if path.exists():
+            return path
+
+    # Try sibling directory
+    try:
+        base = get_base_dir()
+        sibling = base.parent / tool_name
+        if sibling.exists():
+            return sibling
+    except RuntimeError:
+        pass
+
+    # Try home directory subdirs
+    home_paths = [
+        Path.home() / "Desktop" / tool_name,
+        Path.home() / tool_name,
+    ]
+    for path in home_paths:
+        if path.exists():
+            return path
+
+    raise RuntimeError(
+        f"External tool '{tool_name}' not found.\n"
+        f"Please set {env_var} environment variable or ensure the tool\n"
+        f"exists in a sibling directory or home directory."
+    )
+
+
 def get_remote_api_url() -> str:
     """Get the remote inference API URL. Prefer core.hosts.get_service_url('inference')."""
     return f"http://{_get_inference_host()}:{_get_inference_port()}"

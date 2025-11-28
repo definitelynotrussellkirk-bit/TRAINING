@@ -11,6 +11,12 @@ import json
 import subprocess
 import os
 import re
+import sys
+
+# Add core to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "core"))
+from hosts import get_host
+from paths import get_status_dir
 
 from .base import BasePlugin
 
@@ -52,14 +58,14 @@ class SkillMetricsPlugin(BasePlugin):
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         super().__init__(config)
-        self.ssh_host = self.config.get('ssh_host', '192.168.x.x')
+        self.ssh_host = self.config.get('ssh_host', get_host('3090').host)
         self.local_baselines_dir = Path(self.config.get(
             'local_baselines_dir',
-            '/path/to/training/status/baselines'
+            str(get_status_dir() / 'baselines')
         ))
         self.remote_baselines_dir = self.config.get(
             'remote_baselines_dir',
-            '/path/to/training/status/baselines'
+            str(get_status_dir() / 'baselines')
         )
 
     def get_name(self) -> str:
@@ -353,7 +359,7 @@ class SkillMetricsPlugin(BasePlugin):
     def _load_10level_eval(self) -> Dict[str, Any]:
         """Load 10-level SYLLO evaluation results."""
         try:
-            eval_path = Path('/path/to/training/status/baseline_eval_10level.json')
+            eval_path = get_status_dir() / 'baseline_eval_10level.json'
             if not eval_path.exists():
                 return {'available': False}
 

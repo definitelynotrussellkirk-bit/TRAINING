@@ -30,11 +30,18 @@ class CurriculumController:
 
     def __init__(
         self,
-        base_dir: Path,
-        data_gen_script: str = "/path/to/skills/skill_syllo_variant/scripts/export_training_data.py",
+        base_dir: Path = None,
+        data_gen_script: str = None,
         output_dir: str = "queue/normal"
     ):
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = require_base_dir()
         self.base_dir = Path(base_dir)
+        if data_gen_script is None:
+            from core.paths import get_external_tool_path
+            skill_path = get_external_tool_path("singleSKILL")
+            data_gen_script = str(skill_path / "skill_syllo_variant" / "scripts" / "export_training_data.py")
         self.data_gen_script = data_gen_script
         self.output_dir = self.base_dir / output_dir
 
@@ -322,14 +329,14 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Curriculum automation controller')
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base directory')
+    parser.add_argument('--base-dir', default=None, help='Base directory (defaults to auto-detected)')
     parser.add_argument('--count', type=int, default=100000, help='Number of examples to generate')
     parser.add_argument('--auto-generate', action='store_true', help='Automatically generate new batch')
     parser.add_argument('--show-state', action='store_true', help='Show current curriculum state')
 
     args = parser.parse_args()
 
-    controller = CurriculumController(base_dir=args.base_dir)
+    controller = CurriculumController(base_dir=Path(args.base_dir) if args.base_dir else None)
 
     if args.show_state:
         state = controller.get_curriculum_state()

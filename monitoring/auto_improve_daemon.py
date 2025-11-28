@@ -42,6 +42,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
+from core.paths import get_base_dir, get_status_dir
+from core.hosts import get_service_url
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -70,20 +73,20 @@ class AutoImproveDaemon:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
-        scheduler_url: str = "http://192.168.x.x:8766",
+        base_dir: str = None,
+        scheduler_url: str = None,
         improve_interval: int = 14400,  # 4 hours
         sync_interval: int = 300,       # 5 minutes
         min_training_gap: int = 500     # Minimum steps between cycles
     ):
-        self.base_dir = Path(base_dir)
-        self.scheduler_url = scheduler_url
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
+        self.scheduler_url = scheduler_url if scheduler_url else get_service_url("scheduler")
         self.improve_interval = improve_interval
         self.sync_interval = sync_interval
         self.min_training_gap = min_training_gap
 
         # Status files
-        self.status_dir = self.base_dir / "status"
+        self.status_dir = get_status_dir()
         self.status_file = self.status_dir / "auto_improve.json"
         self.pid_file = self.base_dir / ".pids" / "auto_improve.pid"
 
@@ -349,10 +352,10 @@ class AutoImproveDaemon:
 
 def main():
     parser = argparse.ArgumentParser(description="Auto-Improve Daemon")
-    parser.add_argument('--base-dir', default='/path/to/training',
-                       help='Base directory')
-    parser.add_argument('--scheduler-url', default='http://192.168.x.x:8766',
-                       help='GPU scheduler URL')
+    parser.add_argument('--base-dir', default=None,
+                       help='Base directory (default: auto-detect)')
+    parser.add_argument('--scheduler-url', default=None,
+                       help='GPU scheduler URL (default: from hosts.json)')
     parser.add_argument('--daemon', action='store_true',
                        help='Run as daemon')
     parser.add_argument('--cycle', action='store_true',

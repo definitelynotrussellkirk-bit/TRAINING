@@ -75,14 +75,29 @@ def get_saga_reader():
 _skill_cache = None
 
 def get_skills_data():
-    """Load skill data from YAML configs + curriculum state."""
+    """Load skill data from YAML configs + campaign-specific curriculum state."""
     global _skill_cache
 
     try:
         import yaml
 
         skills_dir = BASE_DIR / "configs" / "skills"
-        curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
+
+        # Try to get campaign-specific curriculum state first
+        curriculum_file = None
+        try:
+            from core.hero import get_active_campaign
+            campaign = get_active_campaign()
+            if campaign.get("campaign_path"):
+                campaign_curriculum = BASE_DIR / campaign["campaign_path"] / "status" / "curriculum_state.json"
+                if campaign_curriculum.exists():
+                    curriculum_file = campaign_curriculum
+        except Exception:
+            pass
+
+        # Fallback to global curriculum state
+        if curriculum_file is None:
+            curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
 
         # Load curriculum state for levels/accuracy
         curriculum = {}
@@ -906,8 +921,22 @@ class TavernHandler(SimpleHTTPRequestHandler):
             except Exception as e:
                 logger.warning(f"Failed to get GPU stats: {e}")
 
-            # 3. Curriculum state
-            curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
+            # 3. Curriculum state (campaign-specific if available)
+            curriculum_file = None
+            try:
+                from core.hero import get_active_campaign
+                campaign = get_active_campaign()
+                if campaign.get("campaign_path"):
+                    campaign_curriculum = BASE_DIR / campaign["campaign_path"] / "status" / "curriculum_state.json"
+                    if campaign_curriculum.exists():
+                        curriculum_file = campaign_curriculum
+            except Exception:
+                pass
+
+            # Fallback to global curriculum
+            if curriculum_file is None:
+                curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
+
             if curriculum_file.exists():
                 try:
                     with open(curriculum_file) as f:
@@ -3485,7 +3514,10 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 return
 
             host_config = self.INFERENCE_HOSTS[host_id]
-            models_dir = host_config.get("models_dir", "/path/to/models")
+            models_dir = host_config.get("models_dir")
+            if not models_dir:
+                self._send_json({"success": False, "error": f"Host {host_id} missing models_dir in hosts.json"}, 500)
+                return
 
             # Special handling for base model (step 0)
             if int(step) == 0:
@@ -3615,7 +3647,10 @@ class TavernHandler(SimpleHTTPRequestHandler):
             # Use SSH to check if directory exists
             import subprocess
             host = host_config["host"]
-            models_dir = host_config.get("models_dir", "/path/to/models")
+            models_dir = host_config.get("models_dir")
+            if not models_dir:
+                self._send_json({"success": False, "error": f"Host {host_id} missing models_dir in hosts.json"}, 500)
+                return
             remote_path = f"{models_dir}/{checkpoint_name}"
 
             result = subprocess.run(
@@ -3635,7 +3670,10 @@ class TavernHandler(SimpleHTTPRequestHandler):
         import time
 
         host = host_config["host"]
-        models_dir = host_config.get("models_dir", "/path/to/models")
+        models_dir = host_config.get("models_dir")
+            if not models_dir:
+                self._send_json({"success": False, "error": f"Host {host_id} missing models_dir in hosts.json"}, 500)
+                return
         remote_target = f"{host}:{models_dir}/{checkpoint_name}/"
 
         cmd = [

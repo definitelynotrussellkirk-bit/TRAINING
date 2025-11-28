@@ -1,0 +1,141 @@
+# =============================================================================
+# HERO: FLO - The Compassionate
+# =============================================================================
+# FLO is a Qwen3-4B model - much larger than DIO, requiring special
+# memory optimizations to train on a single RTX 4090.
+#
+# Named after Florence (the city of art and learning).
+# Key: Uses paged 8-bit Adam optimizer to offload optimizer states to CPU.
+# =============================================================================
+
+id: titan-qwen3-4b
+name: "FLO"
+rpg_name: "The Compassionate"
+description: >
+  A gentle giant with deep understanding. FLO's larger capacity allows for
+  nuanced reasoning, though training requires memory optimizations. With paged
+  optimizer states and fused kernels, FLO can train on a single 4090.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "models/Qwen3-4B-Instruct-2507"  # Local path
+  family: "qwen3"
+  architecture: "Qwen3ForCausalLM"
+  size_b: 4.02
+  vocab_size: 151936
+  context_length: 4096
+  rope_scaling: "dynamic"
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+# Calibrated for RTX 4090 (24GB VRAM) with CPU offload
+# Peak VRAM: ~18.6 GB (tested 2025-11-27)
+training_defaults:
+  # Precision
+  precision: "bf16"
+  load_in_4bit: false
+
+  # Batch configuration (must be small for 4B)
+  batch_size: 1
+  gradient_accumulation: 32    # Effective batch = 32
+
+  # Learning rate (lower for larger model)
+  learning_rate: 0.00002       # 2e-5
+  warmup_steps: 10
+  lr_scheduler: "cosine"
+
+  # Context (reduced for VRAM)
+  max_length: 512
+
+  # Memory optimization - CRITICAL for 4B
+  gradient_checkpointing: true
+
+  # Optimizer - paged 8-bit Adam offloads to CPU
+  optimizer: "paged_adamw_8bit"
+
+  # Liger kernel optimizations
+  liger_kernel:
+    enabled: true
+    fused_linear_cross_entropy: true
+    fused_rms_norm: true
+    fused_swiglu: true
+    fused_rope: true
+
+  # Checkpointing
+  save_steps: 1000
+  save_total_limit: 10
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+# TITAN uses full fine-tuning with memory optimizations, not LoRA
+qlora:
+  enabled: false
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "qwen3_chat"
+  system_token: "<|im_start|>system"
+  user_token: "<|im_start|>user"
+  assistant_token: "<|im_start|>assistant"
+  end_token: "<|im_end|>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+# Empirically measured on RTX 4090 (2025-11-27)
+# At batch_size=1, max_length=512, bf16, gradient_checkpointing=true
+# With paged_adamw_8bit and Liger kernel
+vram:
+  base_memory_gb: 8.0          # Model weights in bf16
+  gradients_gb: 8.0            # Gradient buffer
+  activations_gb: 3.0          # With checkpointing + Liger
+  optimizer_note: "paged to CPU"
+  peak_measured_gb: 18.6
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/flo.png"
+  color: "#10B981"             # Emerald - compassion and growth
+  emoji: "👩"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin                        # Binary Alchemy
+  - sy                         # Word Weaving
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  FLO (Qwen3-4B) Training Notes:
+
+  Memory Strategy:
+  - Paged 8-bit Adam: Optimizer states offload to CPU when GPU fills
+  - Liger Kernel: Fused ops, logits never materialized
+  - Gradient Checkpointing: Recompute activations vs storing
+  - bf16 Precision: Half memory footprint
+
+  What DIDN'T Work:
+  - DeepSpeed ZeRO-3: 178GB virtual memory allocation triggered OOM killer
+  - DeepSpeed ZeRO-2: Same issue
+  - Standard 8-bit Adam: OOM at 24.03 GB during optimizer init
+
+  Performance:
+  - Peak VRAM: 18.6 GB (5.4 GB headroom)
+  - ~8 seconds per step
+  - Effective batch size: 32
+
+  Requirements:
+  - RTX 4090 (24GB) or better
+  - 64GB+ system RAM for CPU offload
+  - Liger kernel installed

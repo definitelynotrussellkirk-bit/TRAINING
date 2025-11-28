@@ -28,17 +28,29 @@ tags:
   - notation
 
 # =============================================================================
-# API SERVER
+# API SERVER (Required for The Summoner)
 # =============================================================================
 api:
+  # Connection info
   url: http://localhost:8090
-  source_dir: /path/to/skills/skill_binary
-  start_command: python skill_binary/api_server.py --port 8090
+  port: 8090
+
+  # Server location and startup
+  source_dir: skill_binary                    # Relative to $SKILL_SERVERS_PATH
+  working_dir: ${SKILL_SERVERS_PATH}          # /path/to/skills
+  start_command: python3 skill_binary/api_server.py --port 8090
+
+  # Health and timing
+  health_endpoint: /health
+  startup_timeout: 10
+
+  # API endpoints
   endpoints:
     health: GET /health
     info: GET /info
     levels: GET /levels
     generate: POST /generate
+    eval: GET /eval
 
 # =============================================================================
 # LEVEL SYSTEM (30 Levels - Bit Width Progression)

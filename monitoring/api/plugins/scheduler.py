@@ -10,6 +10,12 @@ from typing import Dict, Any, Optional
 import logging
 import requests
 from datetime import datetime
+import sys
+from pathlib import Path
+
+# Add core to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "core"))
+from hosts import get_host
 
 from .base import BasePlugin, PluginError
 
@@ -33,7 +39,7 @@ class SchedulerPlugin(BasePlugin):
 
     def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
         super().__init__(config)
-        self.scheduler_host = self.config.get('scheduler_host', '192.168.x.x')
+        self.scheduler_host = self.config.get('scheduler_host', get_host('3090').host)
         self.scheduler_port = self.config.get('scheduler_port', 8766)
         self.base_url = f"http://{self.scheduler_host}:{self.scheduler_port}"
         self.timeout = self.config.get('timeout', 5)

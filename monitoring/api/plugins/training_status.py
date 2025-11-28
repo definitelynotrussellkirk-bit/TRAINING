@@ -6,6 +6,12 @@ Phase 2, Task 2.2: Real-time training status from 4090 machine
 
 from typing import Dict, Any, Optional
 from .base import LocalFilePlugin
+import sys
+from pathlib import Path
+
+# Add core to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "core"))
+from paths import get_status_dir
 
 
 class TrainingStatusPlugin(LocalFilePlugin):
@@ -21,7 +27,7 @@ class TrainingStatusPlugin(LocalFilePlugin):
         # Default path, can be overridden in config
         file_path = (config or {}).get(
             'file_path',
-            '/path/to/training/status/training_status.json'
+            str(get_status_dir() / 'training_status.json')
         )
 
         # Cache for 5 seconds (very fresh data)

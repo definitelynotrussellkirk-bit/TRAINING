@@ -43,7 +43,10 @@ SKILLS = {
 
 
 class DataGenerationAutomation:
-    def __init__(self, base_dir: str = "/path/to/training", interval: int = 300):
+    def __init__(self, base_dir: str = None, interval: int = 300):
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
         self.base_dir = Path(base_dir)
         self.interval = interval
         self.queue_dir = self.base_dir / "queue"
@@ -259,7 +262,7 @@ class DataGenerationAutomation:
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Multi-skill data generation automation')
-    parser.add_argument('--base-dir', default='/path/to/training')
+    parser.add_argument('--base-dir', default=None, help='Base directory (default: auto-detected)')
     parser.add_argument('--interval', type=int, default=300, help='Check interval in seconds')
     parser.add_argument('--test', action='store_true', help='Test generation and exit')
     parser.add_argument('--skill', choices=['syllo', 'binary', 'mixed'], default='mixed',

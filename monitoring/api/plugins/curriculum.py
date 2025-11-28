@@ -8,6 +8,13 @@ Phase 3: Added local curriculum state for data flow visibility
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional
+import sys
+
+# Add core to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "core"))
+from hosts import get_host
+from paths import get_base_dir, get_status_dir
+
 from .base import RemoteFilePlugin
 
 
@@ -25,16 +32,17 @@ class CurriculumPlugin(RemoteFilePlugin):
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
-        ssh_host = (config or {}).get('ssh_host', '192.168.x.x')
+        ssh_host = (config or {}).get('ssh_host', get_host('3090').host)
         remote_path = (config or {}).get(
             'remote_path',
-            '/path/to/training/status/curriculum_optimization.json'
+            str(get_status_dir() / 'curriculum_optimization.json')
         )
 
         # Local curriculum state path
-        self.local_state_path = Path(
-            (config or {}).get('base_dir', '/path/to/training')
-        ) / 'data_manager' / 'curriculum_state.json'
+        base_dir = (config or {}).get('base_dir')
+        if base_dir is None:
+            base_dir = get_base_dir()
+        self.local_state_path = Path(base_dir) / 'data_manager' / 'curriculum_state.json'
 
         # Cache for 5 minutes (data updates every 5 min)
         config = config or {}

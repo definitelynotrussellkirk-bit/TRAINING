@@ -56,7 +56,7 @@ class CurriculumOptimizer:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         validation_dir: str = None,
         checkpoint_dir: str = None,
         results_file: str = None,
@@ -67,13 +67,16 @@ class CurriculumOptimizer:
         Initialize curriculum optimizer.
 
         Args:
-            base_dir: Base training directory
+            base_dir: Base training directory (defaults to auto-detected)
             validation_dir: Directory with validation data
             checkpoint_dir: Directory to monitor for checkpoints
             results_file: JSON file to store results
             check_interval: Seconds between checkpoint checks
             samples_per_difficulty: Validation samples per difficulty level
         """
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
         self.base_dir = Path(base_dir)
         self.validation_dir = Path(validation_dir or self.base_dir / "data" / "validation")
         self.checkpoint_dir = Path(checkpoint_dir or self.base_dir / "models" / "current_model")
@@ -731,8 +734,8 @@ def main():
     )
     parser.add_argument(
         "--base-dir",
-        default="/path/to/training",
-        help="Base training directory"
+        default=None,
+        help="Base training directory (defaults to auto-detected)"
     )
     parser.add_argument(
         "--validation-dir",

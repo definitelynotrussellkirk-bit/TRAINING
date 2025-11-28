@@ -35,7 +35,7 @@ class TaskClient:
 
     def __init__(
         self,
-        scheduler_url: str = "http://192.168.x.x:8766",
+        scheduler_url: str = None,
         timeout: int = 30,
         max_retries: int = 3
     ):
@@ -43,10 +43,16 @@ class TaskClient:
         Initialize TaskClient.
 
         Args:
-            scheduler_url: URL of the GPU Task Scheduler
+            scheduler_url: URL of the GPU Task Scheduler (defaults to host registry)
             timeout: Default request timeout in seconds
             max_retries: Max retries for failed requests
         """
+        if scheduler_url is None:
+            try:
+                from core.hosts import get_service_url
+                scheduler_url = get_service_url("scheduler")
+            except (ImportError, Exception):
+                scheduler_url = "http://192.168.x.x:8766"
         self.scheduler_url = scheduler_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
@@ -230,14 +236,14 @@ class SchedulerAwareDaemon:
 
     def __init__(
         self,
-        scheduler_url: str = "http://192.168.x.x:8766",
+        scheduler_url: str = None,
         fallback_to_local: bool = True
     ):
         """
         Initialize daemon.
 
         Args:
-            scheduler_url: URL of the GPU Task Scheduler
+            scheduler_url: URL of the GPU Task Scheduler (defaults to host registry)
             fallback_to_local: If True, run locally when scheduler unavailable
         """
         self.client = TaskClient(scheduler_url)
@@ -313,7 +319,7 @@ class SchedulerAwareDaemon:
 _default_client: Optional[TaskClient] = None
 
 
-def get_client(scheduler_url: str = "http://192.168.x.x:8766") -> TaskClient:
+def get_client(scheduler_url: str = None) -> TaskClient:
     """Get or create the default TaskClient"""
     global _default_client
     if _default_client is None:
@@ -345,8 +351,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Task Client Test")
-    parser.add_argument("--url", default="http://192.168.x.x:8766",
-                        help="Scheduler URL")
+    parser.add_argument("--url", default=None,
+                        help="Scheduler URL (defaults to host registry)")
     parser.add_argument("--task", default="live_prediction",
                         help="Task type to submit")
 

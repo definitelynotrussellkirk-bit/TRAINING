@@ -21,7 +21,7 @@ description: >
 # MODEL IDENTITY
 # =============================================================================
 model:
-  hf_name: "Qwen/Qwen3-0.6B"
+  hf_name: "models/Qwen3-0.6B"  # Local path (HF: Qwen/Qwen3-0.6B)
   family: "qwen3"
   architecture: "Qwen3ForCausalLM"
   size_b: 0.6

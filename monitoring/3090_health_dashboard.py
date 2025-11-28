@@ -14,18 +14,24 @@ from typing import Dict, List, Optional
 from collections import deque
 import statistics
 
+from core.paths import get_base_dir
+from core.hosts import get_host
+
 class HealthDashboard:
     """Comprehensive health monitoring for 3090 server"""
 
     def __init__(
         self,
-        remote_host: str = "192.168.x.x",
-        api_port: int = 8765,
-        base_dir: str = "/path/to/training"
+        remote_host: str = None,
+        api_port: int = None,
+        base_dir: str = None
     ):
-        self.remote_host = remote_host
-        self.api_port = api_port
-        self.base_dir = Path(base_dir)
+        # Get inference host info
+        inference_host = get_host("3090")
+        self.remote_host = remote_host if remote_host else inference_host.host
+        self.api_port = api_port if api_port else inference_host.services.get("inference", {}).get("port", 8765)
+
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
 
         # Metrics history (last 60 samples = 1 hour at 60s intervals)
         self.response_times = deque(maxlen=60)
@@ -341,14 +347,26 @@ class HealthDashboard:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='3090 Health Dashboard')
+    parser.add_argument('--remote-host', default=None,
+                       help='Remote host (default: from hosts.json)')
+    parser.add_argument('--api-port', type=int, default=None,
+                       help='API port (default: from hosts.json)')
+    parser.add_argument('--base-dir', default=None,
+                       help='Base directory (default: auto-detect)')
+    parser.add_argument('--interval', type=int, default=60,
+                       help='Monitoring interval in seconds')
+    args = parser.parse_args()
+
     dashboard = HealthDashboard(
-        remote_host="192.168.x.x",
-        api_port=8765,
-        base_dir="/path/to/training"
+        remote_host=args.remote_host,
+        api_port=args.api_port,
+        base_dir=args.base_dir
     )
 
-    # Run monitoring every 60 seconds
-    dashboard.run_monitoring(interval=60, save_reports=True)
+    # Run monitoring
+    dashboard.run_monitoring(interval=args.interval, save_reports=True)
 
 
 if __name__ == "__main__":

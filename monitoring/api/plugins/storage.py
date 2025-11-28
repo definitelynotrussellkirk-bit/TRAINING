@@ -8,15 +8,22 @@ for the dashboard.
 import json
 from pathlib import Path
 from datetime import datetime
+import sys
+
+# Add core to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "core"))
+from paths import get_base_dir
 
 
-def get_storage_status(base_dir: str = "/path/to/training") -> dict:
+def get_storage_status(base_dir: str = None) -> dict:
     """
     Get storage status for unified API.
 
     Returns:
         Dict with storage metrics for dashboard
     """
+    if base_dir is None:
+        base_dir = get_base_dir()
     status_file = Path(base_dir) / "status" / "storage_status.json"
 
     if not status_file.exists():
@@ -64,13 +71,15 @@ def get_storage_status(base_dir: str = "/path/to/training") -> dict:
         }
 
 
-def get_storage_details(base_dir: str = "/path/to/training") -> dict:
+def get_storage_details(base_dir: str = None) -> dict:
     """
     Get detailed storage info including disks and volumes.
 
     Returns:
         Full storage status data
     """
+    if base_dir is None:
+        base_dir = get_base_dir()
     status_file = Path(base_dir) / "status" / "storage_status.json"
 
     if not status_file.exists():

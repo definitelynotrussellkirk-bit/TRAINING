@@ -438,10 +438,13 @@ class Herald:
 _herald: Optional[Herald] = None
 
 
-def get_herald(base_dir: str | Path = "/path/to/training") -> Herald:
+def get_herald(base_dir: str | Path = None) -> Herald:
     """Get or create the global Herald instance."""
     global _herald
     if _herald is None:
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         _herald = Herald(base_dir)
     return _herald
 

@@ -59,10 +59,21 @@ class CorrectionSync:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
-        remote_host: str = "192.168.x.x",
-        remote_base: str = "/path/to/training"
+        base_dir: str = None,
+        remote_host: str = None,
+        remote_base: str = None
     ):
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
+        if remote_host is None:
+            try:
+                from core.hosts import get_host
+                remote_host = get_host("3090").host
+            except (ImportError, Exception):
+                remote_host = "192.168.x.x"
+        if remote_base is None:
+            from core.hosts import get_trainer_base_dir; remote_base = get_trainer_base_dir()
         self.base_dir = Path(base_dir)
         self.remote_host = remote_host
         self.remote_base = remote_base
@@ -271,10 +282,10 @@ class CorrectionSync:
 
 def main():
     parser = argparse.ArgumentParser(description="Correction Sync")
-    parser.add_argument('--base-dir', default='/path/to/training',
-                       help='Local base directory')
-    parser.add_argument('--remote-host', default='192.168.x.x',
-                       help='Remote host (3090)')
+    parser.add_argument('--base-dir', default=None,
+                       help='Local base directory (default: auto-detected)')
+    parser.add_argument('--remote-host', default=None,
+                       help='Remote host (3090) (default: auto-detected)')
     parser.add_argument('--sync', action='store_true',
                        help='Run one-time sync')
     parser.add_argument('--daemon', action='store_true',

@@ -36,11 +36,14 @@ class LocalTransferBaselineRunner:
     def __init__(
         self,
         model_path: str,
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         samples_per_skill: int = 30,
         device: str = "cuda",
         max_memory_gb: int = None
     ):
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
         self.model_path = Path(model_path)
         self.base_dir = Path(base_dir)
         self.samples_per_skill = samples_per_skill
@@ -359,8 +362,8 @@ def main():
     parser = argparse.ArgumentParser(description="Run transfer effect baselines (local model)")
     parser.add_argument("--tag", required=True, help="Tag for this baseline run")
     parser.add_argument("--model-path", required=True, help="Path to model")
-    parser.add_argument("--base-dir", default="/path/to/training",
-                       help="Base training directory")
+    parser.add_argument("--base-dir", default=None,
+                       help="Base training directory (default: auto-detected)")
     parser.add_argument("--samples", type=int, default=30,
                        help="Samples per skill (default: 30)")
     parser.add_argument("--device", default="cuda", help="Device (cuda/cpu)")

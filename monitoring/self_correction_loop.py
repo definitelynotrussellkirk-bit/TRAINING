@@ -41,13 +41,7 @@ import re
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-try:
-    from core.paths import get_base_dir, get_remote_api_url
-except ImportError:
-    def get_base_dir():
-        return Path("/path/to/training")
-    def get_remote_api_url():
-        return "http://192.168.x.x:8765"
+from core.paths import get_base_dir, get_remote_api_url
 
 logging.basicConfig(
     level=logging.INFO,
@@ -675,10 +669,10 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Self-Correction Loop")
-    parser.add_argument('--api-url', default='http://192.168.x.x:8765',
-                       help='API URL for 3090')
-    parser.add_argument('--base-dir', default='/path/to/training',
-                       help='Base directory')
+    parser.add_argument('--api-url', default=None,
+                       help='API URL for 3090 (auto-detect if not set)')
+    parser.add_argument('--base-dir', default=None,
+                       help='Base directory (auto-detect if not set)')
     parser.add_argument('--file', type=str,
                        help='Process specific file')
     parser.add_argument('--continuous', action='store_true',

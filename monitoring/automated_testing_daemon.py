@@ -14,6 +14,9 @@ from typing import Dict, List, Any, Optional
 import logging
 from collections import defaultdict
 
+from core.paths import get_base_dir, get_status_dir
+from core.hosts import get_service_url
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -28,14 +31,14 @@ class AutomatedTestingDaemon:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
-        api_url: str = "http://192.168.x.x:8765",
+        base_dir: str = None,
+        api_url: str = None,
         interval: int = 600,  # 10 minutes
         validation_file: str = None,
         model: str = None,  # Model ID to use (None = auto-detect or use env var)
     ):
-        self.base_dir = Path(base_dir)
-        self.api_url = api_url
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
+        self.api_url = api_url if api_url else get_service_url("inference")
         self.interval = interval
 
         # API authentication and model
@@ -482,10 +485,10 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Automated Testing Daemon")
-    parser.add_argument('--base-dir', default='/path/to/training',
-                       help='Base directory')
-    parser.add_argument('--api-url', default='http://192.168.x.x:8765',
-                       help='API URL for 3090')
+    parser.add_argument('--base-dir', default=None,
+                       help='Base directory (default: auto-detect)')
+    parser.add_argument('--api-url', default=None,
+                       help='API URL for 3090 (default: from hosts.json)')
     parser.add_argument('--interval', type=int, default=600,
                        help='Check interval (seconds)')
     parser.add_argument('--validation-file', type=str,
@@ -495,14 +498,16 @@ def main():
                             "If not specified, uses INFERENCE_MODEL env var or auto-detects.")
     parser.add_argument('--use-scheduler', action='store_true',
                        help='Submit tasks to GPU Task Scheduler instead of running directly')
-    parser.add_argument('--scheduler-url', default='http://192.168.x.x:8766',
-                       help='GPU Task Scheduler URL')
+    parser.add_argument('--scheduler-url', default=None,
+                       help='GPU Task Scheduler URL (default: from hosts.json)')
 
     args = parser.parse_args()
 
     # Scheduler mode
     if args.use_scheduler:
-        run_with_scheduler(args.scheduler_url, args.interval, args.base_dir, args.validation_file)
+        scheduler_url = args.scheduler_url if args.scheduler_url else get_service_url("scheduler")
+        base_dir = args.base_dir if args.base_dir else str(get_base_dir())
+        run_with_scheduler(scheduler_url, args.interval, base_dir, args.validation_file)
         return
 
     # Create daemon

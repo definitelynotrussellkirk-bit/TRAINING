@@ -705,7 +705,9 @@ and exposes aggregate health at http://localhost:PORT/health
             base_dir = get_base_dir()
         elif args.zone == "3090":
             host_3090 = get_host("3090")
-            base_dir = Path(host_3090.models_dir) if host_3090 and host_3090.models_dir else Path("/home/user/llm")
+            if not host_3090 or not host_3090.models_dir:
+                raise ValueError("3090 host not configured or missing models_dir in hosts.json")
+            base_dir = Path(host_3090.models_dir)
         else:
             base_dir = Path.cwd()
 

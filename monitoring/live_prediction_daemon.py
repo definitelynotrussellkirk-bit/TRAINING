@@ -25,6 +25,9 @@ from typing import List, Dict, Optional, Any
 from urllib import request, error as urllib_error
 from datetime import datetime
 
+from core.paths import get_base_dir, get_status_dir
+from core.hosts import get_service_url
+
 
 class LivePredictionDaemon:
     """
@@ -33,16 +36,16 @@ class LivePredictionDaemon:
 
     def __init__(
         self,
-        base_dir: Path,
-        remote_api_url: str = "http://192.168.x.x:8765",
+        base_dir: Path = None,
+        remote_api_url: str = None,
         validation_file: str = "data/validation/syllo_validation_20.jsonl",
         interval: int = 300,  # 5 minutes
         count: int = 5,
         max_tokens: int = 2048,
         temperature: float = 0.1
     ):
-        self.base_dir = Path(base_dir)
-        self.remote_api_url = remote_api_url
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
+        self.remote_api_url = remote_api_url if remote_api_url else get_service_url("inference")
         self.validation_file = self.base_dir / validation_file
         self.interval = interval
         self.count = count
@@ -54,7 +57,7 @@ class LivePredictionDaemon:
         self.model_name = os.environ.get("INFERENCE_MODEL", "checkpoint-175000")
 
         # Storage
-        self.status_dir = self.base_dir / "status"
+        self.status_dir = get_status_dir()
         self.status_dir.mkdir(parents=True, exist_ok=True)
         self.predictions_file = self.status_dir / "latest_predictions.json"
 
@@ -392,10 +395,10 @@ class LivePredictionDaemon:
 def main():
     """CLI for live prediction daemon"""
     parser = argparse.ArgumentParser(description='Live prediction generation daemon')
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base directory')
+    parser.add_argument('--base-dir', default=None, help='Base directory (default: auto-detect)')
     parser.add_argument('--interval', type=int, default=300, help='Generation interval in seconds (default: 300s = 5min)')
     parser.add_argument('--count', type=int, default=5, help='Number of predictions per cycle')
-    parser.add_argument('--api-url', default='http://192.168.x.x:8765', help='3090 API URL')
+    parser.add_argument('--api-url', default=None, help='3090 API URL (default: from hosts.json)')
     parser.add_argument('--once', action='store_true', help='Run once and exit (for testing)')
 
     args = parser.parse_args()

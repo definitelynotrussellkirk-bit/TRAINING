@@ -44,12 +44,15 @@ class ConfidenceCalibrator:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         checkpoint_dir: str = None,
         test_data_dir: str = None,
         check_interval: int = 600,
         test_samples: int = 100
     ):
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
         self.base_dir = Path(base_dir)
         self.checkpoint_dir = Path(checkpoint_dir or self.base_dir / "models" / "current_model")
         self.test_data_dir = Path(test_data_dir or self.base_dir / "data" / "validation")
@@ -236,7 +239,7 @@ class ConfidenceCalibrator:
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-dir", default="/path/to/training")
+    parser.add_argument("--base-dir", default=None, help="Base directory (default: auto-detected)")
     parser.add_argument("--interval", type=int, default=600)
     args = parser.parse_args()
 

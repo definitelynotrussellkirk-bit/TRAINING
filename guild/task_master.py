@@ -99,7 +99,7 @@ class TaskMaster:
 
         # Get 3090 host config from registry
         self._host_3090 = get_host("3090")
-        self._host_3090_ip = self._host_3090.host if self._host_3090 else "192.168.x.x"
+        self._host_3090_ip = self._host_3090.host if self._host_3090 else "localhost"
 
         # Use centralized service URL or explicit override
         self.inference_url = inference_url or get_service_url("inference") or f"http://{self._host_3090_ip}:8765"

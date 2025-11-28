@@ -61,6 +61,37 @@ logging.basicConfig(
 logger = logging.getLogger("GPUTaskScheduler")
 
 
+def _get_trainer_base_dir() -> str:
+    """
+    Get the trainer's base directory.
+
+    This scheduler runs on 3090 but needs to know where training files
+    live on the 4090. Uses hosts.json configuration.
+
+    Falls back to local get_base_dir() if on the trainer itself.
+    """
+    try:
+        from core.hosts import get_trainer_base_dir, is_trainer_local
+        if is_trainer_local():
+            # We're on the trainer, use local path detection
+            from core.paths import get_base_dir
+            return str(get_base_dir())
+        else:
+            # We're remote, get trainer's path from config
+            return get_trainer_base_dir()
+    except Exception as e:
+        logger.warning(f"Could not get trainer base_dir from hosts.json: {e}")
+        # Last resort fallback - try local detection
+        try:
+            from core.paths import get_base_dir
+            return str(get_base_dir())
+        except Exception:
+            raise RuntimeError(
+                "Cannot determine trainer base directory. "
+                "Ensure hosts.json is configured with base_dir for the trainer host."
+            )
+
+
 class Priority(IntEnum):
     """Task priority levels (lower = higher priority)"""
     CRITICAL = 0   # Urgent - run immediately if possible
@@ -291,17 +322,20 @@ class TaskExecutor:
 
         # Try to call actual eval if available
         try:
+            # Get base_dir from hosts config
+            base_dir = _get_trainer_base_dir()
+
             # Import and run actual evaluation
             spec = importlib.util.spec_from_file_location(
                 "curriculum_eval",
-                "/path/to/training/monitoring/curriculum_eval_loop.py"
+                f"{base_dir}/monitoring/curriculum_eval_loop.py"
             )
             if spec and spec.loader:
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
 
                 loop = module.CurriculumEvalLoop(
-                    base_dir="/path/to/training",
+                    base_dir=base_dir,
                     inference_host="localhost",
                     problems_per_eval=num_problems
                 )
@@ -319,13 +353,16 @@ class TaskExecutor:
         model_path = params.get("model_path")
         tag = params.get("tag", "baseline")
 
+        # Get base_dir from hosts config
+        base_dir = _get_trainer_base_dir()
+
         # Run baseline test script
         cmd = [
-            "python3", "/path/to/training/tools/analysis/run_baseline_test.py",
+            "python3", f"{base_dir}/tools/analysis/run_baseline_test.py",
             "--tag", tag,
             "--skill", skill,
             "--max-per-difficulty", str(max_per_difficulty),
-            "--base-dir", "/path/to/training"
+            "--base-dir", base_dir
         ]
         if model_path:
             cmd.extend(["--model-path", model_path])
@@ -344,7 +381,7 @@ class TaskExecutor:
 
     def _handle_automated_test(self, params: Dict) -> Dict:
         """Run automated testing - actually runs the test suite"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         validation_file = params.get("validation_file")
 
         try:
@@ -425,7 +462,7 @@ class TaskExecutor:
 
     def _handle_self_correction(self, params: Dict) -> Dict:
         """Run self-correction analysis - processes errors and generates corrections"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         error_threshold = params.get("error_threshold", 50)
         batch_size = params.get("batch_size", 100)
 
@@ -487,7 +524,7 @@ class TaskExecutor:
 
     def _handle_adversarial_mine(self, params: Dict) -> Dict:
         """Run adversarial mining - finds hard examples from model failures"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         batch_size = params.get("batch_size", 100)
         categories = params.get("categories", ["negation", "double_negation", "quantifier"])
 
@@ -567,7 +604,7 @@ class TaskExecutor:
 
     def _handle_collect_embeddings(self, params: Dict) -> Dict:
         """Collect embeddings for the probe set (GPU-intensive)"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         model_path = params.get("model_path")
 
         try:
@@ -596,7 +633,7 @@ class TaskExecutor:
 
     def _handle_hard_example_eval(self, params: Dict) -> Dict:
         """Evaluate model on hard examples"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         checkpoint = params.get("checkpoint", "current")
 
         try:
@@ -625,7 +662,7 @@ class TaskExecutor:
 
     def _handle_generate_visualizations(self, params: Dict) -> Dict:
         """Generate all visualization outputs (CPU-only)"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         viz_types = params.get("types", ["skill_radar", "hard_example_board"])
 
         results = {"task": "generate_visualizations", "generated": []}
@@ -681,7 +718,7 @@ class TaskExecutor:
 
     def _handle_update_learning_history(self, params: Dict) -> Dict:
         """Append current metrics to learning history"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
 
         try:
             spec = importlib.util.spec_from_file_location(
@@ -709,7 +746,7 @@ class TaskExecutor:
 
     def _handle_generate_corrections(self, params: Dict) -> Dict:
         """Generate targeted training data for specific error types"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         error_type = params.get("error_type")  # Optional: specific type
         count = params.get("count", 30)
         queue_data = params.get("queue", True)
@@ -774,7 +811,7 @@ class TaskExecutor:
 
         This is the key Phase 3 integration - runs the complete cycle.
         """
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         corrections_per_error = params.get("corrections_per_error", 30)
 
         results = {
@@ -829,7 +866,7 @@ class TaskExecutor:
 
     def _handle_impact_snapshot(self, params: Dict) -> Dict:
         """Take a performance snapshot for impact tracking."""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         notes = params.get("notes")
 
         try:
@@ -867,7 +904,7 @@ class TaskExecutor:
 
         This is designed to run periodically (e.g., every 2-4 hours).
         """
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         corrections_per_error = params.get("corrections_per_error", 25)
         min_errors_to_correct = params.get("min_errors", 3)
 
@@ -940,7 +977,7 @@ class TaskExecutor:
         Discover and add new hard examples from training failures.
         Grows the test suite organically based on real weaknesses.
         """
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         max_new = params.get("max_new", 3)
 
         try:
@@ -978,7 +1015,7 @@ class TaskExecutor:
 
     def _handle_confidence_calibration(self, params: Dict) -> Dict:
         """Run confidence calibration - measures model calibration on validation set"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         num_samples = params.get("num_samples", 100)
 
         try:
@@ -1014,7 +1051,7 @@ class TaskExecutor:
 
     def _handle_curriculum_optimization(self, params: Dict) -> Dict:
         """Run curriculum optimization - adjusts difficulty based on performance"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
 
         try:
             spec = importlib.util.spec_from_file_location(
@@ -1045,7 +1082,7 @@ class TaskExecutor:
 
     def _handle_regression_monitoring(self, params: Dict) -> Dict:
         """Run regression monitoring - checks for performance degradation"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         threshold = params.get("threshold", 0.05)  # 5% drop = regression
 
         try:
@@ -1084,7 +1121,7 @@ class TaskExecutor:
 
     def _handle_checkpoint_sync(self, params: Dict) -> Dict:
         """Run checkpoint sync - syncs checkpoints between machines"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
 
         try:
             spec = importlib.util.spec_from_file_location(
@@ -1118,7 +1155,7 @@ class TaskExecutor:
 
     def _handle_storage_check(self, params: Dict) -> Dict:
         """Check Synology NAS storage status"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
 
         try:
             spec = importlib.util.spec_from_file_location(
@@ -1163,7 +1200,7 @@ class TaskExecutor:
 
     def _handle_storage_sync(self, params: Dict) -> Dict:
         """Sync files to Synology NAS using folder types"""
-        base_dir = params.get("base_dir", "/path/to/training")
+        base_dir = params.get("base_dir") or _get_trainer_base_dir()
         local_path = params.get("local_path")
         folder_type = params.get("folder_type", "backups")  # checkpoints, models, backups, logs, etc.
         subfolder = params.get("subfolder", "")
@@ -1210,12 +1247,24 @@ class GPUTaskScheduler:
         self,
         min_utilization: float = 20.0,
         max_utilization: float = 80.0,
-        inference_url: str = "http://localhost:8765",
-        base_dir: str = "/path/to/training"
+        inference_url: str = None,
+        base_dir: str = None
     ):
         self.min_utilization = min_utilization
         self.max_utilization = max_utilization
+
+        # Dynamic base_dir
+        if base_dir is None:
+            base_dir = _get_trainer_base_dir()
         self.base_dir = Path(base_dir)
+
+        # Dynamic inference_url
+        if inference_url is None:
+            try:
+                from core.hosts import get_service_url
+                inference_url = get_service_url("inference")
+            except (ImportError, Exception):
+                inference_url = "http://localhost:8765"
 
         # Components
         self.gpu_monitor = GPUMonitor()
@@ -1587,8 +1636,8 @@ def main():
                         help="Max GPU utilization limit (%)")
     parser.add_argument("--inference-url", default="http://localhost:8765",
                         help="Inference server URL")
-    parser.add_argument("--base-dir", default="/home/user/TRAINING",
-                        help="Base directory for status files")
+    parser.add_argument("--base-dir", default=None,
+                        help="Base directory for status files (auto-detect if not set)")
 
     args = parser.parse_args()
 

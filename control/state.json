@@ -1,7 +1,7 @@
 {
   "status": "idle",
-  "last_update": "2025-11-27T19:59:31.900798",
-  "current_file": "train_binary_level1_5000_20251127_195059.jsonl",
+  "last_update": "2025-11-28T00:39:16.287898",
+  "current_file": "train_binary_level1_5000_20251128_003741.jsonl",
   "paused_at": "2025-11-21T05:13:38.792400",
   "reason": "Recovered from crash"
 }

@@ -61,7 +61,7 @@ try:
     from core.paths import get_base_dir
 except ImportError:
     def get_base_dir():
-        return Path("/path/to/training")
+        from core.paths import get_base_dir; return get_base_dir()
 
 # =============================================================================
 # DATA LINEAGE - Generator identification for tracking
@@ -570,7 +570,7 @@ def main():
                        help='Level: auto (curriculum), 1-10, range (e.g. 1-3), or all')
     parser.add_argument('--priority', choices=['high', 'normal', 'low'], default='high',
                        help='Queue priority')
-    parser.add_argument('--base-dir', default='/path/to/training',
+    parser.add_argument('--base-dir', default=None,
                        help='Base directory')
     parser.add_argument('--ratio', action='store_true',
                        help='Ratio mode: generate enough to reach 20%% of SYLLO data')

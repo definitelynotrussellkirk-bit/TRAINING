@@ -6,6 +6,13 @@ Phase 4: Self-correction loop results from 3090 intelligence machine
 
 from typing import Dict, Any, Optional
 from .base import RemoteFilePlugin
+import sys
+from pathlib import Path
+
+# Add core to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "core"))
+from hosts import get_host
+from paths import get_status_dir
 
 
 class SelfCorrectionPlugin(RemoteFilePlugin):
@@ -18,10 +25,10 @@ class SelfCorrectionPlugin(RemoteFilePlugin):
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
-        ssh_host = (config or {}).get('ssh_host', '192.168.x.x')
+        ssh_host = (config or {}).get('ssh_host', get_host('3090').host)
         remote_path = (config or {}).get(
             'remote_path',
-            '/path/to/training/status/self_correction.json'
+            str(get_status_dir() / 'self_correction.json')
         )
 
         # Cache for 5 minutes (data updates every 5 min)

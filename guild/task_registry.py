@@ -35,7 +35,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path("/path/to/training")
+from core.paths import get_base_dir
+from core.hosts import get_service_url, get_host
+
+BASE_DIR = get_base_dir()
+
+# Helper to get inference URL for task commands
+def _get_inference_url():
+    return get_service_url("inference") or "http://localhost:8765"
+
+INFERENCE_URL = _get_inference_url()
 
 
 @dataclass
@@ -60,14 +69,14 @@ class Task:
 
 TASKS: Dict[str, Task] = {
     # =========================================================================
-    # EVAL QUEUE PROCESSOR - HIGHEST PRIORITY (require 3090 inference)
-    # Evals are queued when checkpoints are saved - ONLY RUN ONCE PER CHECKPOINT
-    # This task processes the pending eval queue, not re-runs!
+    # EVAL QUEUE PROCESSORS - (require 3090 inference)
+    # Two types: QUICK (5 problems, high priority) and FULL (all levels, medium)
+    # Evals are queued when checkpoints are saved
     # =========================================================================
-    "process_eval_queue": Task(
-        id="process_eval_queue",
-        name="Process Eval Queue",
-        description="Process pending evals (queued from checkpoint saves) - HIGHEST PRIORITY",
+    "process_eval_queue_quick": Task(
+        id="process_eval_queue_quick",
+        name="Quick Evaluations",
+        description="Process QUICK evals (5 problems/level) - HIGHEST PRIORITY",
         gpu="3090",
         min_gpu_free=0.3,
         estimated_duration=120,      # ~2 minutes per checkpoint eval
@@ -75,9 +84,58 @@ TASKS: Dict[str, Task] = {
         priority=10,                 # HIGHEST PRIORITY - evals inform curriculum!
         command=[
             "python3", str(BASE_DIR / "core" / "eval_runner.py"),
-            "--once",  # Process all PENDING evals, then exit
+            "--once", "--type", "quick",
         ],
-        tags=["eval", "queue", "curriculum", "critical"],
+        tags=["eval", "queue", "curriculum", "critical", "quick"],
+    ),
+
+    "process_eval_queue_full": Task(
+        id="process_eval_queue_full",
+        name="Full Evaluations",
+        description="Process FULL evals (all levels) - comprehensive assessment",
+        gpu="3090",
+        min_gpu_free=0.4,
+        estimated_duration=600,      # ~10 minutes for full skill eval
+        cooldown=300,                # 5 min cooldown
+        priority=6,                  # Medium priority - after quick evals
+        command=[
+            "python3", str(BASE_DIR / "core" / "eval_runner.py"),
+            "--once", "--type", "full",
+        ],
+        tags=["eval", "queue", "full", "comprehensive"],
+    ),
+
+    "eval_backfill": Task(
+        id="eval_backfill",
+        name="Eval Backfill",
+        description="Scan for missing evals and queue them at low priority",
+        gpu="none",  # Just queuing, no GPU needed
+        estimated_duration=30,
+        cooldown=3600,               # 1 hour cooldown
+        priority=3,                  # Low priority - fills gaps
+        command=[
+            "python3", str(BASE_DIR / "core" / "eval_runner.py"),
+            "--backfill",
+        ],
+        tags=["eval", "backfill", "maintenance"],
+    ),
+
+    # Legacy alias for backwards compatibility
+    "process_eval_queue": Task(
+        id="process_eval_queue",
+        name="Process Eval Queue (Legacy)",
+        description="Legacy: Process all pending evals - use quick/full instead",
+        gpu="3090",
+        min_gpu_free=0.3,
+        estimated_duration=120,
+        cooldown=60,
+        priority=10,
+        command=[
+            "python3", str(BASE_DIR / "core" / "eval_runner.py"),
+            "--once",
+        ],
+        enabled=False,  # Disabled - use quick/full instead
+        tags=["eval", "queue", "legacy"],
     ),
 
     # =========================================================================
@@ -203,7 +261,7 @@ TASKS: Dict[str, Task] = {
         command=[
             "curl", "-X", "POST", "http://localhost:8767/api/scan",
             "-H", "Content-Type: application/json",
-            "-d", '{"path": "/path/to/training/models/current_model"}',
+            "-d", f'{{"path": "{BASE_DIR / "models" / "current_model"}"}}',
         ],
         tags=["vault", "maintenance", "sync"],
     ),
@@ -221,7 +279,7 @@ TASKS: Dict[str, Task] = {
         cooldown=7200,               # 2 hour cooldown
         priority=2,
         command=[
-            "curl", "-X", "POST", "http://192.168.x.x:8765/generate",
+            "curl", "-X", "POST", f"{INFERENCE_URL}/generate",
             "-H", "Content-Type: application/json",
             "-H", "X-API-Key: admin123",
             "-d", '{"prompt": "Compute: todecimal(①①)", "max_tokens": 50}',

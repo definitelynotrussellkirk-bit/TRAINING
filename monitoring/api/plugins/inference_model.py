@@ -11,6 +11,12 @@ import logging
 import os
 import requests
 from datetime import datetime
+import sys
+from pathlib import Path
+
+# Add core to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "core"))
+from hosts import get_host
 
 from .base import BasePlugin, PluginError
 
@@ -34,7 +40,7 @@ class InferenceModelPlugin(BasePlugin):
 
     def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
         super().__init__(config)
-        self.inference_host = self.config.get('inference_host', '192.168.x.x')
+        self.inference_host = self.config.get('inference_host', get_host('3090').host)
         self.inference_port = self.config.get('inference_port', 8765)
         self.base_url = f"http://{self.inference_host}:{self.inference_port}"
         self.timeout = self.config.get('timeout', 5)

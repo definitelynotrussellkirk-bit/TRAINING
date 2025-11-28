@@ -50,16 +50,39 @@ class CurriculumEvalLoop:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         syllo_host: str = "localhost",
         syllo_port: int = 8080,
-        inference_host: str = "192.168.x.x",
-        inference_port: int = 8765,
+        inference_host: str = None,
+        inference_port: int = None,
         problems_per_eval: int = 20,
         interval: int = 600,  # 10 minutes
         model: str = None,  # Model ID to use (None = auto-detect)
     ):
+        # Dynamic base_dir
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
         self.base_dir = Path(base_dir)
+
+        # Dynamic inference URL
+        if inference_host is None or inference_port is None:
+            try:
+                from core.hosts import get_service_url
+                full_url = get_service_url("inference")
+                # Parse out host and port from URL
+                import re
+                match = re.match(r'http://([^:]+):(\d+)', full_url)
+                if match and inference_host is None:
+                    inference_host = match.group(1)
+                if match and inference_port is None:
+                    inference_port = int(match.group(2))
+            except (ImportError, Exception):
+                if inference_host is None:
+                    inference_host = "192.168.x.x"
+                if inference_port is None:
+                    inference_port = 8765
+
         self.syllo_url = f"http://{syllo_host}:{syllo_port}"
         self.inference_url = f"http://{inference_host}:{inference_port}"
         self.problems_per_eval = problems_per_eval
@@ -640,9 +663,15 @@ class CurriculumEvalLoop:
                 time.sleep(self.interval)
 
 
-def run_with_scheduler(scheduler_url: str, interval: int, problems: int, base_dir: str = "/path/to/training"):
+def run_with_scheduler(scheduler_url: str, interval: int, problems: int, base_dir: str = None):
     """Run as a scheduler client - submit tasks instead of executing directly."""
     import sys
+    if base_dir is None:
+        try:
+            from core.paths import get_base_dir
+            base_dir = str(get_base_dir())
+        except (ImportError, Exception):
+            from core.paths import get_base_dir; base_dir = str(get_base_dir())
     sys.path.insert(0, base_dir)
     from monitoring.task_client import TaskClient
 
@@ -694,16 +723,16 @@ def run_with_scheduler(scheduler_url: str, interval: int, problems: int, base_di
 
 def main():
     parser = argparse.ArgumentParser(description="Curriculum Evaluation Loop")
-    parser.add_argument("--base-dir", default="/path/to/training",
-                        help="Base directory")
+    parser.add_argument("--base-dir", default=None,
+                        help="Base directory (defaults to auto-detected)")
     parser.add_argument("--syllo-host", default="localhost",
                         help="SYLLO API host")
     parser.add_argument("--syllo-port", type=int, default=8080,
                         help="SYLLO API port")
-    parser.add_argument("--inference-host", default="192.168.x.x",
-                        help="Inference server host")
-    parser.add_argument("--inference-port", type=int, default=8765,
-                        help="Inference server port")
+    parser.add_argument("--inference-host", default=None,
+                        help="Inference server host (defaults to host registry)")
+    parser.add_argument("--inference-port", type=int, default=None,
+                        help="Inference server port (defaults to host registry)")
     parser.add_argument("--problems", type=int, default=20,
                         help="Problems per evaluation")
     parser.add_argument("--interval", type=int, default=600,
@@ -715,8 +744,8 @@ def main():
                              "If not specified, auto-detects from inference server.")
     parser.add_argument("--use-scheduler", action="store_true",
                         help="Submit tasks to GPU Task Scheduler instead of running directly")
-    parser.add_argument("--scheduler-url", default="http://192.168.x.x:8766",
-                        help="GPU Task Scheduler URL")
+    parser.add_argument("--scheduler-url", default=None,
+                        help="GPU Task Scheduler URL (defaults to host registry)")
 
     args = parser.parse_args()
 

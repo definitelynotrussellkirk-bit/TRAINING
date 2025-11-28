@@ -29,13 +29,22 @@ class PreviewEngine:
 
     def __init__(
         self,
-        base_dir: Path,
-        remote_api_url: str = "http://192.168.x.x:8765",
+        base_dir: Path = None,
+        remote_api_url: str = None,
         validation_file: str = "data/validation/syllo_validation_20.jsonl",
         preview_count: int = 5,
         max_tokens: int = 2048,
         temperature: float = 0.1
     ):
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = require_base_dir()
+        if remote_api_url is None:
+            try:
+                from core.hosts import get_service_url
+                remote_api_url = get_service_url("inference")
+            except (ImportError, Exception):
+                remote_api_url = "http://192.168.x.x:8765"
         self.base_dir = Path(base_dir)
         self.remote_api_url = remote_api_url
         self.validation_file = self.base_dir / validation_file
@@ -295,7 +304,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Run preview inference')
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base directory')
+    parser.add_argument('--base-dir', default=None, help='Base directory (default: auto-detected)')
     parser.add_argument('--step', type=int, default=0, help='Training step number')
     parser.add_argument('--count', type=int, default=5, help='Number of samples to test')
     parser.add_argument('--show-history', action='store_true', help='Show preview history')

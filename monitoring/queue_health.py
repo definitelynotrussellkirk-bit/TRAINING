@@ -180,10 +180,17 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Monitor queue health')
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base directory')
+    parser.add_argument('--base-dir', default=None, help='Base directory (default: auto-detected)')
     parser.add_argument('--watch', action='store_true', help='Watch mode (updates every 10s)')
 
     args = parser.parse_args()
+
+    if args.base_dir is None:
+        try:
+            from core.paths import get_base_dir
+            args.base_dir = str(get_base_dir())
+        except (ImportError, Exception):
+            from core.paths import get_base_dir; args.base_dir = str(get_base_dir())
 
     monitor = QueueHealthMonitor(base_dir=args.base_dir)
 

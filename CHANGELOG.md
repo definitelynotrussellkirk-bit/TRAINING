@@ -4,6 +4,38 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-11-27 - 4B Full Fine-Tune on Single GPU
+
+### What
+Full fine-tuning of Qwen3-4B (4 billion parameters) now works on a single 24GB RTX 4090.
+
+### Key Stats
+- Peak VRAM: **18.6 GB** (5.4 GB headroom)
+- Effective batch size: 32
+- Speed: ~8s/step
+
+### Optimizations Used
+1. **Paged 8-bit Adam** - Offloads optimizer states to CPU when GPU fills
+2. **Liger Kernel** - Fused ops, logits never materialized
+3. **Gradient Checkpointing** - Trades compute for VRAM
+4. **bf16 Precision** - Half memory footprint
+
+### What Didn't Work
+- DeepSpeed ZeRO-3: Triggered Linux OOM killer (178GB virtual memory allocation)
+- DeepSpeed ZeRO-2: Same issue
+- Standard 8-bit Adam: OOM at 24.03 GB during optimizer init
+
+### Files
+- `scripts/train_4b_full.py` - Training script
+- `configs/ds_zero2_offload.json` - DeepSpeed config (alternative)
+
+### Usage
+```bash
+python3 scripts/train_4b_full.py
+```
+
+---
+
 ## 2025-11-27 - Muon Optimizer Integration
 
 ### What

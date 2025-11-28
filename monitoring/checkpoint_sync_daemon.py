@@ -18,6 +18,9 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import logging
 
+from core.paths import get_base_dir, get_status_dir
+from core.hosts import get_host
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -28,16 +31,20 @@ logger = logging.getLogger('CheckpointSyncDaemon')
 class CheckpointSyncDaemon:
     def __init__(
         self,
-        remote_host: str = "192.168.x.x",
-        remote_dir: str = "/path/to/training/models/current_model",
+        remote_host: str = None,
+        remote_dir: str = None,
         local_dir: str = None,
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         interval: int = 300,  # 5 minutes
         keep_recent: int = 3,  # Keep 3 most recent checkpoints
     ):
-        self.base_dir = Path(base_dir)
-        self.remote_host = remote_host
-        self.remote_dir = remote_dir
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
+
+        # Get trainer host info for remote_host and remote_dir
+        trainer = get_host("4090")
+        self.remote_host = remote_host if remote_host else trainer.host
+        self.remote_dir = remote_dir if remote_dir else str(Path(trainer.models_dir) / "current_model")
+
         self.local_dir = Path(local_dir) if local_dir else self.base_dir / "models" / "current_model"
         self.interval = interval
         self.keep_recent = keep_recent
@@ -46,7 +53,7 @@ class CheckpointSyncDaemon:
         self.local_dir.mkdir(parents=True, exist_ok=True)
 
         # Track tested checkpoints - use base_dir for status
-        self.status_file = self.base_dir / "status" / "checkpoint_sync.json"
+        self.status_file = get_status_dir() / "checkpoint_sync.json"
         self.status_file.parent.mkdir(parents=True, exist_ok=True)
 
         self.tested_checkpoints = self.load_tested_checkpoints()
@@ -365,14 +372,12 @@ class CheckpointSyncDaemon:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Checkpoint Sync Daemon')
-    parser.add_argument('--remote-host', default='192.168.x.x',
-                       help='Remote 4090 hostname/IP')
-    parser.add_argument('--remote-dir',
-                       default='/path/to/training/models/current_model',
-                       help='Remote checkpoint directory')
-    parser.add_argument('--local-dir',
-                       default='/home/user/TRAINING/models/current_model',
-                       help='Local checkpoint directory')
+    parser.add_argument('--remote-host', default=None,
+                       help='Remote 4090 hostname/IP (default: from hosts.json)')
+    parser.add_argument('--remote-dir', default=None,
+                       help='Remote checkpoint directory (default: from hosts.json)')
+    parser.add_argument('--local-dir', default=None,
+                       help='Local checkpoint directory (default: base_dir/models/current_model)')
     parser.add_argument('--interval', type=int, default=300,
                        help='Check interval in seconds (default: 300)')
     parser.add_argument('--keep', type=int, default=3,

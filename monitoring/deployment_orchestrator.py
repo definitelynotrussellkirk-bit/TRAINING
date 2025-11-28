@@ -28,15 +28,38 @@ from typing import Optional, Dict, Any
 ADMIN_KEY = os.environ.get("INFERENCE_ADMIN_KEY", "")
 READ_KEY = os.environ.get("INFERENCE_READ_KEY", "")
 
-# Remote cleanup configuration
-REMOTE_MODELS_DIR = "/path/to/models"
+# Protected directories - never delete
 PROTECTED_MODEL_DIRS = {"Qwen3-0.6B"}  # Never delete base model
-CLEANUP_PATHS = [
-    # (path, description)
-    ("/home/user/trained_adapter", "old adapter files"),
-    ("/path/to/backup_server_backup_*.tar.gz", "old backup archives"),
-    ("/path/to/backup_status_backup_*.tar.gz", "old status backups"),
-]
+
+def _get_remote_models_dir() -> str:
+    """Get remote models directory from hosts.json."""
+    try:
+        from core.hosts import get_host
+        host = get_host("3090")
+        if host and host.models_dir:
+            return host.models_dir
+    except Exception:
+        pass
+    raise RuntimeError(
+        "Cannot determine remote models_dir. "
+        "Ensure 3090 host has models_dir configured in hosts.json."
+    )
+
+def _get_cleanup_paths() -> list:
+    """Get cleanup paths based on 3090 configuration."""
+    try:
+        from core.hosts import get_host
+        host = get_host("3090")
+        if host and host.ssh_user:
+            home = f"/home/{host.ssh_user}"
+            return [
+                (f"{home}/trained_adapter", "old adapter files"),
+                (f"{home}/3090_server_backup_*.tar.gz", "old backup archives"),
+                (f"{home}/3090_status_backup_*.tar.gz", "old status backups"),
+            ]
+    except Exception:
+        pass
+    return []  # No cleanup paths if we can't determine them
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,11 +75,26 @@ class DeploymentOrchestrator:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
-        remote_host: str = "192.168.x.x",
-        remote_api_url: str = "http://192.168.x.x:8765",
+        base_dir: str = None,
+        remote_host: str = None,
+        remote_api_url: str = None,
         check_interval: int = 600  # 10 minutes
     ):
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
+        if remote_host is None:
+            try:
+                from core.hosts import get_host
+                remote_host = get_host("3090").host
+            except (ImportError, Exception):
+                remote_host = "192.168.x.x"
+        if remote_api_url is None:
+            try:
+                from core.hosts import get_service_url
+                remote_api_url = get_service_url("inference")
+            except (ImportError, Exception):
+                remote_api_url = "http://192.168.x.x:8765"
         self.base_dir = Path(base_dir)
         self.remote_host = remote_host
         self.remote_api_url = remote_api_url.rstrip('/')
@@ -170,7 +208,8 @@ class DeploymentOrchestrator:
         """
         local_path = ckpt_info['checkpoint_path']
         checkpoint_name = ckpt_info['checkpoint_name']  # e.g., checkpoint-175000
-        remote_target = f"{self.remote_host}:/path/to/models/{checkpoint_name}/"
+        remote_models_dir = _get_remote_models_dir()
+        remote_target = f"{self.remote_host}:{remote_models_dir}/{checkpoint_name}/"
 
         logger.info(f"📦 Syncing {checkpoint_name} to 3090 as models/{checkpoint_name}/...")
 
@@ -222,7 +261,8 @@ class DeploymentOrchestrator:
         """
         url = f"{self.remote_api_url}/models/reload"
         checkpoint_name = ckpt_info['checkpoint_name']
-        model_path = f"/path/to/models/{checkpoint_name}"
+        remote_models_dir = _get_remote_models_dir()
+        model_path = f"{remote_models_dir}/{checkpoint_name}"
 
         logger.info(f"🔄 Loading {checkpoint_name} on 3090...")
 
@@ -571,12 +611,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Deployment Orchestrator")
-    parser.add_argument('--base-dir', default='/path/to/training',
-                       help="Base training directory")
-    parser.add_argument('--remote-host', default='192.168.x.x',
-                       help="Remote inference server hostname")
-    parser.add_argument('--api-url', default='http://192.168.x.x:8765',
-                       help="Remote API URL")
+    parser.add_argument('--base-dir', default=None,
+                       help="Base training directory (auto-detect if not set)")
+    parser.add_argument('--remote-host', default=None,
+                       help="Remote inference server hostname (from hosts.json if not set)")
+    parser.add_argument('--api-url', default=None,
+                       help="Remote API URL (from hosts.json if not set)")
     parser.add_argument('--interval', type=int, default=600,
                        help="Check interval in seconds (default: 600)")
 

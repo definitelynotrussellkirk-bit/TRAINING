@@ -89,6 +89,7 @@ class HostConfig:
     role: HostRole
     services: Dict[str, ServiceConfig] = field(default_factory=dict)
     ssh_user: str = ""  # Must be set in hosts.json
+    base_dir: str = ""  # Root directory for this host's training files
     models_dir: str = ""
     checkpoints_dir: str = ""
     capabilities: List[str] = field(default_factory=list)
@@ -115,6 +116,7 @@ class HostConfig:
                 for k, v in self.services.items()
             },
             "ssh_user": self.ssh_user,
+            "base_dir": self.base_dir,
             "models_dir": self.models_dir,
             "checkpoints_dir": self.checkpoints_dir,
             "capabilities": self.capabilities,
@@ -223,6 +225,7 @@ class HostRegistry:
             role=role,
             services=services,
             ssh_user=data.get("ssh_user", ""),
+            base_dir=data.get("base_dir", ""),
             models_dir=data.get("models_dir", ""),
             checkpoints_dir=data.get("checkpoints_dir", ""),
             capabilities=data.get("capabilities", []),
@@ -469,3 +472,45 @@ def get_remote_path(host_id: str, relative_path: str = "") -> str:
 def list_hosts() -> Dict[str, HostConfig]:
     """Get all hosts as a dictionary."""
     return {h.host_id: h for h in get_registry().list_all()}
+
+
+def get_trainer_base_dir() -> str:
+    """
+    Get the trainer host's base directory.
+
+    This is the root directory for training files on the trainer machine.
+    Used by remote code that needs to know where training data lives.
+
+    Returns:
+        Path string to trainer's base directory
+
+    Raises:
+        ValueError: If trainer not found or base_dir not configured
+    """
+    trainer = get_trainer()
+    if not trainer:
+        raise ValueError("No trainer host configured in hosts.json")
+    if not trainer.base_dir:
+        raise ValueError(f"No base_dir configured for trainer host: {trainer.host_id}")
+    return trainer.base_dir
+
+
+def get_host_base_dir(host_id: str) -> str:
+    """
+    Get a host's base directory.
+
+    Args:
+        host_id: Host ID to look up
+
+    Returns:
+        Path string to host's base directory
+
+    Raises:
+        ValueError: If host not found or base_dir not configured
+    """
+    host = get_host(host_id)
+    if not host:
+        raise ValueError(f"Unknown host: {host_id}")
+    if not host.base_dir:
+        raise ValueError(f"No base_dir configured for host: {host_id}")
+    return host.base_dir

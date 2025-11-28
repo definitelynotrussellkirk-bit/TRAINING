@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 SYLLO_API = "http://localhost:8080"
-BASE_DIR = Path("/path/to/training")
+from core.paths import get_base_dir; BASE_DIR = get_base_dir()
 QUEUE_DIR = BASE_DIR / "queue"
 STATUS_FILE = BASE_DIR / "status" / "syllo_l1_generator.json"
 

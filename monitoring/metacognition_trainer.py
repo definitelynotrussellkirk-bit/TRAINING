@@ -34,10 +34,16 @@ import argparse
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from core.paths import get_base_dir, get_remote_api_url
+    from core.paths import get_base_dir
+    from core.hosts import get_service_url
+    def get_remote_api_url():
+        try:
+            return get_service_url("inference")
+        except Exception:
+            return "http://192.168.x.x:8765"
 except ImportError:
     def get_base_dir():
-        return Path("/path/to/training")
+        from core.paths import get_base_dir; return get_base_dir()
     def get_remote_api_url():
         return "http://192.168.x.x:8765"
 
@@ -537,10 +543,10 @@ class MetacognitionTrainer:
 
 def main():
     parser = argparse.ArgumentParser(description="Metacognition Trainer")
-    parser.add_argument('--api-url', default='http://192.168.x.x:8765',
-                       help='Inference API URL')
-    parser.add_argument('--base-dir', default='/path/to/training',
-                       help='Base directory')
+    parser.add_argument('--api-url', default=None,
+                       help='Inference API URL (default: auto-detected)')
+    parser.add_argument('--base-dir', default=None,
+                       help='Base directory (default: auto-detected)')
     parser.add_argument('--validation-dir', type=Path,
                        help='Validation directory to process')
     parser.add_argument('--sample-size', type=int, default=100,

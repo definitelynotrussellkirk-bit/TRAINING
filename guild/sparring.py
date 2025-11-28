@@ -76,10 +76,15 @@ class SparringTrainer:
     def __init__(
         self,
         base_dir: Path = None,
-        inference_url: str = "http://192.168.x.x:8765",
+        inference_url: str = None,
         inference_key: str = None,
     ):
-        self.base_dir = Path(base_dir) if base_dir else Path("/path/to/training")
+        from core.paths import get_base_dir
+        from core.hosts import get_service_url
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
+        # Get inference URL from hosts.json if not provided
+        if inference_url is None:
+            inference_url = get_service_url("inference") or "http://localhost:8765"
         self.inference_url = inference_url
         self.inference_key = inference_key or "admin123"
 
@@ -584,8 +589,8 @@ def main():
     parser.add_argument("--checkpoint", help="Specific checkpoint to test")
     parser.add_argument("--no-queue", action="store_true", help="Don't auto-queue results")
     parser.add_argument("--priority", default="high", choices=["high", "normal", "low"])
-    parser.add_argument("--base-dir", default="/path/to/training")
-    parser.add_argument("--inference-url", default="http://192.168.x.x:8765")
+    parser.add_argument("--base-dir", default=None, help="Base dir (default: from core.paths)")
+    parser.add_argument("--inference-url", default=None, help="Inference URL (default: from hosts.json)")
 
     args = parser.parse_args()
 

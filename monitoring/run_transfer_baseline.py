@@ -38,10 +38,19 @@ class TransferBaselineRunner:
 
     def __init__(
         self,
-        api_url: str = "http://192.168.x.x:8765",
-        base_dir: str = "/path/to/training",
+        api_url: str = None,
+        base_dir: str = None,
         samples_per_skill: int = 30
     ):
+        if api_url is None:
+            try:
+                from core.hosts import get_service_url
+                api_url = get_service_url("inference")
+            except (ImportError, Exception):
+                api_url = "http://192.168.x.x:8765"
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
         self.api_url = api_url
         self.base_dir = Path(base_dir)
         self.samples_per_skill = samples_per_skill
@@ -306,10 +315,10 @@ class TransferBaselineRunner:
 def main():
     parser = argparse.ArgumentParser(description="Run transfer effect baselines")
     parser.add_argument("--tag", required=True, help="Tag for this baseline run")
-    parser.add_argument("--api-url", default="http://192.168.x.x:8765",
-                       help="Inference API URL")
-    parser.add_argument("--base-dir", default="/path/to/training",
-                       help="Base training directory")
+    parser.add_argument("--api-url", default=None,
+                       help="Inference API URL (default: auto-detected)")
+    parser.add_argument("--base-dir", default=None,
+                       help="Base training directory (default: auto-detected)")
     parser.add_argument("--samples", type=int, default=30,
                        help="Samples per skill (default: 30)")
     parser.add_argument("--primitives-only", action="store_true",

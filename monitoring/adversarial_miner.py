@@ -50,7 +50,7 @@ class AdversarialMiner:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         checkpoint_dir: str = None,
         test_data_dir: str = None,
         output_dir: str = None,
@@ -62,7 +62,7 @@ class AdversarialMiner:
         Initialize adversarial miner.
 
         Args:
-            base_dir: Base training directory
+            base_dir: Base training directory (defaults to auto-detected)
             checkpoint_dir: Directory to monitor for checkpoints
             test_data_dir: Directory with test data
             output_dir: Directory to save adversarial examples
@@ -70,6 +70,9 @@ class AdversarialMiner:
             confidence_threshold: Below this confidence, flag as adversarial
             samples_per_check: Number of samples to test per checkpoint
         """
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
         self.base_dir = Path(base_dir)
         self.checkpoint_dir = Path(checkpoint_dir or self.base_dir / "models" / "current_model")
         self.test_data_dir = Path(test_data_dir or self.base_dir / "data" / "validation")
@@ -503,8 +506,8 @@ def main():
     )
     parser.add_argument(
         "--base-dir",
-        default="/path/to/training",
-        help="Base training directory"
+        default=None,
+        help="Base training directory (defaults to auto-detected)"
     )
     parser.add_argument(
         "--checkpoint-dir",

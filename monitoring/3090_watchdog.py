@@ -13,6 +13,9 @@ from pathlib import Path
 from typing import Dict, Optional, List
 import logging
 
+from core.paths import get_base_dir, get_status_dir
+from core.hosts import get_host
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -25,17 +28,20 @@ class Remote3090Watchdog:
 
     def __init__(
         self,
-        remote_host: str = "192.168.x.x",
-        api_port: int = 8765,
+        remote_host: str = None,
+        api_port: int = None,
         check_interval: int = 60,
         max_restart_attempts: int = 3,
-        base_dir: str = "/path/to/training"
+        base_dir: str = None
     ):
-        self.remote_host = remote_host
-        self.api_port = api_port
+        # Get inference host info
+        inference_host = get_host("3090")
+        self.remote_host = remote_host if remote_host else inference_host.host
+        self.api_port = api_port if api_port else inference_host.services.get("inference", {}).get("port", 8765)
+
         self.check_interval = check_interval
         self.max_restart_attempts = max_restart_attempts
-        self.base_dir = Path(base_dir)
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
 
         # State tracking
         self.consecutive_failures = 0
@@ -48,7 +54,7 @@ class Remote3090Watchdog:
         self.logs_dir.mkdir(parents=True, exist_ok=True)
 
         # Status file
-        self.status_file = self.base_dir / "status" / "3090_watchdog_status.json"
+        self.status_file = get_status_dir() / "3090_watchdog_status.json"
         self.status_file.parent.mkdir(parents=True, exist_ok=True)
 
     def check_api_health(self) -> Dict:
@@ -285,12 +291,26 @@ class Remote3090Watchdog:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='3090 Watchdog')
+    parser.add_argument('--remote-host', default=None,
+                       help='Remote host (default: from hosts.json)')
+    parser.add_argument('--api-port', type=int, default=None,
+                       help='API port (default: from hosts.json)')
+    parser.add_argument('--check-interval', type=int, default=60,
+                       help='Check interval in seconds')
+    parser.add_argument('--max-restart-attempts', type=int, default=5,
+                       help='Maximum restart attempts')
+    parser.add_argument('--base-dir', default=None,
+                       help='Base directory (default: auto-detect)')
+    args = parser.parse_args()
+
     watchdog = Remote3090Watchdog(
-        remote_host="192.168.x.x",
-        api_port=8765,
-        check_interval=60,  # Check every 60 seconds
-        max_restart_attempts=5,
-        base_dir="/path/to/training"
+        remote_host=args.remote_host,
+        api_port=args.api_port,
+        check_interval=args.check_interval,
+        max_restart_attempts=args.max_restart_attempts,
+        base_dir=args.base_dir
     )
 
     watchdog.run_forever()

@@ -46,7 +46,7 @@ class DiversityAnalyzer:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         queue_dir: str = None,
         output_dir: str = None
     ):
@@ -54,10 +54,13 @@ class DiversityAnalyzer:
         Initialize diversity analyzer.
 
         Args:
-            base_dir: Base training directory
+            base_dir: Base training directory (default: auto-detected)
             queue_dir: Queue directory to monitor
             output_dir: Directory for analysis results
         """
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
         self.base_dir = Path(base_dir)
         self.queue_dir = Path(queue_dir or self.base_dir / "queue")
         self.output_dir = Path(output_dir or self.base_dir / "status")
@@ -421,8 +424,8 @@ def main():
     )
     parser.add_argument(
         "--base-dir",
-        default="/path/to/training",
-        help="Base training directory"
+        default=None,
+        help="Base directory (default: auto-detected)"
     )
     parser.add_argument(
         "--queue-dir",

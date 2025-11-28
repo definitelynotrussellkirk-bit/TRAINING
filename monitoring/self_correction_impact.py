@@ -42,7 +42,7 @@ try:
     from core.paths import get_base_dir, get_status_dir, get_remote_api_url
 except ImportError:
     def get_base_dir():
-        return Path("/path/to/training")
+        from core.paths import get_base_dir; return get_base_dir()
     def get_status_dir():
         return get_base_dir() / "status"
     def get_remote_api_url():

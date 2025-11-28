@@ -44,7 +44,7 @@ class ContinuousRegressionMonitor:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         checkpoint_dir: str = None,
         test_data_dir: str = None,
         check_interval: int = 300,
@@ -55,13 +55,16 @@ class ContinuousRegressionMonitor:
         Initialize continuous regression monitor.
 
         Args:
-            base_dir: Base training directory
+            base_dir: Base training directory (default: auto-detected)
             checkpoint_dir: Directory to monitor for checkpoints
             test_data_dir: Test data directory
             check_interval: Seconds between checks
             regression_threshold: Loss increase threshold for regression alert
             test_samples: Number of samples to test per checkpoint
         """
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
         self.base_dir = Path(base_dir)
         self.checkpoint_dir = Path(checkpoint_dir or self.base_dir / "models" / "current_model")
         self.test_data_dir = Path(test_data_dir or self.base_dir / "data" / "validation")
@@ -386,8 +389,8 @@ def main():
     )
     parser.add_argument(
         "--base-dir",
-        default="/path/to/training",
-        help="Base training directory"
+        default=None,
+        help="Base training directory (default: auto-detected)"
     )
     parser.add_argument(
         "--checkpoint-dir",

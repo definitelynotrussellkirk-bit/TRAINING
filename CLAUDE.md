@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-11-27 (CHANGELOG split + Task Master UI)
+**Last Updated:** 2025-11-27 (4B Full Fine-Tune + System Optimization)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 ---
@@ -56,6 +56,15 @@ python3 weaver/weaver.py --daemon   # Run continuously
 # Stop everything
 ./scripts/stop_all.sh
 ```
+
+### Training Modes
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| **DIO Training** | `./scripts/start_all.sh` | Full daemon system - Tavern, VaultKeeper, queue |
+| **4B Experiments** | `python3 scripts/train_4b_full.py` | Standalone script - no daemon needed |
+
+**Important:** DIO training requires the full system running. Standalone scripts (like 4B experiments) can run directly without services.
 
 ---
 
@@ -1146,6 +1155,58 @@ optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 ### Attribution
 
 Muon optimizer by Keller Jordan: https://github.com/KellerJordan/Muon
+
+---
+
+## 🚀 4B FULL FINE-TUNE (New 2025-11-27)
+
+Full fine-tuning of **Qwen3-4B** on a single 24GB RTX 4090 is now possible.
+
+### VRAM Budget
+
+| Component | Memory |
+|-----------|--------|
+| Model (bf16) | 8 GB |
+| Gradients (bf16) | 8 GB |
+| Activations | ~3 GB |
+| Paged 8-bit Adam | Offloads to CPU |
+| **Peak VRAM** | **18.6 GB** |
+
+### Key Optimizations
+
+1. **Paged 8-bit Adam** (`paged_adamw_8bit`) - Offloads optimizer states to CPU when GPU fills
+2. **Liger Kernel** - Fused ops, logits never materialized (saves ~2GB)
+3. **Gradient Checkpointing** - Trades compute for VRAM
+4. **bf16 Precision** - Half the memory footprint
+
+### Usage
+
+```bash
+python3 scripts/train_4b_full.py
+```
+
+### Configuration
+
+```python
+# Key settings in train_4b_full.py
+MODEL_PATH = "models/Qwen3-4B-Instruct-2507"
+MAX_LENGTH = 512
+BATCH_SIZE = 1
+GRAD_ACCUM = 32  # Effective batch = 32
+optim = "paged_adamw_8bit"
+```
+
+### Why Not DeepSpeed?
+
+DeepSpeed ZeRO-3 was tested but triggered Linux OOM killer due to 178GB virtual memory allocation during initialization. The simpler bitsandbytes paged optimizer works better for single-GPU scenarios.
+
+### Files
+
+```
+scripts/train_4b_full.py           # Training script
+configs/ds_zero2_offload.json      # DeepSpeed config (alternative)
+configs/ds_zero3_offload.json      # DeepSpeed config (not recommended)
+```
 
 ---
 

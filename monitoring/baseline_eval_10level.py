@@ -39,24 +39,30 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# DYNAMIC VALUES - Replace these when deploying to different environments
+# DYNAMIC VALUES - Auto-detected from config
 # ============================================================================
 
-# DYNAMIC: Inference server host/port (3090 server)
-DEFAULT_INFERENCE_HOST = "192.168.x.x"
-DEFAULT_INFERENCE_PORT = 8765
-
-# DYNAMIC: API authentication key (from env var or secrets file)
-# Set via: export INFERENCE_ADMIN_KEY=your_key
+# Defaults if auto-detection fails
 DEFAULT_API_KEY = "admin123"
-
-# DYNAMIC: Base directory for data files
-DEFAULT_BASE_DIR = "/path/to/training"
-
-# DYNAMIC: Validation data path (relative to base_dir)
 VALIDATION_DATA_PATH = "data/validation/syllo_10level/syllo_eval_10level_20251126_051511.jsonl"
 
 # ============================================================================
+
+def get_default_inference_url():
+    """Get default inference URL from host registry"""
+    try:
+        from core.hosts import get_service_url
+        return get_service_url("inference")
+    except (ImportError, Exception):
+        return "http://192.168.x.x:8765"
+
+def get_default_base_dir():
+    """Get default base directory"""
+    try:
+        from core.paths import get_base_dir
+        return str(get_base_dir())
+    except (ImportError, Exception):
+        from core.paths import get_base_dir; return str(get_base_dir())
 
 
 class BaselineEvaluator:
@@ -64,15 +70,18 @@ class BaselineEvaluator:
 
     def __init__(
         self,
-        base_dir: str = DEFAULT_BASE_DIR,
-        inference_host: str = DEFAULT_INFERENCE_HOST,
-        inference_port: int = DEFAULT_INFERENCE_PORT,
+        base_dir: str = None,
+        inference_url: str = None,
         api_key: str = None,
         samples_per_level: int = None,  # None = use all
     ):
+        if base_dir is None:
+            base_dir = get_default_base_dir()
+        if inference_url is None:
+            inference_url = get_default_inference_url()
         self.base_dir = Path(base_dir)
-        self.inference_url = f"http://{inference_host}:{inference_port}"
-        # DYNAMIC: API key from env var, parameter, or default
+        self.inference_url = inference_url.rstrip('/')
+        # API key from env var, parameter, or default
         self.api_key = api_key or os.environ.get("INFERENCE_ADMIN_KEY", DEFAULT_API_KEY)
         self.samples_per_level = samples_per_level
 
@@ -412,22 +421,15 @@ def main():
     parser = argparse.ArgumentParser(
         description="10-Level SYLLO Baseline Evaluation"
     )
-    # DYNAMIC: These defaults should match your environment
     parser.add_argument(
         "--base-dir",
-        default=DEFAULT_BASE_DIR,
-        help=f"Base directory (default: {DEFAULT_BASE_DIR})"
+        default=None,
+        help="Base directory (default: auto-detected)"
     )
     parser.add_argument(
-        "--inference-host",
-        default=DEFAULT_INFERENCE_HOST,
-        help=f"Inference server host (default: {DEFAULT_INFERENCE_HOST})"
-    )
-    parser.add_argument(
-        "--inference-port",
-        type=int,
-        default=DEFAULT_INFERENCE_PORT,
-        help=f"Inference server port (default: {DEFAULT_INFERENCE_PORT})"
+        "--inference-url",
+        default=None,
+        help="Inference server URL (default: auto-detected from host registry)"
     )
     parser.add_argument(
         "--models",
@@ -445,8 +447,7 @@ def main():
 
     evaluator = BaselineEvaluator(
         base_dir=args.base_dir,
-        inference_host=args.inference_host,
-        inference_port=args.inference_port,
+        inference_url=args.inference_url,
         samples_per_level=args.samples_per_level,
     )
 

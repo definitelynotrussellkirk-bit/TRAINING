@@ -31,15 +31,29 @@ display:
 # -----------------------------------------------------------------------------
 # API SERVER (Required for training data generation)
 # -----------------------------------------------------------------------------
+# IMPORTANT: This section is REQUIRED for The Summoner to manage skill servers.
+# The Summoner reads this config and automatically starts/monitors the server.
 api:
+  # Connection info
   url: http://localhost:PORT    # Where the skill API runs
-  source_dir: /path/to/skill    # Source code location in singleSKILL
-  start_command: python skill_xxx/api_server.py --port PORT
+  port: PORT                    # Port number (for The Summoner)
+
+  # Server location and startup (REQUIRED for The Summoner)
+  source_dir: /path/to/skill    # Absolute path OR relative to $SKILL_SERVERS_PATH
+  working_dir: ${SKILL_SERVERS_PATH}  # Working directory for start_command
+  start_command: python3 skill_xxx/api_server.py --port PORT
+
+  # Health and timing
+  health_endpoint: /health      # Endpoint to check if server is running
+  startup_timeout: 10           # Seconds to wait for server startup
+
+  # Required API endpoints
   endpoints:
-    health: GET /health
-    info: GET /info
-    levels: GET /levels
-    generate: POST /generate
+    health: GET /health         # Returns {"status": "ok"}
+    info: GET /info             # Returns {"version": "1.0.0", "skill": "..."}
+    levels: GET /levels         # Returns level configuration
+    generate: POST /generate    # Generate training samples
+    eval: GET /eval             # Get eval set for a level
 
 # -----------------------------------------------------------------------------
 # LEVEL SYSTEM (Required)

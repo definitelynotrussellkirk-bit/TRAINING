@@ -355,10 +355,11 @@ def main():
     parser.add_argument("file", nargs="?", help="JSONL file to validate")
     parser.add_argument("--check-all", action="store_true", help="Validate all sparring files")
     parser.add_argument("--strict", action="store_true", help="Strict mode (warnings = errors)")
-    parser.add_argument("--base-dir", default="/path/to/training")
+    parser.add_argument("--base-dir", default=None, help="Base dir (default: from core.paths)")
 
     args = parser.parse_args()
-    base_dir = Path(args.base_dir)
+    from core.paths import get_base_dir
+    base_dir = Path(args.base_dir) if args.base_dir else get_base_dir()
 
     validator = SparringValidator(strict=args.strict)
 

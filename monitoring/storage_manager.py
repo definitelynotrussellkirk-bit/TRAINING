@@ -56,13 +56,16 @@ class StorageManager:
         username: str,
         password: str,
         port: int = 5001,  # HTTPS port for DSM
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         use_https: bool = True
     ):
         self.host = host
         self.username = username
         self.password = password
         self.port = port
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = str(get_base_dir())
         self.base_dir = Path(base_dir)
         self.use_https = use_https
 
@@ -431,8 +434,11 @@ class StorageManager:
                 time.sleep(60)
 
 
-def load_storage_config(base_dir: str = "/path/to/training") -> Dict:
+def load_storage_config(base_dir: str = None) -> Dict:
     """Load storage configuration"""
+    if base_dir is None:
+        from core.paths import get_base_dir
+        base_dir = str(get_base_dir())
     config_file = Path(base_dir) / "config" / "storage.json"
     if config_file.exists():
         with open(config_file) as f:
@@ -440,7 +446,7 @@ def load_storage_config(base_dir: str = "/path/to/training") -> Dict:
     return {}
 
 
-def get_nas_path(folder_type: str, base_dir: str = "/path/to/training") -> str:
+def get_nas_path(folder_type: str, base_dir: str = None) -> str:
     """Get full NAS path for a folder type"""
     config = load_storage_config(base_dir)
     nas = config.get("nas", {})
@@ -456,7 +462,7 @@ def sync_to_nas(
     local_path: str,
     folder_type: str,
     subfolder: str = "",
-    base_dir: str = "/path/to/training"
+    base_dir: str = None
 ) -> Dict:
     """
     Sync files to NAS using Synology FileStation API.
@@ -609,7 +615,11 @@ def load_credentials(creds_file: str = None) -> Dict:
                 return json.load(f)
 
     # Default credentials file location
-    default_creds = Path("/path/to/training/.secrets/synology.json")
+    try:
+        from core.paths import get_base_dir
+        default_creds = get_base_dir() / ".secrets" / "synology.json"
+    except Exception:
+        default_creds = Path.cwd() / ".secrets" / "synology.json"
     if default_creds.exists():
         with open(default_creds) as f:
             return json.load(f)
@@ -626,7 +636,7 @@ def main():
     parser.add_argument("--password", help="DSM password (or use --creds-file)")
     parser.add_argument("--creds-file", help="JSON file with credentials")
     parser.add_argument("--port", type=int, default=5001, help="DSM port (default: 5001)")
-    parser.add_argument("--base-dir", default="/path/to/training", help="Base directory")
+    parser.add_argument("--base-dir", default=None, help="Base directory (auto-detect if not set)")
     parser.add_argument("--interval", type=int, default=300, help="Check interval in seconds")
     parser.add_argument("--once", action="store_true", help="Run once and exit")
     parser.add_argument("--status", action="store_true", help="Print status and exit")

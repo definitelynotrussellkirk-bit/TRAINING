@@ -13,6 +13,9 @@ from typing import Dict, List, Optional
 from collections import deque
 import logging
 
+from core.paths import get_base_dir
+from core.hosts import get_host
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -25,17 +28,20 @@ class MemoryGuardian:
 
     def __init__(
         self,
-        remote_host: str = "192.168.x.x",
+        remote_host: str = None,
         vram_warning_threshold: float = 85.0,  # % VRAM usage
         vram_critical_threshold: float = 95.0,
         leak_detection_window: int = 10,  # samples
-        base_dir: str = "/path/to/training"
+        base_dir: str = None
     ):
-        self.remote_host = remote_host
+        # Get inference host info
+        inference_host = get_host("3090")
+        self.remote_host = remote_host if remote_host else inference_host.host
+
         self.vram_warning_threshold = vram_warning_threshold
         self.vram_critical_threshold = vram_critical_threshold
         self.leak_detection_window = leak_detection_window
-        self.base_dir = Path(base_dir)
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
 
         # Memory usage history (last 60 samples = 1 hour)
         self.vram_history = deque(maxlen=60)
@@ -318,15 +324,31 @@ class MemoryGuardian:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='3090 Memory Guardian')
+    parser.add_argument('--remote-host', default=None,
+                       help='Remote host (default: from hosts.json)')
+    parser.add_argument('--warning-threshold', type=float, default=85.0,
+                       help='VRAM warning threshold percentage')
+    parser.add_argument('--critical-threshold', type=float, default=95.0,
+                       help='VRAM critical threshold percentage')
+    parser.add_argument('--leak-window', type=int, default=10,
+                       help='Leak detection window size')
+    parser.add_argument('--base-dir', default=None,
+                       help='Base directory (default: auto-detect)')
+    parser.add_argument('--interval', type=int, default=60,
+                       help='Check interval in seconds')
+    args = parser.parse_args()
+
     guardian = MemoryGuardian(
-        remote_host="192.168.x.x",
-        vram_warning_threshold=85.0,
-        vram_critical_threshold=95.0,
-        leak_detection_window=10,
-        base_dir="/path/to/training"
+        remote_host=args.remote_host,
+        vram_warning_threshold=args.warning_threshold,
+        vram_critical_threshold=args.critical_threshold,
+        leak_detection_window=args.leak_window,
+        base_dir=args.base_dir
     )
 
-    guardian.run_guardian(interval=60)
+    guardian.run_guardian(interval=args.interval)
 
 
 if __name__ == "__main__":

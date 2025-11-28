@@ -6,6 +6,12 @@ Phase 2, Task 2.2: GPU VRAM and utilization from both machines
 
 from .base import CommandPlugin
 import subprocess
+import sys
+from pathlib import Path
+
+# Add core to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "core"))
+from hosts import get_host
 
 
 class GPU4090Plugin(CommandPlugin):
@@ -82,7 +88,7 @@ class GPU3090Plugin(CommandPlugin):
     """
 
     def __init__(self, config=None):
-        ssh_host = (config or {}).get('ssh_host', '192.168.x.x')
+        ssh_host = (config or {}).get('ssh_host', get_host('3090').host)
         command = f'ssh {ssh_host} "nvidia-smi --query-gpu=memory.used,memory.total,memory.free,utilization.gpu,temperature.gpu,name --format=csv,noheader,nounits"'
 
         # Cache for 10 seconds

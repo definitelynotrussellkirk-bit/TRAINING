@@ -28,17 +28,29 @@ tags:
   - multimodal
 
 # =============================================================================
-# API SERVER
+# API SERVER (Required for The Summoner)
 # =============================================================================
 api:
+  # Connection info
   url: http://localhost:8080
-  source_dir: /path/to/skills/skill_syllo_variant
-  start_command: python skill_syllo_variant/api_server.py --port 8080
+  port: 8080
+
+  # Server location and startup
+  source_dir: skill_syllo_variant             # Relative to $SKILL_SERVERS_PATH
+  working_dir: ${SKILL_SERVERS_PATH}          # /path/to/skills
+  start_command: python3 skill_syllo_variant/api_server.py --port 8080
+
+  # Health and timing
+  health_endpoint: /health
+  startup_timeout: 10
+
+  # API endpoints
   endpoints:
     health: GET /health
     info: GET /info
     levels: GET /levels
     generate: POST /generate
+    eval: GET /eval
 
 # =============================================================================
 # LEVEL SYSTEM (50 Levels - Signal Degradation Model)

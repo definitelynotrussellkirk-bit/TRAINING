@@ -11,7 +11,13 @@ from typing import List, Dict
 import sys
 
 class CheckpointComparator:
-    def __init__(self, api_url: str = "http://192.168.x.x:8765"):
+    def __init__(self, api_url: str = None):
+        if api_url is None:
+            try:
+                from core.hosts import get_service_url
+                api_url = get_service_url("inference")
+            except (ImportError, Exception):
+                api_url = "http://192.168.x.x:8765"
         self.api_url = api_url
         
     def test_checkpoint(
@@ -123,10 +129,10 @@ def main():
     parser.add_argument('--models', nargs='+', required=True, help="Model IDs to compare")
     parser.add_argument('--dataset', type=Path, required=True, help="Dataset path")
     parser.add_argument('--samples', type=int, default=10, help="Number of samples")
-    parser.add_argument('--api-url', default="http://192.168.x.x:8765")
-    
+    parser.add_argument('--api-url', default=None, help="API URL (defaults to host registry)")
+
     args = parser.parse_args()
-    
+
     comparator = CheckpointComparator(args.api_url)
     comparator.compare(args.models, args.dataset, args.samples)
 

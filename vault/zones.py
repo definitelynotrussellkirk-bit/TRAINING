@@ -314,21 +314,24 @@ class ZoneRegistry:
             ),
         ]
 
-        # Add 3090 if configured
+        # Add 3090 if configured (requires models_dir in hosts.json)
         if host_3090:
-            zones.append(Zone(
-                zone_id="3090",
-                name="Inference Server",
-                zone_type=ZoneType.INFERENCE,
-                host=host_3090.host,
-                port=8768,
-                ssh_user="user",
-                base_path=host_3090.models_dir or "/path/to/models",
-                checkpoint_path=host_3090.models_dir or "/path/to/models",
-                model_path=host_3090.models_dir or "/path/to/models",
-                can_infer=True,
-                can_store=True,
-            ))
+            if not host_3090.models_dir:
+                logger.warning("3090 host missing models_dir in hosts.json, skipping zone")
+            else:
+                zones.append(Zone(
+                    zone_id="3090",
+                    name="Inference Server",
+                    zone_type=ZoneType.INFERENCE,
+                    host=host_3090.host,
+                    port=8768,
+                    ssh_user=host_3090.ssh_user or "user",
+                    base_path=host_3090.models_dir,
+                    checkpoint_path=host_3090.models_dir,
+                    model_path=host_3090.models_dir,
+                    can_infer=True,
+                    can_store=True,
+                ))
 
         # Add NAS if configured in hosts.json
         try:

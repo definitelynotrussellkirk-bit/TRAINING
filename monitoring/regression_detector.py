@@ -49,13 +49,22 @@ class RegressionDetector:
 
     def __init__(
         self,
-        api_url: str = "http://localhost:8765",
-        base_dir: str = "/path/to/training",
+        api_url: str = None,
+        base_dir: str = None,
         alpha: float = 0.05,  # Significance level
         min_effect_size: float = 0.3,  # Minimum Cohen's d
         n_bootstrap: int = 1000,  # Bootstrap iterations
         threshold: float = 0.05  # 5% accuracy drop = regression
     ):
+        if api_url is None:
+            try:
+                from core.hosts import get_service_url
+                api_url = get_service_url("inference")
+            except (ImportError, Exception):
+                api_url = "http://localhost:8765"
+        if base_dir is None:
+            from core.paths import require_base_dir
+            base_dir = str(require_base_dir())
         self.api_url = api_url
         self.base_dir = Path(base_dir)
         self.alpha = alpha

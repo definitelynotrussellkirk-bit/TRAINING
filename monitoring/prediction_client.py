@@ -43,7 +43,7 @@ class PredictionClient:
 
     def __init__(
         self,
-        base_url: str = "http://192.168.x.x:8765",
+        base_url: str = None,
         timeout: int = 120,
         max_retries: int = 3,
         retry_backoff: float = 2.0,
@@ -54,13 +54,19 @@ class PredictionClient:
         Initialize prediction client.
 
         Args:
-            base_url: API base URL
+            base_url: API base URL (defaults to host registry)
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             retry_backoff: Exponential backoff multiplier
             api_key: Read-level API key (defaults to INFERENCE_READ_KEY env var)
             admin_key: Admin-level API key (defaults to INFERENCE_ADMIN_KEY env var)
         """
+        if base_url is None:
+            try:
+                from core.hosts import get_service_url
+                base_url = get_service_url("inference")
+            except (ImportError, Exception):
+                base_url = "http://192.168.x.x:8765"
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self.max_retries = max_retries
@@ -274,7 +280,7 @@ _client = None
 
 
 def get_client(
-    base_url: str = "http://192.168.x.x:8765",
+    base_url: str = None,
     api_key: Optional[str] = None,
     admin_key: Optional[str] = None
 ) -> PredictionClient:
@@ -282,7 +288,7 @@ def get_client(
     Get global PredictionClient instance (singleton pattern).
 
     Args:
-        base_url: API base URL (only used on first call)
+        base_url: API base URL (defaults to host registry; only used on first call)
         api_key: Read API key (defaults to INFERENCE_READ_KEY env var)
         admin_key: Admin API key (defaults to INFERENCE_ADMIN_KEY env var)
 

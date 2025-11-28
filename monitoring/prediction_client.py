@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """
-PredictionClient - Standardized client for 3090 inference API
+PredictionClient - Standardized client for 3090 inference API.
 
 All monitoring scripts should use this instead of raw requests to ensure:
 - Consistent retry logic
 - Proper error handling
 - Unified logging
 - Standard request/response format
+
+This client is built on core.services.ServiceClient for standardized
+network handling, retries, and error semantics.
 """
 
-import os
-import requests
-import time
 import logging
-from typing import List, Dict, Optional, Any
+import os
+from typing import Any, Dict, List, Optional
+
+from core.services import (
+    ServiceClient,
+    ServiceError,
+    ServiceHttpError,
+    ServiceUnavailable,
+    ServiceDecodeError,
+    ServiceAuthError,
+    get_service_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +36,8 @@ DEFAULT_ADMIN_KEY = os.environ.get("INFERENCE_ADMIN_KEY", "")
 class PredictionClient:
     """
     Standardized client for 3090 inference server.
+
+    Built on ServiceClient for consistent retry, timeout, and error handling.
 
     Example usage:
         client = PredictionClient()
@@ -43,7 +56,7 @@ class PredictionClient:
 
     def __init__(
         self,
-        base_url: str = None,
+        base_url: Optional[str] = None,
         timeout: int = 120,
         max_retries: int = 3,
         retry_backoff: float = 2.0,
@@ -61,26 +74,31 @@ class PredictionClient:
             api_key: Read-level API key (defaults to INFERENCE_READ_KEY env var)
             admin_key: Admin-level API key (defaults to INFERENCE_ADMIN_KEY env var)
         """
-        if base_url is None:
-            try:
-                from core.hosts import get_service_url
-                base_url = get_service_url("inference")
-            except (ImportError, Exception):
-                base_url = "http://inference.local:8765"
-        self.base_url = base_url.rstrip('/')
-        self.timeout = timeout
-        self.max_retries = max_retries
-        self.retry_backoff = retry_backoff
+        # Get base config from service registry
+        config = get_service_config("inference")
 
-        # API keys for authentication
-        self.api_key = api_key or DEFAULT_READ_KEY
-        self.admin_key = admin_key or DEFAULT_ADMIN_KEY
+        # Override with constructor parameters
+        if base_url:
+            config.base_url = base_url
+        config.timeout_s = float(timeout)
+        config.max_retries = max_retries
+        config.backoff_factor = retry_backoff
+        config.api_key = api_key or DEFAULT_READ_KEY or config.api_key
+        config.admin_key = admin_key or DEFAULT_ADMIN_KEY or config.admin_key
 
-        logger.info(f"PredictionClient initialized: {self.base_url}")
-        if self.api_key:
+        # Create underlying ServiceClient
+        self._client = ServiceClient(config)
+
+        logger.info(f"PredictionClient initialized: {config.base_url}")
+        if config.api_key:
             logger.info("  Read API key: configured")
-        if self.admin_key:
+        if config.admin_key:
             logger.info("  Admin API key: configured")
+
+    @property
+    def base_url(self) -> str:
+        """Base URL of the inference server."""
+        return self._client.base_url
 
     def chat(
         self,
@@ -109,15 +127,17 @@ class PredictionClient:
                 }],
                 'usage': {'prompt_tokens': 10, 'completion_tokens': 50}
             }
-        """
-        url = f"{self.base_url}/v1/chat/completions"
 
+        Raises:
+            ServiceUnavailable: Server not reachable
+            ServiceHttpError: HTTP error from server
+        """
         # If model not specified, get currently loaded model
         if model is None:
             try:
                 info = self.get_model_info()
                 model = info.get('model_id', 'unknown')
-            except Exception:
+            except ServiceError:
                 model = "unknown"
 
         payload = {
@@ -128,7 +148,7 @@ class PredictionClient:
             **kwargs
         }
 
-        return self._request_with_retry("POST", url, json=payload)
+        return self._client.post_json("/v1/chat/completions", json=payload)
 
     def get_model_info(self) -> Dict[str, Any]:
         """
@@ -143,8 +163,7 @@ class PredictionClient:
                 'vram_usage_gb': float
             }
         """
-        url = f"{self.base_url}/models/info"
-        return self._request_with_retry("GET", url)
+        return self._client.get_json("/models/info")
 
     def reload_model(self, model_path: str) -> Dict[str, Any]:
         """
@@ -153,7 +172,7 @@ class PredictionClient:
         Requires admin API key (INFERENCE_ADMIN_KEY).
 
         Args:
-            model_path: Full path to checkpoint, e.g. {INFERENCE_HOME}/models/checkpoint-175000
+            model_path: Full path to checkpoint
 
         Returns:
             {
@@ -165,9 +184,11 @@ class PredictionClient:
                 'vram_usage_gb': float
             }
         """
-        url = f"{self.base_url}/models/reload"
-        payload = {"model_path": model_path}
-        return self._request_with_retry("POST", url, json=payload, require_admin=True)
+        return self._client.post_json(
+            "/models/reload",
+            json={"model_path": model_path},
+            require_admin=True
+        )
 
     def health_check(self) -> bool:
         """
@@ -176,12 +197,7 @@ class PredictionClient:
         Returns:
             True if server is healthy
         """
-        try:
-            url = f"{self.base_url}/health"
-            response = requests.get(url, timeout=5)
-            return response.status_code == 200
-        except:
-            return False
+        return self._client.health_check()
 
     def get_health_details(self) -> Dict[str, Any]:
         """
@@ -195,92 +211,23 @@ class PredictionClient:
                 'worker_busy': bool
             }
         """
-        url = f"{self.base_url}/health"
-        return self._request_with_retry("GET", url)
+        return self._client.get_json("/health")
 
-    def _request_with_retry(
-        self,
-        method: str,
-        url: str,
-        require_admin: bool = False,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Make HTTP request with exponential backoff retry.
+    def health(self) -> Dict[str, Any]:
+        """Alias for get_health_details (for backward compatibility)."""
+        return self.get_health_details()
 
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            url: Full URL
-            require_admin: If True, use admin API key; otherwise use read key
-            **kwargs: Passed to requests.request()
-
-        Returns:
-            Response JSON
-
-        Raises:
-            requests.exceptions.RequestException: After all retries exhausted
-        """
-        last_error = None
-
-        for attempt in range(self.max_retries):
-            try:
-                # Set timeout if not specified
-                if 'timeout' not in kwargs:
-                    kwargs['timeout'] = self.timeout
-
-                # Add API key header
-                headers = kwargs.pop('headers', {})
-                api_key = self.admin_key if require_admin else self.api_key
-                if api_key:
-                    headers['X-API-Key'] = api_key
-                kwargs['headers'] = headers
-
-                # Make request
-                response = requests.request(method, url, **kwargs)
-                response.raise_for_status()
-
-                # Parse JSON
-                return response.json()
-
-            except requests.exceptions.Timeout as e:
-                last_error = e
-                logger.warning(
-                    f"Request timeout (attempt {attempt+1}/{self.max_retries}): {url}"
-                )
-
-            except requests.exceptions.HTTPError as e:
-                last_error = e
-                logger.warning(
-                    f"HTTP error {response.status_code} (attempt {attempt+1}/{self.max_retries}): {url}"
-                )
-
-                # Don't retry 4xx errors (client errors)
-                if 400 <= response.status_code < 500:
-                    raise
-
-            except requests.exceptions.RequestException as e:
-                last_error = e
-                logger.warning(
-                    f"Request failed (attempt {attempt+1}/{self.max_retries}): {url} - {e}"
-                )
-
-            # Exponential backoff before retry
-            if attempt < self.max_retries - 1:
-                sleep_time = self.retry_backoff ** attempt
-                logger.debug(f"Retrying in {sleep_time:.1f}s...")
-                time.sleep(sleep_time)
-
-        # All retries exhausted
-        logger.error(f"All {self.max_retries} attempts failed for {url}")
-        raise last_error
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get server metrics (if available)."""
+        return self._client.get_json("/metrics")
 
 
 # Global client instance
-_client = None
+_client: Optional[PredictionClient] = None
 
 
 def get_client(
-    base_url: str = None,
+    base_url: Optional[str] = None,
     api_key: Optional[str] = None,
     admin_key: Optional[str] = None
 ) -> PredictionClient:
@@ -305,6 +252,18 @@ def get_client(
     return _client
 
 
+# Re-export exceptions for convenience
+__all__ = [
+    "PredictionClient",
+    "get_client",
+    "ServiceError",
+    "ServiceHttpError",
+    "ServiceUnavailable",
+    "ServiceDecodeError",
+    "ServiceAuthError",
+]
+
+
 if __name__ == "__main__":
     # Test client
     logging.basicConfig(level=logging.INFO)
@@ -316,21 +275,24 @@ if __name__ == "__main__":
     # Test 1: Health check
     print("1. Health check:")
     if client.health_check():
-        print("  ✅ Server is healthy")
+        print("  Server is healthy")
         health = client.get_health_details()
-        print(f"  GPU: {health['gpu']['device_name']}")
-        print(f"  Active model: {health['active_model']}")
+        print(f"  GPU: {health.get('gpu', {}).get('device_name', 'unknown')}")
+        print(f"  Active model: {health.get('active_model', 'unknown')}")
     else:
-        print("  ❌ Server is down")
+        print("  Server is down")
 
     # Test 2: Model info
     print("\n2. Model info:")
-    info = client.get_model_info()
-    print(f"  Loaded: {info['loaded']}")
-    if info['loaded']:
-        print(f"  Model ID: {info['model_id']}")
-        print(f"  Step: {info['checkpoint_step']}")
-        print(f"  VRAM: {info['vram_usage_gb']}GB")
+    try:
+        info = client.get_model_info()
+        print(f"  Loaded: {info.get('loaded', False)}")
+        if info.get('loaded'):
+            print(f"  Model ID: {info.get('model_id')}")
+            print(f"  Step: {info.get('checkpoint_step')}")
+            print(f"  VRAM: {info.get('vram_usage_gb')}GB")
+    except ServiceError as e:
+        print(f"  Error: {e}")
 
     # Test 3: Chat completion (optional - can be slow)
     print("\n3. Chat completion:")
@@ -341,7 +303,7 @@ if __name__ == "__main__":
         )
         content = response['choices'][0]['message']['content']
         print(f"  Response: {content[:50]}")
-    except Exception as e:
+    except ServiceError as e:
         print(f"  Error: {e}")
 
-    print("\n✅ Client tests complete")
+    print("\nClient tests complete")

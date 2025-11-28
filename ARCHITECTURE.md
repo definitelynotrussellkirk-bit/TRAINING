@@ -305,3 +305,81 @@ All host-specific settings (IPs, ports, SSH users, paths) are in `config/hosts.j
 ```
 
 Copy `config/hosts.example.json` to `config/hosts.json` and customize for your setup.
+
+## Remote Services (ServiceClient)
+
+All HTTP communication with remote services goes through a unified abstraction in `core/services.py`.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Domain Clients                               │
+│  PredictionClient  │  VaultClient  │  TaskClient  │  OracleClient│
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      ServiceClient                               │
+│  - Retry with exponential backoff                                │
+│  - Configurable timeouts                                         │
+│  - Standard exception hierarchy                                  │
+│  - API key authentication                                        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      core.hosts                                  │
+│  get_service_url("inference") → http://inference.local:8765     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Usage
+
+```python
+from core.services import get_service_client, ServiceError, ServiceUnavailable
+
+# Get a client for any registered service
+client = get_service_client("inference")
+
+# Make requests with automatic retry/timeout handling
+try:
+    result = client.post_json("/v1/chat/completions", json=payload)
+except ServiceUnavailable:
+    # Service down - degrade gracefully
+    pass
+except ServiceHttpError as e:
+    # HTTP 4xx/5xx
+    logger.error(f"HTTP {e.status}: {e.body}")
+```
+
+### Exception Hierarchy
+
+| Exception | When Raised | Retried? |
+|-----------|-------------|----------|
+| `ServiceUnavailable` | Connection error, timeout, or retries exhausted | Yes (until limit) |
+| `ServiceHttpError` | HTTP 4xx/5xx response | 5xx only |
+| `ServiceAuthError` | HTTP 401/403 | No |
+| `ServiceDecodeError` | Invalid JSON response | No |
+
+### Domain Clients
+
+High-level clients wrap `ServiceClient` with domain-specific methods:
+
+| Client | Service | Location |
+|--------|---------|----------|
+| `PredictionClient` | inference | `monitoring/prediction_client.py` |
+| `VaultKeeperClient` | vault | `vault/client.py` |
+| `TaskClient` | scheduler | `monitoring/task_client.py` |
+| `OracleClient` | inference | `watchtower/oracle_client.py` |
+
+### Configuration
+
+Service URLs are resolved from `config/hosts.json` via `core.hosts`.
+Per-service overrides via environment variables:
+
+```bash
+INFERENCE_TIMEOUT_S=120
+INFERENCE_MAX_RETRIES=5
+INFERENCE_API_KEY=secret123
+```

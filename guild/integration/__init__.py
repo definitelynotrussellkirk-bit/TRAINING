@@ -103,6 +103,36 @@ from guild.integration.queue_adapter import (
     PRIORITY_MAP,
 )
 
+# Skill Engine bridge (NEW)
+from guild.integration.skill_engine_bridge import (
+    TrainingRequest,
+    TrainingBatch,
+    EvalSyncResult,
+    SkillEngineBridge,
+    get_skill_engine_bridge,
+    reset_skill_engine_bridge,
+)
+
+# Hero-aware state management (NEW)
+from guild.integration.hero_state import (
+    HeroSkillState,
+    HeroStateManager,
+    get_hero_state_manager,
+    get_hero_skill_state,
+    set_hero_skill_state,
+    list_hero_skills,
+)
+
+# Scheduler bridge (NEW)
+from guild.integration.scheduler_bridge import (
+    QuestType,
+    QuestRecommendation,
+    SkillMetrics,
+    SchedulerBridge,
+    get_scheduler_bridge,
+    reset_scheduler_bridge,
+)
+
 __all__ = [
     # Base
     "AdapterStatus",
@@ -145,4 +175,25 @@ __all__ = [
     "get_queue_adapter",
     "reset_queue_adapter",
     "PRIORITY_MAP",
+    # Skill Engine Bridge
+    "TrainingRequest",
+    "TrainingBatch",
+    "EvalSyncResult",
+    "SkillEngineBridge",
+    "get_skill_engine_bridge",
+    "reset_skill_engine_bridge",
+    # Hero State
+    "HeroSkillState",
+    "HeroStateManager",
+    "get_hero_state_manager",
+    "get_hero_skill_state",
+    "set_hero_skill_state",
+    "list_hero_skills",
+    # Scheduler Bridge
+    "QuestType",
+    "QuestRecommendation",
+    "SkillMetrics",
+    "SchedulerBridge",
+    "get_scheduler_bridge",
+    "reset_scheduler_bridge",
 ]

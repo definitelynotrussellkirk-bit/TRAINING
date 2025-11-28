@@ -96,7 +96,8 @@ class JobType(str, Enum):
 class JobStatus(str, Enum):
     """Status of a job."""
     PENDING = "pending"        # Waiting to be picked up
-    QUEUED = "queued"          # In worker queue
+    QUEUED = "queued"          # In worker queue (push model)
+    CLAIMED = "claimed"        # Claimed by worker (pull model), not yet running
     RUNNING = "running"        # Currently executing
     COMPLETED = "completed"    # Finished successfully
     FAILED = "failed"          # Failed with error
@@ -261,6 +262,14 @@ class Job:
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        # Support both JobResult and raw dict result (from job store)
+        if self.result:
+            result_data = self.result.to_dict()
+        elif hasattr(self, '_raw_result'):
+            result_data = self._raw_result
+        else:
+            result_data = None
+
         return {
             "job_id": self.job_id,
             "spec": self.spec.to_dict(),
@@ -272,7 +281,7 @@ class Job:
             "worker_id": self.worker_id,
             "attempts": self.attempts,
             "max_attempts": self.max_attempts,
-            "result": self.result.to_dict() if self.result else None,
+            "result": result_data,
         }
 
 

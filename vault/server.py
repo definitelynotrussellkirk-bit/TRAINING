@@ -62,6 +62,7 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
     # Reference to keeper (set by server)
     keeper: Optional[VaultKeeper] = None
     zone_registry: Optional[ZoneRegistry] = None
+    job_store = None  # Set by run_server
 
     def log_message(self, format, *args):
         """Override to use our logger."""
@@ -178,6 +179,14 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
         elif path.startswith("/api/passives/checkpoint/"):
             step_str = path.replace("/api/passives/checkpoint/", "")
             self._handle_passives_by_checkpoint(step_str)
+        # Jobs API - Distributed job execution
+        elif path == "/api/jobs":
+            self._handle_jobs_list(query)
+        elif path == "/api/jobs/stats":
+            self._handle_jobs_stats()
+        elif path.startswith("/api/jobs/"):
+            job_id = path.replace("/api/jobs/", "")
+            self._handle_jobs_get(job_id)
         else:
             self._send_error(f"Unknown endpoint: {path}", 404)
 
@@ -203,6 +212,26 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
         # Training control
         elif path == "/api/training/control":
             self._handle_training_control(body)
+        # Jobs API - Distributed job execution
+        elif path == "/api/jobs":
+            self._handle_jobs_submit(body)
+        elif path == "/api/jobs/claim":
+            self._handle_jobs_claim(body)
+        elif path.endswith("/complete"):
+            job_id = path.replace("/api/jobs/", "").replace("/complete", "")
+            self._handle_jobs_complete(job_id, body)
+        elif path.endswith("/failed"):
+            job_id = path.replace("/api/jobs/", "").replace("/failed", "")
+            self._handle_jobs_failed(job_id, body)
+        elif path.endswith("/running"):
+            job_id = path.replace("/api/jobs/", "").replace("/running", "")
+            self._handle_jobs_running(job_id, body)
+        elif path.endswith("/cancel"):
+            job_id = path.replace("/api/jobs/", "").replace("/cancel", "")
+            self._handle_jobs_cancel(job_id)
+        elif path.endswith("/release"):
+            job_id = path.replace("/api/jobs/", "").replace("/release", "")
+            self._handle_jobs_release(job_id)
         else:
             self._send_error(f"Unknown endpoint: {path}", 404)
 
@@ -1002,6 +1031,237 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             logger.error(f"Passives by checkpoint error: {e}")
             self._send_error(str(e), 500)
 
+    # =========================================================================
+    # JOBS API - Distributed job execution
+    # =========================================================================
+
+    def _get_job_store(self):
+        """Get the job store, initializing if needed."""
+        if self.job_store is None:
+            from jobs.store import get_store
+            self.job_store = get_store()
+        return self.job_store
+
+    def _handle_jobs_list(self, query: Dict[str, list]):
+        """List jobs with optional filters."""
+        try:
+            store = self._get_job_store()
+
+            # Parse query params
+            status = query.get("status", [None])[0]
+            job_type = query.get("type", [None])[0]
+            device_id = query.get("device", [None])[0]
+            limit = int(query.get("limit", [100])[0])
+            offset = int(query.get("offset", [0])[0])
+
+            # Convert to enums if provided
+            from guild.job_types import JobStatus, JobType
+            status_enum = JobStatus(status) if status else None
+            type_enum = JobType(job_type) if job_type else None
+
+            jobs = store.list_jobs(
+                status=status_enum,
+                job_type=type_enum,
+                device_id=device_id,
+                limit=limit,
+                offset=offset,
+            )
+
+            self._send_json({
+                "count": len(jobs),
+                "jobs": [j.to_dict() for j in jobs],
+            })
+
+        except Exception as e:
+            logger.error(f"Jobs list error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_stats(self):
+        """Get job statistics."""
+        try:
+            store = self._get_job_store()
+            stats = store.get_stats()
+            self._send_json(stats)
+
+        except Exception as e:
+            logger.error(f"Jobs stats error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_get(self, job_id: str):
+        """Get a specific job."""
+        try:
+            store = self._get_job_store()
+            job = store.get(job_id)
+
+            if job:
+                self._send_json(job.to_dict())
+            else:
+                self._send_error(f"Job not found: {job_id}", 404)
+
+        except Exception as e:
+            logger.error(f"Jobs get error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_submit(self, body: Optional[Dict[str, Any]]):
+        """Submit a new job."""
+        if not body:
+            self._send_error("Missing request body", 400)
+            return
+
+        try:
+            from guild.job_types import Job, JobSpec
+
+            # Parse job spec
+            if "spec" in body:
+                spec = JobSpec.from_dict(body["spec"])
+            else:
+                # Try to parse body as spec directly
+                spec = JobSpec.from_dict(body)
+
+            # Create and submit job
+            job = Job.create(spec)
+            store = self._get_job_store()
+            store.submit(job)
+
+            self._send_json({
+                "success": True,
+                "job_id": job.job_id,
+                "status": job.status.value,
+            }, 201)
+
+        except Exception as e:
+            logger.error(f"Jobs submit error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_claim(self, body: Optional[Dict[str, Any]]):
+        """Claim the next available job (worker pull)."""
+        if not body:
+            self._send_error("Missing request body", 400)
+            return
+
+        device_id = body.get("device_id")
+        roles = body.get("roles", [])
+        lease_duration = body.get("lease_duration", 300)
+
+        if not device_id:
+            self._send_error("Missing 'device_id' in request body", 400)
+            return
+
+        if not roles:
+            self._send_error("Missing 'roles' in request body", 400)
+            return
+
+        try:
+            store = self._get_job_store()
+            job = store.claim_next(device_id, roles, lease_duration)
+
+            if job:
+                self._send_json({
+                    "claimed": True,
+                    "job": job.to_dict(),
+                })
+            else:
+                self._send_json({
+                    "claimed": False,
+                    "message": "No jobs available for your roles",
+                })
+
+        except Exception as e:
+            logger.error(f"Jobs claim error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_running(self, job_id: str, body: Optional[Dict[str, Any]]):
+        """Mark a job as running."""
+        device_id = body.get("device_id") if body else None
+
+        if not device_id:
+            self._send_error("Missing 'device_id' in request body", 400)
+            return
+
+        try:
+            store = self._get_job_store()
+            success = store.mark_running(job_id, device_id)
+
+            if success:
+                self._send_json({"success": True, "status": "running"})
+            else:
+                self._send_error("Cannot mark job as running", 400)
+
+        except Exception as e:
+            logger.error(f"Jobs running error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_complete(self, job_id: str, body: Optional[Dict[str, Any]]):
+        """Mark a job as completed."""
+        result = body.get("result", {}) if body else {}
+
+        try:
+            store = self._get_job_store()
+            success = store.mark_complete(job_id, result)
+
+            if success:
+                self._send_json({"success": True, "status": "completed"})
+            else:
+                self._send_error("Cannot mark job as completed", 400)
+
+        except Exception as e:
+            logger.error(f"Jobs complete error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_failed(self, job_id: str, body: Optional[Dict[str, Any]]):
+        """Mark a job as failed."""
+        error = body.get("error", "Unknown error") if body else "Unknown error"
+
+        try:
+            store = self._get_job_store()
+            success = store.mark_failed(job_id, error)
+
+            if success:
+                # Check if job was returned to queue for retry
+                job = store.get(job_id)
+                status = job.status.value if job else "unknown"
+                self._send_json({
+                    "success": True,
+                    "status": status,
+                    "message": "Returned to queue for retry" if status == "pending" else "Failed permanently",
+                })
+            else:
+                self._send_error("Cannot mark job as failed", 400)
+
+        except Exception as e:
+            logger.error(f"Jobs failed error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_cancel(self, job_id: str):
+        """Cancel a job."""
+        try:
+            store = self._get_job_store()
+            success = store.cancel(job_id)
+
+            if success:
+                self._send_json({"success": True, "status": "cancelled"})
+            else:
+                self._send_error("Cannot cancel job", 400)
+
+        except Exception as e:
+            logger.error(f"Jobs cancel error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_release(self, job_id: str):
+        """Release a claimed job back to the queue."""
+        try:
+            store = self._get_job_store()
+            success = store.release(job_id)
+
+            if success:
+                self._send_json({"success": True, "status": "pending"})
+            else:
+                self._send_error("Cannot release job", 400)
+
+        except Exception as e:
+            logger.error(f"Jobs release error: {e}")
+            self._send_error(str(e), 500)
+
 
 def run_server(port: int = 8767, base_dir: Optional[str] = None):
     """Run the VaultKeeper server."""
@@ -1020,6 +1280,19 @@ def run_server(port: int = 8767, base_dir: Optional[str] = None):
 
     # Set base directory for training API
     VaultKeeperHandler.base_dir = base_path
+
+    # Initialize job store and start maintenance worker
+    try:
+        from jobs.store import get_store, StoreMaintenanceWorker
+        job_store = get_store()
+        VaultKeeperHandler.job_store = job_store
+
+        # Start background maintenance (expire stale leases, cleanup old jobs)
+        maintenance = StoreMaintenanceWorker(job_store)
+        maintenance.start()
+        logger.info(f"Jobs DB: {job_store.db_path}")
+    except ImportError as e:
+        logger.warning(f"Job store not available: {e}")
 
     # Start server - use ThreadingHTTPServer to handle concurrent requests without blocking
     server = ThreadingHTTPServer(("0.0.0.0", port), VaultKeeperHandler)

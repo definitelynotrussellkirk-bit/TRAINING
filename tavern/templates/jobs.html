@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jobs | Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+    <style>
+        body {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #333;
+        }
+
+        h1 {
+            margin: 0;
+            color: #ffd700;
+            font-size: 1.8rem;
+        }
+
+        .nav-links a {
+            color: #888;
+            text-decoration: none;
+            margin-left: 16px;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: #ffd700;
+        }
+
+        /* Stats cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #252538;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+
+        /* Actions */
+        .actions {
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+        }
+
+        .btn-secondary {
+            background: #333;
+            color: #e0e0e0;
+        }
+
+        .btn-secondary:hover {
+            background: #444;
+        }
+
+        /* Eval form */
+        .eval-form {
+            background: #252538;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+            display: none;
+        }
+
+        .eval-form.visible {
+            display: block;
+        }
+
+        .eval-form h3 {
+            margin-top: 0;
+            color: #ffd700;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #888;
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-size: 1rem;
+        }
+
+        /* Jobs table */
+        .jobs-table-container {
+            background: #252538;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: #1e1e30;
+        }
+
+        .table-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .jobs-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .jobs-table th,
+        .jobs-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+
+        .jobs-table th {
+            background: #1e1e30;
+            color: #888;
+            font-weight: 500;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .jobs-table tr:hover {
+            background: rgba(255, 215, 0, 0.05);
+        }
+
+        /* Status badges */
+        .status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .status-pending { background: #333; color: #888; }
+        .status-claimed { background: #3a3a00; color: #ffd700; }
+        .status-running { background: #003a3a; color: #00ffff; }
+        .status-completed { background: #1a3a1a; color: #4CAF50; }
+        .status-failed { background: #3a1a1a; color: #ff6b6b; }
+        .status-cancelled { background: #2a2a2a; color: #666; }
+
+        /* Priority badges */
+        .priority {
+            font-size: 0.85rem;
+        }
+
+        .priority-critical { color: #ff6b6b; }
+        .priority-high { color: #ffa726; }
+        .priority-normal { color: #888; }
+        .priority-low { color: #666; }
+
+        /* Type badges */
+        .job-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            background: #333;
+        }
+
+        .job-type-eval { border-left: 3px solid #4CAF50; }
+        .job-type-sparring { border-left: 3px solid #ffa726; }
+        .job-type-data_gen { border-left: 3px solid #2196F3; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        /* Refresh animation */
+        .refreshing {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast-success { background: #4CAF50; }
+        .toast-error { background: #f44336; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Job Queue</h1>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/guild">Guild</a>
+                <a href="/quests">Quests</a>
+                <a href="/vault">Vault</a>
+            </div>
+        </header>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-pending">-</div>
+                <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-running">-</div>
+                <div class="stat-label">Running</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-completed">-</div>
+                <div class="stat-label">Completed (1h)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-workers">-</div>
+                <div class="stat-label">Active Workers</div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+            <button class="btn btn-primary" onclick="toggleEvalForm()">Run Eval</button>
+            <button class="btn btn-secondary" onclick="refreshJobs()">
+                <span id="refresh-icon">Refresh</span>
+            </button>
+        </div>
+
+        <!-- Eval form -->
+        <div class="eval-form" id="eval-form">
+            <h3>Submit Eval Job</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="skill-select">Skill</label>
+                    <select id="skill-select">
+                        <option value="bin">Binary (BIN)</option>
+                        <option value="sy">Syllacrostic (SY)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="level-input">Level</label>
+                    <input type="number" id="level-input" value="1" min="1" max="50">
+                </div>
+                <div class="form-group">
+                    <label for="batch-input">Batch Size</label>
+                    <input type="number" id="batch-input" value="100" min="10" max="500">
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="submitEvalJob()">Submit</button>
+                <button class="btn btn-secondary" onclick="toggleEvalForm()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Jobs table -->
+        <div class="jobs-table-container">
+            <div class="table-header">
+                <h2>Jobs</h2>
+                <span id="job-count" style="color: #888"></span>
+            </div>
+            <table class="jobs-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Worker</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="jobs-body">
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            <h3>Loading...</h3>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Auto-refresh every 5 seconds
+        let refreshInterval;
+
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/jobs/stats');
+                const data = await res.json();
+
+                document.getElementById('stat-pending').textContent = data.queue_depth || 0;
+                document.getElementById('stat-running').textContent =
+                    (data.by_status?.running || 0) + (data.by_status?.claimed || 0);
+                document.getElementById('stat-completed').textContent = data.completed_last_hour || 0;
+                document.getElementById('stat-workers').textContent =
+                    Object.keys(data.active_workers || {}).length;
+            } catch (e) {
+                console.error('Stats fetch error:', e);
+            }
+        }
+
+        async function fetchJobs() {
+            try {
+                const res = await fetch('/api/jobs?limit=50');
+                const data = await res.json();
+
+                const tbody = document.getElementById('jobs-body');
+                document.getElementById('job-count').textContent = `${data.count} jobs`;
+
+                if (!data.jobs || data.jobs.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="empty-state">
+                                <h3>No jobs found</h3>
+                                <p>Submit an eval job to get started</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = data.jobs.map(job => {
+                    const spec = job.spec || {};
+                    const type = spec.job_type || 'unknown';
+                    const priority = spec.priority || 'normal';
+                    const status = job.status || 'unknown';
+                    const created = job.created_at ?
+                        new Date(job.created_at).toLocaleTimeString() : '-';
+
+                    return `
+                        <tr>
+                            <td><code>${job.job_id}</code></td>
+                            <td><span class="job-type job-type-${type}">${type}</span></td>
+                            <td><span class="status status-${status}">${status}</span></td>
+                            <td><span class="priority priority-${priority}">${priority}</span></td>
+                            <td>${job.worker_id || '-'}</td>
+                            <td>${created}</td>
+                            <td>
+                                ${status === 'pending' || status === 'claimed' ?
+                                    `<button class="btn btn-secondary" onclick="cancelJob('${job.job_id}')">Cancel</button>` :
+                                    '-'}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Jobs fetch error:', e);
+            }
+        }
+
+        async function refreshJobs() {
+            const icon = document.getElementById('refresh-icon');
+            icon.classList.add('refreshing');
+
+            await Promise.all([fetchStats(), fetchJobs()]);
+
+            setTimeout(() => icon.classList.remove('refreshing'), 500);
+        }
+
+        function toggleEvalForm() {
+            const form = document.getElementById('eval-form');
+            form.classList.toggle('visible');
+        }
+
+        async function submitEvalJob() {
+            const skillId = document.getElementById('skill-select').value;
+            const level = document.getElementById('level-input').value;
+            const batchSize = document.getElementById('batch-input').value;
+
+            try {
+                const res = await fetch('/api/jobs/eval', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        skill_id: skillId,
+                        level: parseInt(level),
+                        batch_size: parseInt(batchSize)
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast(`Job submitted: ${data.job_id}`, 'success');
+                    toggleEvalForm();
+                    refreshJobs();
+                } else {
+                    showToast(`Error: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showToast(`Error: ${e.message}`, 'error');
+            }
+        }
+
+        async function cancelJob(jobId) {
+            try {
+                const res = await fetch(`/api/jobs/${jobId}/cancel`, {
+                    method: 'POST'
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('Job cancelled', 'success');
+                    refreshJobs();
+                } else {
+                    showToast(`Error: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showToast(`Error: ${e.message}`, 'error');
+            }
+        }
+
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Initial load
+        refreshJobs();
+
+        // Auto-refresh every 5 seconds
+        refreshInterval = setInterval(refreshJobs, 5000);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            clearInterval(refreshInterval);
+        });
+    </script>
+</body>
+</html>

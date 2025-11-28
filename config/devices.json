@@ -118,6 +118,27 @@
         "tags": ["nas", "archive"]
       },
       "enabled": true
+    },
+
+    "macmini_eval_1": {
+      "hostname": "macmini-eval-1.local",
+      "description": "Mac Mini for eval jobs and data processing",
+      "roles": [
+        "eval_worker",
+        "data_forge"
+      ],
+      "gpus": [],
+      "cpu": {
+        "cores": 8,
+        "threads": 8
+      },
+      "memory_gb": 16,
+      "storage_zones": [],
+      "network": {
+        "speed_gbps": 1,
+        "tags": ["lan_edge", "eval"]
+      },
+      "enabled": true
     }
   },
 

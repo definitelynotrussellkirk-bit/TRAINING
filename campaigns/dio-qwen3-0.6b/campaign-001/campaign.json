@@ -1,0 +1,32 @@
+{
+  "id": "campaign-001",
+  "hero_id": "dio-qwen3-0.6b",
+  "name": "DIO's First Campaign",
+  "description": "Original training run - Binary Alchemy and Word Weaving",
+  "created_at": "2025-11-22T04:00:00Z",
+  "status": "active",
+  "starting_checkpoint": null,
+  "starting_step": 0,
+  "current_step": 183625,
+  "total_examples": 0,
+  "skills_focus": [
+    "sy",
+    "bin"
+  ],
+  "config_overrides": {},
+  "milestones": [
+    {
+      "step": 100000,
+      "note": "First 100k steps",
+      "date": "2025-11-24",
+      "metrics": null
+    },
+    {
+      "step": 180000,
+      "note": "Campaign system migration",
+      "date": "2025-11-27",
+      "metrics": null
+    }
+  ],
+  "archived_at": null
+}

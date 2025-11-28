@@ -1805,6 +1805,24 @@ def run_server(port: int = 8767, base_dir: Optional[str] = None):
     logger.info(f"Catalog: {keeper.catalog_path}")
     logger.info(f"Zones: {[z.zone_id for z in zone_registry.list()]}")
 
+    # Battle Log - server started event
+    try:
+        from core.battle_log import log_system
+        zone_names = [z.zone_id for z in zone_registry.list()]
+        log_system(
+            f"VaultKeeper started on port {port}",
+            severity="success",
+            source="vault.server",
+            details={
+                "port": port,
+                "base_dir": str(base_dir),
+                "zones": zone_names,
+                "job_store": job_store is not None,
+            },
+        )
+    except Exception:
+        pass  # Don't let battle log errors affect startup
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:

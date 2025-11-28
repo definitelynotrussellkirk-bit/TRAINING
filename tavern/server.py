@@ -4357,6 +4357,18 @@ def run_tavern(
     logger.info(f"  PID file: {ProcessManager.PID_FILE}")
     logger.info("=" * 60)
 
+    # Battle Log - Tavern opened event
+    try:
+        from core.battle_log import log_system
+        log_system(
+            f"Tavern opened for business on port {port}",
+            severity="success",
+            source="tavern.server",
+            details={"port": port, "api_host": api_host, "api_port": api_port},
+        )
+    except Exception:
+        pass  # Don't let battle log errors affect startup
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:

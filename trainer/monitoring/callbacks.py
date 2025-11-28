@@ -471,6 +471,26 @@ class LiveMonitorCallback(TrainerCallback):
                 )
                 print(f"📖 Ledger: {record.canonical_name} (loss={train_loss:.4f})" if train_loss else f"📖 Ledger: {record.canonical_name}")
 
+                # Battle Log - checkpoint saved event
+                try:
+                    from core.battle_log import log_training
+                    loss_str = f" (loss: {train_loss:.4f})" if train_loss else ""
+                    log_training(
+                        f"Checkpoint {state.global_step:,} saved{loss_str}",
+                        severity="success",
+                        source="training.callback",
+                        hero_id="DIO",
+                        details={
+                            "step": state.global_step,
+                            "loss": train_loss,
+                            "val_loss": val_loss,
+                            "learning_rate": learning_rate,
+                            "canonical_name": record.canonical_name,
+                        },
+                    )
+                except Exception:
+                    pass  # Don't let battle log errors affect training
+
                 # =========================================================
                 # QUEUE EVALUATIONS - Quick eval + LITE passives
                 # Also queue FULL eval every 5000 steps

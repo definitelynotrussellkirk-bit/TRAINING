@@ -363,6 +363,80 @@ def get_primary_title(
     return result.primary
 
 
+# Track previously earned titles for detecting new ones
+_previous_titles: Dict[str, set] = {"ids": set()}
+
+
+def check_new_titles(
+    total_steps: int = 0,
+    total_level: int = 0,
+    skill_states: Optional[Dict[str, Any]] = None,
+    hero_id: str = "DIO",
+) -> List[Title]:
+    """
+    Check for newly earned titles and log them to battle log.
+
+    Compares current titles against previously seen titles.
+    Returns list of newly earned titles.
+
+    Usage:
+        # Call periodically (e.g., after each checkpoint or eval)
+        new_titles = check_new_titles(steps, level, skills, hero_id="DIO")
+        for title in new_titles:
+            print(f"New title: {title.name}")
+    """
+    global _previous_titles
+
+    result = get_titles(total_steps, total_level, skill_states)
+    current_ids = {t.id for t in result.all_titles}
+    previous_ids = _previous_titles["ids"]
+
+    # Find newly earned titles
+    new_ids = current_ids - previous_ids
+    new_titles = [t for t in result.all_titles if t.id in new_ids]
+
+    # Log new titles to battle log
+    if new_titles:
+        try:
+            from core.battle_log import log_guild
+
+            for title in new_titles:
+                icon = title.icon or "🏅"
+                category_emoji = {
+                    "global": "🌟",
+                    "skill": "⚔️",
+                    "primitive": "🎯",
+                    "achievement": "🏆",
+                }.get(title.category, "🏅")
+
+                log_guild(
+                    f"{category_emoji} {hero_id} earned the title '{title.name}'",
+                    severity="success",
+                    source="guild.titles",
+                    hero_id=hero_id,
+                    details={
+                        "title_id": title.id,
+                        "title_name": title.name,
+                        "category": title.category,
+                        "skill_id": title.skill_id,
+                        "description": title.description,
+                    },
+                )
+        except Exception:
+            pass  # Don't let battle log errors affect title checking
+
+    # Update tracking
+    _previous_titles["ids"] = current_ids
+
+    return new_titles
+
+
+def reset_title_tracking():
+    """Reset the title tracking state (useful for testing or new heroes)."""
+    global _previous_titles
+    _previous_titles = {"ids": set()}
+
+
 # =============================================================================
 # CLI
 # =============================================================================

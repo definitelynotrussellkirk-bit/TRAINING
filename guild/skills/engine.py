@@ -354,6 +354,28 @@ class SkillEngine:
             f"level {state.level}, {state.xp_total:.0f} XP"
         )
 
+        # Battle Log - eval result event
+        try:
+            from core.battle_log import log_eval
+            acc_pct = result.accuracy * 100
+            severity = "success" if result.accuracy >= 0.8 else ("warning" if result.accuracy >= 0.5 else "error")
+            log_eval(
+                f"Eval {skill_id} L{level}: {acc_pct:.1f}% ({result.correct}/{result.total})",
+                severity=severity,
+                source="guild.skills.engine",
+                hero_id="DIO",
+                details={
+                    "skill_id": skill_id,
+                    "level": level,
+                    "accuracy": result.accuracy,
+                    "correct": result.correct,
+                    "total": result.total,
+                    "per_primitive": result.per_primitive_accuracy,
+                },
+            )
+        except Exception:
+            pass  # Don't let battle log errors affect eval
+
         return result, state
 
     def generate_eval_batch(

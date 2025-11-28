@@ -568,6 +568,14 @@ class TavernHandler(SimpleHTTPRequestHandler):
             job_id = path.replace("/api/jobs/", "")
             self._serve_job(job_id)
 
+        # Forge - Data validation and queue health
+        elif path == "/forge" or path == "/forge.html":
+            self._serve_template("forge.html")
+        elif path == "/api/forge/status":
+            self._serve_forge_status()
+        elif path == "/api/forge/rejected":
+            self._serve_forge_rejected()
+
         # Campaign - Hero/Campaign management
         elif path == "/campaign" or path == "/campaign.html":
             self._serve_template("campaign.html")
@@ -3010,6 +3018,157 @@ class TavernHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Cancel job error: {e}")
             self._send_json({"success": False, "error": str(e)}, 500)
+
+    # =========================================================================
+    # FORGE - Data Validation and Queue Health
+    # =========================================================================
+
+    def _serve_forge_status(self):
+        """Get Forge status including queue health and validation stats."""
+        try:
+            from core.training_queue import TrainingQueue
+            from core.paths import get_base_dir
+
+            queue = TrainingQueue(str(get_base_dir()))
+            base_status = queue.get_queue_status()
+
+            # Get rejected files
+            rejected_dir = queue.queue_dir / "rejected"
+            rejected_files = []
+            recent_rejections = []
+
+            if rejected_dir.exists():
+                for jsonl_file in sorted(rejected_dir.glob("*.jsonl"))[-20:]:
+                    rejected_files.append(jsonl_file.name)
+
+                    # Try to get rejection report
+                    report_file = rejected_dir / f"{jsonl_file.stem}.rejection.json"
+                    if report_file.exists():
+                        try:
+                            import json
+                            with open(report_file) as f:
+                                report = json.load(f)
+                                recent_rejections.append({
+                                    "file": jsonl_file.name,
+                                    "rejected_at": report.get("rejected_at", ""),
+                                    "errors": report.get("validation", {}).get("errors", [])[:3],
+                                    "leakage_count": report.get("validation", {}).get("leakage_count", 0),
+                                })
+                        except Exception:
+                            pass
+
+            # Get eval banks info
+            eval_banks = []
+            try:
+                from forge.leakage import EvalBankManager
+                manager = EvalBankManager()
+                banks = manager.list_banks()
+                for skill_id, counts in banks.items():
+                    eval_banks.append({
+                        "skill_id": skill_id,
+                        "ids": counts["ids"],
+                        "prompt_hashes": counts["prompt_hashes"],
+                    })
+            except Exception:
+                pass
+
+            # Get dataset contracts
+            contracts = []
+            try:
+                from forge.contracts import list_contracts
+                for contract in list_contracts():
+                    contracts.append({
+                        "id": contract.id,
+                        "version": contract.version,
+                        "description": contract.description[:100] if contract.description else "",
+                        "skill_id": contract.skill_id,
+                        "max_invalid_fraction": contract.max_invalid_fraction,
+                        "required_fields": contract.required_fields,
+                    })
+            except Exception:
+                pass
+
+            # Get shard state summary
+            datasets = []
+            try:
+                from forge.state import get_forge_state
+                state_mgr = get_forge_state()
+                summary = state_mgr.get_summary()
+                for dataset_id, info in summary.get("datasets", {}).items():
+                    datasets.append({
+                        "id": dataset_id,
+                        "total_shards": info["total"],
+                        "ready": info["by_status"].get("ready", 0),
+                        "rejected": info["by_status"].get("rejected", 0),
+                        "pending": info["by_status"].get("unknown", 0) + info["by_status"].get("pending", 0),
+                    })
+            except Exception:
+                pass
+
+            self._send_json({
+                "queue": {
+                    "high": base_status.get("queued", {}).get("high", 0),
+                    "normal": base_status.get("queued", {}).get("normal", 0),
+                    "low": base_status.get("queued", {}).get("low", 0),
+                    "processing": base_status.get("processing", 0),
+                    "total": base_status.get("total_queued", 0),
+                },
+                "rejected": {
+                    "count": len(rejected_files),
+                    "files": rejected_files[-10:],
+                },
+                "recent_rejections": recent_rejections[-5:],
+                "eval_banks": eval_banks,
+                "contracts": contracts,
+                "datasets": datasets,
+            })
+
+        except Exception as e:
+            logger.error(f"Forge status error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_forge_rejected(self):
+        """Get list of rejected files with details."""
+        try:
+            from core.training_queue import TrainingQueue
+            from core.paths import get_base_dir
+            import json
+
+            queue = TrainingQueue(str(get_base_dir()))
+            rejected_dir = queue.queue_dir / "rejected"
+
+            rejected = []
+            if rejected_dir.exists():
+                for jsonl_file in sorted(rejected_dir.glob("*.jsonl"), key=lambda x: x.stat().st_mtime, reverse=True):
+                    entry = {
+                        "file": jsonl_file.name,
+                        "size_bytes": jsonl_file.stat().st_size,
+                        "rejected_at": None,
+                        "errors": [],
+                        "leakage_count": 0,
+                    }
+
+                    report_file = rejected_dir / f"{jsonl_file.stem}.rejection.json"
+                    if report_file.exists():
+                        try:
+                            with open(report_file) as f:
+                                report = json.load(f)
+                                entry["rejected_at"] = report.get("rejected_at")
+                                validation = report.get("validation", {})
+                                entry["errors"] = validation.get("errors", [])[:5]
+                                entry["warnings"] = validation.get("warnings", [])[:5]
+                                entry["leakage_count"] = validation.get("leakage_count", 0)
+                                entry["stats"] = validation.get("stats", {})
+                        except Exception:
+                            pass
+
+                    rejected.append(entry)
+
+            self._send_json({"rejected": rejected[:50]})
+
+        except Exception as e:
+            logger.error(f"Forge rejected error: {e}")
+            self._send_json({"error": str(e)}, 500)
 
     def _serve_vault_zones(self, refresh: bool = False):
         """Serve zone status by querying Zone Wardens."""

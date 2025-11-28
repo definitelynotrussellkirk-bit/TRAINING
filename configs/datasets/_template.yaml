@@ -1,0 +1,62 @@
+# Dataset Contract Template
+#
+# Copy this file and customize for your dataset.
+# Place in configs/datasets/{dataset_id}.yaml
+#
+# The contract defines what valid training data looks like,
+# enabling automatic validation before training.
+
+# Required: Unique identifier for this dataset
+id: my_dataset_v1
+
+# Required: Version string (bump when schema changes)
+version: "1"
+
+# Required: Human-readable description
+description: |
+  Brief description of what this dataset contains,
+  its purpose, and any special characteristics.
+
+# Format: "jsonl" (default) or "parquet"
+kind: jsonl
+
+# Schema: Field names and their types
+# Supported types: str, int, float, bool, list, list[str], dict, any
+schema:
+  id: str
+  messages: list
+  metadata: dict
+
+# Required fields (must be present and non-null)
+required_fields:
+  - id
+  - messages
+
+# Optional fields (can be missing)
+optional_fields:
+  - metadata
+
+# Human-readable invariants (documented rules)
+# These are for documentation; actual validation is in code
+invariants:
+  - "id must be unique within the dataset"
+  - "messages must contain at least one user and one assistant message"
+  - "each message must have 'role' and 'content' fields"
+
+# Maximum fraction of invalid examples allowed (0.01 = 1%)
+max_invalid_fraction: 0.01
+
+# Safety profile: "internal" | "public" | "restricted"
+safety_profile: internal
+
+# Link to skill for leakage detection (optional)
+# If set, examples are checked against the skill's eval bank
+skill_id: null
+
+# Eval bank name for leakage detection (optional)
+# Defaults to skill_id if not set
+eval_leakage_guard: null
+
+# Tags for organization and filtering
+task_tags:
+  - training

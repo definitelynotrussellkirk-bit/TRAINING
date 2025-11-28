@@ -419,6 +419,10 @@ class ClaimingWorker:
                 result = self._execute_layer_stats(payload)
             elif job_type == "layer_drift":
                 result = self._execute_layer_drift(payload)
+            elif job_type == "data_validate":
+                result = self._execute_data_validate(payload)
+            elif job_type == "data_profile":
+                result = self._execute_data_profile(payload)
             else:
                 raise ValueError(f"Unknown job type: {job_type}")
 
@@ -512,15 +516,15 @@ class ClaimingWorker:
                 answers.append("")
 
         # Score results
-        result, state = engine.run_eval(skill_id, answers, level=level)
+        result, state = engine.run_eval(skill_id, answers, level=level, count=batch_size)
 
         return {
             "success": True,
             "skill_id": skill_id,
             "level": level,
             "accuracy": result.accuracy,
-            "correct": result.correct_count,
-            "total": result.total_count,
+            "correct": result.num_correct,
+            "total": result.num_examples,
             "per_primitive": result.per_primitive_accuracy,
         }
 
@@ -584,9 +588,14 @@ class ClaimingWorker:
 
     def _generate(self, prompt: str, max_tokens: int = 100) -> str:
         """Generate text via inference server."""
-        inference_url = self.config.inference_url or os.environ.get(
-            "INFERENCE_URL", "http://localhost:8765"
-        )
+        if self.config.inference_url:
+            inference_url = self.config.inference_url
+        else:
+            # Use service discovery from hosts.json
+            from core.hosts import get_service_url
+            inference_url = get_service_url("inference") or os.environ.get(
+                "INFERENCE_URL", "http://localhost:8765"
+            )
 
         response = requests.post(
             f"{inference_url}/generate",
@@ -752,6 +761,131 @@ class ClaimingWorker:
             result["output_path"] = str(output_path)
 
         return result
+
+    def _execute_data_validate(self, payload: Dict) -> Dict:
+        """Execute a data_validate job using the Forge validator."""
+        from pathlib import Path
+
+        file_path = Path(payload["file_path"])
+        skill_id = payload.get("skill_id")
+        deep = payload.get("deep", True)
+        check_leakage = payload.get("check_leakage", True)
+        add_to_queue = payload.get("add_to_queue", False)
+        priority = payload.get("priority", "normal")
+
+        logger.info(f"Validating: {file_path} (skill={skill_id}, deep={deep})")
+
+        # Run Forge validation
+        from forge.validator import ForgeValidator
+
+        validator = ForgeValidator()
+        result = validator.validate(
+            file_path,
+            skill_id=skill_id,
+            deep=deep,
+            check_leakage=check_leakage,
+        )
+
+        # Log to Battle Log
+        try:
+            from core.battle_log import log_jobs
+            if result.passed:
+                log_jobs(
+                    f"✅ Validated {file_path.name}: {result.summary}",
+                    source="forge.data_validate",
+                    severity="success",
+                    details={"file": file_path.name, "skill_id": skill_id}
+                )
+            else:
+                log_jobs(
+                    f"🚫 Validation failed {file_path.name}: {result.summary}",
+                    source="forge.data_validate",
+                    severity="warning",
+                    details={
+                        "file": file_path.name,
+                        "errors": result.errors[:5],
+                        "leakage_count": result.leakage_count,
+                    }
+                )
+        except Exception:
+            pass
+
+        # Optionally add to queue if passed
+        if add_to_queue and result.passed:
+            try:
+                from core.training_queue import TrainingQueue
+                from core.paths import get_base_dir
+
+                queue = TrainingQueue(str(get_base_dir()))
+                if queue.add_to_queue(file_path, priority):
+                    logger.info(f"Added {file_path.name} to {priority} queue")
+            except Exception as e:
+                logger.warning(f"Failed to add to queue: {e}")
+
+        return result.to_dict()
+
+    def _execute_data_profile(self, payload: Dict) -> Dict:
+        """Execute a data_profile job using the Forge profiler."""
+        from pathlib import Path
+        import json
+
+        file_path = Path(payload["file_path"])
+        max_samples = payload.get("max_samples", 10000)
+        output_path = payload.get("output_path")
+        dataset_id = payload.get("dataset_id")
+
+        logger.info(f"Profiling: {file_path} (max_samples={max_samples})")
+
+        # Run profiler
+        from forge.profiler import profile_shard
+
+        profile = profile_shard(file_path, max_samples=max_samples)
+
+        # Save report if output path specified
+        if output_path:
+            output_path = Path(output_path)
+        else:
+            # Default: save to data/reports/
+            try:
+                from core.paths import get_base_dir
+                reports_dir = get_base_dir() / "data" / "reports"
+            except ImportError:
+                reports_dir = Path("data/reports")
+
+            if dataset_id:
+                reports_dir = reports_dir / dataset_id
+
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            output_path = reports_dir / f"{file_path.stem}.profile.json"
+
+        with open(output_path, "w") as f:
+            json.dump(profile.to_dict(), f, indent=2)
+
+        logger.info(f"Profile saved to: {output_path}")
+
+        # Log to Battle Log
+        try:
+            from core.battle_log import log_jobs
+            log_jobs(
+                f"Profiled {file_path.name}: {profile.rows_total} rows, "
+                f"avg {profile.char_lengths.get('mean', 0):.0f} chars",
+                source="forge.data_profile",
+                severity="info",
+                details={
+                    "file": file_path.name,
+                    "rows": profile.rows_total,
+                    "output": str(output_path),
+                }
+            )
+        except Exception:
+            pass
+
+        return {
+            "file_path": str(file_path),
+            "rows_total": profile.rows_total,
+            "output_path": str(output_path),
+            "summary": profile.summary(),
+        }
 
     def _get_analysis_path(self, campaign_id: str, hero_id: str, analysis_type: str) -> Path:
         """Get the analysis directory path for a campaign."""

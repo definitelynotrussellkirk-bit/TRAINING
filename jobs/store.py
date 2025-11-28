@@ -226,12 +226,29 @@ CREATE TABLE IF NOT EXISTS workers (
     last_seen_ip TEXT,
     status TEXT NOT NULL DEFAULT 'online',
     active_jobs INTEGER DEFAULT 0,
+    -- Heterogeneous Cluster (HC) fields
+    resource_class TEXT,
+    priority_class TEXT,
+    max_concurrent_jobs INTEGER DEFAULT 1,
+    capabilities_json TEXT,
+    gpus_json TEXT,
     metadata_json TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_workers_status ON workers(status);
 CREATE INDEX IF NOT EXISTS idx_workers_heartbeat ON workers(last_heartbeat_at);
 CREATE INDEX IF NOT EXISTS idx_workers_device ON workers(device_id);
+CREATE INDEX IF NOT EXISTS idx_workers_resource_class ON workers(resource_class);
+"""
+
+# Migration for existing workers table (add HC columns)
+MIGRATION_WORKERS_HC = """
+ALTER TABLE workers ADD COLUMN resource_class TEXT;
+ALTER TABLE workers ADD COLUMN priority_class TEXT;
+ALTER TABLE workers ADD COLUMN max_concurrent_jobs INTEGER DEFAULT 1;
+ALTER TABLE workers ADD COLUMN capabilities_json TEXT;
+ALTER TABLE workers ADD COLUMN gpus_json TEXT;
+CREATE INDEX IF NOT EXISTS idx_workers_resource_class ON workers(resource_class);
 """
 
 # Job events table schema (audit trail)
@@ -333,12 +350,12 @@ class SQLiteJobStore(JobStore):
 
     def _migrate(self, conn: sqlite3.Connection):
         """Run migrations on existing database."""
-        # Check if error_code column exists
+        # Check if error_code column exists in jobs table
         cursor = conn.execute("PRAGMA table_info(jobs)")
-        columns = {row[1] for row in cursor.fetchall()}
+        job_columns = {row[1] for row in cursor.fetchall()}
 
-        if "error_code" not in columns:
-            logger.info("Running migration: adding error_code column")
+        if "error_code" not in job_columns:
+            logger.info("Running migration: adding error_code column to jobs")
             try:
                 conn.execute(
                     "ALTER TABLE jobs ADD COLUMN error_code TEXT NOT NULL DEFAULT 'none'"
@@ -350,6 +367,33 @@ class SQLiteJobStore(JobStore):
                 logger.info("Migration complete: error_code column added")
             except sqlite3.OperationalError as e:
                 # Column might already exist (race condition)
+                if "duplicate column" not in str(e).lower():
+                    raise
+
+        # Check if HC columns exist in workers table
+        cursor = conn.execute("PRAGMA table_info(workers)")
+        worker_columns = {row[1] for row in cursor.fetchall()}
+
+        hc_columns = ["resource_class", "priority_class", "max_concurrent_jobs", "capabilities_json", "gpus_json"]
+        missing_hc = [c for c in hc_columns if c not in worker_columns]
+
+        if missing_hc:
+            logger.info(f"Running migration: adding HC columns to workers: {missing_hc}")
+            try:
+                if "resource_class" not in worker_columns:
+                    conn.execute("ALTER TABLE workers ADD COLUMN resource_class TEXT")
+                if "priority_class" not in worker_columns:
+                    conn.execute("ALTER TABLE workers ADD COLUMN priority_class TEXT")
+                if "max_concurrent_jobs" not in worker_columns:
+                    conn.execute("ALTER TABLE workers ADD COLUMN max_concurrent_jobs INTEGER DEFAULT 1")
+                if "capabilities_json" not in worker_columns:
+                    conn.execute("ALTER TABLE workers ADD COLUMN capabilities_json TEXT")
+                if "gpus_json" not in worker_columns:
+                    conn.execute("ALTER TABLE workers ADD COLUMN gpus_json TEXT")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_workers_resource_class ON workers(resource_class)")
+                conn.commit()
+                logger.info("Migration complete: HC columns added to workers")
+            except sqlite3.OperationalError as e:
                 if "duplicate column" not in str(e).lower():
                     raise
 
@@ -590,6 +634,168 @@ class SQLiteJobStore(JobStore):
                 return job
 
         return None
+
+    def claim_next_smart(
+        self,
+        worker: Dict[str, Any],
+        lease_duration: int = 300,
+    ) -> Optional[Job]:
+        """
+        Smart job claiming using heterogeneous cluster routing.
+
+        Uses the routing module to determine job type priority order
+        based on worker capabilities, resource class, and cluster mode.
+
+        Args:
+            worker: Full worker info dict with resource_class, capabilities, etc.
+            lease_duration: Seconds before lease expires
+
+        Returns:
+            Claimed job or None if no jobs available
+        """
+        try:
+            from jobs.routing import ordered_job_types_for_worker, compute_cluster_mode
+        except ImportError:
+            # Fall back to basic claim if routing module not available
+            device_id = worker.get("device_id")
+            roles = worker.get("roles", [])
+            return self.claim_next(device_id, roles, lease_duration)
+
+        device_id = worker.get("device_id")
+        roles = worker.get("roles", [])
+
+        # Get queue stats for routing decisions
+        queue_stats = self.get_queue_stats()
+
+        # Compute cluster mode
+        cluster_mode = compute_cluster_mode(queue_stats)
+
+        # Get queue depths for routing
+        queue_depths = {
+            jt: stats.get("pending", 0)
+            for jt, stats in queue_stats.items()
+        }
+
+        # Get ordered job types for this worker
+        ordered_types = ordered_job_types_for_worker(
+            worker=worker,
+            cluster_mode=cluster_mode,
+            queue_depths=queue_depths,
+        )
+
+        if not ordered_types:
+            logger.debug(f"No job types available for worker {worker.get('worker_id')}")
+            return None
+
+        # Try claiming in priority order
+        for job_type in ordered_types:
+            job = self._claim_by_type(
+                device_id=device_id,
+                job_type=job_type,
+                lease_duration=lease_duration,
+            )
+            if job:
+                # Log routing decision
+                logger.info(
+                    f"Smart claim: {device_id} claimed {job_type} job {job.job_id} "
+                    f"(cluster_mode={cluster_mode}, priority_order={ordered_types[:5]})"
+                )
+                return job
+
+        return None
+
+    def _claim_by_type(
+        self,
+        device_id: str,
+        job_type: str,
+        lease_duration: int = 300,
+    ) -> Optional[Job]:
+        """
+        Claim next available job of a specific type.
+
+        Internal helper for smart routing.
+        """
+        now = self._now()
+        lease_expires = (datetime.utcnow() + timedelta(seconds=lease_duration)).isoformat()
+
+        with self._transaction() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE jobs SET
+                    status = 'claimed',
+                    claimed_by = ?,
+                    lease_expires_at = ?,
+                    updated_at = ?,
+                    queued_at = COALESCE(queued_at, ?)
+                WHERE id = (
+                    SELECT id FROM jobs
+                    WHERE (
+                        status = 'pending'
+                        OR (status IN ('claimed', 'running') AND lease_expires_at < ?)
+                    )
+                    AND type = ?
+                    AND (target_device_id IS NULL OR target_device_id = ?)
+                    ORDER BY
+                        CASE priority
+                            WHEN 'critical' THEN 0
+                            WHEN 'high' THEN 1
+                            WHEN 'normal' THEN 2
+                            WHEN 'low' THEN 3
+                            WHEN 'idle' THEN 4
+                        END,
+                        created_at
+                    LIMIT 1
+                )
+                RETURNING *
+                """,
+                (device_id, lease_expires, now, now, now, job_type, device_id),
+            )
+
+            row = cursor.fetchone()
+            if row:
+                job = self._row_to_job(row)
+
+                # Record CLAIMED event
+                self.record_event(
+                    job_id=job.job_id,
+                    event_type=JobEventType.CLAIMED,
+                    actor=device_id,
+                    message=f"Job claimed by {device_id} (smart routing)",
+                    details={"lease_expires": lease_expires, "job_type": job_type},
+                )
+
+                return job
+
+        return None
+
+    def get_queue_stats(self) -> Dict[str, Dict[str, int]]:
+        """
+        Get queue statistics by job type.
+
+        Returns:
+            Dict of {job_type: {"pending": N, "running": M, "claimed": K}}
+        """
+        conn = self._get_conn()
+        cursor = conn.execute(
+            """
+            SELECT type, status, COUNT(*) as count
+            FROM jobs
+            WHERE status IN ('pending', 'claimed', 'running')
+            GROUP BY type, status
+            """
+        )
+
+        stats: Dict[str, Dict[str, int]] = {}
+        for row in cursor.fetchall():
+            job_type = row["type"]
+            status = row["status"]
+            count = row["count"]
+
+            if job_type not in stats:
+                stats[job_type] = {"pending": 0, "claimed": 0, "running": 0}
+            stats[job_type][status] = count
+
+        return stats
 
     def mark_running(self, job_id: str, device_id: str) -> bool:
         """Mark a claimed job as running."""
@@ -1131,6 +1337,12 @@ class SQLiteJobStore(JobStore):
         hostname: str = None,
         client_ip: str = None,
         metadata: Dict[str, Any] = None,
+        # Heterogeneous Cluster fields
+        resource_class: str = None,
+        priority_class: str = None,
+        max_concurrent_jobs: int = 1,
+        capabilities: List[str] = None,
+        gpus: List[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Register or update a worker.
@@ -1144,6 +1356,11 @@ class SQLiteJobStore(JobStore):
             hostname: Worker hostname
             client_ip: IP address of worker
             metadata: Additional metadata
+            resource_class: Device resource class (gpu_heavy, gpu_medium, cpu_heavy, cpu_light)
+            priority_class: Device priority class (critical, support, auxiliary)
+            max_concurrent_jobs: Max concurrent jobs for this worker
+            capabilities: List of capability tags
+            gpus: List of GPU info dicts with name, vram_gb
 
         Returns:
             Registration result with allowed job types
@@ -1169,6 +1386,11 @@ class SQLiteJobStore(JobStore):
                         last_heartbeat_at = ?,
                         last_seen_ip = ?,
                         status = 'online',
+                        resource_class = ?,
+                        priority_class = ?,
+                        max_concurrent_jobs = ?,
+                        capabilities_json = ?,
+                        gpus_json = ?,
                         metadata_json = ?
                     WHERE id = ?
                     """,
@@ -1178,11 +1400,16 @@ class SQLiteJobStore(JobStore):
                         hostname,
                         now,
                         client_ip,
+                        resource_class,
+                        priority_class,
+                        max_concurrent_jobs,
+                        json.dumps(capabilities) if capabilities else None,
+                        json.dumps(gpus) if gpus else None,
                         json.dumps(metadata) if metadata else None,
                         worker_id,
                     ),
                 )
-                logger.info(f"Worker {worker_id} re-registered")
+                logger.info(f"Worker {worker_id} re-registered (resource_class={resource_class})")
             else:
                 # Insert new worker
                 conn.execute(
@@ -1190,8 +1417,10 @@ class SQLiteJobStore(JobStore):
                     INSERT INTO workers (
                         id, device_id, worker_kind, roles_json,
                         version, hostname, registered_at, last_heartbeat_at,
-                        last_seen_ip, status, active_jobs, metadata_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', 0, ?)
+                        last_seen_ip, status, active_jobs,
+                        resource_class, priority_class, max_concurrent_jobs,
+                        capabilities_json, gpus_json, metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', 0, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         worker_id,
@@ -1203,10 +1432,15 @@ class SQLiteJobStore(JobStore):
                         now,
                         now,
                         client_ip,
+                        resource_class,
+                        priority_class,
+                        max_concurrent_jobs,
+                        json.dumps(capabilities) if capabilities else None,
+                        json.dumps(gpus) if gpus else None,
                         json.dumps(metadata) if metadata else None,
                     ),
                 )
-                logger.info(f"Worker {worker_id} registered (device={device_id}, roles={roles})")
+                logger.info(f"Worker {worker_id} registered (device={device_id}, resource_class={resource_class})")
 
         # Get allowed job types for this worker
         from jobs.registry import get_allowed_job_types
@@ -1216,6 +1450,9 @@ class SQLiteJobStore(JobStore):
             "worker_id": worker_id,
             "registered": True,
             "allowed_job_types": allowed_types,
+            "resource_class": resource_class,
+            "priority_class": priority_class,
+            "max_concurrent_jobs": max_concurrent_jobs,
         }
 
     def heartbeat_worker(
@@ -1375,6 +1612,23 @@ class SQLiteJobStore(JobStore):
         heartbeat_at = datetime.fromisoformat(row["last_heartbeat_at"])
         age_sec = (datetime.utcnow() - heartbeat_at).total_seconds()
 
+        # Helper to safely get optional columns (may not exist in old DBs)
+        def safe_get(column: str, default=None):
+            try:
+                return row[column]
+            except (IndexError, KeyError):
+                return default
+
+        # Parse HC JSON fields safely (may be None for old workers)
+        capabilities = None
+        gpus = None
+        capabilities_json = safe_get("capabilities_json")
+        gpus_json = safe_get("gpus_json")
+        if capabilities_json:
+            capabilities = json.loads(capabilities_json)
+        if gpus_json:
+            gpus = json.loads(gpus_json)
+
         return {
             "worker_id": row["id"],
             "device_id": row["device_id"],
@@ -1388,6 +1642,12 @@ class SQLiteJobStore(JobStore):
             "last_seen_ip": row["last_seen_ip"],
             "status": row["status"],
             "active_jobs": row["active_jobs"],
+            # Heterogeneous Cluster fields
+            "resource_class": safe_get("resource_class"),
+            "priority_class": safe_get("priority_class"),
+            "max_concurrent_jobs": safe_get("max_concurrent_jobs", 1),
+            "capabilities": capabilities or [],
+            "gpus": gpus or [],
             "metadata": json.loads(row["metadata_json"]) if row["metadata_json"] else None,
         }
 

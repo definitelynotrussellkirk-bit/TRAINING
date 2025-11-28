@@ -198,6 +198,8 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             self._handle_jobs_stats()
         elif path == "/api/jobs/workers":
             self._handle_workers_list()
+        elif path == "/api/jobs/cluster":
+            self._handle_cluster_status()
         elif path == "/api/jobs/health":
             self._handle_jobs_health()
         elif path == "/api/jobs/events":
@@ -1334,9 +1336,12 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
 
         Supports two modes:
         1. worker_id mode (preferred): Server looks up roles from workers table
+           - Uses smart routing based on resource_class, capabilities
+           - Enforces max_concurrent_jobs limit
         2. Legacy mode: Client provides device_id + roles directly
+           - Falls back to basic role-based routing
 
-        Using worker_id mode ensures roles are validated from registration.
+        Using worker_id mode enables heterogeneous cluster routing.
         """
         if not body:
             self._send_error("Missing request body", 400)
@@ -1346,10 +1351,11 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
         device_id = body.get("device_id")
         roles = body.get("roles", [])
         lease_duration = body.get("lease_duration", 300)
+        use_smart_routing = body.get("smart_routing", True)  # Default to smart routing
 
         store = self._get_job_store()
 
-        # Prefer worker_id mode - look up roles from registered worker
+        # Prefer worker_id mode - look up full worker info
         if worker_id:
             worker = store.get_worker(worker_id)
             if not worker:
@@ -1360,15 +1366,57 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
                 }, 404)
                 return
 
-            # Use roles from registered worker (validated during registration)
-            roles = worker.get("roles", [])
-            device_id = worker.get("device_id")
+            # Check load limits (max_concurrent_jobs)
+            max_jobs = worker.get("max_concurrent_jobs", 1)
+            active_jobs = worker.get("active_jobs", 0)
+            if active_jobs >= max_jobs:
+                self._send_json({
+                    "claimed": False,
+                    "message": "Worker at capacity",
+                    "active_jobs": active_jobs,
+                    "max_concurrent_jobs": max_jobs,
+                })
+                return
 
-        elif not device_id:
+            # Use smart routing if worker has HC fields
+            if use_smart_routing and worker.get("resource_class"):
+                try:
+                    job = store.claim_next_smart(worker, lease_duration)
+                except Exception as e:
+                    logger.warning(f"Smart routing failed, falling back: {e}")
+                    job = store.claim_next(
+                        worker.get("device_id"),
+                        worker.get("roles", []),
+                        lease_duration
+                    )
+            else:
+                # Fall back to basic routing
+                job = store.claim_next(
+                    worker.get("device_id"),
+                    worker.get("roles", []),
+                    lease_duration
+                )
+
+            if job:
+                self._send_json({
+                    "claimed": True,
+                    "job": job.to_dict(),
+                    "routing": "smart" if worker.get("resource_class") else "basic",
+                })
+            else:
+                self._send_json({
+                    "claimed": False,
+                    "message": "No jobs available for your capabilities",
+                    "routing": "smart" if worker.get("resource_class") else "basic",
+                })
+            return
+
+        # Legacy mode: device_id + roles
+        if not device_id:
             self._send_error("Missing 'device_id' or 'worker_id' in request body", 400)
             return
 
-        elif not roles:
+        if not roles:
             self._send_error("Missing 'roles' in request body (or use 'worker_id')", 400)
             return
 
@@ -1379,11 +1427,13 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
                 self._send_json({
                     "claimed": True,
                     "job": job.to_dict(),
+                    "routing": "legacy",
                 })
             else:
                 self._send_json({
                     "claimed": False,
                     "message": "No jobs available for your roles",
+                    "routing": "legacy",
                 })
 
         except Exception as e:
@@ -1521,7 +1571,13 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             }, 400)
             return
 
-        # Validate device_id and roles against devices.json
+        # Validate device_id and roles against devices.json, extract HC fields
+        resource_class = None
+        priority_class = None
+        max_concurrent_jobs = 1
+        capabilities = []
+        gpus = []
+
         try:
             from core.paths import get_base_dir
             devices_path = get_base_dir() / "config" / "devices.json"
@@ -1561,6 +1617,14 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
 
                 # Use the validated roles (intersection with allowed)
                 roles = list(requested_roles & allowed_roles)
+
+                # Extract HC fields from device config
+                resource_class = device_cfg.get("resource_class")
+                priority_class = device_cfg.get("priority_class")
+                max_concurrent_jobs = device_cfg.get("max_concurrent_jobs", 1)
+                capabilities = device_cfg.get("capabilities", [])
+                gpus = device_cfg.get("gpus", [])
+
         except Exception as e:
             # Log but don't block registration if devices.json can't be read
             logger.warning(f"Could not validate device roles: {e}")
@@ -1581,6 +1645,12 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
                 version=version,
                 hostname=hostname,
                 client_ip=client_ip,
+                # HC fields from devices.json
+                resource_class=resource_class,
+                priority_class=priority_class,
+                max_concurrent_jobs=max_concurrent_jobs,
+                capabilities=capabilities,
+                gpus=gpus,
             )
 
             self._send_json(result)
@@ -1647,6 +1717,97 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Workers list error: {e}")
             self._send_error(str(e), 500)
+
+    def _handle_cluster_status(self):
+        """
+        Get heterogeneous cluster status.
+
+        Returns cluster mode, queue depths, and worker summary with resource classes.
+        """
+        try:
+            store = self._get_job_store()
+
+            # Get queue stats
+            queue_stats = store.get_queue_stats()
+
+            # Compute cluster mode
+            try:
+                from jobs.routing import compute_cluster_mode
+                cluster_mode = compute_cluster_mode(queue_stats)
+            except ImportError:
+                cluster_mode = "unknown"
+
+            # Get workers
+            workers = store.list_workers()
+            online_workers = [w for w in workers if w.get("status") == "online"]
+
+            # Group by resource class
+            by_resource_class = {}
+            for w in online_workers:
+                rc = w.get("resource_class") or "unknown"
+                if rc not in by_resource_class:
+                    by_resource_class[rc] = {"count": 0, "active_jobs": 0, "max_jobs": 0}
+                by_resource_class[rc]["count"] += 1
+                by_resource_class[rc]["active_jobs"] += w.get("active_jobs", 0)
+                by_resource_class[rc]["max_jobs"] += w.get("max_concurrent_jobs", 1)
+
+            # Group by priority class
+            by_priority_class = {}
+            for w in online_workers:
+                pc = w.get("priority_class") or "unknown"
+                if pc not in by_priority_class:
+                    by_priority_class[pc] = {"count": 0, "active_jobs": 0}
+                by_priority_class[pc]["count"] += 1
+                by_priority_class[pc]["active_jobs"] += w.get("active_jobs", 0)
+
+            # Calculate total capacity
+            total_capacity = sum(w.get("max_concurrent_jobs", 1) for w in online_workers)
+            total_active = sum(w.get("active_jobs", 0) for w in online_workers)
+
+            # Calculate queue depths
+            total_pending = sum(
+                stats.get("pending", 0)
+                for stats in queue_stats.values()
+            )
+
+            self._send_json({
+                "mode": cluster_mode,
+                "queue_depths": queue_stats,
+                "workers_summary": {
+                    "total": len(workers),
+                    "online": len(online_workers),
+                    "by_resource_class": by_resource_class,
+                    "by_priority_class": by_priority_class,
+                    "total_capacity": total_capacity,
+                    "total_active": total_active,
+                    "utilization_pct": round(100 * total_active / total_capacity, 1) if total_capacity > 0 else 0,
+                },
+                "health": {
+                    "total_pending": total_pending,
+                    "cluster_mode": cluster_mode,
+                    "mode_reason": self._get_mode_reason(cluster_mode, queue_stats),
+                },
+            })
+
+        except Exception as e:
+            logger.error(f"Cluster status error: {e}")
+            self._send_error(str(e), 500)
+
+    def _get_mode_reason(self, mode: str, queue_stats: dict) -> str:
+        """Get human-readable reason for current cluster mode."""
+        if mode == "catch_up":
+            # Find which job types have high backlogs
+            high_backlogs = [
+                jt for jt, stats in queue_stats.items()
+                if stats.get("pending", 0) > 10
+            ]
+            if high_backlogs:
+                return f"High backlog in: {', '.join(high_backlogs)}"
+            return "Critical job backlog detected"
+        elif mode == "idle":
+            return "No critical or high-priority work pending"
+        else:
+            return "Balanced operation"
 
     def _handle_jobs_health(self):
         """Job system health check."""

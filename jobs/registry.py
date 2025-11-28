@@ -54,9 +54,18 @@ class JobTypeConfig:
     max_attempts: int = 3
     retryable_errors: List[JobErrorCode] = field(default_factory=list)
 
-    # Routing
+    # Routing - Basic
     allowed_roles: List[str] = field(default_factory=list)
     requires_gpu: bool = False
+
+    # Routing - Heterogeneous Cluster (HC)
+    resource_intensity: str = "medium"  # "light" | "medium" | "heavy"
+    job_priority_class: str = "normal"  # "critical" | "high" | "normal" | "low"
+    preferred_resource_classes: List[str] = field(default_factory=list)  # ["gpu_heavy", "gpu_medium"]
+    required_resource_classes: List[str] = field(default_factory=list)   # Must be one of these (empty = any)
+    forbidden_roles: List[str] = field(default_factory=list)             # Never route to these
+    required_capabilities: List[str] = field(default_factory=list)       # Worker must have all
+    min_vram_gb: Optional[int] = None                                    # Minimum VRAM required
 
     # Backpressure
     max_pending: int = 100  # Queue limit
@@ -100,6 +109,10 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         ],
         allowed_roles=["eval_worker"],
         requires_gpu=False,  # Uses remote inference
+        # HC routing
+        resource_intensity="light",
+        job_priority_class="high",
+        preferred_resource_classes=["gpu_heavy", "gpu_medium", "cpu_heavy", "cpu_light"],
         max_pending=50,
         max_running=3,
         queue_full_policy="warn",
@@ -116,6 +129,10 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[],
         allowed_roles=["eval_worker"],
         requires_gpu=False,
+        # HC routing - heavy because it's long-running
+        resource_intensity="heavy",
+        job_priority_class="normal",
+        preferred_resource_classes=["gpu_heavy", "gpu_medium"],
         max_pending=10,
         max_running=1,
         queue_full_policy="reject",
@@ -135,6 +152,11 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         ],
         allowed_roles=["inference", "eval_worker"],
         requires_gpu=False,
+        # HC routing
+        resource_intensity="light",
+        job_priority_class="high",
+        preferred_resource_classes=["gpu_medium", "gpu_heavy"],  # Prefer 3090 for inference
+        required_capabilities=["inference"],
         max_pending=100,
         max_running=10,
         queue_full_policy="reject",
@@ -155,6 +177,10 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[JobErrorCode.EXECUTION_ERROR],
         allowed_roles=["data_forge"],
         requires_gpu=False,
+        # HC routing - CPU-bound, R730xd is ideal
+        resource_intensity="medium",
+        job_priority_class="normal",
+        preferred_resource_classes=["cpu_heavy", "cpu_light", "gpu_medium"],
         max_pending=20,
         max_running=2,
         queue_full_policy="warn",
@@ -171,6 +197,10 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[],
         allowed_roles=["data_forge"],
         requires_gpu=False,
+        # HC routing
+        resource_intensity="light",
+        job_priority_class="normal",
+        preferred_resource_classes=["cpu_heavy", "cpu_light"],
         max_pending=10,
         max_running=2,
         queue_full_policy="warn",
@@ -187,9 +217,53 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[],
         allowed_roles=["data_forge"],
         requires_gpu=False,
+        # HC routing
+        resource_intensity="light",
+        job_priority_class="normal",
+        preferred_resource_classes=["cpu_heavy", "cpu_light"],
         max_pending=10,
         max_running=2,
         queue_full_policy="warn",
+    ),
+
+    "data_validate": JobTypeConfig(
+        name="data_validate",
+        description="Validate training data with Forge (schema + leakage check)",
+        required_fields=["file_path"],
+        optional_fields=["skill_id", "deep", "check_leakage", "add_to_queue", "priority", "dataset_id"],
+        payload_version=1,
+        default_timeout=300,
+        max_attempts=1,
+        retryable_errors=[],
+        allowed_roles=["data_forge"],
+        requires_gpu=False,
+        # HC routing - light, can run anywhere
+        resource_intensity="light",
+        job_priority_class="normal",
+        preferred_resource_classes=["cpu_heavy", "cpu_light", "gpu_medium"],
+        max_pending=50,
+        max_running=4,
+        queue_full_policy="allow",
+    ),
+
+    "data_profile": JobTypeConfig(
+        name="data_profile",
+        description="Compute distributional stats for training data (token lengths, etc.)",
+        required_fields=["file_path"],
+        optional_fields=["dataset_id", "max_samples", "output_path"],
+        payload_version=1,
+        default_timeout=600,
+        max_attempts=1,
+        retryable_errors=[],
+        allowed_roles=["data_forge", "analytics"],
+        requires_gpu=False,
+        # HC routing - medium CPU work
+        resource_intensity="medium",
+        job_priority_class="normal",
+        preferred_resource_classes=["cpu_heavy", "gpu_medium", "cpu_light"],
+        max_pending=50,
+        max_running=2,
+        queue_full_policy="allow",
     ),
 
     # =========================================================================
@@ -207,6 +281,11 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[],
         allowed_roles=["vault_worker"],
         requires_gpu=False,
+        # HC routing - R730xd with 40TB storage is ideal
+        resource_intensity="heavy",
+        job_priority_class="low",
+        preferred_resource_classes=["cpu_heavy"],
+        required_capabilities=["archive"],
         max_pending=5,
         max_running=1,
         queue_full_policy="reject",
@@ -223,6 +302,10 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[],
         allowed_roles=["vault_worker"],
         requires_gpu=False,
+        # HC routing
+        resource_intensity="light",
+        job_priority_class="low",
+        preferred_resource_classes=["cpu_heavy"],
         max_pending=3,
         max_running=1,
         queue_full_policy="reject",
@@ -242,6 +325,10 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         ],
         allowed_roles=["vault_worker"],
         requires_gpu=False,
+        # HC routing - network-bound, prefer 10Gb nodes
+        resource_intensity="heavy",
+        job_priority_class="low",
+        preferred_resource_classes=["cpu_heavy"],
         max_pending=3,
         max_running=1,
         queue_full_policy="reject",
@@ -262,6 +349,10 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[],
         allowed_roles=["analytics"],
         requires_gpu=False,
+        # HC routing - CPU analytics, prefer R730xd or 3090
+        resource_intensity="medium",
+        job_priority_class="low",
+        preferred_resource_classes=["cpu_heavy", "gpu_medium"],
         max_pending=10,
         max_running=2,
         queue_full_policy="allow",
@@ -278,6 +369,10 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[],
         allowed_roles=["analytics"],
         requires_gpu=False,
+        # HC routing
+        resource_intensity="light",
+        job_priority_class="low",
+        preferred_resource_classes=["cpu_heavy", "gpu_medium", "cpu_light"],
         max_pending=10,
         max_running=3,
         queue_full_policy="allow",
@@ -294,6 +389,10 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[],
         allowed_roles=["eval_worker", "data_forge", "vault_worker", "analytics"],
         requires_gpu=False,
+        # HC routing - can run anywhere
+        resource_intensity="light",
+        job_priority_class="low",
+        preferred_resource_classes=["cpu_light", "cpu_heavy", "gpu_medium", "gpu_heavy"],
         max_pending=10,
         max_running=5,
         queue_full_policy="allow",
@@ -322,6 +421,12 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[],
         allowed_roles=["analytics"],
         requires_gpu=True,          # Need GPU for activation computation
+        # HC routing - GPU analytics, 3090 is primary, 4090 only when idle
+        resource_intensity="heavy",
+        job_priority_class="low",
+        preferred_resource_classes=["gpu_medium"],  # Prefer 3090
+        required_capabilities=["layer_analysis"],
+        min_vram_gb=16,
         max_pending=10,
         max_running=1,              # Only one at a time (VRAM constraint)
         queue_full_policy="warn",
@@ -346,6 +451,10 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         retryable_errors=[],
         allowed_roles=["analytics"],
         requires_gpu=False,         # Can be CPU-only (loads state_dicts)
+        # HC routing - CPU analytics, R730xd with 188GB RAM is ideal
+        resource_intensity="medium",
+        job_priority_class="low",
+        preferred_resource_classes=["cpu_heavy", "gpu_medium"],
         max_pending=20,
         max_running=2,
         queue_full_policy="allow",

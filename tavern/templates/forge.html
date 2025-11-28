@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Forge | Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+    <style>
+        body {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #333;
+        }
+
+        h1 {
+            margin: 0;
+            color: #ffd700;
+            font-size: 1.8rem;
+        }
+
+        .nav-links a {
+            color: #888;
+            text-decoration: none;
+            margin-left: 16px;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: #ffd700;
+        }
+
+        /* Stats cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #252538;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .stat-value.success { color: #4CAF50; }
+        .stat-value.warning { color: #ff9800; }
+        .stat-value.danger { color: #f44336; }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        /* Sections */
+        .section {
+            background: #252538;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .section h2 {
+            margin: 0 0 16px 0;
+            color: #ffd700;
+            font-size: 1.2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section h2 .badge {
+            background: #333;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        /* Two column layout */
+        .two-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 900px) {
+            .two-columns {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid #333;
+        }
+
+        .data-table th {
+            color: #888;
+            font-weight: 500;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .data-table tr:hover {
+            background: #1a1a2e;
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-badge.ready { background: #4CAF50; color: white; }
+        .status-badge.rejected { background: #f44336; color: white; }
+        .status-badge.pending { background: #ff9800; color: white; }
+        .status-badge.skill { background: #2196F3; color: white; }
+        .status-badge.leakage { background: #9c27b0; color: white; }
+
+        /* Contract cards */
+        .contract-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .contract-card {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 16px;
+            border-left: 3px solid #ffd700;
+        }
+
+        .contract-card .title {
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 8px;
+        }
+
+        .contract-card .description {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .contract-card .meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* Queue bars */
+        .queue-bars {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .queue-bar {
+            flex: 1;
+            min-width: 120px;
+            background: #1a1a2e;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .queue-bar-label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .queue-bar-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .queue-bar.high .queue-bar-value { color: #f44336; }
+        .queue-bar.normal .queue-bar-value { color: #4CAF50; }
+        .queue-bar.low .queue-bar-value { color: #888; }
+        .queue-bar.processing .queue-bar-value { color: #2196F3; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+
+        .empty-state small {
+            display: block;
+            margin-top: 8px;
+            font-size: 0.8rem;
+        }
+
+        /* Refresh button */
+        .refresh-btn {
+            background: transparent;
+            border: 1px solid #555;
+            color: #888;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.85rem;
+        }
+
+        .refresh-btn:hover {
+            border-color: #ffd700;
+            color: #ffd700;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Data Forge</h1>
+            <div class="nav-links">
+                <a href="/">Tavern</a>
+                <a href="/jobs">Jobs</a>
+                <a href="/quests">Quests</a>
+                <a href="/vault">Vault</a>
+                <a href="/settings">Settings</a>
+            </div>
+        </header>
+
+        <div id="app">
+            <div class="loading">Loading forge status...</div>
+        </div>
+    </div>
+
+    <script>
+        const app = document.getElementById('app');
+
+        async function loadForgeStatus() {
+            try {
+                const response = await fetch('/api/forge/status');
+                const data = await response.json();
+
+                if (data.error) {
+                    app.innerHTML = `<div class="empty-state">Error: ${data.error}</div>`;
+                    return;
+                }
+
+                renderForgeStatus(data);
+            } catch (error) {
+                app.innerHTML = `<div class="empty-state">Failed to load: ${error.message}</div>`;
+            }
+        }
+
+        function renderForgeStatus(data) {
+            const queue = data.queue || {};
+            const rejected = data.rejected || {};
+            const recentRejections = data.recent_rejections || [];
+            const evalBanks = data.eval_banks || [];
+            const contracts = data.contracts || [];
+            const datasets = data.datasets || [];
+
+            const totalQueue = queue.total || 0;
+            const rejectedCount = rejected.count || 0;
+            const totalReady = datasets.reduce((sum, d) => sum + (d.ready || 0), 0);
+
+            app.innerHTML = `
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value success">${totalQueue}</div>
+                        <div class="stat-label">Queue Total</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${contracts.length}</div>
+                        <div class="stat-label">Contracts</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value success">${totalReady}</div>
+                        <div class="stat-label">Ready Shards</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value ${rejectedCount > 0 ? 'danger' : ''}">${rejectedCount}</div>
+                        <div class="stat-label">Rejected</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${evalBanks.length}</div>
+                        <div class="stat-label">Eval Banks</div>
+                    </div>
+                    <div class="stat-card">
+                        <button class="refresh-btn" onclick="loadForgeStatus()">Refresh</button>
+                    </div>
+                </div>
+
+                <!-- Queue Status -->
+                <div class="section">
+                    <h2>Queue Status</h2>
+                    <div class="queue-bars">
+                        <div class="queue-bar high">
+                            <div class="queue-bar-label">High</div>
+                            <div class="queue-bar-value">${queue.high || 0}</div>
+                        </div>
+                        <div class="queue-bar normal">
+                            <div class="queue-bar-label">Normal</div>
+                            <div class="queue-bar-value">${queue.normal || 0}</div>
+                        </div>
+                        <div class="queue-bar low">
+                            <div class="queue-bar-label">Low</div>
+                            <div class="queue-bar-value">${queue.low || 0}</div>
+                        </div>
+                        <div class="queue-bar processing">
+                            <div class="queue-bar-label">Processing</div>
+                            <div class="queue-bar-value">${queue.processing || 0}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="two-columns">
+                    <!-- Dataset Contracts -->
+                    <div class="section">
+                        <h2>Dataset Contracts <span class="badge">${contracts.length}</span></h2>
+                        ${contracts.length > 0 ? `
+                        <div class="contract-grid">
+                            ${contracts.map(c => `
+                                <div class="contract-card">
+                                    <div class="title">${c.id}</div>
+                                    <div class="description">${c.description || 'No description'}</div>
+                                    <div class="meta">
+                                        ${c.skill_id ? `<span class="status-badge skill">${c.skill_id}</span>` : ''}
+                                        <span class="status-badge">${(c.max_invalid_fraction * 100).toFixed(0)}% max invalid</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : `
+                        <div class="empty-state">
+                            No contracts defined.
+                            <small>Add YAML files to configs/datasets/</small>
+                        </div>
+                        `}
+                    </div>
+
+                    <!-- Registered Datasets -->
+                    <div class="section">
+                        <h2>Registered Datasets <span class="badge">${datasets.length}</span></h2>
+                        ${datasets.length > 0 ? `
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Dataset</th>
+                                    <th>Ready</th>
+                                    <th>Rejected</th>
+                                    <th>Pending</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${datasets.map(d => `
+                                    <tr>
+                                        <td>${d.id}</td>
+                                        <td><span class="status-badge ready">${d.ready}</span></td>
+                                        <td>${d.rejected > 0 ? `<span class="status-badge rejected">${d.rejected}</span>` : '-'}</td>
+                                        <td>${d.pending > 0 ? `<span class="status-badge pending">${d.pending}</span>` : '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ` : `
+                        <div class="empty-state">
+                            No shards registered.
+                            <small>Use Forge CLI to register shards</small>
+                        </div>
+                        `}
+                    </div>
+                </div>
+
+                <div class="two-columns">
+                    <!-- Eval Banks -->
+                    <div class="section">
+                        <h2>Eval Banks <span class="badge">${evalBanks.length}</span></h2>
+                        ${evalBanks.length > 0 ? `
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Skill</th>
+                                    <th>IDs</th>
+                                    <th>Hashes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${evalBanks.map(b => `
+                                    <tr>
+                                        <td><span class="status-badge leakage">${b.skill_id}</span></td>
+                                        <td>${b.ids}</td>
+                                        <td>${b.prompt_hashes}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ` : `
+                        <div class="empty-state">
+                            No eval banks configured.
+                            <small>Add JSONL to data/eval_banks/</small>
+                        </div>
+                        `}
+                    </div>
+
+                    <!-- Recent Rejections -->
+                    <div class="section">
+                        <h2>Recent Rejections <span class="badge">${recentRejections.length}</span></h2>
+                        ${recentRejections.length > 0 ? `
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Issues</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${recentRejections.map(r => `
+                                    <tr>
+                                        <td>${r.file}</td>
+                                        <td>
+                                            ${r.errors && r.errors.length > 0 ? `<span class="status-badge rejected">${r.errors.length} errors</span>` : ''}
+                                            ${r.leakage_count > 0 ? `<span class="status-badge leakage">${r.leakage_count} leakage</span>` : ''}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ` : `
+                        <div class="empty-state">No rejected files.</div>
+                        `}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initial load
+        loadForgeStatus();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadForgeStatus, 30000);
+    </script>
+</body>
+</html>

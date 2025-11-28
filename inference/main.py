@@ -360,33 +360,70 @@ async def reload_model(req: ReloadRequest):
 # ===== Inference =====
 @app.post("/generate", dependencies=[Depends(require_read)])
 async def generate(req: GenerateRequest):
-    """Generate text (read access)"""
-    # TODO: Implement actual generation via GPU worker
-    # For now, just queue the job
+    """Generate text synchronously using model pool"""
+    try:
+        from inference_worker import get_pool
+        pool = get_pool()
 
-    job_id = f"gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        # Use active model if not specified
+        model_id = req.model_id
+        if not model_id or model_id == "active":
+            # Get active model from pool or load default
+            if pool.pool:
+                model_id = list(pool.pool.keys())[0]
+            else:
+                # Try to load active model from DB
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                c.execute("SELECT id, path FROM models WHERE is_active = 1")
+                row = c.fetchone()
+                conn.close()
 
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        INSERT INTO jobs (id, type, model_id, config, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        job_id,
-        "inference",
-        req.model_id or "active",
-        json.dumps(req.dict()),
-        "pending",
-        datetime.now().isoformat()
-    ))
-    conn.commit()
-    conn.close()
+                if row:
+                    model_id = row[0]
+                    pool.load_model(model_id, path=row[1])
+                else:
+                    raise HTTPException(status_code=400, detail="No active model. Load one first.")
 
-    return {
-        "job_id": job_id,
-        "status": "pending",
-        "message": "Job queued. Poll /jobs/{job_id} for status"
-    }
+        # Ensure model is loaded
+        if not pool.is_loaded(model_id):
+            # Try to find and load it
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("SELECT path FROM models WHERE id = ?", (model_id,))
+            row = c.fetchone()
+            conn.close()
+
+            if row:
+                pool.load_model(model_id, path=row[0])
+            else:
+                raise HTTPException(status_code=404, detail=f"Model not found: {model_id}")
+
+        # Generate text
+        result = pool.generate(
+            model_id=model_id,
+            prompt=req.prompt,
+            max_tokens=req.max_tokens,
+            temperature=req.temperature,
+            top_p=req.top_p,
+            repetition_penalty=1.1
+        )
+
+        if 'error' in result:
+            raise HTTPException(status_code=500, detail=result['error'])
+
+        generated = result.get("generated_text", "")
+        return {
+            "text": generated,
+            "response": generated,  # Alias for compatibility
+            "model_id": result.get("model_id", model_id),
+            "tokens_generated": result.get("completion_tokens", 0)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
 
 # ===== Eval Jobs =====
 @app.post("/eval/jobs", dependencies=[Depends(require_admin)])

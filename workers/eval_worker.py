@@ -50,10 +50,14 @@ class EvalWorker(BaseWorker):
         """
         super().__init__(config, device_id)
 
-        # Get inference URL
-        self.inference_url = inference_url or os.environ.get(
-            "INFERENCE_URL", "http://localhost:8765"
-        )
+        # Get inference URL - use service discovery from hosts.json
+        if inference_url:
+            self.inference_url = inference_url
+        else:
+            from core.hosts import get_service_url
+            self.inference_url = get_service_url("inference") or os.environ.get(
+                "INFERENCE_URL", "http://localhost:8765"
+            )
 
         # Verify inference connection
         self._check_inference()
@@ -139,15 +143,15 @@ class EvalWorker(BaseWorker):
                     answers.append("")
 
             # Score results
-            result, state = engine.run_eval(skill_id, answers, level=level)
+            result, state = engine.run_eval(skill_id, answers, level=level, count=batch_size)
 
             return {
                 "success": True,
                 "skill_id": skill_id,
                 "level": level,
                 "accuracy": result.accuracy,
-                "correct": result.correct_count,
-                "total": result.total_count,
+                "correct": result.num_correct,
+                "total": result.num_examples,
                 "per_primitive": result.per_primitive_accuracy,
             }
 

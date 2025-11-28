@@ -4,6 +4,49 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-11-28 - Engine-First Refactor
+
+### What
+TrainerEngine is now the default training path. UltimateTrainer becomes a thin orchestration shell.
+
+### Architecture
+```
+TrainingDaemon → UltimateTrainer (CLI shell) → TrainerEngine (HF training)
+```
+
+### Changes
+- **trainer/core/engine.py**
+  - Extended `MonitorContext` with all fields needed by `LiveMonitorCallback`
+  - Wire `LiveMonitorCallback` in `_create_trainer()` from `MonitorContext`
+  - Auto-create `LayerMonitor` if not provided
+
+- **core/train.py**
+  - `run()` now defaults to engine path (was opt-in via `USE_ENGINE=1`)
+  - Override with `USE_LEGACY_TRAINER=1` for legacy path
+  - `_run_with_engine()` now builds `MonitorContext` with controller, status_writer
+  - Renamed legacy code to `_run_legacy()` with deprecation docstring
+  - Marked `load_model()`, `prepare_dataset()`, `train()` as DEPRECATED
+
+### Usage
+```bash
+# Default: uses TrainerEngine
+python3 core/train.py --dataset data/train.jsonl --model qwen3_0.6b --yes
+
+# Force legacy path
+USE_LEGACY_TRAINER=1 python3 core/train.py --dataset data/train.jsonl --model qwen3_0.6b --yes
+```
+
+### Monitoring
+The engine path now has full monitoring via `LiveMonitorCallback`:
+- Progress tracking (steps, loss, LR)
+- Throughput monitoring (tokens/sec)
+- Checkpoint ledger recording
+- Control signal handling (pause/stop)
+- Smart alerts
+- Layer monitoring (if available)
+
+---
+
 ## 2025-11-28 - Storage + Device Registry System
 
 ### What

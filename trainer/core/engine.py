@@ -98,6 +98,22 @@ except ImportError:
     create_custom_optimizer = None
     get_param_group_summary = None
 
+# Optional: LiveMonitorCallback for full monitoring
+try:
+    from trainer.monitoring.callbacks import LiveMonitorCallback
+    LIVE_MONITOR_AVAILABLE = True
+except ImportError:
+    LIVE_MONITOR_AVAILABLE = False
+    LiveMonitorCallback = None
+
+# Optional: LayerMonitor for layer statistics
+try:
+    from monitoring.servers.layer_monitor import LayerMonitor
+    LAYER_MONITOR_AVAILABLE = True
+except ImportError:
+    LAYER_MONITOR_AVAILABLE = False
+    LayerMonitor = None
+
 
 @dataclass
 class TrainingResult:
@@ -147,18 +163,45 @@ class MonitorContext:
     Context for training monitors passed from UltimateTrainer.
 
     Contains all monitoring components that can be injected into
-    the training loop via callbacks.
+    the training loop via callbacks. This context provides everything
+    LiveMonitorCallback needs to enable full monitoring features:
+    - Progress tracking (steps, loss, learning rate)
+    - Validation loss tracking (micro-eval)
+    - Throughput monitoring (tokens/sec, VRAM usage)
+    - Pattern tracking (heatmaps)
+    - Layer monitoring
+    - Control signal handling (pause/stop)
+    - Smart alerts
+    - Checkpoint ledger recording
+    - Remote evaluation sync
     """
+    # Core monitors
     live_monitor: Any = None  # LiveInferenceMonitor
     evolution_tracker: Any = None  # EvolutionTracker
-    layer_monitor: Any = None  # LayerMonitor
+    layer_monitor: Any = None  # LayerMonitor (can be created by engine if None)
     controller: Any = None  # TrainingController (pause/stop)
+
+    # Training data context
     raw_train_examples: List[Dict] = field(default_factory=list)
-    logits_processor: Any = None  # LogitsProcessorList
+    logits_processor: Any = None  # LogitsProcessorList for generation
+
+    # Remote evaluation
     remote_eval_config: Dict[str, Any] = field(default_factory=dict)
+
+    # Batch/file context (for progress display)
     current_file: Optional[str] = None
     batch_number: Optional[int] = None
     batch_queue_size: Optional[int] = None
+
+    # Validation datasets
+    fixed_val_dataset: Any = None  # Fixed validation set for generalization metrics
+    micro_eval_inputs: Any = None  # Tokenized micro eval inputs
+
+    # Monitoring intervals
+    micro_eval_interval: int = 500  # How often to run micro-eval
+
+    # Status writer (optional - engine has its own, but can be overridden)
+    status_writer: Any = None
 
 
 class TrainerEngine:
@@ -763,6 +806,51 @@ class TrainerEngine:
 
         # Build callbacks list
         all_callbacks = list(callbacks or [])
+
+        # Wire LiveMonitorCallback from MonitorContext (engine-first refactor)
+        if LIVE_MONITOR_AVAILABLE and monitors and monitors.live_monitor:
+            # Use provided status_writer or fall back to engine's
+            status_writer = monitors.status_writer or self.status_writer
+
+            # Create LayerMonitor if not provided but available
+            layer_monitor = monitors.layer_monitor
+            if layer_monitor is None and LAYER_MONITOR_AVAILABLE:
+                try:
+                    layer_monitor = LayerMonitor(self.model)
+                    print("   Created LayerMonitor for layer statistics")
+                except Exception as e:
+                    print(f"   LayerMonitor disabled: {e}")
+                    layer_monitor = None
+
+            # Create LiveMonitorCallback with all monitoring features
+            monitor_cb = LiveMonitorCallback(
+                monitor=monitors.live_monitor,
+                status_writer=status_writer,
+                eval_steps=config.hyperparams.eval_steps,
+                total_steps=max_steps,
+                raw_train_examples=monitors.raw_train_examples,
+                tokenizer=self.tokenizer,
+                model=self.model,
+                batch_total_steps=steps_for_this_file,
+                current_global_step=current_global_step,
+                evolution_tracker=monitors.evolution_tracker,
+                current_file=monitors.current_file,
+                batch_number=monitors.batch_number,
+                batch_queue_size=monitors.batch_queue_size,
+                controller=monitors.controller,
+                fixed_val_dataset=monitors.fixed_val_dataset,
+                avg_seq_len=self.avg_seq_len,
+                effective_batch=effective_batch,
+                micro_eval_inputs=monitors.micro_eval_inputs,
+                micro_eval_interval=monitors.micro_eval_interval,
+                logits_processor=monitors.logits_processor,
+                layer_monitor=layer_monitor,
+                remote_eval_config=monitors.remote_eval_config,
+            )
+            all_callbacks.append(monitor_cb)
+            print("   LiveMonitorCallback enabled (full monitoring)")
+        elif monitors and monitors.live_monitor:
+            print("   Warning: LiveMonitorCallback not available, monitoring disabled")
 
         # Create trainer
         trainer = Trainer(

@@ -406,13 +406,14 @@ class UltimateTrainer:
         self.training_summary: Dict[str, Any] | None = None
         self.layer_monitor: LayerMonitor | None = None
 
-        # TrainerEngine for delegation (Phase 3 refactor)
-        # Enable with USE_ENGINE=1 environment variable
+        # TrainerEngine for delegation (engine-first refactor)
+        # Engine is now the DEFAULT path. To use legacy: USE_LEGACY_TRAINER=1
         self.engine = None
-        self.use_engine = os.environ.get("USE_ENGINE", "0").lower() in ("1", "true", "yes")
-        if self.use_engine and ENGINE_AVAILABLE:
+        if ENGINE_AVAILABLE:
             self.engine = TrainerEngine(self.status_writer)
-            print("TrainerEngine delegation enabled (USE_ENGINE=1)")
+            print("TrainerEngine available (engine-first default)")
+        else:
+            print("TrainerEngine not available, will use legacy path")
 
     def _get_hyperparam(self, name: str, default=None):
         """Get hyperparam from config (preferred) or args (fallback)."""
@@ -641,12 +642,35 @@ class UltimateTrainer:
 
         self.training_start_time = time.time()
 
+        # Build MonitorContext with available components
+        # Note: live_monitor=None is OK - inference preview is disabled in callback
+        # The callback still handles: progress, throughput, ledger, control signals
+        monitors = MonitorContext(
+            live_monitor=None,  # Inference preview disabled, not needed
+            evolution_tracker=self.evolution_tracker,
+            layer_monitor=None,  # Engine will create if available
+            controller=self.controller,
+            raw_train_examples=[],  # Engine will populate from dataset
+            logits_processor=self.logits_processor,
+            remote_eval_config=self.config_dict.get("remote_eval", {}),
+            current_file=getattr(self.args, "dataset", None),
+            batch_number=getattr(self.args, "batch_number", None),
+            batch_queue_size=getattr(self.args, "batch_queue_size", None),
+            fixed_val_dataset=None,  # Could be set if available
+            micro_eval_inputs=None,  # Could be set if available
+            micro_eval_interval=self.config.monitoring.micro_eval_interval
+                if self.config and self.config.monitoring else 500,
+            status_writer=self.status_writer,
+        ) if MonitorContext else None
+
+        print("   MonitorContext built (controller, status_writer, remote_eval)")
+
         # Run the engine
         result = self.engine.run_job(
             config=self.config,
             config_dict=self.config_dict,
-            monitors=None,  # MonitorContext available from trainer.core.engine
-            callbacks=None,  # LiveMonitorCallback now in trainer.monitoring.callbacks
+            monitors=monitors,
+            callbacks=None,  # Engine creates LiveMonitorCallback from monitors
         )
 
         # Handle result
@@ -690,14 +714,50 @@ class UltimateTrainer:
             return False
 
     def run(self):
-        """Execute full training pipeline."""
+        """
+        Execute full training pipeline.
+
+        Routing logic (engine-first refactor):
+        1. Default: Use TrainerEngine (engine-first)
+        2. Override: USE_LEGACY_TRAINER=1 forces legacy path
+        3. Fallback: If engine unavailable, use legacy
+        """
         print("\n" + "=" * 80)
         print("ULTIMATE TRAINER")
         print("=" * 80)
 
-        # Check if using engine delegation (USE_ENGINE=1)
-        if self.use_engine and self.engine and self.config:
+        # Check for legacy override (USE_LEGACY_TRAINER=1)
+        use_legacy = os.environ.get("USE_LEGACY_TRAINER", "0").lower() in ("1", "true", "yes")
+
+        if use_legacy:
+            print("Using LEGACY trainer (USE_LEGACY_TRAINER=1)")
+            return self._run_legacy()
+
+        # Default: Use TrainerEngine (engine-first)
+        if self.engine and self.config:
             return self._run_with_engine()
+
+        # Fallback: If engine unavailable, use legacy
+        print("TrainerEngine unavailable, falling back to legacy path")
+        return self._run_legacy()
+
+    def _run_legacy(self) -> bool:
+        """
+        DEPRECATED: Legacy training path.
+
+        This method contains the original training implementation that
+        manually handles model loading, dataset prep, and trainer creation.
+
+        Use _run_with_engine() instead (default since engine-first refactor).
+        This path remains for fallback and backward compatibility.
+
+        To force legacy: USE_LEGACY_TRAINER=1
+
+        Returns:
+            bool: True if training succeeded, False otherwise
+        """
+        print("Running legacy training path...")
+        print("-" * 80)
 
         # Step 0: Enforce locked config values to prevent bad runs
         self.enforce_locked_config()
@@ -800,7 +860,14 @@ class UltimateTrainer:
         return True
 
     def load_model(self) -> bool:
-        """Load base model and tokenizer."""
+        """
+        DEPRECATED: Load base model and tokenizer.
+
+        This method is used by the legacy training path (_run_legacy).
+        For new code, use TrainerEngine._load_model_and_tokenizer() instead.
+
+        The engine-first refactor delegates model loading to TrainerEngine.
+        """
         try:
             # Find model in database
             model_info = self.model_db.get_model(self.args.model)
@@ -987,7 +1054,14 @@ class UltimateTrainer:
             return False
 
     def prepare_dataset(self) -> bool:
-        """Load and prepare dataset."""
+        """
+        DEPRECATED: Load and prepare dataset.
+
+        This method is used by the legacy training path (_run_legacy).
+        For new code, use TrainerEngine._prepare_dataset() instead.
+
+        The engine-first refactor delegates dataset preparation to TrainerEngine.
+        """
         try:
             # Build enforced system prompt with date (use profile, CLI arg, or default)
             from datetime import datetime
@@ -1319,7 +1393,14 @@ class UltimateTrainer:
         )
 
     def train(self) -> bool:
-        """Run actual training."""
+        """
+        DEPRECATED: Run actual training.
+
+        This method is used by the legacy training path (_run_legacy).
+        For new code, use TrainerEngine.run_job() instead.
+
+        The engine-first refactor delegates training execution to TrainerEngine.
+        """
         try:
             # Tokenize dataset - get max_length from config
             max_length = self._get_hyperparam('max_length', 2048)

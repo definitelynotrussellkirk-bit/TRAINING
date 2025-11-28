@@ -380,7 +380,8 @@ def get_tracker(status_dir: Optional[Path] = None) -> DataFileImpactTracker:
     global _tracker_instance
     if _tracker_instance is None:
         if status_dir is None:
-            status_dir = Path('/path/to/training/status')
+            from core.paths import get_status_dir
+            status_dir = get_status_dir()
         _tracker_instance = DataFileImpactTracker(status_dir)
     return _tracker_instance
 

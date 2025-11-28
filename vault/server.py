@@ -697,7 +697,8 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
     def _handle_training_status(self):
         """Get current training status."""
         try:
-            base = self.base_dir or Path("/path/to/training")
+            from core.paths import get_base_dir
+            base = self.base_dir or get_base_dir()
             status_file = base / "status" / "training_status.json"
 
             if not status_file.exists():
@@ -719,7 +720,8 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
     def _handle_training_queue(self):
         """Get training queue status."""
         try:
-            base = self.base_dir or Path("/path/to/training")
+            from core.paths import get_base_dir
+            base = self.base_dir or get_base_dir()
             queue_dirs = ["high", "normal", "low", "processing", "failed"]
 
             queue_status = {}
@@ -761,7 +763,8 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            base = self.base_dir or Path("/path/to/training")
+            from core.paths import get_base_dir
+            base = self.base_dir or get_base_dir()
             control_dir = base / "control"
             control_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1000,8 +1003,11 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             self._send_error(str(e), 500)
 
 
-def run_server(port: int = 8767, base_dir: str = "/path/to/training"):
+def run_server(port: int = 8767, base_dir: Optional[str] = None):
     """Run the VaultKeeper server."""
+    if base_dir is None:
+        from core.paths import get_base_dir
+        base_dir = str(get_base_dir())
     base_path = Path(base_dir)
 
     # Initialize keeper
@@ -1035,8 +1041,8 @@ def main():
     parser.add_argument(
         "--base-dir",
         type=str,
-        default="/path/to/training",
-        help="Base training directory",
+        default=None,
+        help="Base training directory (default: auto-detect)",
     )
     args = parser.parse_args()
 

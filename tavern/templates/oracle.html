@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Oracle - Talk to DIO</title>
+    <title>Oracle - Realm of Training</title>
     <link rel="stylesheet" href="/static/css/game.css">
     <style>
         .oracle-container {
@@ -135,6 +135,20 @@
             font-size: 0.75rem;
             color: white;
             margin-top: 4px;
+        }
+
+        .section-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 10px 0 8px 0;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .checkpoint-item.inactive {
+            opacity: 0.5;
         }
 
         .load-btn {
@@ -328,7 +342,7 @@
     <div class="oracle-container">
         <div class="oracle-header">
             <h1>The Oracle</h1>
-            <p class="subtitle">Consult with DIO - Your AI Champion</p>
+            <p class="subtitle" id="oracleSubtitle">Loading...</p>
         </div>
 
         <div class="oracle-layout">
@@ -339,7 +353,7 @@
                 <div class="host-selector">
                     <label>Inference Host</label>
                     <select id="hostSelect">
-                        <option value="3090">RTX 3090 (192.168.x.x)</option>
+                        <option value="">Loading...</option>
                     </select>
                     <div class="host-status">
                         <span class="status-dot" id="hostDot"></span>
@@ -361,7 +375,7 @@
             <!-- Chat Panel -->
             <div class="chat-panel">
                 <div class="chat-header">
-                    <h2>Chat with DIO</h2>
+                    <h2 id="chatTitle">Chat</h2>
                     <div class="model-info">
                         Loaded: <span class="loaded-model" id="loadedModel">None</span>
                     </div>
@@ -375,7 +389,7 @@
                 </div>
 
                 <div class="chat-input">
-                    <textarea id="messageInput" placeholder="Ask DIO anything..." disabled></textarea>
+                    <textarea id="messageInput" placeholder="Ask your hero anything..." disabled></textarea>
                     <button id="sendBtn" disabled>Send</button>
                 </div>
             </div>
@@ -396,9 +410,14 @@
         let loadedCheckpoint = null;
         let currentHost = '3090';
         let conversationHistory = [];
+        let activeHero = null;
+        let activeCampaign = null;
+        let heroName = 'Hero';  // Default fallback
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadAvailableHosts();
+            await loadCampaignInfo();
             loadCheckpoints();
             checkHostStatus();
 
@@ -418,7 +437,147 @@
             });
         });
 
+        async function loadAvailableHosts() {
+            try {
+                const response = await fetch('/oracle/hosts');
+                const data = await response.json();
+                const select = $('#hostSelect');
+
+                if (data.hosts && data.hosts.length > 0) {
+                    select.innerHTML = data.hosts.map(host =>
+                        `<option value="${host.id}">${host.name} (${host.host})</option>`
+                    ).join('');
+                    currentHost = data.hosts[0].id;
+                } else {
+                    select.innerHTML = '<option value="">No hosts available</option>';
+                }
+            } catch (error) {
+                console.error('Failed to load hosts:', error);
+                $('#hostSelect').innerHTML = '<option value="">Error loading hosts</option>';
+            }
+        }
+
+        async function loadCampaignInfo() {
+            try {
+                // Get active campaign
+                const campResp = await fetch('/api/campaigns/active');
+                if (campResp.ok) {
+                    activeCampaign = await campResp.json();
+                }
+
+                // Get hero details
+                const heroesResp = await fetch('/api/heroes');
+                if (heroesResp.ok) {
+                    const heroes = await heroesResp.json();
+                    if (activeCampaign?.hero_id) {
+                        activeHero = heroes.find(h => h.id === activeCampaign.hero_id);
+                    }
+                }
+
+                // Update UI
+                heroName = activeHero?.name || 'Your Hero';
+                $('#oracleSubtitle').textContent = `Consult with ${heroName} - Your AI Champion`;
+                $('#chatTitle').textContent = `Chat with ${heroName}`;
+
+                // Update placeholder text
+                $('#messageInput').placeholder = `Ask ${heroName} anything...`;
+            } catch (err) {
+                console.error('Error loading campaign info:', err);
+                $('#oracleSubtitle').textContent = 'Consult with Your AI Champion';
+            }
+        }
+
         async function loadCheckpoints() {
+            try {
+                // Use vault/assets for campaign-aware checkpoint list
+                const response = await fetch('/vault/assets');
+                const data = await response.json();
+
+                const list = $('#checkpointList');
+                const checkpoints = data.checkpoints || [];
+
+                // Filter to active campaign checkpoints
+                const activeCheckpoints = checkpoints.filter(cp => cp.is_active_campaign);
+                const otherCheckpoints = checkpoints.filter(cp => !cp.is_active_campaign);
+
+                if (checkpoints.length === 0) {
+                    list.innerHTML = `
+                        <div class="empty-state">
+                            <p>No checkpoints found</p>
+                            <p style="font-size: 0.85rem; margin-top: 10px;">
+                                Train your hero to create checkpoints
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '';
+
+                // Add base model option
+                if (activeHero) {
+                    html += `
+                        <div class="checkpoint-item base-model" data-step="0" data-hero="${activeCampaign?.hero_id || ''}">
+                            <div class="step">🏛️ ${activeHero.name}'s Base (${activeHero.model?.size_b || '?'}B)</div>
+                            <div class="stats">${activeHero.model?.hf_name || 'Base Model'}</div>
+                        </div>
+                    `;
+                }
+
+                // Active campaign checkpoints
+                if (activeCheckpoints.length > 0) {
+                    html += `<div class="section-label">Active Campaign (${activeCheckpoints.length})</div>`;
+                    for (const cp of activeCheckpoints.slice(0, 15)) {
+                        html += renderCheckpointItem(cp, false);
+                    }
+                }
+
+                // Other campaign checkpoints (faded)
+                if (otherCheckpoints.length > 0) {
+                    html += `<div class="section-label" style="opacity: 0.5; margin-top: 15px;">Other Campaigns (${otherCheckpoints.length})</div>`;
+                    for (const cp of otherCheckpoints.slice(0, 10)) {
+                        html += renderCheckpointItem(cp, true);
+                    }
+                }
+
+                list.innerHTML = html;
+
+                // Add click handlers
+                $$('.checkpoint-item').forEach(item => {
+                    item.addEventListener('click', () => selectCheckpoint(item));
+                });
+            } catch (err) {
+                console.error('Error loading checkpoints:', err);
+            }
+        }
+
+        function renderCheckpointItem(cp, isInactive) {
+            const heroLabel = cp.hero_id ? cp.hero_id.split('-')[0].toUpperCase() : '';
+            return `
+                <div class="checkpoint-item ${isInactive ? 'inactive' : ''}"
+                     data-step="${cp.step}"
+                     data-path="${cp.path}"
+                     data-hero="${cp.hero_id || ''}"
+                     style="${isInactive ? 'opacity: 0.5;' : ''}">
+                    <div class="step">${cp.is_champion ? '👑' : '💾'} Step ${cp.step.toLocaleString()}</div>
+                    <div class="stats">${heroLabel} · ${cp.size_gb} GB · ${cp.age_hours < 1 ? 'Just now' : cp.age_hours.toFixed(1) + 'h ago'}</div>
+                </div>
+            `;
+        }
+
+        function selectCheckpoint(item) {
+            $$('.checkpoint-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+            selectedCheckpoint = {
+                step: parseInt(item.dataset.step),
+                path: item.dataset.path,
+                hero_id: item.dataset.hero || activeCampaign?.hero_id
+            };
+            $('#loadBtn').disabled = false;
+        }
+
+        // Legacy support - also try ledger if vault doesn't have data
+        async function loadCheckpointsFromLedger() {
             try {
                 const response = await fetch('/ledger?limit=20');
                 const data = await response.json();
@@ -545,7 +704,8 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         step: selectedCheckpoint.step,
-                        host: currentHost
+                        host: currentHost,
+                        hero_id: selectedCheckpoint.hero_id || activeCampaign?.hero_id
                     })
                 });
 
@@ -553,7 +713,10 @@
 
                 if (data.success) {
                     loadedCheckpoint = selectedCheckpoint.step;
-                    $('#loadedModel').textContent = `Step ${selectedCheckpoint.step.toLocaleString()}`;
+                    const stepLabel = selectedCheckpoint.step === 0
+                        ? (data.checkpoint_name || 'Base Model')
+                        : `Step ${selectedCheckpoint.step.toLocaleString()}`;
+                    $('#loadedModel').textContent = stepLabel;
                     enableChat();
                     addSystemMessage(`Loaded checkpoint: Step ${selectedCheckpoint.step.toLocaleString()}`);
 
@@ -598,7 +761,7 @@
 
         function addMessage(role, content) {
             const messages = $('#chatMessages');
-            const sender = role === 'user' ? 'You' : 'DIO';
+            const sender = role === 'user' ? 'You' : heroName;
 
             messages.innerHTML += `
                 <div class="message ${role}">

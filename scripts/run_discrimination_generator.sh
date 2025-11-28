@@ -6,11 +6,15 @@
 # - 2000 examples/run @ ~20/min = ~1.5 hours max runtime
 # - 24,000/day throughput keeps up with ~100k SYLLO/day
 
-cd /path/to/training
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+cd "$BASE_DIR"
 export INFERENCE_ADMIN_KEY=admin123
 
 # Log file
-LOG=/path/to/training/logs/discrimination_generator.log
+LOG="$BASE_DIR/logs/discrimination_generator.log"
 
 echo "$(date): Starting discrimination generator (ratio mode)" >> $LOG
 

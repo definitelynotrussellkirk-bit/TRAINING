@@ -3,7 +3,9 @@
 
 set -e
 
-BASE_DIR="/path/to/training"
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 cd "$BASE_DIR"
 
 echo "=================================================="
@@ -90,5 +92,6 @@ echo "  cat status/deployment_status.json | jq ."
 
 echo ""
 echo "3090 Status:"
-echo "  curl http://192.168.x.x:8765/health | jq ."
-echo "  curl http://192.168.x.x:8765/models/info | jq ."
+INFERENCE_HOST="${INFERENCE_HOST:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").host)' 2>/dev/null || echo "192.168.x.x")}"
+echo "  curl http://$INFERENCE_HOST:8765/health | jq ."
+echo "  curl http://$INFERENCE_HOST:8765/models/info | jq ."

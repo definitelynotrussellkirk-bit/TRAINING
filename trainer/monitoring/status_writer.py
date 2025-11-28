@@ -730,7 +730,17 @@ class TrainingStatusReader:
 
 
 # Default status file location
-DEFAULT_STATUS_FILE = Path("/path/to/training/status/training_status.json")
+def get_default_status_file() -> Path:
+    """Get default status file path using core.paths."""
+    try:
+        from core.paths import get_status_dir
+        return get_status_dir() / "training_status.json"
+    except ImportError:
+        # Fallback to auto-detection
+        base = Path(__file__).parent.parent.parent
+        return base / "status" / "training_status.json"
+
+DEFAULT_STATUS_FILE = get_default_status_file()
 
 
 def example_usage():

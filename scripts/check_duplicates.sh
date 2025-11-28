@@ -15,7 +15,7 @@ if [ "$DAEMON_COUNT" -gt 1 ]; then
     echo
     echo "⚠️  WARNING: $DAEMON_COUNT training daemons running!"
     echo "Run: pkill -f training_daemon.py"
-    echo "Then: nohup python3 training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &"
+    echo "Then: ./scripts/start_all.sh"
 elif [ "$DAEMON_COUNT" -eq 1 ]; then
     echo
     echo "✅ OK: Only 1 training daemon running"

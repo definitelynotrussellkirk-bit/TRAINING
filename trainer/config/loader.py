@@ -3,9 +3,10 @@
 Configuration Loader
 
 Loads and merges configuration from multiple sources:
-1. config.json (base)
-2. CLI arguments (overrides)
-3. Defaults (fallback)
+1. Campaign system (hero + campaign overrides) - NEW
+2. config.json (base)
+3. CLI arguments (overrides)
+4. Defaults (fallback)
 
 Handles precedence and validation.
 """
@@ -28,6 +29,15 @@ from .schema import (
     EnvironmentConfig,
 )
 
+# Campaign system integration
+try:
+    from core.config_builder import get_active_config as get_campaign_config, ConfigBuilder
+    CAMPAIGN_SYSTEM_AVAILABLE = True
+except ImportError:
+    CAMPAIGN_SYSTEM_AVAILABLE = False
+    get_campaign_config = None
+    ConfigBuilder = None
+
 
 class ConfigLoader:
     """Loads and merges training configuration"""
@@ -42,34 +52,68 @@ class ConfigLoader:
             return json.load(f)
 
     @staticmethod
+    def from_campaign(use_campaign: bool = True) -> Optional[Dict[str, Any]]:
+        """
+        Try to load configuration from the campaign system.
+
+        The campaign system provides hero defaults + campaign overrides,
+        giving a cleaner separation than config.json.
+
+        Args:
+            use_campaign: If False, skip campaign system entirely
+
+        Returns:
+            Config dict compatible with TrainerConfig.from_dict(), or None if unavailable
+        """
+        if not use_campaign or not CAMPAIGN_SYSTEM_AVAILABLE:
+            return None
+
+        try:
+            campaign_config = get_campaign_config()
+            config_dict = campaign_config.to_trainer_config_dict()
+            print(f"✓ Using campaign config: {campaign_config.hero_id}/{campaign_config.campaign_id}")
+            return config_dict
+        except Exception as e:
+            # No active campaign or error - fall back to config.json
+            print(f"ℹ️  Campaign system unavailable ({e}), using config.json")
+            return None
+
+    @staticmethod
     def from_args_and_json(
         args: argparse.Namespace,
         base_config_path: Optional[Path] = None,
-        validate_lock: bool = True
+        validate_lock: bool = True,
+        use_campaign: bool = True
     ) -> TrainerConfig:
         """
         Create configuration from CLI args and config.json
 
         Precedence (highest to lowest):
         1. CLI arguments (--batch-size, etc.)
-        2. config.json
-        3. Schema defaults
+        2. Campaign system (if active) - NEW
+        3. config.json
+        4. Schema defaults
 
         Args:
             args: Parsed CLI arguments
             base_config_path: Path to config.json (default: config.json)
             validate_lock: If True, validate against .config_lock.json
+            use_campaign: If True, try campaign system before config.json
 
         Returns:
             TrainerConfig instance
         """
-        # Load base config
-        if base_config_path is None:
-            base_config_path = Path("config.json")
+        # Try campaign system first
+        base_config = ConfigLoader.from_campaign(use_campaign)
 
-        base_config = {}
-        if base_config_path.exists():
-            base_config = ConfigLoader.from_json_file(base_config_path)
+        # Fall back to config.json if no campaign
+        if base_config is None:
+            if base_config_path is None:
+                base_config_path = Path("config.json")
+
+            base_config = {}
+            if base_config_path.exists():
+                base_config = ConfigLoader.from_json_file(base_config_path)
 
         # Build configuration with precedence
         config_dict = ConfigLoader._merge_config(base_config, args)
@@ -82,6 +126,55 @@ class ConfigLoader:
             ConfigLoader.validate_locked_config(config, strict=True)
 
         return config
+
+    @staticmethod
+    def from_args_and_json_with_raw(
+        args: argparse.Namespace,
+        base_config_path: Optional[Path] = None,
+        validate_lock: bool = True,
+        use_campaign: bool = True
+    ) -> tuple:
+        """
+        Create configuration and return both TrainerConfig and raw dict.
+
+        The raw dict includes extra fields not in TrainerConfig schema:
+        - optimizer: Optimizer type and settings
+        - liger_kernel: Liger kernel configuration
+        - campaign: Campaign metadata (hero_id, campaign_id, etc.)
+
+        Args:
+            args: Parsed CLI arguments
+            base_config_path: Path to config.json (default: config.json)
+            validate_lock: If True, validate against .config_lock.json
+            use_campaign: If True, try campaign system before config.json
+
+        Returns:
+            Tuple of (TrainerConfig, raw_config_dict)
+        """
+        # Try campaign system first
+        base_config = ConfigLoader.from_campaign(use_campaign)
+
+        # Fall back to config.json if no campaign
+        if base_config is None:
+            if base_config_path is None:
+                base_config_path = Path("config.json")
+
+            base_config = {}
+            if base_config_path.exists():
+                base_config = ConfigLoader.from_json_file(base_config_path)
+
+        # Build configuration with precedence
+        config_dict = ConfigLoader._merge_config(base_config, args)
+
+        # Create TrainerConfig
+        config = TrainerConfig.from_dict(config_dict)
+
+        # Validate locked config
+        if validate_lock:
+            ConfigLoader.validate_locked_config(config, strict=True)
+
+        # Return both TrainerConfig and raw dict (for extra fields)
+        return config, config_dict
 
     @staticmethod
     def _merge_config(base: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:

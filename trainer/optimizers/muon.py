@@ -245,6 +245,7 @@ class SingleDeviceMuonWithAuxAdam(torch.optim.Optimizer):
                 group.setdefault("lr", 0.02)
                 group.setdefault("momentum", 0.95)
                 group.setdefault("weight_decay", 0)
+                group.setdefault("ns_steps", 5)  # Newton-Schulz iterations
                 muon_count += len(group["params"])
             else:
                 # AdamW defaults
@@ -278,7 +279,8 @@ class SingleDeviceMuonWithAuxAdam(torch.optim.Optimizer):
                     update = muon_update(
                         p.grad,
                         state["momentum_buffer"],
-                        beta=group["momentum"]
+                        beta=group["momentum"],
+                        ns_steps=group.get("ns_steps", 5)
                     )
 
                     p.mul_(1 - group["lr"] * group["weight_decay"])

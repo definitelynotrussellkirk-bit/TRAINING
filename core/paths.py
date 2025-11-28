@@ -78,11 +78,11 @@ def _detect_base_dir_legacy() -> Path:
             return current
         current = current.parent
 
-    # Fallback: try common locations
+    # Fallback: try common locations (no hardcoded usernames)
     fallbacks = [
         Path.home() / "Desktop" / "TRAINING",
         Path.home() / "TRAINING",
-        Path("/path/to/training"),  # Legacy default
+        Path.cwd(),
     ]
 
     for fallback in fallbacks:
@@ -92,11 +92,13 @@ def _detect_base_dir_legacy() -> Path:
                 _resolution_logged = True
             return fallback
 
-    # Ultimate fallback: current working directory
-    if not _resolution_logged:
-        logger.warning(f"Base dir fallback to cwd: {Path.cwd()}")
-        _resolution_logged = True
-    return Path.cwd()
+    # No valid directory found - fail clearly
+    raise RuntimeError(
+        "Cannot detect training base directory. Either:\n"
+        "  1. Set TRAINING_BASE_DIR environment variable\n"
+        "  2. Run from the training repository root\n"
+        "  3. Ensure CLAUDE.md exists in the project root"
+    )
 
 
 @lru_cache(maxsize=1)
@@ -245,21 +247,68 @@ def get_test_results_dir() -> Path:
     return get_base_dir() / "test_results"
 
 
-# Remote server paths (3090)
-REMOTE_HOST = os.environ.get("INFERENCE_HOST", "192.168.x.x")
-REMOTE_PORT = int(os.environ.get("INFERENCE_PORT", "8765"))
-REMOTE_SCHEDULER_PORT = int(os.environ.get("SCHEDULER_PORT", "8766"))
-REMOTE_MODELS_DIR = Path(os.environ.get("REMOTE_MODELS_DIR", "/path/to/models"))
+# Remote server configuration - use core.hosts for service discovery
+# These are deprecated - use get_service_url("inference") from core.hosts instead
+def _get_inference_host() -> str:
+    """Get inference host from hosts.json or environment."""
+    if "INFERENCE_HOST" in os.environ:
+        return os.environ["INFERENCE_HOST"]
+    try:
+        from core.hosts import get_host
+        host = get_host("3090")
+        return host.host if host else "localhost"
+    except Exception:
+        return os.environ.get("INFERENCE_HOST", "localhost")
+
+def _get_inference_port() -> int:
+    """Get inference port from hosts.json or environment."""
+    if "INFERENCE_PORT" in os.environ:
+        return int(os.environ["INFERENCE_PORT"])
+    try:
+        from core.hosts import get_host
+        host = get_host("3090")
+        if host and "inference" in host.services:
+            return host.services["inference"].port
+    except Exception:
+        pass
+    return int(os.environ.get("INFERENCE_PORT", "8765"))
+
+def _get_remote_models_dir() -> Path:
+    """Get remote models directory from hosts.json or environment."""
+    if "REMOTE_MODELS_DIR" in os.environ:
+        return Path(os.environ["REMOTE_MODELS_DIR"])
+    try:
+        from core.hosts import get_host
+        host = get_host("3090")
+        if host and host.models_dir:
+            return Path(host.models_dir)
+    except Exception:
+        pass
+    return Path(os.environ.get("REMOTE_MODELS_DIR", "/tmp/models"))
+
+# Module-level access (deprecated - use core.hosts.get_service_url() instead)
+# These call the functions above on each access for backward compatibility
+def __getattr__(name):
+    """Lazy attribute access for deprecated remote config variables."""
+    if name == "REMOTE_HOST":
+        return _get_inference_host()
+    elif name == "REMOTE_PORT":
+        return _get_inference_port()
+    elif name == "REMOTE_SCHEDULER_PORT":
+        return _get_inference_port() + 1
+    elif name == "REMOTE_MODELS_DIR":
+        return _get_remote_models_dir()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get_remote_api_url() -> str:
-    """Get the remote inference API URL."""
-    return f"http://{REMOTE_HOST}:{REMOTE_PORT}"
+    """Get the remote inference API URL. Prefer core.hosts.get_service_url('inference')."""
+    return f"http://{_get_inference_host()}:{_get_inference_port()}"
 
 
 def get_scheduler_api_url() -> str:
-    """Get the GPU task scheduler API URL."""
-    return f"http://{REMOTE_HOST}:{REMOTE_SCHEDULER_PORT}"
+    """Get the GPU task scheduler API URL. Prefer core.hosts.get_service_url('scheduler')."""
+    return f"http://{_get_inference_host()}:{_get_inference_port() + 1}"
 
 
 if __name__ == "__main__":

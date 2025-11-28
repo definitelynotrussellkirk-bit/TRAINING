@@ -1,6 +1,10 @@
 #!/bin/bash
 # Monitor Training Output - Shows what's happening with the current training
 
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
 echo "=== Training Monitor ==="
 echo ""
 
@@ -15,7 +19,7 @@ if [ -z "$TRAIN_PID" ]; then
         echo "✓ Daemon is running"
         echo ""
         echo "Last 20 lines of daemon log:"
-        tail -20 /path/to/training/logs/daemon_*.log | tail -20
+        tail -20 "$BASE_DIR"/logs/daemon_*.log | tail -20
     else
         echo "✗ Daemon is NOT running"
     fi
@@ -45,11 +49,11 @@ echo ""
 
 # Show daemon log
 echo "Daemon log (last 30 lines):"
-tail -30 /path/to/training/logs/daemon_*.log | tail -30
+tail -30 "$BASE_DIR"/logs/daemon_*.log | tail -30
 echo ""
 
 # Show training status if it exists
-if [ -f "/path/to/training/training_status.json" ]; then
+if [ -f "$BASE_DIR/training_status.json" ]; then
     echo "Training status:"
-    cat /path/to/training/training_status.json | python3 -m json.tool 2>/dev/null || cat /path/to/training/training_status.json
+    cat "$BASE_DIR/training_status.json" | python3 -m json.tool 2>/dev/null || cat "$BASE_DIR/training_status.json"
 fi

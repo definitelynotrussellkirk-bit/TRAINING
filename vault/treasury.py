@@ -56,7 +56,7 @@ class Treasury:
 
     def __init__(
         self,
-        base_dir: str | Path = "/path/to/training",
+        base_dir: Optional[str | Path] = None,
         checkpoint_limit_gb: float = 150.0,
         min_age_hours: float = 36.0,
     ):
@@ -64,10 +64,13 @@ class Treasury:
         Initialize the Treasury.
 
         Args:
-            base_dir: Base training directory
+            base_dir: Base training directory (default: auto-detect)
             checkpoint_limit_gb: Maximum checkpoint storage in GB
             min_age_hours: Minimum age before cleanup eligible
         """
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.checkpoint_dir = self.base_dir / "models" / "current_model"
         self.backup_dir = self.base_dir / "models" / "backups"
@@ -416,6 +419,6 @@ class Treasury:
 
 
 # Convenience function
-def get_treasury(base_dir: str | Path = "/path/to/training") -> Treasury:
+def get_treasury(base_dir: Optional[str | Path] = None) -> Treasury:
     """Get a Treasury instance for the given base directory."""
     return Treasury(base_dir)

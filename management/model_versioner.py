@@ -22,10 +22,17 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Use centralized path resolution for default
+try:
+    from core.paths import get_base_dir
+    _DEFAULT_BASE_DIR = get_base_dir()
+except ImportError:
+    _DEFAULT_BASE_DIR = Path(__file__).parent.parent  # Fallback: parent of management/
+
 
 class ModelVersioner:
-    def __init__(self, base_dir: str = "/path/to/training"):
-        self.base_dir = Path(base_dir)
+    def __init__(self, base_dir: str = None):
+        self.base_dir = Path(base_dir) if base_dir else _DEFAULT_BASE_DIR
         self.versions_dir = self.base_dir / "models" / "versions"
         self.backups_dir = self.base_dir / "models" / "backups"
 
@@ -282,7 +289,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Model Version Management")
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base directory')
+    parser.add_argument('--base-dir', default=None, help='Base directory')
 
     subparsers = parser.add_subparsers(dest='command', help='Command to run')
 

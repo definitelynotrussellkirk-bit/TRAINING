@@ -88,7 +88,7 @@ class HostConfig:
     host: str  # IP or hostname
     role: HostRole
     services: Dict[str, ServiceConfig] = field(default_factory=dict)
-    ssh_user: str = "user"
+    ssh_user: str = ""  # Must be set in hosts.json
     models_dir: str = ""
     checkpoints_dir: str = ""
     capabilities: List[str] = field(default_factory=list)
@@ -128,45 +128,9 @@ class HostRegistry:
     Loads from config/hosts.json and provides service discovery.
     """
 
-    # Default configuration (used if hosts.json doesn't exist)
-    DEFAULTS = {
-        "4090": {
-            "name": "Training Server",
-            "host": "192.168.x.x",
-            "role": "trainer",
-            "services": {
-                "vault": {"port": 8767, "path": "/api"},
-                "ledger": {"port": 8767, "path": "/api/ledger"},
-                "training": {"port": 8767, "path": "/api/training"},
-                "branch": {"port": 8768},
-                "monitor": {"port": 8081},
-            },
-            "models_dir": "/path/to/training/models",
-            "checkpoints_dir": "/path/to/training/current_model",
-            "capabilities": ["training", "vault", "ledger"],
-        },
-        "3090": {
-            "name": "Inference Server",
-            "host": "192.168.x.x",
-            "role": "inference",
-            "services": {
-                "inference": {"port": 8765},
-                "branch": {"port": 8768},
-            },
-            "models_dir": "/path/to/models",
-            "capabilities": ["inference", "eval"],
-        },
-        "nas": {
-            "name": "Synology NAS",
-            "host": "192.168.x.x",
-            "role": "storage",
-            "services": {
-                "branch": {"port": 8768},
-            },
-            "models_dir": "/volume1/data/llm_training/models",
-            "capabilities": ["storage", "backup"],
-        },
-    }
+    # No hardcoded defaults - hosts.json is required
+    # All host configuration must come from config/hosts.json
+    DEFAULTS = {}
 
     def __init__(self, config_path: Optional[Path] = None):
         """
@@ -192,19 +156,28 @@ class HostRegistry:
         self._detect_local_host()
 
     def _load(self):
-        """Load hosts from config file."""
-        config_data = {}
+        """Load hosts from config file. Fails if hosts.json is missing or invalid."""
+        if not self.config_path.exists():
+            raise FileNotFoundError(
+                f"Host configuration not found: {self.config_path}\n"
+                "Create config/hosts.json with host definitions.\n"
+                "See ARCHITECTURE.md for the required format."
+            )
 
-        if self.config_path.exists():
-            try:
-                with open(self.config_path) as f:
-                    config_data = json.load(f)
-                logger.info(f"Loaded hosts from {self.config_path}")
-            except Exception as e:
-                logger.warning(f"Failed to load hosts.json: {e}, using defaults")
+        try:
+            with open(self.config_path) as f:
+                config_data = json.load(f)
+            logger.info(f"Loaded hosts from {self.config_path}")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in {self.config_path}: {e}")
 
-        # Merge with defaults
-        hosts_data = config_data.get("hosts", self.DEFAULTS)
+        # hosts.json must have a "hosts" section
+        hosts_data = config_data.get("hosts", {})
+        if not hosts_data:
+            raise ValueError(
+                f"No hosts defined in {self.config_path}\n"
+                "Add a 'hosts' section with at least one host definition."
+            )
 
         # Also check for old format (inference_hosts, training_hosts)
         if "inference_hosts" in config_data:
@@ -249,7 +222,7 @@ class HostRegistry:
             host=data.get("host", "localhost"),
             role=role,
             services=services,
-            ssh_user=data.get("ssh_user", "user"),
+            ssh_user=data.get("ssh_user", ""),
             models_dir=data.get("models_dir", ""),
             checkpoints_dir=data.get("checkpoints_dir", ""),
             capabilities=data.get("capabilities", []),
@@ -455,3 +428,44 @@ def get_inference() -> Optional[HostConfig]:
 def get_local_host() -> Optional[HostConfig]:
     """Get the local host config."""
     return get_registry().get_local()
+
+
+def get_ssh_target(host_id: str) -> str:
+    """Get SSH target string (user@host) for a host."""
+    host = get_host(host_id)
+    if not host:
+        raise ValueError(f"Unknown host: {host_id}")
+    if not host.ssh_user:
+        raise ValueError(f"No ssh_user configured for host: {host_id}")
+    return f"{host.ssh_user}@{host.host}"
+
+
+def get_ssh_command(host_id: str, command: str) -> str:
+    """Build SSH command for a host."""
+    return f"ssh {get_ssh_target(host_id)} '{command}'"
+
+
+def get_scp_command(host_id: str, local_path: str, remote_path: str, to_remote: bool = True) -> str:
+    """Build SCP command for a host."""
+    target = get_ssh_target(host_id)
+    if to_remote:
+        return f"scp {local_path} {target}:{remote_path}"
+    else:
+        return f"scp {target}:{remote_path} {local_path}"
+
+
+def get_remote_path(host_id: str, relative_path: str = "") -> str:
+    """Get full path on a remote host's models directory."""
+    host = get_host(host_id)
+    if not host:
+        raise ValueError(f"Unknown host: {host_id}")
+    if not host.models_dir:
+        raise ValueError(f"No models_dir configured for host: {host_id}")
+    if relative_path:
+        return f"{host.models_dir}/{relative_path}"
+    return host.models_dir
+
+
+def list_hosts() -> Dict[str, HostConfig]:
+    """Get all hosts as a dictionary."""
+    return {h.host_id: h for h in get_registry().list_all()}

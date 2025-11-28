@@ -111,7 +111,9 @@ class DataManager:
 
         if not client.health_check():
             logger.error(f"❌ {skill} API server is not available")
-            logger.error(f"   Start with: cd /path/to/skills && python3 {skill_config['server_script']} --port {skill_config['base_url'].split(':')[-1]}")
+            server_script = skill_config['server_script']
+            singleskill_dir = Path(server_script).parents[1]
+            logger.error(f"   Start with: cd {singleskill_dir} && python3 {server_script} --port {skill_config['base_url'].split(':')[-1]}")
             return False
 
         try:
@@ -425,7 +427,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Data Manager - Generate and test training data")
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base directory')
+    parser.add_argument('--base-dir', default=None, help='Base directory (auto-detect from core.paths)')
     parser.add_argument('--config', help='Config file (default: base-dir/config.json)')
 
     subparsers = parser.add_subparsers(dest='command', help='Command')
@@ -451,7 +453,15 @@ def main():
     )
 
     # Load config
-    base_dir = Path(args.base_dir)
+    if args.base_dir is None:
+        try:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
+        except Exception:
+            base_dir = Path(__file__).parent.parent
+    else:
+        base_dir = Path(args.base_dir)
+
     config_file = Path(args.config) if args.config else base_dir / "config.json"
 
     with open(config_file) as f:

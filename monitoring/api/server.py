@@ -20,6 +20,8 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from monitoring.api.aggregator import DataAggregator
+from core.paths import get_base_dir, get_status_dir
+from core.hosts import get_host
 
 # Setup logging
 logging.basicConfig(
@@ -95,7 +97,7 @@ def index():
         },
         'machines': {
             '4090': 'Training machine (local)',
-            '3090': 'Intelligence machine (192.168.x.x)'
+            '3090': f'Intelligence machine ({get_host("3090").host})'
         }
     })
 
@@ -223,7 +225,7 @@ def api_queue():
     Used by SYLLO dashboard for pipeline status.
     """
     try:
-        base_dir = Path('/path/to/training')
+        base_dir = get_base_dir()
         queue_dir = base_dir / 'queue'
 
         # Count files in each priority queue
@@ -320,7 +322,7 @@ def api_queue_preview(filename):
     import random
 
     try:
-        base_dir = Path('/path/to/training')
+        base_dir = get_base_dir()
         count = min(int(request.args.get('count', 5)), 20)
 
         # Find the file in queue directories
@@ -421,7 +423,7 @@ def api_curriculum_state():
     Returns current level, active skill, and progression history.
     """
     try:
-        state_file = Path('/path/to/training/data_manager/curriculum_state.json')
+        state_file = get_base_dir() / 'data_manager' / 'curriculum_state.json'
         if state_file.exists():
             with open(state_file) as f:
                 state = json.load(f)
@@ -449,8 +451,9 @@ def api_syllo_generator():
     """
     try:
         import subprocess
-        status_file = Path('/path/to/training/status/syllo_l1_generator.json')
-        pid_file = Path('/path/to/training/.pids/syllo_l1_generator.pid')
+        base_dir = get_base_dir()
+        status_file = get_status_dir() / 'syllo_l1_generator.json'
+        pid_file = base_dir / '.pids' / 'syllo_l1_generator.pid'
 
         result = {
             'daemon_running': False,
@@ -514,7 +517,7 @@ def api_lineage():
     }
     """
     try:
-        lineage_file = Path('/path/to/training/status/data_lineage.json')
+        lineage_file = get_status_dir() / 'data_lineage.json'
         if lineage_file.exists():
             with open(lineage_file) as f:
                 lineage = json.load(f)

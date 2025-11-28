@@ -17,24 +17,30 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-BASE_DIR = Path("/path/to/training")
-MODEL_DIR = BASE_DIR / "current_model"
-STATUS_FILE = BASE_DIR / "status" / "training_status.json"
+# Use centralized path resolution for default
+try:
+    from core.paths import get_base_dir
+    _DEFAULT_BASE_DIR = get_base_dir()
+except ImportError:
+    _DEFAULT_BASE_DIR = Path(__file__).parent.parent  # Fallback: parent of management/
 
 DEFAULT_KEEP = 5
 
 class SafeCheckpointCleanup:
-    def __init__(self, keep=DEFAULT_KEEP, dry_run=False, force=False):
+    def __init__(self, keep=DEFAULT_KEEP, dry_run=False, force=False, base_dir=None):
         self.keep = keep
         self.dry_run = dry_run
         self.force = force
+        self.base_dir = Path(base_dir) if base_dir else _DEFAULT_BASE_DIR
+        self.model_dir = self.base_dir / "current_model"
+        self.status_file = self.base_dir / "status" / "training_status.json"
 
     def is_training_active(self):
         """Check if training is currently active"""
         try:
             # Check if status file was updated recently (within last 5 minutes)
-            if STATUS_FILE.exists():
-                mtime = STATUS_FILE.stat().st_mtime
+            if self.status_file.exists():
+                mtime = self.status_file.stat().st_mtime
                 age = time.time() - mtime
                 return age < 300  # 5 minutes
         except:
@@ -43,11 +49,11 @@ class SafeCheckpointCleanup:
 
     def get_checkpoints(self):
         """Get all checkpoints sorted by step number"""
-        if not MODEL_DIR.exists():
+        if not self.model_dir.exists():
             return []
 
         checkpoints = []
-        for ckpt_dir in MODEL_DIR.glob("checkpoint-*"):
+        for ckpt_dir in self.model_dir.glob("checkpoint-*"):
             try:
                 # Extract step number
                 step = int(ckpt_dir.name.split('-')[1])
@@ -154,6 +160,7 @@ class SafeCheckpointCleanup:
 
 def main():
     parser = argparse.ArgumentParser(description="Safely cleanup old checkpoints")
+    parser.add_argument('--base-dir', default=None, help='Base directory (default: auto-detect)')
     parser.add_argument('--keep', type=int, default=DEFAULT_KEEP,
                         help=f"Number of latest checkpoints to keep (default: {DEFAULT_KEEP})")
     parser.add_argument('--dry-run', action='store_true',
@@ -165,7 +172,8 @@ def main():
     cleaner = SafeCheckpointCleanup(
         keep=args.keep,
         dry_run=args.dry_run,
-        force=args.force
+        force=args.force,
+        base_dir=args.base_dir
     )
 
     success = cleaner.cleanup()

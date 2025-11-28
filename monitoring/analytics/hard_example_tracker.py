@@ -156,10 +156,16 @@ class HardExampleTracker:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
-        api_url: str = "http://192.168.x.x:8765"
+        base_dir: Optional[str] = None,
+        api_url: Optional[str] = None
     ):
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
+        if api_url is None:
+            from core.hosts import get_service_url
+            api_url = get_service_url("inference")
         self.api_url = api_url
 
         # Paths
@@ -467,9 +473,9 @@ class HardExampleTracker:
 
 def main():
     parser = argparse.ArgumentParser(description="Hard Example Tracker")
-    parser.add_argument('--base-dir', default='/path/to/training',
+    parser.add_argument('--base-dir', default=None,
                        help='Base directory')
-    parser.add_argument('--api-url', default='http://192.168.x.x:8765',
+    parser.add_argument('--api-url', default=None,
                        help='Inference API URL')
     parser.add_argument('--evaluate', action='store_true',
                        help='Evaluate current checkpoint')

@@ -1,7 +1,9 @@
 #!/bin/bash
 # Stop all Realm of Training services
 
-BASE_DIR="/path/to/training"
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 cd "$BASE_DIR"
 
 echo ""

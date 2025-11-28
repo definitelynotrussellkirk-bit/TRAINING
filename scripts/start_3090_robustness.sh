@@ -6,7 +6,9 @@
 
 set -e
 
-TRAINING_DIR="/path/to/training"
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TRAINING_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 cd "$TRAINING_DIR"
 
 # Create necessary directories

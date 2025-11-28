@@ -19,6 +19,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Iterator
 from dataclasses import asdict
+import sys
+import os
+
+# Add core to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "core"))
+from paths import get_base_dir
 
 from view_models import PreviewHistoryEntry
 
@@ -28,8 +34,8 @@ class PreviewHistoryLogger:
     Append-only logger for preview results
     """
 
-    def __init__(self, base_dir: Path = Path("/path/to/training")):
-        self.base_dir = Path(base_dir)
+    def __init__(self, base_dir: Path = None):
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
         self.logs_dir = self.base_dir / "logs" / "preview"
         self.logs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -273,7 +279,7 @@ class PreviewHistoryLogger:
 _logger_instance = None
 
 
-def get_preview_logger(base_dir: Path = Path("/path/to/training")) -> PreviewHistoryLogger:
+def get_preview_logger(base_dir: Path = None) -> PreviewHistoryLogger:
     """Get or create singleton preview logger"""
     global _logger_instance
     if _logger_instance is None:

@@ -3,7 +3,11 @@
 # Queue Statistics - View data in all queues
 #
 
-cd /path/to/training/queue
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+cd "$BASE_DIR/queue"
 
 echo "================================================================================"
 echo "📊 TRAINING DATA QUEUE STATISTICS"

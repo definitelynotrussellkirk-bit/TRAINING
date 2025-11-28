@@ -2,7 +2,9 @@
 # Safe launcher to ensure only one training daemon runs at a time.
 set -euo pipefail
 
-BASE_DIR="/path/to/training"
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 DAEMON_CMD="python3 -u training_daemon.py --base-dir $BASE_DIR"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 

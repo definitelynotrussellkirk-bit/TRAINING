@@ -53,7 +53,7 @@ class Guardian:
 
     def __init__(
         self,
-        base_dir: str | Path = "/path/to/training",
+        base_dir: str | Path = None,
         daemon_script: str = "core/training_daemon.py",
     ):
         """
@@ -63,7 +63,14 @@ class Guardian:
             base_dir: Base training directory
             daemon_script: Path to daemon script relative to base_dir
         """
-        self.base_dir = Path(base_dir)
+        if base_dir is None:
+            try:
+                from core.paths import get_base_dir
+                self.base_dir = get_base_dir()
+            except ImportError:
+                self.base_dir = Path(__file__).parent.parent  # Fallback
+        else:
+            self.base_dir = Path(base_dir)
         self.daemon_script = daemon_script
         self.pid_file = self.base_dir / ".pids" / "training_daemon.pid"
         self.log_file = self.base_dir / "logs" / "training_output.log"
@@ -240,6 +247,6 @@ class Guardian:
         }
 
 
-def get_guardian(base_dir: str | Path = "/path/to/training") -> Guardian:
+def get_guardian(base_dir: str | Path = None) -> Guardian:
     """Get a Guardian instance."""
     return Guardian(base_dir)

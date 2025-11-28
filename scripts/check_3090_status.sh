@@ -6,9 +6,13 @@
 
 set -e
 
-REMOTE_HOST="192.168.x.x"
-API_PORT="8765"
-TRAINING_DIR="/path/to/training"
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TRAINING_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+# Get remote host from config or env var
+REMOTE_HOST="${INFERENCE_HOST:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").host)' 2>/dev/null || echo "192.168.x.x")}"
+API_PORT="${INFERENCE_PORT:-8765}"
 
 echo "================================================================================"
 echo "🖥️  3090 REMOTE GPU SERVER STATUS"

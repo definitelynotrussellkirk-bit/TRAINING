@@ -340,13 +340,19 @@ class UltimateTrainer:
 
         # Create TrainerConfig from args (new config system)
         # This provides single source of truth for all config values
+        # Also stores raw config dict for extra fields (optimizer, liger_kernel, campaign)
         try:
-            self.config = ConfigLoader.from_args_and_json(args)
+            self.config, self.config_dict = ConfigLoader.from_args_and_json_with_raw(args)
             print(f"✓ TrainerConfig created (profile: {self.config.profile.name}, precision: {self.config.hyperparams.fp_precision})")
+            # Show campaign info if using campaign system
+            campaign = self.config_dict.get('campaign', {})
+            if campaign.get('hero_id'):
+                print(f"  Campaign: {campaign.get('hero_id')}/{campaign.get('campaign_id')} - {campaign.get('campaign_name')}")
         except Exception as e:
             print(f"⚠️  Could not create TrainerConfig: {e}")
             print(f"   Falling back to args-only mode")
             self.config = None
+            self.config_dict = {}
 
         self.model_db = ModelDatabase()
         self.validator = None
@@ -1478,9 +1484,14 @@ class UltimateTrainer:
                     self.remote_evaluator = None
                     if REMOTE_EVAL_AVAILABLE and self.remote_eval_config.get("enabled", False):
                         try:
+                            # Get defaults from hosts.json if not in config
+                            from core.hosts import get_host
+                            inference = get_host("3090")
+                            default_host = inference.host if inference else "localhost"
+                            default_port = inference.services.get("inference", {}).port if inference else 8765
                             self.remote_evaluator = RemoteEvaluator(
-                                host=self.remote_eval_config.get("host", "192.168.x.x"),
-                                port=self.remote_eval_config.get("port", 8765)
+                                host=self.remote_eval_config.get("host", default_host),
+                                port=self.remote_eval_config.get("port", default_port)
                             )
                             print(f"✅ Remote eval enabled: {self.remote_eval_config['host']}:{self.remote_eval_config['port']}")
                         except Exception as e:
@@ -1820,10 +1831,11 @@ class UltimateTrainer:
                             print(f"📖 Ledger: {record.canonical_name} (loss={train_loss:.4f})" if train_loss else f"📖 Ledger: {record.canonical_name}")
 
                             # =========================================================
-                            # QUEUE EVALUATIONS - Skill eval + LITE passives
+                            # QUEUE EVALUATIONS - Quick eval + LITE passives
+                            # Also queue FULL eval every 5000 steps
                             # =========================================================
                             try:
-                                from core.evaluation_ledger import queue_evaluation
+                                from core.evaluation_ledger import queue_evaluation, queue_full_evaluation
                                 from core.passives import queue_passive_lite
 
                                 # Get current curriculum level from state
@@ -1832,11 +1844,28 @@ class UltimateTrainer:
                                     import json
                                     with open(curriculum_state_file) as f:
                                         curriculum = json.load(f)
-                                    # Queue eval for each active skill at current level
+
+                                    # Queue QUICK eval for each active skill at current level
                                     for skill_id, skill_state in curriculum.get("skills", {}).items():
                                         current_level = skill_state.get("current_level", 1)
-                                        queue_evaluation(state.global_step, skill_id, current_level)
-                                        print(f"📋 Queued eval: {skill_id} L{current_level}")
+                                        queue_evaluation(
+                                            checkpoint_step=state.global_step,
+                                            skill=skill_id,
+                                            level=current_level,
+                                            eval_type="quick",
+                                            priority=10,
+                                        )
+                                        print(f"📋 Queued quick eval: {skill_id} L{current_level}")
+
+                                    # Queue FULL eval every 5000 steps (all levels)
+                                    if state.global_step % 5000 == 0:
+                                        for skill_id in curriculum.get("skills", {}).keys():
+                                            queue_full_evaluation(
+                                                checkpoint_step=state.global_step,
+                                                skill=skill_id,
+                                                priority=6,  # Medium priority
+                                            )
+                                            print(f"📋 Queued FULL eval: {skill_id} (all levels)")
 
                                 # Queue LITE passives
                                 queue_passive_lite(state.global_step)
@@ -1880,9 +1909,11 @@ class UltimateTrainer:
                             print(f"⚠️  Checkpoint not found: {checkpoint_dir}")
                             return
 
-                        # Get remote config
-                        remote_user = self.remote_eval_config.get("remote_user", "user")
-                        remote_host = self.remote_eval_config.get("host", "192.168.x.x")
+                        # Get remote config from hosts.json
+                        from core.hosts import get_host
+                        inference = get_host("3090")
+                        remote_user = self.remote_eval_config.get("remote_user", inference.ssh_user if inference else "")
+                        remote_host = self.remote_eval_config.get("host", inference.host if inference else "localhost")
                         # Use paths.py constant for remote models dir fallback
                         from paths import REMOTE_MODELS_DIR
                         remote_dir = self.remote_eval_config.get("remote_models_dir", str(REMOTE_MODELS_DIR))
@@ -1977,11 +2008,9 @@ class UltimateTrainer:
             custom_scheduler = None
             optimizer_type = "adamw"  # default
 
-            if MUON_AVAILABLE and self.config:
-                opt_config = getattr(self.config, "optimizer", {}) if hasattr(self.config, "optimizer") else {}
-                if isinstance(self.config, dict):
-                    opt_config = self.config.get("optimizer", {})
-
+            if MUON_AVAILABLE:
+                # Get optimizer config from raw config dict (includes extra fields)
+                opt_config = self.config_dict.get("optimizer", {})
                 optimizer_type = opt_config.get("type", "adamw") if isinstance(opt_config, dict) else "adamw"
 
                 if optimizer_type == "muon":
@@ -1996,10 +2025,9 @@ class UltimateTrainer:
                     print(f"  Other (AdamW):         {summary.adam_params:,} params ({100*summary.adam_params/total:.1f}%)")
 
                     # Create optimizer with config
-                    config_dict = self.config if isinstance(self.config, dict) else vars(self.config)
                     custom_optimizer, custom_scheduler, opt_info = create_custom_optimizer(
                         self.model,
-                        config_dict,
+                        self.config_dict,
                         optimizer_type="muon",
                         num_training_steps=max_steps,
                         num_warmup_steps=self.args.warmup_steps,

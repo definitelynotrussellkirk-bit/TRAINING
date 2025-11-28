@@ -8,12 +8,19 @@ This shows how to integrate the retention manager into your existing training fl
 from pathlib import Path
 from retention_manager import RetentionManager
 
+# Use centralized path resolution for default
+try:
+    from core.paths import get_base_dir
+    _DEFAULT_BASE_DIR = get_base_dir()
+except ImportError:
+    _DEFAULT_BASE_DIR = Path(__file__).parent.parent  # Fallback: parent of management/
+
 
 class TrainingDaemonIntegration:
     """Example integration with training daemon"""
 
-    def __init__(self, base_dir: Path):
-        self.base_dir = Path(base_dir)
+    def __init__(self, base_dir: Path = None):
+        self.base_dir = Path(base_dir) if base_dir else _DEFAULT_BASE_DIR
         self.output_dir = self.base_dir / "models" / "current_model"
         self.base_model_path = self.base_dir / "models" / "Qwen3-0.6B"
 
@@ -150,14 +157,14 @@ def cron_example():
     Set up a cron job to run daily maintenance:
 
     # crontab -e
-    0 3 * * * cd /path/to/training && python3 -c "from management.retention_manager import RetentionManager; m = RetentionManager('/path/to/training/models/current_model'); m.create_daily_snapshot_if_needed(); m.enforce_retention()"
+    0 3 * * * cd $TRAINING_DIR && python3 -c "from management.retention_manager import RetentionManager; from core.paths import get_base_dir; base = get_base_dir(); m = RetentionManager(base / 'models/current_model'); m.create_daily_snapshot_if_needed(); m.enforce_retention()"
 
     Or create a shell script:
 
     #!/bin/bash
-    # /path/to/training/scripts/daily_retention.sh
+    # scripts/daily_retention.sh
 
-    cd /path/to/training
+    cd $(dirname $0)/..
     python3 management/retention_manager.py \\
         --output-dir models/current_model \\
         --base-model models/Qwen3-0.6B \\
@@ -165,7 +172,7 @@ def cron_example():
         --enforce
 
     Then in crontab:
-    0 3 * * * /path/to/training/scripts/daily_retention.sh >> logs/retention.log 2>&1
+    0 3 * * * $TRAINING_DIR/scripts/daily_retention.sh >> logs/retention.log 2>&1
     """
     pass
 
@@ -198,8 +205,7 @@ def manual_examples():
 
 if __name__ == '__main__':
     # Example: Quick test
-    base_dir = Path("/path/to/training")
-    integration = TrainingDaemonIntegration(base_dir)
+    integration = TrainingDaemonIntegration()  # Uses auto-detected base_dir
 
     print("Getting status...")
     integration.retention_manager.print_status()

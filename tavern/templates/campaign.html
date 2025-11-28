@@ -692,7 +692,7 @@
             }
 
             list.innerHTML = allCampaigns.map(c => {
-                const isActive = activeCampaign?.id === c.id;
+                const isActive = activeCampaign?.id === c.id && activeCampaign?.hero_id === c.hero_id;
                 return `
                 <div class="campaign-item ${isActive ? 'active' : 'clickable'}"
                      data-hero="${c.hero_id}" data-id="${c.id}"
@@ -700,7 +700,7 @@
                      ${isActive ? '' : 'title="Click to switch to this campaign"'}>
                     <div class="campaign-item-header">
                         <span class="campaign-item-name">${c.name}</span>
-                        <span class="campaign-item-step">${isActive ? '● Active' : `Step ${(c.current_step || 0).toLocaleString()}`}</span>
+                        <span class="campaign-item-step">${isActive ? '★ Selected' : `Step ${(c.current_step || 0).toLocaleString()}`}</span>
                     </div>
                     <div class="campaign-item-date">${c.hero_id} - Created ${new Date(c.created_at).toLocaleDateString()}</div>
                 </div>

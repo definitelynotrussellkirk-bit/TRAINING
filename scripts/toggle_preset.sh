@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Toggle config.json between 0.6B presets and set current model dir.
 set -euo pipefail
-BASE_DIR="/path/to/training"
+
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 usage() {
   echo "Usage: $0 {0.6b|0.6b-short|0.6b-med|0.6b-long}"

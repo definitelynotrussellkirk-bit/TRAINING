@@ -50,13 +50,13 @@ def list_scrolls() -> List[str]:
     return list(SCROLL_REGISTRY.keys())
 
 
-def get_scroll_path(scroll_name: str, base_dir: str = "/path/to/training") -> Optional[Path]:
+def get_scroll_path(scroll_name: str, base_dir: str = None) -> Optional[Path]:
     """
     Get the path to a scroll script.
 
     Args:
         scroll_name: Name of the scroll
-        base_dir: Base training directory
+        base_dir: Base training directory (None = auto-detect)
 
     Returns:
         Path to script or None if not found
@@ -64,12 +64,19 @@ def get_scroll_path(scroll_name: str, base_dir: str = "/path/to/training") -> Op
     if scroll_name not in SCROLL_REGISTRY:
         return None
 
+    if base_dir is None:
+        try:
+            from core.paths import get_base_dir
+            base_dir = str(get_base_dir())
+        except ImportError:
+            base_dir = str(Path(__file__).parent.parent)
+
     return Path(base_dir) / SCROLL_REGISTRY[scroll_name]
 
 
 def invoke_scroll(
     scroll_name: str,
-    base_dir: str = "/path/to/training",
+    base_dir: str = None,
     args: List[str] = None,
     capture_output: bool = True,
 ) -> Dict[str, Any]:
@@ -140,8 +147,15 @@ class ScrollInvoker:
         print(scrolls.available)
     """
 
-    def __init__(self, base_dir: str = "/path/to/training"):
-        self.base_dir = base_dir
+    def __init__(self, base_dir: str = None):
+        if base_dir is None:
+            try:
+                from core.paths import get_base_dir
+                self.base_dir = str(get_base_dir())
+            except ImportError:
+                self.base_dir = str(Path(__file__).parent.parent)
+        else:
+            self.base_dir = base_dir
 
     @property
     def available(self) -> List[str]:
@@ -158,7 +172,7 @@ class ScrollInvoker:
         return path is not None and path.exists()
 
 
-def get_scroll_invoker(base_dir: str = "/path/to/training") -> ScrollInvoker:
+def get_scroll_invoker(base_dir: str = None) -> ScrollInvoker:
     """Get a ScrollInvoker instance."""
     return ScrollInvoker(base_dir)
 

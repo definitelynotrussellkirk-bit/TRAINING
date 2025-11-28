@@ -455,6 +455,33 @@
         const step = parseInt(stepStr);
 
         let checkpointData = null;
+        let heroName = 'Hero';  // Default fallback
+        let baseModelName = 'Base Model';  // Default fallback
+
+        // Load hero info for dynamic names
+        async function loadHeroInfo() {
+            try {
+                const campResp = await fetch('/api/campaigns/active');
+                if (campResp.ok) {
+                    const campaign = await campResp.json();
+                    if (campaign?.hero_id) {
+                        const heroesResp = await fetch('/api/heroes');
+                        if (heroesResp.ok) {
+                            const heroes = await heroesResp.json();
+                            const hero = heroes.find(h => h.id === campaign.hero_id);
+                            if (hero?.name) {
+                                heroName = hero.name;
+                            }
+                            if (hero?.model?.hf_name) {
+                                baseModelName = hero.model.hf_name;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load hero info:', err);
+            }
+        }
 
         // Fetch checkpoint data
         async function loadCheckpointData() {
@@ -495,7 +522,7 @@
             // Header
             if (isBase) {
                 document.getElementById('stepNumber').textContent = 'Base';
-                document.getElementById('canonicalName').textContent = ledger.display_name || 'Qwen3-0.6B (Untrained)';
+                document.getElementById('canonicalName').textContent = ledger.display_name || `${baseModelName} (Untrained)`;
             } else {
                 document.getElementById('stepNumber').textContent = step.toLocaleString();
                 document.getElementById('canonicalName').textContent = ledger.canonical_name || physical.name || `checkpoint-${step}`;
@@ -815,7 +842,7 @@
         }
 
         // Load on page load
-        loadCheckpointData();
+        loadHeroInfo().then(() => loadCheckpointData());
     </script>
 </body>
 </html>

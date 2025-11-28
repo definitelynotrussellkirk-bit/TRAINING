@@ -16,7 +16,12 @@ import json
 import sys
 from pathlib import Path
 
-BASE_DIR = Path("/path/to/training")
+try:
+    from core.paths import get_base_dir
+    BASE_DIR = get_base_dir()
+except ImportError:
+    BASE_DIR = Path(__file__).parent.parent  # Fallback: parent of safety/
+
 CONFIG_FILE = BASE_DIR / "config.json"
 STATUS_FILE = BASE_DIR / "status" / "training_status.json"
 MODEL_DIR = BASE_DIR / "current_model"
@@ -130,12 +135,12 @@ def check_resume_correctness():
         else:
             print("✅ Base model path exists")
 
-            # Check if it's the approved base model directory
-            expected_base = Path("/path/to/training/consolidated_models/20251119_152444")
-            if base_model.resolve() == expected_base.resolve():
-                print("✅ Using approved merged base (Qwen3-0.6B)")
+            # Check if it's within expected consolidated models directory
+            expected_base = BASE_DIR / "consolidated_models"
+            if expected_base in base_model.parents or base_model.parent == expected_base:
+                print("✅ Using consolidated merged base model")
             else:
-                print("⚠️ Base model is not the current merged base directory")
+                print("⚠️ Base model is not in consolidated_models directory")
                 warnings.append(f"Unexpected base_model path: {base_model}")
     except Exception as e:
         print(f"❌ Error checking config: {e}")

@@ -2,9 +2,15 @@
 # Sync training checkpoints to RTX 3090 for curriculum optimization
 # Runs continuously, syncing latest checkpoint every 5 minutes
 
-TRAINING_CHECKPOINT_DIR="/path/to/training/models/current_model"
-REMOTE_USER="user"
-REMOTE_HOST="192.168.x.x"
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+TRAINING_CHECKPOINT_DIR="$BASE_DIR/models/current_model"
+
+# Get remote host from config or env var
+REMOTE_HOST="${INFERENCE_HOST:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").host)' 2>/dev/null || echo "192.168.x.x")}"
+REMOTE_USER="${REMOTE_USER:-user}"
 REMOTE_DIR="~/TRAINING/models/current_model"
 SYNC_INTERVAL=300  # 5 minutes
 

@@ -34,6 +34,7 @@ from .types import (
     HeroProfile,
     ModelSpec,
     TrainingDefaults,
+    LigerKernelConfig,
     QLoRAConfig,
     ChatTemplate,
     VRAMProfile,
@@ -148,6 +149,19 @@ class HeroRegistry:
 
             # Parse training defaults
             train_data = data.get("training_defaults", {})
+
+            # Parse liger kernel config if present
+            liger_data = train_data.get("liger_kernel", {})
+            liger_kernel = None
+            if liger_data and liger_data.get("enabled", False):
+                liger_kernel = LigerKernelConfig(
+                    enabled=True,
+                    fused_linear_cross_entropy=liger_data.get("fused_linear_cross_entropy", True),
+                    fused_rms_norm=liger_data.get("fused_rms_norm", True),
+                    fused_swiglu=liger_data.get("fused_swiglu", True),
+                    fused_rope=liger_data.get("fused_rope", True),
+                )
+
             training_defaults = TrainingDefaults(
                 precision=train_data.get("precision", "bf16"),
                 load_in_4bit=train_data.get("load_in_4bit", False),
@@ -155,8 +169,11 @@ class HeroRegistry:
                 gradient_accumulation=int(train_data.get("gradient_accumulation", 16)),
                 learning_rate=float(train_data.get("learning_rate", 0.0004)),
                 warmup_steps=int(train_data.get("warmup_steps", 100)),
+                lr_scheduler=train_data.get("lr_scheduler", "cosine"),
                 max_length=int(train_data.get("max_length", 2048)),
                 gradient_checkpointing=train_data.get("gradient_checkpointing", True),
+                optimizer=train_data.get("optimizer", "adamw"),
+                liger_kernel=liger_kernel,
                 save_steps=int(train_data.get("save_steps", 10000)),
                 save_total_limit=int(train_data.get("save_total_limit", 40)),
             )

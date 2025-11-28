@@ -322,7 +322,7 @@ except ImportError:
         current = Path(__file__).resolve().parent.parent
         if (current / "CLAUDE.md").exists():
             return current
-        return Path("/path/to/training")  # Legacy fallback
+        raise RuntimeError("Cannot detect base dir. Set TRAINING_BASE_DIR env var.")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

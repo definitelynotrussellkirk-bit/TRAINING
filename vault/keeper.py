@@ -135,16 +135,19 @@ class VaultKeeper:
 
     def __init__(
         self,
-        base_dir: str | Path = "/path/to/training",
+        base_dir: Optional[str | Path] = None,
         catalog_path: Optional[str | Path] = None,
     ):
         """
         Initialize the VaultKeeper.
 
         Args:
-            base_dir: Base training directory
+            base_dir: Base training directory (default: auto-detect)
             catalog_path: Path to catalog database (defaults to vault/catalog.db)
         """
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.catalog_path = Path(catalog_path) if catalog_path else self.base_dir / "vault" / "catalog.db"
 
@@ -981,7 +984,7 @@ class VaultKeeper:
 _keeper_instance: Optional[VaultKeeper] = None
 
 
-def get_vault_keeper(base_dir: str | Path = "/path/to/training") -> VaultKeeper:
+def get_vault_keeper(base_dir: Optional[str | Path] = None) -> VaultKeeper:
     """Get or create a VaultKeeper instance."""
     global _keeper_instance
     if _keeper_instance is None:

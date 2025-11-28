@@ -1038,7 +1038,7 @@
 
                     <div class="settings-row">
                         <div class="settings-label">Host</div>
-                        <input type="text" class="settings-input" id="remote_host" value="192.168.x.x">
+                        <input type="text" class="settings-input" id="remote_host" placeholder="Loading...">
                     </div>
 
                     <div class="settings-row">
@@ -1203,6 +1203,21 @@
             }
         }
 
+        async function loadDefaultInferenceHost() {
+            try {
+                const response = await fetch('/oracle/hosts');
+                const data = await response.json();
+                if (data.hosts && data.hosts.length > 0) {
+                    // Use the first inference host as default
+                    const firstHost = data.hosts[0];
+                    $('#remote_host').value = firstHost.host;
+                }
+            } catch (error) {
+                console.error('Failed to load inference hosts:', error);
+                $('#remote_host').placeholder = 'Host not configured';
+            }
+        }
+
         function populateForm(config) {
             // Training hyperparams
             $('#batch_size').value = config.hyperparams?.batch_size || config.batch_size || 1;
@@ -1240,7 +1255,12 @@
 
             // Remote eval
             setToggle('#remote_enabled', config.remote_eval?.enabled);
-            $('#remote_host').value = config.remote_eval?.host || '192.168.x.x';
+            // Get default from inference hosts if not set
+            if (config.remote_eval?.host) {
+                $('#remote_host').value = config.remote_eval.host;
+            } else {
+                loadDefaultInferenceHost();
+            }
             $('#remote_port').value = config.remote_eval?.port || 8765;
             $('#remote_interval').value = config.remote_eval?.eval_interval_steps || 5000;
             setToggle('#remote_sync', config.remote_eval?.sync_checkpoints);

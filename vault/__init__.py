@@ -26,11 +26,13 @@ NEW: VaultKeeper - Ask Vault First Pattern
 Before loading ANY asset, ask the VaultKeeper first:
 
     from vault import ask_vault_first, VaultKeeper
+    from core.paths import get_base_dir
 
     # Ask vault where checkpoint is (may be local, NAS, or 3090)
+    base = get_base_dir()
     checkpoint_path = ask_vault_first(
         "checkpoint_175000",
-        fallback="/path/to/training/models/checkpoint-175000"
+        fallback=str(base / "models" / "checkpoint-175000")
     )
 
     # The keeper will:
@@ -56,12 +58,16 @@ API Server (for remote devices like 3090):
     python3 vault/server.py --port 8767
 
     # Query from 3090:
-    curl http://192.168.x.x:8767/api/locate/checkpoint_175000
+    from core.hosts import get_service_url
+    keeper_url = get_service_url("vault")
+    curl {keeper_url}/api/locate/checkpoint_175000
 
 Client Library (for remote queries):
     from vault.client import VaultKeeperClient
+    from core.hosts import get_service_url
 
-    client = VaultKeeperClient("192.168.x.x:8767")
+    keeper_url = get_service_url("vault")
+    client = VaultKeeperClient(keeper_url)
     result = client.locate("checkpoint_175000")
 
 Discovery Service (scan and register assets):

@@ -30,6 +30,8 @@ import requests
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from core.paths import get_base_dir
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -63,8 +65,8 @@ class Weaver:
     4. Report tapestry status
     """
 
-    def __init__(self, base_dir: str = "/path/to/training"):
-        self.base_dir = Path(base_dir)
+    def __init__(self, base_dir: Optional[str] = None):
+        self.base_dir = Path(base_dir) if base_dir else get_base_dir()
         self.config = self._load_config()
         self.threads: Dict[str, Thread] = {}
         self.running = False
@@ -593,10 +595,10 @@ def main():
     parser.add_argument("--restart", metavar="SERVICE", help="Restart a specific service (tavern, vault, training, data_flow)")
     parser.add_argument("--shutdown", action="store_true", help="Force shutdown all services cleanly")
     parser.add_argument("--start", action="store_true", help="Start all services fresh")
-    parser.add_argument("--base-dir", default="/path/to/training", help="Base directory")
+    parser.add_argument("--base-dir", default=None, help="Base directory (auto-detected if not provided)")
 
     args = parser.parse_args()
-    base_dir = Path(args.base_dir)
+    base_dir = Path(args.base_dir) if args.base_dir else get_base_dir()
 
     # For daemon mode, check for existing Weaver
     if args.daemon:
@@ -606,7 +608,7 @@ def main():
             print("Kill the existing Weaver first, or use --status to check status")
             sys.exit(1)
 
-    weaver = Weaver(args.base_dir)
+    weaver = Weaver(str(base_dir) if args.base_dir else None)
 
     if args.shutdown:
         force_shutdown(base_dir)

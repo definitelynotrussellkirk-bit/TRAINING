@@ -44,9 +44,12 @@ class EmbeddingCollector:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
+        base_dir: Optional[str] = None,
         model_path: Optional[str] = None
     ):
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.embeddings_dir = self.base_dir / "status" / "embeddings"
         self.embeddings_dir.mkdir(parents=True, exist_ok=True)
@@ -198,7 +201,10 @@ class EmbeddingCollector:
 class EmbeddingVisualizer:
     """Visualize embeddings using UMAP."""
 
-    def __init__(self, base_dir: str = "/path/to/training"):
+    def __init__(self, base_dir: Optional[str] = None):
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.embeddings_dir = self.base_dir / "status" / "embeddings"
         self.viz_dir = self.base_dir / "status" / "visualizations"
@@ -414,7 +420,7 @@ class EmbeddingVisualizer:
 
 def main():
     parser = argparse.ArgumentParser(description="Embedding Tracker")
-    parser.add_argument('--base-dir', default='/path/to/training',
+    parser.add_argument('--base-dir', default=None,
                        help='Base directory')
     parser.add_argument('--collect', action='store_true',
                        help='Collect embeddings for current checkpoint')

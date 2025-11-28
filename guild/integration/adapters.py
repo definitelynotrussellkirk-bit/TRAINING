@@ -42,8 +42,8 @@ class AdapterConfig:
     max_retries: int = 3
     retry_delay_seconds: float = 1.0
 
-    # Inference settings
-    inference_host: str = "192.168.x.x"
+    # Inference settings (defaults from hosts.json)
+    inference_host: str = ""  # Set in __post_init__
     inference_port: int = 8765
 
     # Queue settings

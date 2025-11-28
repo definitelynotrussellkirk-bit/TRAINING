@@ -164,7 +164,7 @@ function computeActionHint() {
 
         // High loss warning
         if (GameState.loss > 2.0) {
-            hints.push({ priority: 8, text: '💪 Strain is high. DIO is struggling with this material.' });
+            hints.push({ priority: 8, text: `💪 Strain is high. ${GameState.heroName || 'Hero'} is struggling with this material.` });
         }
 
         // Low queue warning during training
@@ -853,11 +853,49 @@ function updateAll() {
 }
 
 // ============================================
+// CAMPAIGN / HERO DATA
+// ============================================
+
+async function fetchCampaignData() {
+    try {
+        // Fetch active hero info (single endpoint has all we need)
+        const heroResp = await fetch('/api/hero');
+        if (!heroResp.ok) return;
+        const hero = await heroResp.json();
+
+        if (!hero || !hero.name) return;
+
+        // Update hero display
+        const nameEl = document.getElementById('heroName');
+        const titleEl = document.getElementById('heroTitle');
+        const classEl = document.getElementById('heroClass');
+        const iconEl = document.querySelector('.dio-icon');
+
+        if (nameEl) nameEl.textContent = hero.name;
+        if (titleEl) titleEl.textContent = hero.rpg_name;
+        if (classEl) classEl.textContent = hero.model_name || hero.hero_id;
+        if (iconEl) iconEl.textContent = hero.icon || '🦸';
+
+        // Store hero info for other uses
+        GameState.heroName = hero.name;
+        GameState.heroIcon = hero.icon;
+        GameState.modelName = hero.model_name;
+
+        console.log(`Hero loaded: ${hero.name} (${hero.rpg_name})`);
+    } catch (err) {
+        console.error('Error fetching hero:', err);
+    }
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 
 function init() {
     console.log('Realm of Training initializing...');
+
+    // Load active campaign/hero first
+    fetchCampaignData();
 
     // Initial UI update
     updateAll();

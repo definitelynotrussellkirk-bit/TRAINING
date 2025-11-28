@@ -51,13 +51,16 @@ class Chronicle(_ModelVersioner):
         chronicle.restore_chapter("v003")
     """
 
-    def __init__(self, base_dir: str = "/path/to/training"):
+    def __init__(self, base_dir: Optional[str] = None):
         """
         Initialize the Chronicle.
 
         Args:
-            base_dir: Base training directory
+            base_dir: Base training directory (default: auto-detect)
         """
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = str(get_base_dir())
         super().__init__(base_dir)
 
     # =========================================================================
@@ -328,7 +331,7 @@ class Chronicle(_ModelVersioner):
 
 
 # Convenience function
-def get_chronicle(base_dir: str = "/path/to/training") -> Chronicle:
+def get_chronicle(base_dir: Optional[str] = None) -> Chronicle:
     """Get a Chronicle instance for the given base directory."""
     return Chronicle(base_dir)
 

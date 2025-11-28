@@ -446,6 +446,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Guild - Skills and Passives
         elif path == "/guild" or path == "/guild.html" or path == "/guildhall.html":
             self._serve_template("guild.html")
+        elif path == "/api/hero":
+            self._serve_hero_info()
         elif path == "/api/skills":
             self._serve_skills()
         elif path == "/api/curriculum":
@@ -585,6 +587,9 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._activate_campaign()
         elif path == "/api/campaigns/archive":
             self._archive_campaign()
+        # Vault - Delete checkpoints
+        elif path == "/api/vault/delete":
+            self._delete_checkpoints()
         else:
             self._send_error(404, "Endpoint not found")
 
@@ -1064,6 +1069,25 @@ class TavernHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Eval results error: {e}")
             self._send_json({"error": str(e)}, 500)
+
+    def _serve_hero_info(self):
+        """Serve active hero information from campaign/hero config."""
+        try:
+            from core.hero import get_active_hero
+            hero = get_active_hero()
+            self._send_json(hero)
+        except Exception as e:
+            logger.error(f"Hero info error: {e}")
+            # Fallback to generic hero
+            self._send_json({
+                "name": "Hero",
+                "rpg_name": "The Apprentice",
+                "icon": "🦸",
+                "model_name": "Unknown",
+                "hero_id": "",
+                "campaign_id": "",
+                "error": str(e)
+            })
 
     def _serve_skills(self):
         """Serve skill data from YAML configs."""
@@ -2231,43 +2255,92 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._send_json({"success": False, "error": str(e)}, 500)
 
     def _serve_vault_assets(self):
-        """Serve vault assets - base model, checkpoints, etc."""
+        """Serve vault assets - base model, checkpoints, etc. Campaign-aware."""
         try:
             import os
             from datetime import datetime
+
+            # Get active campaign
+            active_hero_id = None
+            active_campaign_id = None
+            try:
+                from guild.campaigns import get_active_campaign
+                active = get_active_campaign(BASE_DIR)
+                if active:
+                    active_hero_id = active.hero_id
+                    active_campaign_id = active.id
+            except Exception:
+                pass
 
             assets = {
                 "base_model": None,
                 "checkpoints": [],
                 "total_size_gb": 0,
                 "last_updated": datetime.now().isoformat(),
+                "active_hero_id": active_hero_id,
+                "active_campaign_id": active_campaign_id,
             }
 
-            # Load config for base model info
-            config_path = BASE_DIR / "config.json"
-            if config_path.exists():
-                with open(config_path) as f:
-                    config = json.load(f)
+            # Load ALL hero base models (active one highlighted, others faded)
+            assets["base_models"] = []
+            seen_paths = set()
 
-                model_path = Path(config.get("model_path", ""))
-                if model_path.exists():
-                    # Calculate size
-                    size_bytes = sum(
-                        f.stat().st_size for f in model_path.rglob("*") if f.is_file()
-                    )
-                    assets["base_model"] = {
-                        "name": config.get("model_name", "unknown"),
-                        "display_name": config.get("model_display_name", "Base Model"),
-                        "path": str(model_path),
-                        "size_gb": round(size_bytes / (1024**3), 2),
-                        "locked": config.get("locked", {}),
-                    }
-                    assets["total_size_gb"] += assets["base_model"]["size_gb"]
+            try:
+                from guild.heroes import list_heroes, get_hero
+                for hero_id in list_heroes():
+                    try:
+                        hero = get_hero(hero_id)
+                        if hero and hero.model:
+                            hero_model_path = hero.model.hf_name
+                            # Handle relative paths
+                            if not hero_model_path.startswith("/"):
+                                hero_model_path = BASE_DIR / hero_model_path
+                            else:
+                                hero_model_path = Path(hero_model_path)
 
-            # Scan for checkpoints
-            current_model_dir = BASE_DIR / "current_model"
-            if current_model_dir.exists():
-                for item in sorted(current_model_dir.iterdir(), reverse=True):
+                            # Skip if already seen (same model for multiple heroes)
+                            path_str = str(hero_model_path)
+                            if path_str in seen_paths:
+                                continue
+                            seen_paths.add(path_str)
+
+                            if hero_model_path.exists():
+                                size_bytes = sum(
+                                    f.stat().st_size for f in hero_model_path.rglob("*") if f.is_file()
+                                )
+                                size_gb = round(size_bytes / (1024**3), 2)
+                                is_active = (hero_id == active_hero_id)
+
+                                assets["base_models"].append({
+                                    "name": f"{hero.name.lower()}_{hero.model.size_b}b",
+                                    "display_name": f"{hero.name}'s Base ({hero.model.size_b}B)",
+                                    "hero_id": hero_id,
+                                    "hero_name": hero.name,
+                                    "path": path_str,
+                                    "size_gb": size_gb,
+                                    "is_active": is_active,
+                                })
+                                assets["total_size_gb"] += size_gb
+                    except Exception as e:
+                        logger.warning(f"Could not load hero {hero_id}: {e}")
+            except Exception as e:
+                logger.warning(f"Could not list heroes: {e}")
+
+            # Sort: active first, then by size descending
+            assets["base_models"].sort(key=lambda x: (not x["is_active"], -x["size_gb"]))
+
+            # Keep backward compat: set base_model to active one
+            active_models = [m for m in assets["base_models"] if m["is_active"]]
+            if active_models:
+                assets["base_model"] = active_models[0]
+
+            def scan_checkpoint_dir(checkpoint_dir, hero_id=None, campaign_id=None):
+                """Scan a directory for checkpoints."""
+                checkpoints = []
+                if not checkpoint_dir.exists():
+                    return checkpoints
+
+                for item in sorted(checkpoint_dir.iterdir(), reverse=True):
                     if item.is_dir() and item.name.startswith("checkpoint-"):
                         try:
                             step = int(item.name.split("-")[1])
@@ -2279,34 +2352,53 @@ class TavernHandler(SimpleHTTPRequestHandler):
                             # Get modification time
                             mtime = datetime.fromtimestamp(item.stat().st_mtime)
 
-                            # Get eval count from curriculum_state.json
-                            eval_count = 0
-                            try:
-                                curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
-                                if curriculum_file.exists():
-                                    with open(curriculum_file) as cf:
-                                        curriculum = json.load(cf)
-                                    # Count evals at or near this step (within 500 steps)
-                                    for skill_id, skill_data in curriculum.get("skills", {}).items():
-                                        for eval_entry in skill_data.get("accuracy_history", []):
-                                            eval_step = eval_entry.get("step", 0)
-                                            if abs(eval_step - step) <= 500:
-                                                eval_count += 1
-                            except Exception:
-                                pass
-
-                            assets["checkpoints"].append({
+                            checkpoints.append({
                                 "name": item.name,
                                 "step": step,
                                 "path": str(item),
                                 "size_gb": size_gb,
                                 "created": mtime.isoformat(),
                                 "age_hours": round((datetime.now() - mtime).total_seconds() / 3600, 1),
-                                "eval_count": eval_count,
+                                "eval_count": 0,
+                                "hero_id": hero_id,
+                                "campaign_id": campaign_id,
+                                "is_active_campaign": (hero_id == active_hero_id and campaign_id == active_campaign_id),
                             })
-                            assets["total_size_gb"] += size_gb
                         except (ValueError, OSError) as e:
                             logger.warning(f"Error processing {item}: {e}")
+                return checkpoints
+
+            # Scan campaign checkpoint directories
+            campaigns_dir = BASE_DIR / "campaigns"
+            if campaigns_dir.exists():
+                for hero_dir in campaigns_dir.iterdir():
+                    if hero_dir.is_dir() and hero_dir.name not in ('active', 'archived'):
+                        hero_id = hero_dir.name
+                        for campaign_dir in hero_dir.iterdir():
+                            if campaign_dir.is_dir():
+                                campaign_id = campaign_dir.name
+                                checkpoint_dir = campaign_dir / "checkpoints"
+                                cps = scan_checkpoint_dir(checkpoint_dir, hero_id, campaign_id)
+                                assets["checkpoints"].extend(cps)
+                                for cp in cps:
+                                    assets["total_size_gb"] += cp["size_gb"]
+
+            # Also scan legacy current_model/ directory (for DIO's old checkpoints)
+            current_model_dir = BASE_DIR / "current_model"
+            if current_model_dir.exists():
+                # Assume current_model belongs to DIO unless we know otherwise
+                legacy_hero = "dio-qwen3-0.6b"
+                legacy_campaign = "campaign-001"
+                cps = scan_checkpoint_dir(current_model_dir, legacy_hero, legacy_campaign)
+                # Mark as active if DIO campaign-001 is active
+                for cp in cps:
+                    cp["is_active_campaign"] = (legacy_hero == active_hero_id and legacy_campaign == active_campaign_id)
+                assets["checkpoints"].extend(cps)
+                for cp in cps:
+                    assets["total_size_gb"] += cp["size_gb"]
+
+            # Sort all checkpoints by step descending
+            assets["checkpoints"].sort(key=lambda x: x["step"], reverse=True)
 
             # Round total
             assets["total_size_gb"] = round(assets["total_size_gb"], 2)
@@ -2334,6 +2426,83 @@ class TavernHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Vault assets error: {e}")
             self._send_json({"error": str(e)}, 500)
+
+    def _delete_checkpoints(self):
+        """Delete checkpoints from the vault."""
+        import shutil
+
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(content_length)) if content_length else {}
+
+            paths = body.get("paths", [])
+            steps = body.get("steps", [])
+
+            if not paths and not steps:
+                self._send_json({"success": False, "error": "No paths or steps provided"}, 400)
+                return
+
+            deleted = []
+            errors = []
+
+            # If steps provided, find all checkpoint paths matching those steps
+            if steps:
+                # Scan for checkpoints matching the steps
+                checkpoint_dirs = [
+                    BASE_DIR / "current_model",
+                ]
+                # Also scan campaign checkpoint directories
+                campaigns_dir = BASE_DIR / "campaigns"
+                if campaigns_dir.exists():
+                    for hero_dir in campaigns_dir.iterdir():
+                        if hero_dir.is_dir() and hero_dir.name not in ('active', 'archived'):
+                            for campaign_dir in hero_dir.iterdir():
+                                if campaign_dir.is_dir():
+                                    cp_dir = campaign_dir / "checkpoints"
+                                    if cp_dir.exists():
+                                        checkpoint_dirs.append(cp_dir)
+
+                for step in steps:
+                    for cp_dir in checkpoint_dirs:
+                        if not cp_dir.exists():
+                            continue
+                        for item in cp_dir.iterdir():
+                            if item.is_dir() and item.name.startswith(f"checkpoint-{step}"):
+                                paths.append(str(item))
+
+            # Delete each path
+            for path_str in paths:
+                path = Path(path_str)
+                try:
+                    if path.exists() and path.is_dir():
+                        # Safety check - must be a checkpoint directory
+                        if not path.name.startswith("checkpoint-"):
+                            errors.append(f"Skipped (not a checkpoint): {path_str}")
+                            continue
+
+                        # Safety check - must be under TRAINING directory
+                        if not str(path).startswith(str(BASE_DIR)):
+                            errors.append(f"Skipped (outside base dir): {path_str}")
+                            continue
+
+                        shutil.rmtree(path)
+                        deleted.append(path_str)
+                        logger.info(f"Deleted checkpoint: {path_str}")
+                    else:
+                        errors.append(f"Not found: {path_str}")
+                except Exception as e:
+                    errors.append(f"Error deleting {path_str}: {e}")
+
+            self._send_json({
+                "success": True,
+                "deleted": deleted,
+                "deleted_count": len(deleted),
+                "errors": errors,
+            })
+
+        except Exception as e:
+            logger.error(f"Delete checkpoints error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
 
     def _serve_vault_zones(self, refresh: bool = False):
         """Serve zone status by querying Zone Wardens."""
@@ -2952,25 +3121,20 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
         # Fallback to config file
         hosts_file = BASE_DIR / "config" / "hosts.json"
-        default_hosts = {
-            "3090": {
-                "name": "RTX 3090 (Inference)",
-                "host": "192.168.x.x",
-                "port": 8765,
-                "type": "inference",
-                "models_dir": "/path/to/models",
-            },
-        }
 
-        if hosts_file.exists():
-            try:
-                with open(hosts_file) as f:
-                    config = json.load(f)
-                return config.get("inference_hosts", default_hosts)
-            except Exception as e:
-                logger.warning(f"Failed to load hosts.json: {e}")
+        # No hardcoded defaults - hosts.json is required
+        if not hosts_file.exists():
+            logger.error(f"Host configuration not found: {hosts_file}")
+            logger.error("Create config/hosts.json with host definitions.")
+            return {}
 
-        return default_hosts
+        try:
+            with open(hosts_file) as f:
+                config = json.load(f)
+            return config.get("inference_hosts", {})
+        except Exception as e:
+            logger.warning(f"Failed to load hosts.json: {e}")
+            return {}
 
     @property
     def INFERENCE_HOSTS(self):
@@ -3302,13 +3466,14 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": str(e)}, 500)
 
     def _handle_oracle_load(self):
-        """Load a checkpoint on an inference host."""
+        """Load a checkpoint on an inference host. Campaign-aware for base models."""
         try:
             content_length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(content_length).decode())
 
             step = body.get("step")
             host_id = body.get("host", "3090")
+            hero_id = body.get("hero_id")  # Optional: for campaign-aware base model
             force_sync = body.get("sync", False)  # Force sync even if might exist
 
             if step is None:
@@ -3324,14 +3489,37 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
             # Special handling for base model (step 0)
             if int(step) == 0:
-                checkpoint_name = "Qwen3-0.6B-base"
+                # Get hero's base model (campaign-aware)
+                base_model_name = "Qwen3-0.6B"
                 local_path = BASE_DIR / "models" / "Qwen3-0.6B"
-                remote_path = f"{models_dir}/Qwen3-0.6B-base"
+                display_name = "Qwen3-0.6B (Base)"
+
+                # Try to get hero-specific base model
+                if hero_id:
+                    try:
+                        from guild.heroes import get_hero
+                        hero = get_hero(hero_id)
+                        if hero and hero.model:
+                            hero_model_path = hero.model.hf_name
+                            if not hero_model_path.startswith("/"):
+                                hero_model_path = BASE_DIR / hero_model_path
+                            else:
+                                hero_model_path = Path(hero_model_path)
+                            if hero_model_path.exists():
+                                local_path = hero_model_path
+                                base_model_name = f"{hero.name}-base"
+                                display_name = f"{hero.name}'s Base ({hero.model.size_b}B)"
+                                logger.info(f"Using hero {hero.name}'s base model: {local_path}")
+                    except Exception as e:
+                        logger.warning(f"Could not get hero model, using default: {e}")
+
+                checkpoint_name = base_model_name
+                remote_path = f"{models_dir}/{base_model_name}"
 
                 # Check if base model exists on remote
                 if not self._check_remote_checkpoint(host_config, checkpoint_name):
                     # Sync base model
-                    logger.info(f"Syncing base model to {host_id}...")
+                    logger.info(f"Syncing base model {checkpoint_name} to {host_id}...")
                     sync_result = self._sync_checkpoint_to_host(str(local_path), host_config, checkpoint_name)
                     if not sync_result["success"]:
                         self._send_json({
@@ -3351,7 +3539,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
                     "success": True,
                     "step": 0,
                     "host": host_id,
-                    "checkpoint_name": "Qwen3-0.6B (Base)",
+                    "hero_id": hero_id,
+                    "checkpoint_name": display_name,
                     "remote_path": remote_path,
                     "result": result,
                 })

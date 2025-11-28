@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Remote GPU Client - Interface to RTX 3090 inference server
-Handles all communication with 192.168.x.x:8765
+Handles all communication with inference server
 """
 
 import json
@@ -16,7 +16,21 @@ logger = logging.getLogger(__name__)
 class RemoteGPUClient:
     """Client for remote RTX 3090 inference server"""
 
-    def __init__(self, host: str = "192.168.x.x", port: int = 8765, timeout: int = 300):
+    def __init__(self, host: Optional[str] = None, port: Optional[int] = None, timeout: int = 300):
+        # Use host registry for defaults
+        if host is None or port is None:
+            try:
+                from core.hosts import get_host
+                inference_host = get_host("3090")
+                if host is None:
+                    host = inference_host.host
+                if port is None:
+                    port = inference_host.services.get("inference", {}).get("port", 8765)
+            except Exception:
+                # Fallback if host registry unavailable
+                host = host or "192.168.x.x"
+                port = port or 8765
+
         self.host = host
         self.port = port
         self.timeout = timeout

@@ -16,6 +16,13 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Tuple
 
+# Use centralized path resolution for default
+try:
+    from core.paths import get_base_dir
+    _DEFAULT_BASE_DIR = get_base_dir()
+except ImportError:
+    _DEFAULT_BASE_DIR = Path(__file__).parent.parent  # Fallback: parent of management/
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -31,13 +38,13 @@ class DiskSpaceManager:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
+        base_dir: str = None,
         min_free_gb: int = 50,  # Minimum free space in GB
         min_free_percent: int = 10,  # Minimum free space percentage
         keep_versions: int = 2,  # Keep latest N model versions
         check_interval: int = 300  # Check every 5 minutes
     ):
-        self.base_dir = Path(base_dir)
+        self.base_dir = Path(base_dir) if base_dir else _DEFAULT_BASE_DIR
         self.min_free_gb = min_free_gb
         self.min_free_percent = min_free_percent
         self.keep_versions = keep_versions
@@ -232,12 +239,22 @@ class DiskSpaceManager:
 
 
 if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Automatic Disk Space Manager")
+    parser.add_argument('--base-dir', default=None, help='Base directory (default: auto-detect)')
+    parser.add_argument('--min-free-gb', type=int, default=50, help='Minimum free GB')
+    parser.add_argument('--min-free-percent', type=int, default=10, help='Minimum free percent')
+    parser.add_argument('--keep-versions', type=int, default=2, help='Keep N latest versions')
+    parser.add_argument('--check-interval', type=int, default=300, help='Check interval in seconds')
+    args = parser.parse_args()
+
     manager = DiskSpaceManager(
-        base_dir="/path/to/training",
-        min_free_gb=50,  # Cleanup when < 50GB free
-        min_free_percent=10,  # Or when < 10% free
-        keep_versions=2,  # Keep latest 2 versions
-        check_interval=300  # Check every 5 minutes
+        base_dir=args.base_dir,
+        min_free_gb=args.min_free_gb,
+        min_free_percent=args.min_free_percent,
+        keep_versions=args.keep_versions,
+        check_interval=args.check_interval
     )
 
     manager.run()

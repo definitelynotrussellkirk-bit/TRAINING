@@ -203,7 +203,7 @@ class HealthCheck:
             self.log_issue(
                 "Daemon process",
                 "Not running",
-                "python3 training_daemon.py --base-dir /path/to/training &"
+                f"python3 training_daemon.py --base-dir {BASE_DIR} &"
             )
 
     def check_training_progress(self):

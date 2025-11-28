@@ -209,7 +209,10 @@ def create_animated_radar(
 class SkillRadarGenerator:
     """Generate skill radar visualizations from training data."""
 
-    def __init__(self, base_dir: str = "/path/to/training"):
+    def __init__(self, base_dir: Optional[str] = None):
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.viz_dir = self.base_dir / "status" / "visualizations"
         self.viz_dir.mkdir(parents=True, exist_ok=True)
@@ -321,7 +324,7 @@ class SkillRadarGenerator:
 
 def main():
     parser = argparse.ArgumentParser(description="Skill Radar Generator")
-    parser.add_argument('--base-dir', default='/path/to/training',
+    parser.add_argument('--base-dir', default=None,
                        help='Base directory')
     parser.add_argument('--checkpoint', type=str,
                        help='Generate radar for specific checkpoint')

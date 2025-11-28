@@ -41,7 +41,10 @@ from core.evaluation_ledger import (
     record_evaluation,
     pop_evaluation,
     get_pending_evaluations,
+    queue_evaluation,
+    queue_full_evaluation,
     EvalRecord,
+    EvalQueueEntry,
 )
 from core.passives import (
     get_passives_ledger,
@@ -93,11 +96,17 @@ class EvalRunner:
     def __init__(
         self,
         base_dir: Optional[Path] = None,
-        inference_host: str = "192.168.x.x",
-        inference_port: int = 8765,
+        inference_host: Optional[str] = None,
+        inference_port: Optional[int] = None,
     ):
         self.base_dir = Path(base_dir) if base_dir else PROJECT_ROOT
-        self.inference_url = f"http://{inference_host}:{inference_port}"
+
+        # Get inference URL from hosts.json if not explicitly provided
+        if inference_host and inference_port:
+            self.inference_url = f"http://{inference_host}:{inference_port}"
+        else:
+            from core.hosts import get_service_url
+            self.inference_url = get_service_url("inference") or "http://localhost:8765"
         self.eval_ledger = get_eval_ledger(self.base_dir)
         self.passives_ledger = get_passives_ledger(self.base_dir)
 
@@ -131,41 +140,86 @@ class EvalRunner:
 
         return None
 
-    def run_skill_evaluation(self, checkpoint_step: int, skill: str, level: int) -> Optional[EvalRecord]:
+    def _load_skill_config(self, skill: str) -> Optional[dict]:
+        """Load skill configuration from YAML."""
+        import yaml
+        skill_config_file = self.base_dir / "configs" / "skills" / f"{skill}.yaml"
+        if not skill_config_file.exists():
+            logger.warning(f"Skill config not found: {skill_config_file}")
+            return None
+
+        try:
+            with open(skill_config_file) as f:
+                return yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Failed to load skill config: {e}")
+            return None
+
+    def _load_eval_set(self, skill: str, level: int) -> Optional[List[dict]]:
+        """
+        Load evaluation set for a skill at a specific level.
+
+        Tries new format first (data/validation/{skill}/level_XX.json),
+        falls back to legacy format ({skill}_validation.json).
+        """
+        # New format: per-level files
+        new_format_file = self.validation_dir / skill / f"level_{level:02d}.json"
+        if new_format_file.exists():
+            try:
+                with open(new_format_file) as f:
+                    data = json.load(f)
+                # New format has "problems" key
+                problems = data.get("problems", [])
+                if problems:
+                    logger.debug(f"Loaded {len(problems)} problems from {new_format_file}")
+                    return problems
+            except Exception as e:
+                logger.warning(f"Failed to load new format: {e}")
+
+        # Legacy format: single file with level keys
+        legacy_file = self.validation_dir / f"{skill}_validation.json"
+        if legacy_file.exists():
+            try:
+                with open(legacy_file) as f:
+                    data = json.load(f)
+                level_key = str(level)
+                if level_key in data:
+                    logger.debug(f"Loaded from legacy format: {legacy_file}")
+                    return data[level_key]
+            except Exception as e:
+                logger.warning(f"Failed to load legacy format: {e}")
+
+        logger.error(f"No eval set found for {skill} L{level}")
+        return None
+
+    def run_skill_evaluation(
+        self,
+        checkpoint_step: int,
+        skill: str,
+        level: int,
+        eval_type: str = "quick",
+    ) -> Optional[EvalRecord]:
         """
         Run skill evaluation using static validation set.
 
+        Args:
+            checkpoint_step: Checkpoint to evaluate
+            skill: Skill ID
+            level: Skill level
+            eval_type: "quick" or "full"
+
         Returns EvalRecord if successful, None if failed.
         """
-        logger.info(f"Running skill eval: checkpoint-{checkpoint_step} {skill} L{level}")
+        logger.info(f"Running {eval_type} skill eval: checkpoint-{checkpoint_step} {skill} L{level}")
 
         # Check if already done
         if self.eval_ledger.has_evaluation(checkpoint_step, skill, level):
             logger.info(f"Already evaluated, skipping")
             return self.eval_ledger.get(checkpoint_step, skill, level)
 
-        # Load validation set
-        val_file = self.validation_dir / f"{skill}_validation.json"
-        if not val_file.exists():
-            logger.error(f"Validation file not found: {val_file}")
-            return None
-
-        try:
-            with open(val_file) as f:
-                validation_data = json.load(f)
-        except Exception as e:
-            logger.error(f"Failed to load validation: {e}")
-            return None
-
-        # Get problems for this level
-        level_key = str(level)
-        if level_key not in validation_data:
-            logger.error(f"Level {level} not in validation set")
-            return None
-
-        problems = validation_data[level_key]
+        # Load evaluation set
+        problems = self._load_eval_set(skill, level)
         if not problems:
-            logger.error(f"No problems for level {level}")
             return None
 
         # Load checkpoint on inference server
@@ -194,7 +248,7 @@ class EvalRunner:
                 })
                 continue
 
-            # Check correctness (simple exact match for now)
+            # Check correctness
             is_correct = self._check_answer(expected, response, skill)
             if is_correct:
                 correct += 1
@@ -218,6 +272,7 @@ class EvalRunner:
             total=total,
             problems=results,
             validation_type="static",
+            eval_type=eval_type,
             base_dir=self.base_dir,
         )
 
@@ -227,6 +282,46 @@ class EvalRunner:
         else:
             logger.warning(f"Failed to record evaluation")
             return None
+
+    def run_full_skill_evaluation(
+        self,
+        checkpoint_step: int,
+        skill: str,
+        max_level: Optional[int] = None,
+    ) -> List[EvalRecord]:
+        """
+        Run FULL evaluation - all levels for a skill.
+
+        Args:
+            checkpoint_step: Checkpoint to evaluate
+            skill: Skill ID
+            max_level: Max level to evaluate (default: from skill config)
+
+        Returns list of EvalRecords for each level.
+        """
+        logger.info(f"Running FULL skill eval: checkpoint-{checkpoint_step} {skill}")
+
+        # Get max level from skill config if not specified
+        if max_level is None:
+            config = self._load_skill_config(skill)
+            if config:
+                max_level = config.get("max_level", 10)
+            else:
+                max_level = 10  # Default fallback
+
+        results = []
+        for level in range(1, max_level + 1):
+            result = self.run_skill_evaluation(
+                checkpoint_step=checkpoint_step,
+                skill=skill,
+                level=level,
+                eval_type="full",
+            )
+            if result:
+                results.append(result)
+
+        logger.info(f"FULL eval complete: {skill} {len(results)}/{max_level} levels")
+        return results
 
     def run_passive_evaluation(
         self,
@@ -386,9 +481,11 @@ class EvalRunner:
         import requests
         import subprocess
 
-        # Remote server config (3090)
-        remote_host = "192.168.x.x"
-        remote_models_dir = "/path/to/models"
+        # Remote server config from hosts.json
+        from core.hosts import get_host, get_remote_path
+        inference_host = get_host("3090")
+        remote_host = inference_host.host if inference_host else "localhost"
+        remote_models_dir = get_remote_path("3090")
 
         # Use the Checkpoint Ledger to find the path (single source of truth!)
         try:
@@ -646,25 +743,136 @@ class EvalRunner:
 
         return problems
 
-    def process_skill_queue(self, limit: int = 10) -> int:
-        """Process pending skill evaluations. Returns count processed."""
+    def process_skill_queue(
+        self,
+        limit: int = 10,
+        eval_type: Optional[str] = None,
+    ) -> int:
+        """
+        Process pending skill evaluations.
+
+        Args:
+            limit: Max evaluations to process
+            eval_type: Filter by type ("quick" or "full"), or None for any
+
+        Returns count processed.
+        """
         processed = 0
 
         for _ in range(limit):
-            item = pop_evaluation()
-            if not item:
+            entry = pop_evaluation(eval_type=eval_type)
+            if not entry:
                 break
 
-            result = self.run_skill_evaluation(
-                checkpoint_step=item["checkpoint_step"],
-                skill=item["skill"],
-                level=item["level"],
-            )
-
-            if result:
-                processed += 1
+            # Handle FULL eval (all levels)
+            if entry.eval_type == "full" and entry.level is None:
+                results = self.run_full_skill_evaluation(
+                    checkpoint_step=entry.checkpoint_step,
+                    skill=entry.skill,
+                )
+                processed += len(results)
+            else:
+                # Quick eval (single level)
+                result = self.run_skill_evaluation(
+                    checkpoint_step=entry.checkpoint_step,
+                    skill=entry.skill,
+                    level=entry.level,
+                    eval_type=entry.eval_type,
+                )
+                if result:
+                    processed += 1
 
         return processed
+
+    def scan_for_backfill(self, skills: Optional[List[str]] = None) -> int:
+        """
+        Scan checkpoint ledger for missing evaluations and queue them.
+
+        Args:
+            skills: List of skills to check (default: all from configs)
+
+        Returns count of evaluations queued.
+        """
+        from core.checkpoint_ledger import get_ledger
+
+        logger.info("Scanning for missing evaluations...")
+
+        # Get skills from configs if not specified
+        if skills is None:
+            skills = []
+            configs_dir = self.base_dir / "configs" / "skills"
+            for config_file in configs_dir.glob("*.yaml"):
+                if not config_file.name.startswith("_"):
+                    skills.append(config_file.stem)
+
+        if not skills:
+            logger.warning("No skills found")
+            return 0
+
+        # Get checkpoint ledger
+        ledger = get_ledger()
+        all_checkpoints = ledger.list_all(limit=100)
+
+        # Sort by step descending (newest first)
+        all_checkpoints.sort(key=lambda r: r.step, reverse=True)
+
+        queued = 0
+        for skill in skills:
+            config = self._load_skill_config(skill)
+            if not config:
+                continue
+
+            max_level = config.get("max_level", 10)
+
+            for checkpoint_record in all_checkpoints:
+                step = checkpoint_record.step
+
+                # Check each level for this skill
+                for level in range(1, max_level + 1):
+                    if not self.eval_ledger.has_evaluation(step, skill, level):
+                        # Queue at low priority (backfill)
+                        if queue_evaluation(
+                            checkpoint_step=step,
+                            skill=skill,
+                            level=level,
+                            eval_type="quick",
+                            priority=3,  # Low priority for backfill
+                        ):
+                            queued += 1
+
+        logger.info(f"Queued {queued} backfill evaluations")
+        return queued
+
+    def show_status(self) -> Dict[str, Any]:
+        """Show current evaluation status."""
+        pending = get_pending_evaluations()
+        quick_pending = [e for e in pending if e.eval_type == "quick"]
+        full_pending = [e for e in pending if e.eval_type == "full"]
+
+        summary = self.eval_ledger.summary()
+
+        status = {
+            "queue": {
+                "total": len(pending),
+                "quick": len(quick_pending),
+                "full": len(full_pending),
+            },
+            "ledger": summary,
+            "next_up": [],
+        }
+
+        # Show next few items
+        for entry in pending[:5]:
+            level_str = f"L{entry.level}" if entry.level else "ALL"
+            status["next_up"].append({
+                "checkpoint": entry.checkpoint_step,
+                "skill": entry.skill,
+                "level": level_str,
+                "type": entry.eval_type,
+                "priority": entry.priority,
+            })
+
+        return status
 
     def process_passive_queue(self, limit: int = 10) -> int:
         """Process pending passive evaluations. Returns count processed."""
@@ -700,8 +908,8 @@ class EvalRunner:
 def run_daemon(
     base_dir: Path,
     interval: int = 60,
-    inference_host: str = "192.168.x.x",
-    inference_port: int = 8765,
+    inference_host: Optional[str] = None,
+    inference_port: Optional[int] = None,
 ):
     """Run eval runner as daemon."""
     logger.info(f"Starting eval runner daemon (interval={interval}s)")
@@ -710,7 +918,7 @@ def run_daemon(
         base_dir=base_dir,
         inference_host=inference_host,
         inference_port=inference_port,
-    )
+    )  # EvalRunner uses hosts.json if host/port not provided
 
     while True:
         try:
@@ -732,13 +940,36 @@ def run_daemon(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Eval Runner")
+    parser = argparse.ArgumentParser(
+        description="Eval Runner - Process skill and passive evaluations",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python3 core/eval_runner.py --status                    # Show queue status
+  python3 core/eval_runner.py --once                      # Process all pending
+  python3 core/eval_runner.py --once --type quick         # Process only quick evals
+  python3 core/eval_runner.py --once --type full          # Process only full evals
+  python3 core/eval_runner.py --checkpoint 183000 --full  # Full eval for checkpoint
+  python3 core/eval_runner.py --backfill                  # Queue missing evals
+  python3 core/eval_runner.py --daemon                    # Run as daemon
+        """
+    )
     parser.add_argument("--base-dir", type=Path, default=PROJECT_ROOT)
-    parser.add_argument("--inference-host", default="192.168.x.x")
-    parser.add_argument("--inference-port", type=int, default=8765)
+    parser.add_argument("--inference-host", default=None, help="Inference host (default: from hosts.json)")
+    parser.add_argument("--inference-port", type=int, default=None, help="Inference port (default: from hosts.json)")
+
+    # Mode flags
     parser.add_argument("--daemon", action="store_true", help="Run as daemon")
     parser.add_argument("--interval", type=int, default=60, help="Daemon check interval")
-    parser.add_argument("--once", action="store_true", help="Process all pending and exit")
+    parser.add_argument("--once", action="store_true", help="Process pending and exit")
+    parser.add_argument("--status", action="store_true", help="Show detailed status")
+    parser.add_argument("--backfill", action="store_true", help="Scan and queue missing evals")
+
+    # Eval type filtering
+    parser.add_argument("--type", choices=["quick", "full"], help="Filter by eval type")
+    parser.add_argument("--full", action="store_true", help="Run full evaluation (all levels)")
+
+    # Specific evaluation
     parser.add_argument("--checkpoint", type=int, help="Evaluate specific checkpoint")
     parser.add_argument("--skill", help="Skill to evaluate (with --checkpoint)")
     parser.add_argument("--level", type=int, help="Level to evaluate (with --checkpoint)")
@@ -760,31 +991,75 @@ def main():
         )
 
     elif args.once:
-        results = runner.process_all()
-        print(f"Processed: {results['skills']} skills, {results['passives']} passives")
+        # Process with optional type filter
+        skills_processed = runner.process_skill_queue(limit=100, eval_type=args.type)
+        passives_processed = runner.process_passive_queue(limit=100)
+        print(f"Processed: {skills_processed} skills, {passives_processed} passives")
+
+    elif args.backfill:
+        queued = runner.scan_for_backfill()
+        print(f"Queued {queued} backfill evaluations")
+
+    elif args.status:
+        status = runner.show_status()
+        print("\n  EVALUATION STATUS")
+        print("  " + "=" * 50)
+        print(f"  Queue: {status['queue']['total']} pending")
+        print(f"    Quick: {status['queue']['quick']}")
+        print(f"    Full:  {status['queue']['full']}")
+        print(f"\n  Ledger: {status['ledger']['total_evaluations']} recorded")
+
+        if status['ledger']['by_skill']:
+            print("\n  By Skill:")
+            for skill, info in status['ledger']['by_skill'].items():
+                print(f"    {skill}: {info['count']} evals, best={info['best_accuracy']:.0%} @ step {info['best_checkpoint']}")
+
+        if status['next_up']:
+            print("\n  Next up:")
+            for item in status['next_up']:
+                print(f"    checkpoint-{item['checkpoint']} {item['skill']} {item['level']} ({item['type']}, pri={item['priority']})")
+        print()
 
     elif args.checkpoint:
-        if args.skill and args.level:
-            result = runner.run_skill_evaluation(args.checkpoint, args.skill, args.level)
+        if args.full:
+            # Full evaluation (all levels)
+            skill = args.skill
+            if not skill:
+                print("Specify --skill with --checkpoint --full")
+                sys.exit(1)
+
+            results = runner.run_full_skill_evaluation(args.checkpoint, skill)
+            print(f"\nFull evaluation: {skill} @ checkpoint-{args.checkpoint}")
+            print(f"Completed {len(results)} levels")
+            for r in results:
+                print(f"  L{r.level}: {r.accuracy:.0%} ({r.correct}/{r.total})")
+
+        elif args.skill and args.level:
+            # Single level evaluation
+            result = runner.run_skill_evaluation(
+                args.checkpoint, args.skill, args.level,
+                eval_type="quick"
+            )
             if result:
                 print(f"Result: {result.accuracy:.1%} ({result.correct}/{result.total})")
             else:
                 print("Evaluation failed")
         else:
-            print("Specify --skill and --level with --checkpoint")
+            print("Specify --skill and --level, or --full with --checkpoint")
             sys.exit(1)
 
     else:
-        # Show status
-        skill_pending = get_pending_evaluations()
+        # Default: show simple status
+        pending = get_pending_evaluations()
         passive_pending = get_pending_passives()
-        print(f"Pending skill evaluations: {len(skill_pending)}")
+        print(f"Pending skill evaluations: {len(pending)}")
         print(f"Pending passive evaluations: {len(passive_pending)}")
 
-        if skill_pending:
-            print("\nSkill queue:")
-            for item in skill_pending[:5]:
-                print(f"  - checkpoint-{item['checkpoint_step']} {item['skill']} L{item['level']}")
+        if pending:
+            print("\nSkill queue (sorted by priority):")
+            for entry in pending[:5]:
+                level_str = f"L{entry.level}" if entry.level else "ALL"
+                print(f"  - checkpoint-{entry.checkpoint_step} {entry.skill} {level_str} ({entry.eval_type}, pri={entry.priority})")
 
         if passive_pending:
             print("\nPassive queue:")

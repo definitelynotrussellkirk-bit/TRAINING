@@ -57,15 +57,18 @@ class VaultDiscovery:
     def __init__(
         self,
         keeper: Optional[VaultKeeper] = None,
-        base_dir: str | Path = "/path/to/training",
+        base_dir: Optional[str | Path] = None,
     ):
         """
         Initialize the discovery service.
 
         Args:
             keeper: VaultKeeper instance (or create new)
-            base_dir: Base training directory
+            base_dir: Base training directory (default: auto-detect)
         """
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.keeper = keeper or get_vault_keeper(base_dir)
 
@@ -394,9 +397,11 @@ def ask_vault_first(
         model_path = "/path/to/training/models/checkpoint-175000"
 
         # New way (ask vault first):
+        from core.paths import get_base_dir
+        base = get_base_dir()
         model_path = ask_vault_first(
             "checkpoint_175000",
-            fallback="/path/to/training/models/checkpoint-175000"
+            fallback=str(base / "models" / "checkpoint-175000")
         )
 
         # The vault might return:
@@ -517,8 +522,8 @@ def main():
     parser.add_argument(
         "--base-dir",
         type=str,
-        default="/path/to/training",
-        help="Base training directory",
+        default=None,
+        help="Base training directory (default: auto-detect)",
     )
     parser.add_argument(
         "--scan-all",

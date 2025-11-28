@@ -56,13 +56,16 @@ class Archivist(_BackupManager):
         archivist.restore_from_archive(archive_path, restore_to)
     """
 
-    def __init__(self, base_dir: str = "/path/to/training"):
+    def __init__(self, base_dir: Optional[str] = None):
         """
         Initialize the Archivist.
 
         Args:
-            base_dir: Base training directory
+            base_dir: Base training directory (default: auto-detect)
         """
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = str(get_base_dir())
         super().__init__(base_dir)
 
         # Rename directories with RPG theme (but keep underlying paths)
@@ -349,7 +352,7 @@ class Archivist(_BackupManager):
 
 
 # Convenience function
-def get_archivist(base_dir: str = "/path/to/training") -> Archivist:
+def get_archivist(base_dir: Optional[str] = None) -> Archivist:
     """Get an Archivist instance for the given base directory."""
     return Archivist(base_dir)
 

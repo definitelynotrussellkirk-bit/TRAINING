@@ -24,8 +24,22 @@ class RemoteEvaluator:
     while training continues uninterrupted.
     """
 
-    def __init__(self, host: str = "192.168.x.x", port: int = 8765,
+    def __init__(self, host: Optional[str] = None, port: Optional[int] = None,
                  timeout: int = 300):
+        # Use host registry for defaults
+        if host is None or port is None:
+            try:
+                from core.hosts import get_host
+                inference_host = get_host("3090")
+                if host is None:
+                    host = inference_host.host
+                if port is None:
+                    port = inference_host.services.get("inference", {}).get("port", 8765)
+            except Exception:
+                # Fallback if host registry unavailable
+                host = host or "192.168.x.x"
+                port = port or 8765
+
         self.host = host
         self.port = port
         self.timeout = timeout
@@ -255,8 +269,8 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Remote Evaluator - Run eval on RTX 3090")
-    parser.add_argument('--host', default='192.168.x.x', help='Remote server host')
-    parser.add_argument('--port', type=int, default=8765, help='Remote server port')
+    parser.add_argument('--host', default=None, help='Remote server host (auto-detect from host registry)')
+    parser.add_argument('--port', type=int, default=None, help='Remote server port (auto-detect from host registry)')
 
     subparsers = parser.add_subparsers(dest='command', help='Command')
 

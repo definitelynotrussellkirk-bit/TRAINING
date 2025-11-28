@@ -492,7 +492,10 @@ ERROR_TYPE_MAP = {
 class PatternGenerator:
     """Generate targeted training data for error types."""
 
-    def __init__(self, base_dir: str = "/path/to/training"):
+    def __init__(self, base_dir: Optional[str] = None):
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.inbox_dir = self.base_dir / "inbox"
         self.status_dir = self.base_dir / "status"
@@ -634,7 +637,7 @@ class PatternGenerator:
 
 def main():
     parser = argparse.ArgumentParser(description="Pattern Generator")
-    parser.add_argument('--base-dir', default='/path/to/training',
+    parser.add_argument('--base-dir', default=None,
                        help='Base directory')
     parser.add_argument('--type', type=str, choices=list(GENERATORS.keys()),
                        help='Error type to generate for')

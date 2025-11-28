@@ -78,7 +78,10 @@ class LearningHistory:
     Stores data in JSONL format for durability and streaming reads.
     """
 
-    def __init__(self, base_dir: str = "/path/to/training"):
+    def __init__(self, base_dir: Optional[str] = None):
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.history_file = self.base_dir / "status" / "learning_history.jsonl"
         self.history_file.parent.mkdir(parents=True, exist_ok=True)
@@ -274,7 +277,7 @@ class LearningHistory:
 
 def main():
     parser = argparse.ArgumentParser(description="Learning History Manager")
-    parser.add_argument('--base-dir', default='/path/to/training',
+    parser.add_argument('--base-dir', default=None,
                        help='Base directory')
     parser.add_argument('--append', action='store_true',
                        help='Append current metrics to history')

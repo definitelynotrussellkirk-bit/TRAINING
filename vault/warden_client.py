@@ -41,10 +41,13 @@ DEFAULT_TIMEOUT = 5
 
 def find_config_file() -> Path:
     """Find hosts.json config file."""
+    from core.paths import get_base_dir
+
+    base_dir = get_base_dir()
     here = Path(__file__).parent.parent
     candidates = [
         here / "config" / "hosts.json",
-        Path("/path/to/training/config/hosts.json"),
+        base_dir / "config" / "hosts.json",
         Path.cwd() / "config" / "hosts.json",
     ]
     for path in candidates:

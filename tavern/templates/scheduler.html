@@ -298,7 +298,7 @@
     <div class="scheduler-container">
         <div class="scheduler-header">
             <h1>Curriculum Scheduler</h1>
-            <p class="subtitle">Configure how DIO trains across skills</p>
+            <p class="subtitle">Configure training curriculum</p>
         </div>
 
         <div id="statusMessage" class="status-message"></div>
@@ -366,6 +366,34 @@
 
     <script>
         let currentStatus = null;
+        let heroName = 'Hero';  // Default fallback
+
+        // Load hero name
+        async function loadHeroName() {
+            try {
+                const campResp = await fetch('/api/campaigns/active');
+                if (campResp.ok) {
+                    const campaign = await campResp.json();
+                    if (campaign?.hero_id) {
+                        const heroesResp = await fetch('/api/heroes');
+                        if (heroesResp.ok) {
+                            const heroes = await heroesResp.json();
+                            const hero = heroes.find(h => h.id === campaign.hero_id);
+                            if (hero?.name) {
+                                heroName = hero.name;
+                                // Update subtitle
+                                const subtitle = document.querySelector('.subtitle');
+                                if (subtitle) {
+                                    subtitle.textContent = `Configure how ${heroName} trains across skills`;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load hero name:', err);
+            }
+        }
 
         async function loadStatus() {
             try {
@@ -529,6 +557,7 @@
         });
 
         // Initialize
+        loadHeroName();
         loadStatus();
         loadPresets();
     </script>

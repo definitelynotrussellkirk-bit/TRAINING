@@ -236,7 +236,8 @@ def connect_herald_to_saga(
         Tuple of (SagaWriter, HeraldBridge)
 
     Example:
-        saga, bridge = connect_herald_to_saga("/path/to/training")
+        from core.paths import get_base_dir
+        saga, bridge = connect_herald_to_saga(get_base_dir())
         # Now all Herald events will be recorded in the Saga
     """
     from guild.saga.writer import SagaWriter

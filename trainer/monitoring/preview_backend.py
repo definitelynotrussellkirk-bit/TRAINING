@@ -210,8 +210,8 @@ class Remote3090Backend:
     - Can use different model/settings for preview
 
     Configuration:
-    - host: 3090 server IP (default: 192.168.x.x)
-    - port: API port (default: 8765)
+    - host: 3090 server IP (default: from hosts.json or localhost)
+    - port: API port (default: from hosts.json or 8765)
     - timeout: Request timeout in seconds (default: 30)
 
     API Contract:
@@ -222,8 +222,8 @@ class Remote3090Backend:
 
     def __init__(
         self,
-        host: str = "192.168.x.x",
-        port: int = 8765,
+        host: str = None,
+        port: int = None,
         timeout: int = 30,
         model_id: Optional[str] = None
     ):
@@ -231,16 +231,35 @@ class Remote3090Backend:
         Initialize remote backend.
 
         Args:
-            host: 3090 server IP
-            port: API port
+            host: 3090 server IP (None = use hosts.json)
+            port: API port (None = use hosts.json)
             timeout: Request timeout (seconds)
             model_id: Model to use on 3090 (None = use active model)
         """
-        self.host = host
-        self.port = port
+        # Use host registry for dynamic lookup
+        if host is None or port is None:
+            try:
+                from core.hosts import get_host
+                inference_host = get_host("3090")
+                if inference_host:
+                    self.host = host or inference_host.host
+                    if port is None and "inference" in inference_host.services:
+                        self.port = inference_host.services["inference"].port
+                    else:
+                        self.port = port or 8765
+                else:
+                    self.host = host or "localhost"
+                    self.port = port or 8765
+            except ImportError:
+                self.host = host or "localhost"
+                self.port = port or 8765
+        else:
+            self.host = host
+            self.port = port
+
         self.timeout = timeout
         self.model_id = model_id
-        self.base_url = f"http://{host}:{port}"
+        self.base_url = f"http://{self.host}:{self.port}"
 
     @property
     def backend_type(self) -> str:
@@ -357,12 +376,8 @@ def create_preview_backend(
         # Local backend
         backend = create_preview_backend("local", model=model, tokenizer=tokenizer)
 
-        # Remote 3090 backend
-        backend = create_preview_backend(
-            "remote_3090",
-            host="192.168.x.x",
-            port=8765
-        )
+        # Remote 3090 backend (uses hosts.json for defaults)
+        backend = create_preview_backend("remote_3090")
     """
     if backend_type == "local":
         if model is None or tokenizer is None:

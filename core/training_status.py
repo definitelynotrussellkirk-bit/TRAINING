@@ -1390,8 +1390,18 @@ class TrainingStatusReader:
         return status is not None and status.status == "crashed"
 
 
-# Default status file location
-DEFAULT_STATUS_FILE = Path("/path/to/training/status/training_status.json")
+# Default status file location - uses core.paths
+def get_default_status_file() -> Path:
+    """Get the default status file path from core.paths."""
+    from core.paths import get_status_dir
+    return get_status_dir() / "training_status.json"
+
+
+# For backward compatibility - callers should use get_default_status_file()
+def __getattr__(name):
+    if name == "DEFAULT_STATUS_FILE":
+        return get_default_status_file()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def example_usage():

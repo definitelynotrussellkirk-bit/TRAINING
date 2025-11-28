@@ -257,14 +257,22 @@ def consolidate_model(base_dir: Path, description: str, training_data: list = No
 def main():
     parser = argparse.ArgumentParser(
         description='Safely consolidate LoRA adapter into base model with versioning',
-        epilog='Example: python3 consolidate_model.py --base-dir /path/to/training --description "Math training 10k examples"'
+        epilog='Example: python3 consolidate_model.py --description "Math training 10k examples"'
     )
-    parser.add_argument('--base-dir', type=Path, required=True, help='Base directory (e.g., /path/to/training)')
+    parser.add_argument('--base-dir', type=Path, default=None, help='Base directory (default: auto-detect)')
     parser.add_argument('--current-dir', type=Path, help='Override current adapter directory (default: <base>/current_model)')
     parser.add_argument('--description', required=True, help='Description of this version (e.g., "Math training 10k")')
     parser.add_argument('--training-data', nargs='+', help='Training data files used (optional)')
 
     args = parser.parse_args()
+
+    # Auto-detect base_dir if not provided
+    if args.base_dir is None:
+        try:
+            from core.paths import get_base_dir
+            args.base_dir = get_base_dir()
+        except ImportError:
+            args.base_dir = Path(__file__).parent.parent
 
     if not args.base_dir.exists():
         print(f"❌ Directory not found: {args.base_dir}")

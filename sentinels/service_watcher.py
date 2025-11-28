@@ -121,7 +121,14 @@ class ServiceWatcher:
             startup_delay: Seconds to wait after starting before health check
             base_dir: Base directory for relative paths
         """
-        self.base_dir = base_dir or Path("/path/to/training")
+        if base_dir is None:
+            try:
+                from core.paths import get_base_dir
+                self.base_dir = get_base_dir()
+            except ImportError:
+                self.base_dir = Path(__file__).parent.parent  # Fallback
+        else:
+            self.base_dir = Path(base_dir)
 
         self.config = ServiceConfig(
             name=name,
@@ -407,7 +414,14 @@ class ServiceWatcher:
 
 def get_tavern_watcher(base_dir: Optional[Path] = None) -> ServiceWatcher:
     """Get a ServiceWatcher configured for the Tavern."""
-    base = base_dir or Path("/path/to/training")
+    if base_dir is None:
+        try:
+            from core.paths import get_base_dir
+            base = get_base_dir()
+        except ImportError:
+            base = Path(__file__).parent.parent
+    else:
+        base = Path(base_dir)
     return ServiceWatcher(
         name="tavern",
         health_url="http://localhost:8888/health",
@@ -425,7 +439,18 @@ def get_skill_watcher(
     base_dir: Optional[Path] = None,
 ) -> ServiceWatcher:
     """Get a ServiceWatcher for a skill API."""
-    base = base_dir or Path("/path/to/skills")
+    # Skills live in a different directory (singleSKILL)
+    # Default to ~/Desktop/singleSKILL or parent of TRAINING
+    if base_dir is None:
+        try:
+            from core.paths import get_base_dir
+            training_base = get_base_dir()
+            # Assume singleSKILL is adjacent to TRAINING
+            base = training_base.parent / "singleSKILL"
+        except ImportError:
+            base = Path.home() / "Desktop" / "singleSKILL"
+    else:
+        base = Path(base_dir)
     return ServiceWatcher(
         name=f"skill_{skill_id}",
         health_url=f"http://localhost:{port}/health",
@@ -462,9 +487,9 @@ if __name__ == "__main__":
     if args.service == "tavern":
         watcher = get_tavern_watcher()
     elif args.service == "sy":
-        watcher = get_skill_watcher("syllo_variant", 8080, Path("/path/to/skills"))
+        watcher = get_skill_watcher("syllo_variant", 8080)
     elif args.service == "bin":
-        watcher = get_skill_watcher("binary", 8090, Path("/path/to/skills"))
+        watcher = get_skill_watcher("binary", 8090)
 
     if args.check:
         status = watcher.get_status()

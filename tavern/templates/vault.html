@@ -300,6 +300,28 @@
             letter-spacing: 0.05em;
             margin-bottom: 0.75rem;
         }
+
+        /* Delete button */
+        .delete-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            padding: 0.4rem 0.5rem;
+            cursor: pointer;
+            opacity: 0.3;
+            transition: all 0.2s ease;
+            font-size: 1rem;
+        }
+
+        .asset-card:hover .delete-btn {
+            opacity: 0.7;
+        }
+
+        .delete-btn:hover {
+            opacity: 1 !important;
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
     </style>
 </head>
 <body>
@@ -548,8 +570,36 @@
 
             let html = '';
 
-            // Base model first
-            if (data.base_model) {
+            // Base models - show all, active highlighted, others faded
+            if (data.base_models?.length > 0) {
+                html += `
+                    <div class="section-divider">
+                        <h4>Base Models (${data.base_models.length})</h4>
+                    </div>
+                `;
+                for (const model of data.base_models) {
+                    const isActive = model.is_active;
+                    html += `
+                        <div class="asset-card ${isActive ? 'active-model' : ''}" style="${isActive ? '' : 'opacity: 0.5;'}">
+                            <div class="asset-icon">${isActive ? '🤖' : '💤'}</div>
+                            <div class="asset-info">
+                                <div class="asset-name">${model.display_name || model.name}${isActive ? ' ★' : ''}</div>
+                                <div class="asset-meta">
+                                    <span>${model.hero_name}</span>
+                                    <span>${model.path.split('/').pop()}</span>
+                                </div>
+                            </div>
+                            <div class="asset-metrics">
+                                <div class="metric">
+                                    <div class="metric-value">${model.size_gb}</div>
+                                    <div class="metric-label">GB</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            } else if (data.base_model) {
+                // Fallback for old format
                 html += `
                     <div class="section-divider">
                         <h4>Base Model</h4>
@@ -559,8 +609,7 @@
                         <div class="asset-info">
                             <div class="asset-name">${data.base_model.display_name || data.base_model.name}</div>
                             <div class="asset-meta">
-                                <span>${data.base_model.locked?.base_model || 'Qwen3-0.6B'}</span>
-                                <span>Vocab: ${(data.base_model.locked?.vocab_size || 0).toLocaleString()}</span>
+                                <span>${data.base_model.path?.split('/').pop() || 'Base'}</span>
                             </div>
                         </div>
                         <div class="asset-metrics">
@@ -573,44 +622,33 @@
                 `;
             }
 
-            // Checkpoints
+            // Checkpoints - grouped by active/inactive campaign
             if (data.checkpoints?.length > 0) {
-                html += `
-                    <div class="section-divider">
-                        <h4>Checkpoints (${data.checkpoints.length})</h4>
-                    </div>
-                `;
+                const activeCheckpoints = data.checkpoints.filter(cp => cp.is_active_campaign);
+                const otherCheckpoints = data.checkpoints.filter(cp => !cp.is_active_campaign);
 
-                for (const cp of data.checkpoints) {
-                    const classes = ['asset-card', 'clickable'];
-                    if (cp.is_champion) classes.push('champion');
-                    if (cp.is_latest) classes.push('latest');
-
-                    const icon = cp.is_champion ? '👑' : (cp.is_latest ? '✨' : '💾');
-
+                // Active campaign checkpoints
+                if (activeCheckpoints.length > 0) {
                     html += `
-                        <div class="${classes.join(' ')}" data-step="${cp.step}" onclick="viewCheckpoint(${cp.step})">
-                            <div class="asset-icon">${icon}</div>
-                            <div class="asset-info">
-                                <div class="asset-name">${cp.name}</div>
-                                <div class="asset-meta">
-                                    <span>Step ${cp.step.toLocaleString()}</span>
-                                    <span>${cp.age_hours < 1 ? 'Just now' : cp.age_hours.toFixed(1) + 'h ago'}</span>
-                                </div>
-                            </div>
-                            <div class="asset-metrics">
-                                ${cp.eval_count > 0 ? `
-                                <div class="eval-badge ${cp.eval_count >= 5 ? 'lots-evals' : cp.eval_count >= 3 ? 'many-evals' : 'has-evals'}" title="${cp.eval_count} evaluation${cp.eval_count !== 1 ? 's' : ''} run">
-                                    ${cp.eval_count}
-                                </div>
-                                ` : ''}
-                                <div class="metric">
-                                    <div class="metric-value">${cp.size_gb}</div>
-                                    <div class="metric-label">GB</div>
-                                </div>
-                            </div>
+                        <div class="section-divider">
+                            <h4>Active Campaign (${activeCheckpoints.length})</h4>
                         </div>
                     `;
+                    for (const cp of activeCheckpoints) {
+                        html += renderCheckpointCard(cp, false);
+                    }
+                }
+
+                // Other campaigns (grayed out)
+                if (otherCheckpoints.length > 0) {
+                    html += `
+                        <div class="section-divider" style="opacity: 0.6;">
+                            <h4>Other Campaigns (${otherCheckpoints.length})</h4>
+                        </div>
+                    `;
+                    for (const cp of otherCheckpoints) {
+                        html += renderCheckpointCard(cp, true);
+                    }
                 }
             } else {
                 html += `
@@ -618,8 +656,43 @@
                         <div class="empty-vault-icon">🗃️</div>
                         <p>No checkpoints found</p>
                         <p style="font-size: 0.85rem; margin-top: 0.5rem;">
-                            Train DIO to create checkpoints
+                            Train your hero to create checkpoints
                         </p>
+                    </div>
+                `;
+            }
+
+            function renderCheckpointCard(cp, isInactive) {
+                const classes = ['asset-card'];
+                if (cp.is_champion) classes.push('champion');
+                if (cp.is_latest && cp.is_active_campaign) classes.push('latest');
+                if (isInactive) classes.push('inactive-campaign');
+
+                const icon = cp.is_champion ? '👑' : (cp.is_latest && cp.is_active_campaign ? '✨' : '💾');
+                const heroLabel = cp.hero_id ? cp.hero_id.split('-')[0].toUpperCase() : '';
+
+                return `
+                    <div class="${classes.join(' ')}" data-step="${cp.step}" data-path="${cp.path}" ${isInactive ? 'style="opacity: 0.5;"' : ''}>
+                        <div class="asset-icon" style="cursor: pointer;" onclick="viewCheckpoint(${cp.step})">${icon}</div>
+                        <div class="asset-info" style="cursor: pointer;" onclick="viewCheckpoint(${cp.step})">
+                            <div class="asset-name">${cp.name}</div>
+                            <div class="asset-meta">
+                                <span>${heroLabel ? heroLabel + ' · ' : ''}Step ${cp.step.toLocaleString()}</span>
+                                <span>${cp.age_hours < 1 ? 'Just now' : cp.age_hours.toFixed(1) + 'h ago'}</span>
+                            </div>
+                        </div>
+                        <div class="asset-metrics">
+                            ${cp.eval_count > 0 ? `
+                            <div class="eval-badge ${cp.eval_count >= 5 ? 'lots-evals' : cp.eval_count >= 3 ? 'many-evals' : 'has-evals'}" title="${cp.eval_count} evaluation${cp.eval_count !== 1 ? 's' : ''} run">
+                                ${cp.eval_count}
+                            </div>
+                            ` : ''}
+                            <div class="metric">
+                                <div class="metric-value">${cp.size_gb}</div>
+                                <div class="metric-label">GB</div>
+                            </div>
+                            <button class="delete-btn" onclick="event.stopPropagation(); deleteCheckpoint(${cp.step}, '${cp.path}')" title="Delete checkpoint">🗑️</button>
+                        </div>
                     </div>
                 `;
             }
@@ -629,6 +702,32 @@
 
         function viewCheckpoint(step) {
             window.location.href = `/checkpoint/${step}`;
+        }
+
+        async function deleteCheckpoint(step, path) {
+            const confirmed = confirm(`Delete checkpoint-${step}?\n\nThis will permanently delete the checkpoint from all locations.\n\nPath: ${path}`);
+            if (!confirmed) return;
+
+            try {
+                const resp = await fetch('/api/vault/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ steps: [step] })
+                });
+
+                const result = await resp.json();
+                if (result.success) {
+                    const msg = result.deleted_count > 0
+                        ? `Deleted ${result.deleted_count} checkpoint(s)`
+                        : 'No checkpoints found to delete';
+                    alert(msg + (result.errors?.length ? '\n\nErrors:\n' + result.errors.join('\n') : ''));
+                    fetchVaultAssets(); // Refresh
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Error deleting checkpoint: ' + err.message);
+            }
         }
 
         // Initialize

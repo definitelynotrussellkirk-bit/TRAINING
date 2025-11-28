@@ -1125,11 +1125,34 @@
         // State
         let currentFilter = 'normal';
         let questData = null;
+        let heroName = 'Hero';  // Default fallback
 
         // DOM helpers
         function $(sel) { return document.querySelector(sel); }
         function $$(sel) { return document.querySelectorAll(sel); }
         function setText(sel, text) { const el = $(sel); if (el) el.textContent = text; }
+
+        // Load hero name
+        async function loadHeroName() {
+            try {
+                const campResp = await fetch('/api/campaigns/active');
+                if (campResp.ok) {
+                    const campaign = await campResp.json();
+                    if (campaign?.hero_id) {
+                        const heroesResp = await fetch('/api/heroes');
+                        if (heroesResp.ok) {
+                            const heroes = await heroesResp.json();
+                            const hero = heroes.find(h => h.id === campaign.hero_id);
+                            if (hero?.name) {
+                                heroName = hero.name;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load hero name:', err);
+            }
+        }
 
         // Filter titles
         const filterTitles = {
@@ -1195,7 +1218,7 @@
                     </div>
                 `;
             } else {
-                container.innerHTML = '<div class="idle-message">No quest active - DIO is resting</div>';
+                container.innerHTML = `<div class="idle-message">No quest active - ${heroName} is resting</div>`;
             }
         }
 
@@ -1588,6 +1611,7 @@
         }
 
         // Initialize
+        loadHeroName();
         loadQuests();
         loadGeneratorStatus();
         checkApiStatus();

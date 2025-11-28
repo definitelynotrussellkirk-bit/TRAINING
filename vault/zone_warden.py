@@ -107,11 +107,14 @@ class ZoneHealth:
 
 def find_config_file() -> Path:
     """Find hosts.json config file."""
+    from core.paths import get_base_dir
+
+    base_dir = get_base_dir()
     # Try relative to this file
     here = Path(__file__).parent.parent
     candidates = [
         here / "config" / "hosts.json",
-        Path("/path/to/training/config/hosts.json"),
+        base_dir / "config" / "hosts.json",
         Path.cwd() / "config" / "hosts.json",
     ]
     for path in candidates:
@@ -695,10 +698,14 @@ and exposes aggregate health at http://localhost:PORT/health
         base_dir = Path(args.base_dir)
     else:
         # Auto-detect based on zone
+        from core.paths import get_base_dir
+        from core.hosts import get_host
+
         if args.zone == "4090":
-            base_dir = Path("/path/to/training")
+            base_dir = get_base_dir()
         elif args.zone == "3090":
-            base_dir = Path("/home/user/llm")
+            host_3090 = get_host("3090")
+            base_dir = Path(host_3090.models_dir) if host_3090 and host_3090.models_dir else Path("/home/user/llm")
         else:
             base_dir = Path.cwd()
 

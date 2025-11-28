@@ -85,7 +85,7 @@ class LayerDriftMonitor:
         history: List of past analyses for trend detection
     """
 
-    def __init__(self, base_dir: Path, reference_path: Optional[Path] = None):
+    def __init__(self, base_dir: Optional[Path] = None, reference_path: Optional[Path] = None):
         """
         Initialize the layer drift monitor.
 
@@ -93,6 +93,9 @@ class LayerDriftMonitor:
             base_dir: Base TRAINING directory
             reference_path: Path to reference checkpoint. If None, uses base model.
         """
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.status_dir = self.base_dir / "status"
         self.status_dir.mkdir(exist_ok=True)
@@ -471,7 +474,7 @@ class LayerDriftMonitor:
 
 def main():
     parser = argparse.ArgumentParser(description="Layer Drift Monitor")
-    parser.add_argument("--base-dir", type=Path, required=True, help="Base TRAINING directory")
+    parser.add_argument("--base-dir", type=Path, default=None, help="Base TRAINING directory")
     parser.add_argument("--reference", type=Path, help="Reference checkpoint path")
     parser.add_argument("--current", type=Path, help="Current checkpoint path (default: latest)")
     parser.add_argument("--interval", type=int, default=600, help="Daemon interval in seconds")

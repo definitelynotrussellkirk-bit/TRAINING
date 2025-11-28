@@ -581,9 +581,10 @@ class RemoteLedgerClient:
 
     Usage:
         from core.checkpoint_ledger import RemoteLedgerClient
+        from core.hosts import get_service_url
 
         # From 3090, query 4090's ledger
-        client = RemoteLedgerClient("http://192.168.x.x:8767/api/ledger")
+        client = RemoteLedgerClient(get_service_url("ledger"))
 
         # Same interface as local ledger
         latest = client.get_latest()
@@ -596,7 +597,7 @@ class RemoteLedgerClient:
         Initialize the remote ledger client.
 
         Args:
-            base_url: Base URL of the ledger API (e.g., "http://192.168.x.x:8767/api/ledger")
+            base_url: Base URL of the ledger API (from get_service_url("ledger"))
             timeout: Request timeout in seconds
         """
         self.base_url = base_url.rstrip("/")
@@ -746,8 +747,12 @@ def get_remote_ledger(host: Optional[str] = None) -> RemoteLedgerClient:
     if host and host.startswith("http"):
         return RemoteLedgerClient(host)
 
-    # Default to trainer
-    return RemoteLedgerClient("http://192.168.x.x:8767/api/ledger")
+    # Default to trainer - get URL from hosts.json
+    from core.hosts import get_service_url
+    ledger_url = get_service_url("ledger")
+    if not ledger_url:
+        raise RuntimeError("No ledger service configured in hosts.json")
+    return RemoteLedgerClient(ledger_url)
 
 
 def get_ledger_client(base_dir: Optional[str] = None) -> "CheckpointLedger | RemoteLedgerClient":

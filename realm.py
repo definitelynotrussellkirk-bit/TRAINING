@@ -32,8 +32,18 @@ This is the recommended entry point for the RPG-themed training system.
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-# Default base directory
-DEFAULT_BASE_DIR = "/path/to/training"
+
+def _get_default_base_dir() -> str:
+    """Get default base directory using core.paths."""
+    try:
+        from core.paths import get_base_dir
+        return str(get_base_dir())
+    except ImportError:
+        # Fallback to auto-detection
+        return str(Path(__file__).parent.absolute())
+
+
+DEFAULT_BASE_DIR = _get_default_base_dir()
 
 
 class Realm:

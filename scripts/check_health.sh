@@ -162,7 +162,7 @@ else
     # Suggest fixes based on what's broken
     if ! ps aux | grep "training_daemon.py" | grep -v grep > /dev/null; then
         echo "Start training daemon:"
-        echo "  nohup python3 training_daemon.py --base-dir /path/to/training > training_output.log 2>&1 &"
+        echo "  ./scripts/start_all.sh"
         echo ""
     fi
 

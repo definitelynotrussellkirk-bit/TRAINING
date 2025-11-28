@@ -289,45 +289,69 @@ class ZoneRegistry:
     """
 
     # Pre-configured zones for our setup
-    DEFAULT_ZONES = [
-        Zone(
-            zone_id="4090",
-            name="Training Server",
-            zone_type=ZoneType.CENTRAL,
-            host="localhost",
-            port=8767,  # Central Vault port
-            base_path="/path/to/training",
-            checkpoint_path="/path/to/training/models",
-            model_path="/path/to/training/models",
-            can_train=True,
-            can_store=True,
-        ),
-        Zone(
-            zone_id="3090",
-            name="Inference Server",
-            zone_type=ZoneType.INFERENCE,
-            host="192.168.x.x",
-            port=8768,
-            ssh_user="user",
-            base_path="/path/to/models",
-            checkpoint_path="/path/to/models",
-            model_path="/path/to/models",
-            can_infer=True,
-            can_store=True,
-        ),
-        Zone(
-            zone_id="nas",
-            name="Synology NAS",
-            zone_type=ZoneType.STORAGE,
-            host="192.168.x.x",
-            port=8768,
-            ssh_user="admin",
-            base_path="/volume1/data/llm_training",
-            checkpoint_path="/volume1/data/llm_training/checkpoints",
-            model_path="/volume1/data/llm_training/models",
-            can_store=True,
-        ),
-    ]
+    @staticmethod
+    def _get_default_zones():
+        """Get default zones with dynamic paths."""
+        from core.paths import get_base_dir
+        from core.hosts import get_host
+
+        base_dir = get_base_dir()
+        host_4090 = get_host("4090")
+        host_3090 = get_host("3090")
+
+        zones = [
+            Zone(
+                zone_id="4090",
+                name="Training Server",
+                zone_type=ZoneType.CENTRAL,
+                host="localhost",
+                port=8767,  # Central Vault port
+                base_path=str(base_dir),
+                checkpoint_path=str(base_dir / "models"),
+                model_path=str(base_dir / "models"),
+                can_train=True,
+                can_store=True,
+            ),
+        ]
+
+        # Add 3090 if configured
+        if host_3090:
+            zones.append(Zone(
+                zone_id="3090",
+                name="Inference Server",
+                zone_type=ZoneType.INFERENCE,
+                host=host_3090.host,
+                port=8768,
+                ssh_user="user",
+                base_path=host_3090.models_dir or "/path/to/models",
+                checkpoint_path=host_3090.models_dir or "/path/to/models",
+                model_path=host_3090.models_dir or "/path/to/models",
+                can_infer=True,
+                can_store=True,
+            ))
+
+        # Add NAS if configured in hosts.json
+        try:
+            nas_host = get_host("nas")
+            if nas_host:
+                zones.append(Zone(
+                    zone_id="nas",
+                    name="Synology NAS",
+                    zone_type=ZoneType.STORAGE,
+                    host=nas_host.host,
+                    port=8768,
+                    ssh_user="admin",
+                    base_path="/volume1/data/llm_training",
+                    checkpoint_path="/volume1/data/llm_training/checkpoints",
+                    model_path="/volume1/data/llm_training/models",
+                    can_store=True,
+                ))
+        except:
+            pass  # NAS not configured
+
+        return zones
+
+    DEFAULT_ZONES = property(lambda self: self._get_default_zones())
 
     def __init__(self, config_path: Optional[Path] = None):
         """
@@ -336,7 +360,9 @@ class ZoneRegistry:
         Args:
             config_path: Path to zones config file (optional)
         """
-        self.config_path = config_path or Path("/path/to/training/config/zones.json")
+        from core.paths import get_base_dir
+        base_dir = get_base_dir()
+        self.config_path = config_path or (base_dir / "config" / "zones.json")
         self._zones: Dict[str, Zone] = {}
         self._lock = threading.Lock()
 
@@ -357,7 +383,7 @@ class ZoneRegistry:
                 logger.warning(f"Failed to load zones config: {e}")
 
         # Use defaults
-        for zone in self.DEFAULT_ZONES:
+        for zone in self._get_default_zones():
             self._zones[zone.zone_id] = zone
         logger.info(f"Using {len(self._zones)} default zones")
 

@@ -52,9 +52,16 @@ class HealthInspector:
         gpu_health = inspector.inspect_gpu()
     """
 
-    def __init__(self, base_dir: str | Path = "/path/to/training"):
+    def __init__(self, base_dir: str | Path = None):
         """Initialize the Health Inspector."""
-        self.base_dir = Path(base_dir)
+        if base_dir is None:
+            try:
+                from core.paths import get_base_dir
+                self.base_dir = get_base_dir()
+            except ImportError:
+                self.base_dir = Path(__file__).parent.parent  # Fallback
+        else:
+            self.base_dir = Path(base_dir)
 
         # Thresholds
         self.disk_warning_gb = 50
@@ -346,6 +353,6 @@ class HealthInspector:
         }
 
 
-def get_health_inspector(base_dir: str | Path = "/path/to/training") -> HealthInspector:
+def get_health_inspector(base_dir: str | Path = None) -> HealthInspector:
     """Get a HealthInspector instance."""
     return HealthInspector(base_dir)

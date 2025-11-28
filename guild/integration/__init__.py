@@ -16,10 +16,13 @@ Example:
         get_queue_adapter,
     )
 
-    # Configure adapters
+    # Configure adapters (using hosts.json for defaults)
+    from core.paths import get_base_dir
+    from core.hosts import get_host
+    inference = get_host("3090")
     config = AdapterConfig(
-        base_dir=Path("/path/to/training"),
-        inference_host="192.168.x.x",
+        base_dir=get_base_dir(),
+        inference_host=inference.host if inference else "localhost",
         inference_port=8765,
     )
 

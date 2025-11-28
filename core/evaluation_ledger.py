@@ -54,6 +54,7 @@ class EvalRecord:
     total: int
     timestamp: str  # ISO format
     validation_type: str = "static"  # "static" (fixed 5 problems) or "dynamic"
+    eval_type: str = "quick"  # "quick" (5 problems) or "full" (all levels)
     problems: List[Dict[str, Any]] = field(default_factory=list)  # Individual results
 
     @classmethod
@@ -67,6 +68,7 @@ class EvalRecord:
             total=data["total"],
             timestamp=data["timestamp"],
             validation_type=data.get("validation_type", "static"),
+            eval_type=data.get("eval_type", "quick"),
             problems=data.get("problems", []),
         )
 
@@ -77,6 +79,31 @@ class EvalRecord:
     def key(self) -> str:
         """Unique key for this evaluation."""
         return f"{self.checkpoint_step}:{self.skill}:{self.level}"
+
+
+@dataclass
+class EvalQueueEntry:
+    """Entry in the evaluation queue with priority."""
+    checkpoint_step: int
+    skill: str
+    level: Optional[int]  # None means all levels (for FULL eval)
+    queued_at: str
+    eval_type: str = "quick"  # "quick" or "full"
+    priority: int = 10  # 1-10, higher = processed sooner
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'EvalQueueEntry':
+        return cls(
+            checkpoint_step=data["checkpoint_step"],
+            skill=data["skill"],
+            level=data.get("level"),
+            queued_at=data["queued_at"],
+            eval_type=data.get("eval_type", "quick"),
+            priority=data.get("priority", 10),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 class EvaluationLedger:
@@ -310,10 +337,23 @@ def record_evaluation(
     total: int,
     problems: Optional[List[Dict]] = None,
     validation_type: str = "static",
+    eval_type: str = "quick",
     base_dir: Optional[Path] = None,
 ) -> bool:
     """
     Convenience function to record an evaluation.
+
+    Args:
+        checkpoint_step: The checkpoint step
+        skill: Skill ID
+        level: Skill level
+        accuracy: Accuracy (0.0 - 1.0)
+        correct: Number correct
+        total: Total problems
+        problems: Optional detailed results
+        validation_type: "static" or "dynamic"
+        eval_type: "quick" or "full"
+        base_dir: Base directory (optional)
 
     Returns True if recorded, False if already exists.
     """
@@ -328,6 +368,7 @@ def record_evaluation(
         total=total,
         timestamp=datetime.now().isoformat(),
         validation_type=validation_type,
+        eval_type=eval_type,
         problems=problems or [],
     )
 
@@ -335,68 +376,150 @@ def record_evaluation(
 
 
 # Eval Queue for checkpoint saves
-_eval_queue: List[Dict[str, Any]] = []
+_eval_queue: List[EvalQueueEntry] = []
 _eval_queue_lock = Lock()
 
 
-def queue_evaluation(checkpoint_step: int, skill: str, level: int):
+def queue_evaluation(
+    checkpoint_step: int,
+    skill: str,
+    level: Optional[int] = None,
+    eval_type: str = "quick",
+    priority: int = 10,
+) -> bool:
     """
     Queue an evaluation to run for a checkpoint.
+
+    Args:
+        checkpoint_step: The checkpoint step to evaluate
+        skill: Skill ID (e.g., "bin", "sy")
+        level: Level to evaluate (None = all levels for FULL eval)
+        eval_type: "quick" (5 problems at level) or "full" (all levels)
+        priority: 1-10, higher = processed sooner
 
     Called when a checkpoint is saved. The eval runner will pick this up
     and run the evaluation against the static validation set.
     """
     global _eval_queue
 
-    # Check if already evaluated
-    ledger = get_eval_ledger()
-    if ledger.has_evaluation(checkpoint_step, skill, level):
-        logger.info(f"Checkpoint {checkpoint_step} already evaluated for {skill} L{level}, skipping queue")
-        return False
+    # For quick evals, check if already evaluated
+    if eval_type == "quick" and level is not None:
+        ledger = get_eval_ledger()
+        if ledger.has_evaluation(checkpoint_step, skill, level):
+            logger.info(f"Checkpoint {checkpoint_step} already evaluated for {skill} L{level}, skipping queue")
+            return False
 
     with _eval_queue_lock:
-        # Check if already queued
-        for item in _eval_queue:
-            if (item["checkpoint_step"] == checkpoint_step and
-                item["skill"] == skill and
-                item["level"] == level):
-                logger.info(f"Evaluation already queued for checkpoint-{checkpoint_step} {skill} L{level}")
+        _load_eval_queue_locked()
+
+        # Check if already queued (same checkpoint, skill, level, type)
+        for entry in _eval_queue:
+            if (entry.checkpoint_step == checkpoint_step and
+                entry.skill == skill and
+                entry.level == level and
+                entry.eval_type == eval_type):
+                logger.info(f"Evaluation already queued for checkpoint-{checkpoint_step} {skill} L{level} ({eval_type})")
                 return False
 
-        _eval_queue.append({
-            "checkpoint_step": checkpoint_step,
-            "skill": skill,
-            "level": level,
-            "queued_at": datetime.now().isoformat(),
-        })
+        entry = EvalQueueEntry(
+            checkpoint_step=checkpoint_step,
+            skill=skill,
+            level=level,
+            queued_at=datetime.now().isoformat(),
+            eval_type=eval_type,
+            priority=priority,
+        )
+        _eval_queue.append(entry)
 
-        logger.info(f"Queued evaluation: checkpoint-{checkpoint_step} {skill} L{level}")
+        level_str = f"L{level}" if level else "ALL"
+        logger.info(f"Queued {eval_type} evaluation: checkpoint-{checkpoint_step} {skill} {level_str} (priority={priority})")
 
-        # Also persist queue to disk for daemon restart recovery
+        # Persist queue to disk
         _save_eval_queue()
 
         return True
 
 
-def get_pending_evaluations() -> List[Dict[str, Any]]:
-    """Get list of pending evaluations."""
+def queue_full_evaluation(checkpoint_step: int, skill: str, priority: int = 6) -> bool:
+    """Queue a FULL evaluation (all levels) for a checkpoint."""
+    return queue_evaluation(
+        checkpoint_step=checkpoint_step,
+        skill=skill,
+        level=None,  # All levels
+        eval_type="full",
+        priority=priority,
+    )
+
+
+def get_pending_evaluations(
+    sorted_by_priority: bool = True,
+    eval_type: Optional[str] = None,
+) -> List[EvalQueueEntry]:
+    """
+    Get list of pending evaluations.
+
+    Args:
+        sorted_by_priority: If True, sort by priority DESC, checkpoint DESC, quick before full
+        eval_type: Filter by eval type ("quick" or "full")
+
+    Returns:
+        List of EvalQueueEntry objects
+    """
     global _eval_queue
-    _load_eval_queue()  # Reload from disk
+    _load_eval_queue()
+
     with _eval_queue_lock:
-        return list(_eval_queue)
+        entries = list(_eval_queue)
+
+    # Filter by type if specified
+    if eval_type:
+        entries = [e for e in entries if e.eval_type == eval_type]
+
+    # Sort by priority
+    if sorted_by_priority:
+        entries.sort(key=lambda e: (
+            -e.priority,              # Higher priority first
+            -e.checkpoint_step,       # Newer checkpoints first
+            e.eval_type == "full",    # Quick before full (False < True)
+            e.queued_at,              # Older queued items first
+        ))
+
+    return entries
 
 
-def pop_evaluation() -> Optional[Dict[str, Any]]:
-    """Pop the next evaluation from the queue."""
+def pop_evaluation(eval_type: Optional[str] = None) -> Optional[EvalQueueEntry]:
+    """
+    Pop the highest-priority evaluation from the queue.
+
+    Args:
+        eval_type: Only pop items of this type ("quick" or "full")
+
+    Returns:
+        EvalQueueEntry or None if queue is empty
+    """
     global _eval_queue
     _load_eval_queue()
 
     with _eval_queue_lock:
         if not _eval_queue:
             return None
-        item = _eval_queue.pop(0)
-        _save_eval_queue()
-        return item
+
+        # Sort queue by priority
+        _eval_queue.sort(key=lambda e: (
+            -e.priority,
+            -e.checkpoint_step,
+            e.eval_type == "full",
+            e.queued_at,
+        ))
+
+        # Find matching item
+        for i, entry in enumerate(_eval_queue):
+            if eval_type is None or entry.eval_type == eval_type:
+                _eval_queue.pop(i)
+                _save_eval_queue()
+                return entry
+
+        return None
 
 
 def _get_queue_file() -> Path:
@@ -412,23 +535,34 @@ def _save_eval_queue():
 
     with open(queue_file, "w") as f:
         json.dump({
-            "queue": _eval_queue,
+            "queue": [e.to_dict() for e in _eval_queue],
             "updated_at": datetime.now().isoformat(),
         }, f, indent=2)
 
 
 def _load_eval_queue():
-    """Load queue from disk."""
+    """Load queue from disk (acquires lock)."""
+    with _eval_queue_lock:
+        _load_eval_queue_locked()
+
+
+def _load_eval_queue_locked():
+    """Load queue from disk (must hold lock)."""
     global _eval_queue
 
     queue_file = _get_queue_file()
     if not queue_file.exists():
         return
 
-    with _eval_queue_lock:
-        try:
-            with open(queue_file) as f:
-                data = json.load(f)
-            _eval_queue = data.get("queue", [])
-        except Exception as e:
-            logger.error(f"Failed to load eval queue: {e}")
+    try:
+        with open(queue_file) as f:
+            data = json.load(f)
+        queue_data = data.get("queue", [])
+
+        # Convert to EvalQueueEntry objects
+        _eval_queue = []
+        for item in queue_data:
+            if isinstance(item, dict):
+                _eval_queue.append(EvalQueueEntry.from_dict(item))
+    except Exception as e:
+        logger.error(f"Failed to load eval queue: {e}")

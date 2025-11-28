@@ -479,7 +479,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Progression Advisor - Hero skill advancement"
     )
-    parser.add_argument('--base-dir', default='/path/to/training')
+    parser.add_argument('--base-dir', default=None, help="Base dir (default: from core.paths)")
 
     subparsers = parser.add_subparsers(dest='command', help='Command')
 

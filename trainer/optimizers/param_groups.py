@@ -81,6 +81,7 @@ def split_transformer_params(
     weight_decay: float = 0.0,
     aux_betas: Tuple[float, float] = (0.9, 0.95),
     aux_eps: float = 1e-10,
+    ns_steps: int = 5,
 ) -> List[Dict[str, Any]]:
     """
     Split model parameters into Muon and AdamW groups.
@@ -136,6 +137,7 @@ def split_transformer_params(
             "lr": hidden_lr,
             "momentum": hidden_momentum,
             "weight_decay": weight_decay,
+            "ns_steps": ns_steps,
         })
 
     if adam_params:

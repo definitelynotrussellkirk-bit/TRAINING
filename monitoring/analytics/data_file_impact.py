@@ -110,7 +110,7 @@ class DataFileImpactAnalyzer:
         self,
         base_dir: Path,
         validation_path: Optional[Path] = None,
-        ssh_host: str = "192.168.x.x"
+        ssh_host: Optional[str] = None
     ):
         """
         Initialize the data file impact analyzer.
@@ -127,6 +127,9 @@ class DataFileImpactAnalyzer:
         self.validation_path = validation_path or (
             self.base_dir / "data" / "validation" / "val_easy_200.jsonl"
         )
+        if ssh_host is None:
+            from core.hosts import get_host
+            ssh_host = get_host("3090").host
         self.ssh_host = ssh_host
 
         self.impact_log_path = self.status_dir / "data_file_impact.jsonl"
@@ -522,14 +525,18 @@ class DataFileImpactAnalyzer:
 
 def main():
     parser = argparse.ArgumentParser(description="Data File Impact Analyzer")
-    parser.add_argument("--base-dir", type=Path, required=True)
+    parser.add_argument("--base-dir", type=Path, default=None)
     parser.add_argument("--file", type=Path, help="Analyze specific file")
     parser.add_argument("--interval", type=int, default=300)
     parser.add_argument("--daemon", action="store_true")
     parser.add_argument("--summary", action="store_true", help="Generate summary")
-    parser.add_argument("--ssh-host", default="192.168.x.x")
+    parser.add_argument("--ssh-host", default=None)
 
     args = parser.parse_args()
+
+    if args.base_dir is None:
+        from core.paths import get_base_dir
+        args.base_dir = get_base_dir()
 
     analyzer = DataFileImpactAnalyzer(args.base_dir, ssh_host=args.ssh_host)
 

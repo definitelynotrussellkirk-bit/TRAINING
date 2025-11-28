@@ -240,13 +240,16 @@ class StorageRegistry:
         rec = registry.recommend_storage("checkpoint", size_gb=5)
     """
 
-    def __init__(self, base_dir: str | Path = "/path/to/training"):
+    def __init__(self, base_dir: Optional[str | Path] = None):
         """
         Initialize the Storage Registry.
 
         Args:
-            base_dir: Base training directory
+            base_dir: Base training directory (default: auto-detect)
         """
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.config_dir = self.base_dir / "config"
         self.registry_file = self.config_dir / "storage_registry.json"
@@ -817,6 +820,6 @@ class StorageRegistry:
 
 
 # Convenience function
-def get_storage_registry(base_dir: str | Path = "/path/to/training") -> StorageRegistry:
+def get_storage_registry(base_dir: Optional[str | Path] = None) -> StorageRegistry:
     """Get a StorageRegistry instance."""
     return StorageRegistry(base_dir)

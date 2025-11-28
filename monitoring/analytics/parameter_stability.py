@@ -97,7 +97,7 @@ class ParameterStabilityMonitor:
         "dead_change_threshold": 1e-6, # Less than this change = dead
     }
 
-    def __init__(self, base_dir: Path, thresholds: Optional[Dict[str, float]] = None):
+    def __init__(self, base_dir: Optional[Path] = None, thresholds: Optional[Dict[str, float]] = None):
         """
         Initialize the parameter stability monitor.
 
@@ -105,6 +105,9 @@ class ParameterStabilityMonitor:
             base_dir: Base TRAINING directory
             thresholds: Custom alert thresholds (optional)
         """
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.status_dir = self.base_dir / "status"
         self.status_dir.mkdir(exist_ok=True)
@@ -522,7 +525,7 @@ class ParameterStabilityMonitor:
 
 def main():
     parser = argparse.ArgumentParser(description="Parameter Stability Monitor")
-    parser.add_argument("--base-dir", type=Path, required=True)
+    parser.add_argument("--base-dir", type=Path, default=None)
     parser.add_argument("--checkpoint", type=Path, help="Specific checkpoint to analyze")
     parser.add_argument("--interval", type=int, default=600, help="Daemon interval")
     parser.add_argument("--daemon", action="store_true", help="Run as daemon")

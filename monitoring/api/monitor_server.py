@@ -43,6 +43,7 @@ from view_models import (
     create_live_status_from_training_status,
 )
 from preview_history import get_preview_logger
+from paths import get_base_dir, get_status_dir
 
 
 app = Flask(__name__)
@@ -50,8 +51,8 @@ if CORS_AVAILABLE:
     CORS(app)  # Enable CORS for development
 
 # Global config
-BASE_DIR = Path("/path/to/training")
-STATUS_FILE = BASE_DIR / "status" / "training_status.json"
+BASE_DIR = get_base_dir()
+STATUS_FILE = get_status_dir() / "training_status.json"
 
 
 def load_training_status() -> dict:
@@ -357,14 +358,14 @@ def main():
     parser = argparse.ArgumentParser(description="Monitoring API Server V2")
     parser.add_argument('--port', type=int, default=8080, help='Port to listen on')
     parser.add_argument('--host', default='0.0.0.0', help='Host to bind to')
-    parser.add_argument('--base-dir', default='/path/to/training',
-                       help='Base directory for training system')
+    parser.add_argument('--base-dir', default=None,
+                       help='Base directory for training system (default: auto-detect)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
 
     args = parser.parse_args()
 
     global BASE_DIR, STATUS_FILE
-    BASE_DIR = Path(args.base_dir)
+    BASE_DIR = Path(args.base_dir) if args.base_dir else get_base_dir()
     STATUS_FILE = BASE_DIR / "status" / "training_status.json"
 
     print(f"Starting Monitoring API Server V2")

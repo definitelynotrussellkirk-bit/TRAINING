@@ -410,7 +410,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Curriculum Manager - Adaptive Difficulty")
-    parser.add_argument('--base-dir', default='/path/to/training')
+    parser.add_argument('--base-dir', default=None, help='Base directory (auto-detect from core.paths)')
 
     subparsers = parser.add_subparsers(dest='command', help='Command')
 
@@ -456,7 +456,15 @@ def main():
     )
 
     # Load config
-    base_dir = Path(args.base_dir)
+    if args.base_dir is None:
+        try:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
+        except Exception:
+            base_dir = Path(__file__).parent.parent
+    else:
+        base_dir = Path(args.base_dir)
+
     config_file = base_dir / "config.json"
     with open(config_file) as f:
         config = json.load(f)

@@ -10,6 +10,30 @@ from dataclasses import dataclass, field
 from typing import Literal, Optional, Dict, Any, List
 
 
+def _get_default_inference_host() -> str:
+    """Get default inference host from hosts.json or fallback to localhost."""
+    try:
+        from core.hosts import get_host
+        inference_host = get_host("3090")
+        if inference_host:
+            return inference_host.host
+    except (ImportError, Exception):
+        pass
+    return "localhost"
+
+
+def _get_default_inference_port() -> int:
+    """Get default inference port from hosts.json or fallback to 8765."""
+    try:
+        from core.hosts import get_host
+        inference_host = get_host("3090")
+        if inference_host and "inference" in inference_host.services:
+            return inference_host.services["inference"].port
+    except (ImportError, Exception):
+        pass
+    return 8765
+
+
 @dataclass
 class Hyperparams:
     """Core hyperparameters for training"""
@@ -105,8 +129,8 @@ class MonitoringConfig:
     preview_temperature: float = 0.7         # Sampling temperature for preview
 
     # Remote 3090 backend settings (used if preview_backend == "remote_3090")
-    remote_3090_host: str = "192.168.x.x"
-    remote_3090_port: int = 8765
+    remote_3090_host: str = field(default_factory=_get_default_inference_host)
+    remote_3090_port: int = field(default_factory=_get_default_inference_port)
     remote_3090_timeout: int = 30            # Request timeout (seconds)
     remote_3090_model_id: Optional[str] = None  # Model ID on 3090 (None = use active)
 

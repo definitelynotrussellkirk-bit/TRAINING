@@ -17,11 +17,21 @@ except ImportError:
 
 
 class InferenceAPIClient:
-    """Client for RTX 3090 Inference API at 192.168.x.x:8765"""
+    """Client for RTX 3090 Inference API"""
 
-    def __init__(self, base_url: str = "http://192.168.x.x:8765"):
+    def __init__(self, base_url: Optional[str] = None):
         if requests is None:
             raise ImportError("requests library required. Install: pip install requests")
+
+        # Use host registry for default URL
+        if base_url is None:
+            try:
+                from core.hosts import get_service_url
+                base_url = get_service_url("inference")
+            except Exception:
+                # Fallback if host registry unavailable
+                base_url = "http://192.168.x.x:8765"
+
         self.base_url = base_url
 
     # ===== Health & Info =====

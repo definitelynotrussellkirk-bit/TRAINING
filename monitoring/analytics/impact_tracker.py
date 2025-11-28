@@ -92,7 +92,10 @@ class CorrectionFileImpact:
 class ImpactTracker:
     """Track the effectiveness of correction training."""
 
-    def __init__(self, base_dir: str = "/path/to/training"):
+    def __init__(self, base_dir: Optional[str] = None):
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.status_dir = self.base_dir / "status"
         self.inbox_dir = self.base_dir / "inbox"
@@ -438,7 +441,7 @@ class ImpactTracker:
 
 def main():
     parser = argparse.ArgumentParser(description="Impact Tracker")
-    parser.add_argument('--base-dir', default='/path/to/training',
+    parser.add_argument('--base-dir', default=None,
                        help='Base directory')
     parser.add_argument('--snapshot', action='store_true',
                        help='Take a performance snapshot')

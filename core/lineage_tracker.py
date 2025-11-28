@@ -412,7 +412,8 @@ def get_global_tracker(status_dir: Path = None) -> LineageTracker:
     global _global_tracker
     if _global_tracker is None:
         if status_dir is None:
-            status_dir = Path("/path/to/training/status")
+            from core.paths import get_status_dir
+            status_dir = get_status_dir()
         _global_tracker = LineageTracker(status_dir)
     return _global_tracker
 
@@ -425,13 +426,14 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Data Lineage Tracker")
-    parser.add_argument("--status-dir", default="/path/to/training/status",
-                       help="Status directory")
+    parser.add_argument("--status-dir", default=None,
+                       help="Status directory (default: from core.paths)")
     parser.add_argument("--show", action="store_true", help="Show current stats")
     parser.add_argument("--reset", action="store_true", help="Reset all stats")
     args = parser.parse_args()
 
-    tracker = LineageTracker(Path(args.status_dir))
+    status_dir = Path(args.status_dir) if args.status_dir else None
+    tracker = get_global_tracker(status_dir)
 
     if args.reset:
         tracker.reset()

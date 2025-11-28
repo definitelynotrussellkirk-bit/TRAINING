@@ -141,7 +141,10 @@ def generate_edge_case_probe(category: str, prompt: str, answer: str, idx: int) 
 class ProbeSetManager:
     """Manage the fixed probe set for representation tracking."""
 
-    def __init__(self, base_dir: str = "/path/to/training"):
+    def __init__(self, base_dir: Optional[str] = None):
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
         self.base_dir = Path(base_dir)
         self.probe_file = self.base_dir / "config" / "probe_set.json"
         self.probe_file.parent.mkdir(parents=True, exist_ok=True)
@@ -262,7 +265,7 @@ class ProbeSetManager:
 
 def main():
     parser = argparse.ArgumentParser(description="Probe Set Manager")
-    parser.add_argument('--base-dir', default='/path/to/training',
+    parser.add_argument('--base-dir', default=None,
                        help='Base directory')
     parser.add_argument('--init', action='store_true',
                        help='Initialize probe set')

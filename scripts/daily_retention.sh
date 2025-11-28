@@ -15,8 +15,9 @@
 
 set -e  # Exit on error
 
-# Configuration
-BASE_DIR="/path/to/training"
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 OUTPUT_DIR="${BASE_DIR}/models/current_model"
 BASE_MODEL="${BASE_DIR}/models/Qwen3-0.6B"
 LOG_DIR="${BASE_DIR}/logs"

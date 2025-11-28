@@ -2,7 +2,11 @@
 # Start Unified Monitoring API Server
 # Phase 3: Standalone API on port 8081
 
-cd /path/to/training
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+cd "$BASE_DIR"
 
 echo "Starting Unified Monitoring API Server on port 8081..."
 nohup python3 monitoring/api/server.py > logs/unified_api.log 2>&1 &

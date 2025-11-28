@@ -3,7 +3,9 @@
 
 set -e
 
-BASE_DIR="/path/to/training"
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 LOG_FILE="$BASE_DIR/logs/curriculum.log"
 PID_FILE="$BASE_DIR/control/curriculum.pid"
 

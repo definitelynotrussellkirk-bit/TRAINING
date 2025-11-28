@@ -33,6 +33,21 @@ class ModelSpec:
 
 
 @dataclass
+class LigerKernelConfig:
+    """
+    Liger Kernel optimization settings.
+
+    Liger provides fused CUDA kernels for memory efficiency.
+    Critical for large models (4B+) on consumer GPUs.
+    """
+    enabled: bool = False
+    fused_linear_cross_entropy: bool = True  # Key memory saver - logits not materialized
+    fused_rms_norm: bool = True
+    fused_swiglu: bool = True
+    fused_rope: bool = True
+
+
+@dataclass
 class TrainingDefaults:
     """
     Default training hyperparameters for this hero.
@@ -46,8 +61,11 @@ class TrainingDefaults:
         gradient_accumulation: Steps to accumulate gradients
         learning_rate: Base learning rate
         warmup_steps: LR warmup steps
+        lr_scheduler: LR scheduler type (cosine, linear, constant)
         max_length: Training sequence length
         gradient_checkpointing: Enable activation checkpointing
+        optimizer: Optimizer type (adamw, muon, paged_adamw_8bit, adamw_bnb_8bit)
+        liger_kernel: Liger kernel optimization config
         save_steps: Checkpoint save frequency
         save_total_limit: Max checkpoints to keep
     """
@@ -57,8 +75,11 @@ class TrainingDefaults:
     gradient_accumulation: int = 16
     learning_rate: float = 0.0004
     warmup_steps: int = 100
+    lr_scheduler: str = "cosine"
     max_length: int = 2048
     gradient_checkpointing: bool = True
+    optimizer: str = "adamw"  # adamw, muon, paged_adamw_8bit, adamw_bnb_8bit
+    liger_kernel: Optional[LigerKernelConfig] = None
     save_steps: int = 10000
     save_total_limit: int = 40
 

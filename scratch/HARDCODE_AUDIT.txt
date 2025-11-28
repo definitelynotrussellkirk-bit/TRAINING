@@ -1,0 +1,69 @@
+Hardcoded Values Audit (2025-11-27)
+Reference list for cleanup by another agent. Grouped by type with representative files and suggested remediation patterns. Paths are workspace-relative unless noted.
+
+1) Absolute base dir (/path/to/training)
+   - weaver/weaver.py (class Weaver __init__ default, argparse default), scripts/start_all.sh|stop_all.sh (BASE_DIR variable)
+   - core/training_controller.py (fallback Path), core/paths.py (legacy default list)
+   - monitoring/api/server.py (base_dir Path(...) in several handlers), monitoring/api/plugins/training_status.py, training_analytics.py, skill_metrics.py, storage.py (all build absolute status paths)
+   - vault/server.py (run_server default), vault/zones.py (zone configs), vault/discovery.py (fallback), vault/zone_warden.py (find_config_file), vault/keeper.py/treasury.py/archivist.py (constructor defaults)
+   - guild/task_registry.py (BASE_DIR Path), sentinels/health_inspector.py|guardian.py, trainer/monitoring/status_writer.py (DEFAULT_STATUS_FILE), realm.py (DEFAULT_BASE_DIR)
+   - Scripts and docs: scripts/daily_retention.sh, scripts/monitor_training.sh, TROUBLESHOOTING.md examples.
+   - Impact: portability breakage off the 4090 box; double maintenance.
+   - Remedy: centralize base via core.paths.get_base_dir() with env override (e.g., TRAINING_BASE_DIR); plumb base_dir args/constructor params instead of hard defaults; scripts should read env or accept --base-dir flags rather than literals.
+
+2) Hardcoded hosts/IPs (192.168.x.x trainer, 192.168.x.x inference, 192.168.x.x NAS)
+   - tavern/server.py (oracle client host), tavern/templates/settings.html & oracle.html (UI defaults)
+   - core/train.py (remote_eval host default), core/eval_runner.py (inference_host default), core/paths.py (REMOTE_HOST env fallback)
+   - vault/zones.py (zone definitions), vault/client.py (VaultKeeperClient host), vault/warden_client.py (default host)
+   - monitoring/api/plugins/gpu_stats.py, inference_model.py, scheduler.py, skill_metrics.py, checkpoints.py, adversarial.py, confidence.py, testing.py, regression.py, curriculum.py, self_correction.py, training_analytics.py (ssh_host/inference_host defaults)
+   - monitoring daemons: 3090_watchdog.py, 3090_memory_guardian.py, 3090_self_healer.py, automated_testing_daemon.py, deployment_orchestrator.py, live_prediction_daemon.py (api_url/remote_host defaults)
+   - monitoring/analytics/hard_example_tracker.py|hard_example_expander.py (api_url), prediction_client.py, compare_checkpoints.py
+   - guild/sparring.py (inference_url default), guild/task_registry.py (curl to 192.168.x.x:8765)
+   - data_manager/api_client.py, data_manager/remote_client.py, monitoring/3090_health_dashboard.py
+   - trainer/config/schema.py (remote_3090_host), monitoring/tests/test_all_endpoints.py & tests/test_smoke_e2e.py (assert host), scripts/check_3090_status.sh, scripts/sync_checkpoints_to_3090.sh.
+   - Docs containing IPs: REMOTE_INFERENCE.md, CLAUDE.md, ARCHITECTURE.md, TROUBLESHOOTING.md, monitoring/README.md, LORE.md, scratch plans.
+   - Impact: relocation pain; inconsistent single source of truth vs config/hosts.json.
+   - Remedy: use config/hosts.json + core.hosts.get_service_url()/get_host(); default CLI args to those helpers; expose host list to UI via API and render dynamically; tests should read hosts.json or accept env override.
+
+3) Hardcoded ports/URLs
+   - Ports baked in: inference 8765, scheduler 8766, vault 8767, warden 8760, tavern 8888, monitoring 8081, skill APIs 8080/8090.
+   - monitoring/api/plugins/* (scheduler host/port, inference host/port, ssh data paths), monitoring/task_client.py (scheduler_url default), monitoring/3090_* daemons (api/scheduler URLs)
+   - guild/task_registry.py (curl to 8765), tavern templates (settings/oracle select options)
+   - data_manager/skill_api_client.py (base_url for syllo/binary), monitoring/ui/analytics_dashboard.html (SCHEDULER_URL constant), scripts/start_option_c.sh (curl to 8765), monitoring/live_prediction_daemon.py (default api_url 8765).
+   - Remedy: derive from config/hosts.json services; for skill APIs, move endpoints into a small config (e.g., config/skills.json) and let data_manager read it; UI should fetch current ports from an API/config endpoint instead of literals.
+
+4) Usernames/SSH and remote paths
+   - “user” baked into: scripts/bin/branch_officer, scripts/sync_checkpoints_to_3090.sh, scripts/check_3090_status.sh, monitoring/gpu_task_scheduler.py (ssh commands), monitoring/servers/launch_live_monitor.py (ssh), monitoring/3090_watchdog.py (ssh), monitoring/3090_memory_guardian.py, monitoring/3090_self_healer.py
+   - config/hosts.json ssh_user defaults to user; REMOTE_INFERENCE.md and other docs use user in scp/ssh commands.
+   - Impact: not portable to other usernames or home dirs.
+   - Impact: unusable for other users; hard to run under different account.
+   - Remedy: read ssh_user from hosts.json; parameterize scripts/daemons; build remote paths from host config (models_dir/checkpoints_dir) instead of inline /home/user.
+
+5) Model/checkpoint identifiers and paths
+   - scripts/train_4b_full.py (MODEL_PATH/OUTPUT_DIR literals), config.json/config.json.bak/config.defaults.json (model_path/current_model/base_model), ARCHITECTURE.md and REMOTE_INFERENCE.md examples, scratch plans.
+   - Some references in vault/discovery.py fallback path, vault/__init__.py examples, CLAUDE.md ledger examples.
+   - Remedy: source paths from hero configs (configs/heroes/*.yaml) and config_builder; allow CLI overrides; avoid duplicating in scripts—load hero or hosts config for defaults.
+
+6) Status/baseline file paths
+   - monitoring/api/plugins/skill_metrics.py (local/remote baseline paths), training_status.py, checkpoints.py, training_analytics.py, storage.py, curriculum.py, self_correction.py (absolute status files)
+   - monitoring/ui/analytics_dashboard.html (STATUS_BASE constant), monitoring/tests/test_all_endpoints.py (expects status files in absolute path)
+   - monitoring/api/server.py (lineage_file/status files absolute).
+   - Remedy: build paths from base_dir; avoid absolute strings in JS by having the monitoring API supply data or a status root.
+
+7) Skill API endpoints and server script paths
+   - data_manager/skill_api_client.py (base_url for syllo/binary, server_script pointing to /path/to/skills/…).
+   - Remedy: move skill endpoints into config (hosts.json or a skills.json) and read there; allow env override.
+
+8) UI hardcoded host labels
+   - tavern/templates/settings.html (input default value 192.168.x.x), tavern/templates/oracle.html (option label “RTX 3090 (192.168.x.x)”).
+   - Remedy: fetch host list from an endpoint (e.g., hosts.json via API) and populate options dynamically.
+
+9) Tests tied to fixed network
+   - monitoring/tests/test_all_endpoints.py (expects 192.168.x.x, SSH checks), tests/test_smoke_e2e.py (asserts api_url contains 192.168.x.x).
+   - Remedy: read hosts.json or allow env-provided host; skip or parametrize when host is unreachable.
+
+General remediation pattern
+   - Base dir: core.paths.get_base_dir() with env override; thread base_dir through constructors/CLIs.
+   - Hosts/ports: config/hosts.json + core.hosts helpers as single source; remove literals.
+   - Skill endpoints: config-driven (JSON or env) consumed by data_manager.
+   - Docs: where possible, reference “default from config/hosts.json” instead of fixed IP; keep examples parameterized.

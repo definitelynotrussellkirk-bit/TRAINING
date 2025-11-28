@@ -28,23 +28,42 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 # Skill API configuration
-SKILL_APIS = {
-    "syllo": {
-        "name": "SYLLO Puzzles",
-        "base_url": "http://127.0.0.1:8080",
-        "levels": 50,
-        "server_script": "/path/to/skills/skill_syllo_variant/api_server.py",
-    },
-    "binary": {
-        "name": "Binary Arithmetic",
-        "base_url": "http://127.0.0.1:8090",
-        "levels": 30,  # 30 levels: 2-bit to 32-bit
-        "server_script": "/path/to/skills/skill_binary/api_server.py",
+def _get_skill_apis():
+    """Get skill API configuration with dynamic base_dir detection."""
+    try:
+        from core.paths import get_base_dir
+        base_dir = get_base_dir()
+    except Exception:
+        # Fallback
+        base_dir = Path(__file__).resolve().parents[1]
+
+    # singleSKILL is expected to be a sibling directory to TRAINING
+    singleskill_dir = base_dir.parent / "singleSKILL"
+
+    return {
+        "syllo": {
+            "name": "SYLLO Puzzles",
+            "base_url": "http://127.0.0.1:8080",
+            "levels": 50,
+            "server_script": str(singleskill_dir / "skill_syllo_variant" / "api_server.py"),
+        },
+        "binary": {
+            "name": "Binary Arithmetic",
+            "base_url": "http://127.0.0.1:8090",
+            "levels": 30,  # 30 levels: 2-bit to 32-bit
+            "server_script": str(singleskill_dir / "skill_binary" / "api_server.py"),
+        }
     }
-}
+
+SKILL_APIS = _get_skill_apis()
 
 # Output directory
-BASE_DIR = Path(__file__).resolve().parents[1]
+try:
+    from core.paths import get_base_dir
+    BASE_DIR = get_base_dir()
+except Exception:
+    BASE_DIR = Path(__file__).resolve().parents[1]
+
 QUEUE_DIR = BASE_DIR / "queue" / "normal"
 
 
@@ -177,9 +196,11 @@ def generate_skill_data(
     client = SkillAPIClient(skill)
 
     if not client.health_check():
+        server_script = client.config['server_script']
+        singleskill_dir = Path(server_script).parents[1]
         raise ConnectionError(
             f"{skill} API not running. Start with:\n"
-            f"  cd /path/to/skills && python3 {client.config['server_script']} --port {client.base_url.split(':')[-1]}"
+            f"  cd {singleskill_dir} && python3 {server_script} --port {client.base_url.split(':')[-1]}"
         )
 
     # Build request params
@@ -277,7 +298,9 @@ Examples:
             status = "OK" if client.health_check() else "NOT RUNNING"
             print(f"  {skill:8} ({config['base_url']}): {status}")
             if status == "NOT RUNNING":
-                print(f"           Start: cd /path/to/skills && python3 {config['server_script']} --port {config['base_url'].split(':')[-1]}")
+                server_script = config['server_script']
+                singleskill_dir = Path(server_script).parents[1]
+                print(f"           Start: cd {singleskill_dir} && python3 {server_script} --port {config['base_url'].split(':')[-1]}")
         return
 
     if args.skill == "all":

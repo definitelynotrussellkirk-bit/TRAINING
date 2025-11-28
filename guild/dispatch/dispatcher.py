@@ -509,7 +509,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Quest Dispatcher - Coordinate quest flow to the Quest Board"
     )
-    parser.add_argument('--base-dir', default='/path/to/training')
+    parser.add_argument('--base-dir', default=None, help="Base dir (default: from core.paths)")
 
     subparsers = parser.add_subparsers(dest='command', help='Command')
 

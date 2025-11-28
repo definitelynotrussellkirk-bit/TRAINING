@@ -553,6 +553,10 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/events/stats":
             self._serve_events_stats()
 
+        # Battle Log - MMO-style event stream
+        elif path == "/battle-log" or path == "/battle_log" or path == "/battlelog":
+            self._serve_template("battle_log.html")
+
         # Jobs API - Distributed job execution
         elif path == "/jobs" or path == "/jobs.html":
             self._serve_template("jobs.html")

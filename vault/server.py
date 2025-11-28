@@ -186,6 +186,11 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
         elif path.startswith("/api/passives/checkpoint/"):
             step_str = path.replace("/api/passives/checkpoint/", "")
             self._handle_passives_by_checkpoint(step_str)
+        # Battle Log API - MMO-style event stream
+        elif path == "/api/battle_log":
+            self._handle_battle_log(query)
+        elif path == "/api/battle_log/channels":
+            self._handle_battle_log_channels()
         # Jobs API - Distributed job execution
         elif path == "/api/jobs":
             self._handle_jobs_list(query)
@@ -1053,6 +1058,108 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Passives by checkpoint error: {e}")
             self._send_error(str(e), 500)
+
+    # =========================================================================
+    # BATTLE LOG API - MMO-style event stream
+    # =========================================================================
+
+    def _handle_battle_log(self, query: Dict[str, list]):
+        """Get events from the battle log."""
+        try:
+            from core.battle_log import get_battle_logger, CHANNEL_ICONS, SEVERITY_COLORS
+
+            blog = get_battle_logger()
+
+            # Parse query params
+            channels_str = query.get("channels", [None])[0]
+            channels = channels_str.split(",") if channels_str else None
+            since = query.get("since", [None])[0]
+            limit = int(query.get("limit", [50])[0])
+            limit = min(limit, 200)  # Cap at 200
+            hero_id = query.get("hero", [None])[0]
+            campaign_id = query.get("campaign", [None])[0]
+            severity = query.get("severity", [None])[0]
+
+            events = blog.get_events(
+                channels=channels,
+                since=since,
+                limit=limit,
+                hero_id=hero_id,
+                campaign_id=campaign_id,
+                severity=severity,
+            )
+
+            # Build response
+            response = {
+                "events": [e.to_dict() for e in events],
+                "count": len(events),
+            }
+
+            # Include next_since for polling
+            if events:
+                response["next_since"] = events[0].timestamp
+
+            # Include channel counts
+            response["channel_counts"] = blog.get_channel_counts(hours=24)
+
+            self._send_json(response)
+
+        except ImportError:
+            self._send_json({
+                "events": [],
+                "count": 0,
+                "error": "Battle log module not available",
+            })
+        except Exception as e:
+            logger.error(f"Battle log error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_battle_log_channels(self):
+        """Get available channels and their metadata."""
+        from core.battle_log import CHANNEL_ICONS, SEVERITY_COLORS
+
+        channels = {
+            "system": {
+                "name": "System",
+                "icon": CHANNEL_ICONS.get("system", "⚙️"),
+                "description": "Server events, errors, config changes",
+            },
+            "jobs": {
+                "name": "Jobs",
+                "icon": CHANNEL_ICONS.get("jobs", "⚔️"),
+                "description": "Job lifecycle - claims, completions, failures",
+            },
+            "training": {
+                "name": "Training",
+                "icon": CHANNEL_ICONS.get("training", "📈"),
+                "description": "Checkpoints, LR changes, milestones",
+            },
+            "eval": {
+                "name": "Eval",
+                "icon": CHANNEL_ICONS.get("eval", "📊"),
+                "description": "Evaluation results, regressions",
+            },
+            "vault": {
+                "name": "Vault",
+                "icon": CHANNEL_ICONS.get("vault", "🗃️"),
+                "description": "Archive and sync operations",
+            },
+            "guild": {
+                "name": "Guild",
+                "icon": CHANNEL_ICONS.get("guild", "🏰"),
+                "description": "Titles, lore, hero progression",
+            },
+            "debug": {
+                "name": "Debug",
+                "icon": CHANNEL_ICONS.get("debug", "🔧"),
+                "description": "Developer-only events",
+            },
+        }
+
+        self._send_json({
+            "channels": channels,
+            "severities": SEVERITY_COLORS,
+        })
 
     # =========================================================================
     # JOBS API - Distributed job execution

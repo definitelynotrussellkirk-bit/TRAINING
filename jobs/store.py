@@ -1494,7 +1494,87 @@ class SQLiteJobStore(JobStore):
             ),
         )
         conn.commit()
+
+        # Also emit to battle log for real-time MMO-style feed
+        self._emit_battle_log(job_id, event_type, actor, message, details)
+
         return cursor.lastrowid
+
+    def _emit_battle_log(
+        self,
+        job_id: str,
+        event_type: JobEventType,
+        actor: str,
+        message: Optional[str],
+        details: Optional[Dict[str, Any]],
+    ):
+        """Emit job events to the battle log with MMO-style formatting."""
+        try:
+            from core.battle_log import log_jobs
+
+            # Get job info if available
+            job = self.get(job_id)
+            job_type = job.spec.job_type.value if job else "unknown"
+            short_id = job_id[:8]
+
+            # Map event types to severity and message style
+            if event_type == JobEventType.CREATED:
+                log_jobs(
+                    f"New {job_type} quest submitted",
+                    severity="info",
+                    details={"job_id": job_id, "job_type": job_type},
+                )
+            elif event_type == JobEventType.CLAIMED:
+                worker = actor if actor != "system" else "a worker"
+                log_jobs(
+                    f"{job_type.capitalize()} quest claimed by {worker}",
+                    severity="info",
+                    details={"job_id": job_id, "worker": actor},
+                )
+            elif event_type == JobEventType.STARTED:
+                log_jobs(
+                    f"Battle started: {job_type} ({short_id})",
+                    severity="info",
+                    details={"job_id": job_id, "job_type": job_type},
+                )
+            elif event_type == JobEventType.COMPLETED:
+                duration = details.get("duration_seconds", 0) if details else 0
+                log_jobs(
+                    f"Victory! {job_type} completed in {duration:.1f}s",
+                    severity="success",
+                    details={"job_id": job_id, "duration": duration},
+                )
+            elif event_type == JobEventType.FAILED:
+                error_code = details.get("error_code", "unknown") if details else "unknown"
+                log_jobs(
+                    f"Defeat! {job_type} failed [{error_code}]",
+                    severity="error",
+                    details={"job_id": job_id, "error_code": error_code},
+                )
+            elif event_type == JobEventType.RETRIED:
+                attempt = details.get("attempt", "?") if details else "?"
+                log_jobs(
+                    f"{job_type} quest retrying (attempt {attempt})",
+                    severity="warning",
+                    details={"job_id": job_id, "attempt": attempt},
+                )
+            elif event_type == JobEventType.LEASE_EXPIRED:
+                log_jobs(
+                    f"Lease expired on {job_type} quest, returning to board",
+                    severity="warning",
+                    details={"job_id": job_id},
+                )
+            elif event_type == JobEventType.CANCELLED:
+                log_jobs(
+                    f"{job_type} quest cancelled",
+                    severity="info",
+                    details={"job_id": job_id},
+                )
+            # Skip STATUS_CHANGE as it's usually redundant with other events
+
+        except Exception as e:
+            # Don't let battle log errors affect job processing
+            logger.debug(f"Battle log emit failed: {e}")
 
     def get_events(
         self,

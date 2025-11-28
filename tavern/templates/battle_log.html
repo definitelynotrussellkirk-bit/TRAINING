@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battle Log | Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a14;
+            color: #c0c0c0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            background: #12121f;
+            border-bottom: 1px solid #2a2a3a;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.4rem;
+            color: #ffd700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-links a {
+            color: #666;
+            text-decoration: none;
+            margin-left: 16px;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: #ffd700;
+        }
+
+        /* Main layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Channel sidebar */
+        .channel-sidebar {
+            width: 200px;
+            background: #0e0e1a;
+            border-right: 1px solid #2a2a3a;
+            padding: 16px;
+            flex-shrink: 0;
+            overflow-y: auto;
+        }
+
+        .channel-header {
+            color: #888;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .channel-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .channel-item {
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.15s;
+            font-size: 0.9rem;
+        }
+
+        .channel-item:hover {
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .channel-item.active {
+            background: rgba(255, 215, 0, 0.15);
+            color: #ffd700;
+        }
+
+        .channel-item.muted {
+            opacity: 0.4;
+        }
+
+        .channel-icon {
+            font-size: 1.1rem;
+        }
+
+        .channel-count {
+            margin-left: auto;
+            font-size: 0.75rem;
+            background: #1a1a2e;
+            padding: 2px 6px;
+            border-radius: 10px;
+            color: #666;
+        }
+
+        .channel-item.active .channel-count {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+        }
+
+        /* Log area */
+        .log-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .log-header {
+            padding: 12px 20px;
+            background: #0e0e1a;
+            border-bottom: 1px solid #2a2a3a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .log-title {
+            font-weight: 600;
+            color: #e0e0e0;
+        }
+
+        .log-meta {
+            font-size: 0.8rem;
+            color: #666;
+            margin-left: auto;
+        }
+
+        .log-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Individual log entries */
+        .log-entry {
+            display: flex;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .log-entry:hover {
+            background: rgba(255, 255, 255, 0.02);
+            margin: 0 -20px;
+            padding: 6px 20px;
+        }
+
+        .log-time {
+            color: #444;
+            font-size: 0.75rem;
+            min-width: 70px;
+            font-family: monospace;
+        }
+
+        .log-channel {
+            min-width: 90px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .log-channel-icon {
+            font-size: 0.9rem;
+        }
+
+        .log-channel-name {
+            color: #666;
+        }
+
+        .log-message {
+            flex: 1;
+            word-break: break-word;
+        }
+
+        /* Severity colors */
+        .severity-info { color: #c0c0c0; }
+        .severity-success { color: #4CAF50; }
+        .severity-warning { color: #ffa726; }
+        .severity-error { color: #ff6b6b; }
+
+        /* Channel colors */
+        .channel-system .log-channel-name { color: #888; }
+        .channel-jobs .log-channel-name { color: #e57373; }
+        .channel-training .log-channel-name { color: #64b5f6; }
+        .channel-eval .log-channel-name { color: #81c784; }
+        .channel-vault .log-channel-name { color: #ba68c8; }
+        .channel-guild .log-channel-name { color: #ffd54f; }
+        .channel-debug .log-channel-name { color: #666; }
+
+        /* New events notification */
+        .new-events-pill {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ffd700;
+            color: #000;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: none;
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+            z-index: 100;
+        }
+
+        .new-events-pill:hover {
+            transform: translateX(-50%) scale(1.05);
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #444;
+        }
+
+        .empty-state h3 {
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        /* Filter controls */
+        .filter-bar {
+            padding: 8px 20px;
+            background: #0a0a14;
+            border-bottom: 1px solid #1a1a2a;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .filter-chip {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            border: 1px solid #333;
+            background: transparent;
+            color: #888;
+            transition: all 0.15s;
+        }
+
+        .filter-chip:hover {
+            border-color: #666;
+            color: #c0c0c0;
+        }
+
+        .filter-chip.active {
+            background: rgba(255, 215, 0, 0.15);
+            border-color: #ffd700;
+            color: #ffd700;
+        }
+
+        .filter-label {
+            font-size: 0.75rem;
+            color: #666;
+            margin-right: 4px;
+        }
+
+        /* Status indicator */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-dot.disconnected {
+            background: #ff6b6b;
+            animation: none;
+        }
+
+        /* Preset buttons */
+        .preset-group {
+            margin-top: 24px;
+        }
+
+        .preset-header {
+            color: #888;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .preset-btn {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            border: none;
+            background: #1a1a2e;
+            color: #888;
+            font-size: 0.85rem;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .preset-btn:hover {
+            background: #252540;
+            color: #c0c0c0;
+        }
+
+        /* Details expansion */
+        .log-details {
+            display: none;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: #0a0a14;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: #666;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .log-entry.expanded .log-details {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>
+            <span class="status-dot" id="status-dot"></span>
+            Battle Log
+        </h1>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/jobs">Jobs</a>
+            <a href="/guild">Guild</a>
+            <a href="/vault">Vault</a>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Channel sidebar -->
+        <div class="channel-sidebar">
+            <div class="channel-header">Channels</div>
+            <ul class="channel-list" id="channel-list">
+                <li class="channel-item active" data-channel="all">
+                    <span class="channel-icon">*</span>
+                    <span>All</span>
+                    <span class="channel-count" id="count-all">0</span>
+                </li>
+                <li class="channel-item active" data-channel="system">
+                    <span class="channel-icon">&#9881;&#65039;</span>
+                    <span>System</span>
+                    <span class="channel-count" id="count-system">0</span>
+                </li>
+                <li class="channel-item active" data-channel="jobs">
+                    <span class="channel-icon">&#9876;&#65039;</span>
+                    <span>Jobs</span>
+                    <span class="channel-count" id="count-jobs">0</span>
+                </li>
+                <li class="channel-item active" data-channel="training">
+                    <span class="channel-icon">&#128200;</span>
+                    <span>Training</span>
+                    <span class="channel-count" id="count-training">0</span>
+                </li>
+                <li class="channel-item active" data-channel="eval">
+                    <span class="channel-icon">&#128202;</span>
+                    <span>Eval</span>
+                    <span class="channel-count" id="count-eval">0</span>
+                </li>
+                <li class="channel-item active" data-channel="vault">
+                    <span class="channel-icon">&#128451;&#65039;</span>
+                    <span>Vault</span>
+                    <span class="channel-count" id="count-vault">0</span>
+                </li>
+                <li class="channel-item active" data-channel="guild">
+                    <span class="channel-icon">&#127984;</span>
+                    <span>Guild</span>
+                    <span class="channel-count" id="count-guild">0</span>
+                </li>
+                <li class="channel-item" data-channel="debug">
+                    <span class="channel-icon">&#128295;</span>
+                    <span>Debug</span>
+                    <span class="channel-count" id="count-debug">0</span>
+                </li>
+            </ul>
+
+            <div class="preset-group">
+                <div class="preset-header">Presets</div>
+                <button class="preset-btn" onclick="setPreset('ops')">
+                    Ops View
+                </button>
+                <button class="preset-btn" onclick="setPreset('guild')">
+                    Guild View
+                </button>
+                <button class="preset-btn" onclick="setPreset('all')">
+                    Show All
+                </button>
+            </div>
+        </div>
+
+        <!-- Log content -->
+        <div class="log-container">
+            <div class="filter-bar">
+                <span class="filter-label">Severity:</span>
+                <button class="filter-chip active" data-severity="all">All</button>
+                <button class="filter-chip" data-severity="error">Errors</button>
+                <button class="filter-chip" data-severity="warning">Warnings</button>
+                <button class="filter-chip" data-severity="success">Success</button>
+            </div>
+
+            <div class="log-header">
+                <span class="log-title" id="log-title">All Channels</span>
+                <span class="log-meta" id="log-meta">Loading...</span>
+            </div>
+
+            <div class="log-scroll" id="log-scroll">
+                <div class="empty-state" id="empty-state">
+                    <h3>No events yet</h3>
+                    <p>Events will appear here as they happen</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="new-events-pill" id="new-events-pill" onclick="scrollToBottom()">
+        New events
+    </div>
+
+    <script>
+        // State
+        let activeChannels = new Set(['system', 'jobs', 'training', 'eval', 'vault', 'guild']);
+        let activeSeverity = 'all';
+        let lastTimestamp = null;
+        let events = [];
+        let autoScroll = true;
+        let pollInterval = null;
+
+        // Load saved channel preferences
+        const savedChannels = localStorage.getItem('battlelog_channels');
+        if (savedChannels) {
+            activeChannels = new Set(JSON.parse(savedChannels));
+            updateChannelUI();
+        }
+
+        // Channel click handler
+        document.getElementById('channel-list').addEventListener('click', (e) => {
+            const item = e.target.closest('.channel-item');
+            if (!item) return;
+
+            const channel = item.dataset.channel;
+
+            if (channel === 'all') {
+                // Toggle all channels
+                const allActive = activeChannels.size === 7;
+                if (allActive) {
+                    activeChannels.clear();
+                } else {
+                    activeChannels = new Set(['system', 'jobs', 'training', 'eval', 'vault', 'guild', 'debug']);
+                }
+            } else {
+                // Toggle single channel
+                if (activeChannels.has(channel)) {
+                    activeChannels.delete(channel);
+                } else {
+                    activeChannels.add(channel);
+                }
+            }
+
+            updateChannelUI();
+            saveChannelPrefs();
+            renderEvents();
+        });
+
+        // Severity filter
+        document.querySelectorAll('.filter-chip[data-severity]').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.filter-chip[data-severity]').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                activeSeverity = chip.dataset.severity;
+                renderEvents();
+            });
+        });
+
+        function updateChannelUI() {
+            document.querySelectorAll('.channel-item').forEach(item => {
+                const channel = item.dataset.channel;
+                if (channel === 'all') {
+                    item.classList.toggle('active', activeChannels.size === 7);
+                } else {
+                    item.classList.toggle('active', activeChannels.has(channel));
+                }
+            });
+        }
+
+        function saveChannelPrefs() {
+            localStorage.setItem('battlelog_channels', JSON.stringify([...activeChannels]));
+        }
+
+        function setPreset(preset) {
+            if (preset === 'ops') {
+                activeChannels = new Set(['system', 'jobs', 'training', 'vault']);
+            } else if (preset === 'guild') {
+                activeChannels = new Set(['guild', 'eval', 'training']);
+            } else {
+                activeChannels = new Set(['system', 'jobs', 'training', 'eval', 'vault', 'guild', 'debug']);
+            }
+            updateChannelUI();
+            saveChannelPrefs();
+            renderEvents();
+        }
+
+        async function fetchEvents() {
+            try {
+                let url = '/api/battle_log?limit=100';
+                if (lastTimestamp) {
+                    url += `&since=${encodeURIComponent(lastTimestamp)}`;
+                }
+
+                const res = await fetch(url);
+                const data = await res.json();
+
+                document.getElementById('status-dot').classList.remove('disconnected');
+
+                // Update channel counts
+                const counts = data.channel_counts || {};
+                let total = 0;
+                Object.entries(counts).forEach(([ch, count]) => {
+                    const el = document.getElementById(`count-${ch}`);
+                    if (el) el.textContent = count;
+                    total += count;
+                });
+                document.getElementById('count-all').textContent = total;
+
+                // Merge new events
+                if (data.events && data.events.length > 0) {
+                    // If this is initial load, replace all
+                    if (!lastTimestamp) {
+                        events = data.events;
+                    } else {
+                        // Prepend new events (they come newest first)
+                        const newIds = new Set(data.events.map(e => e.id));
+                        events = data.events.concat(events.filter(e => !newIds.has(e.id)));
+                    }
+
+                    // Track for next poll
+                    if (data.next_since) {
+                        lastTimestamp = data.next_since;
+                    }
+
+                    renderEvents();
+
+                    // Show new events pill if not at bottom
+                    if (!autoScroll && data.events.length > 0 && lastTimestamp) {
+                        showNewEventsPill(data.events.length);
+                    }
+                }
+
+                document.getElementById('log-meta').textContent =
+                    `${events.length} events | Polling every 2s`;
+
+            } catch (e) {
+                console.error('Fetch error:', e);
+                document.getElementById('status-dot').classList.add('disconnected');
+                document.getElementById('log-meta').textContent = 'Disconnected';
+            }
+        }
+
+        function renderEvents() {
+            const container = document.getElementById('log-scroll');
+            const emptyState = document.getElementById('empty-state');
+
+            // Filter events
+            const filtered = events.filter(e => {
+                if (!activeChannels.has(e.channel)) return false;
+                if (activeSeverity !== 'all' && e.severity !== activeSeverity) return false;
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '';
+                container.appendChild(emptyState);
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+
+            // Render (oldest first for chat feel)
+            const reversed = [...filtered].reverse();
+            container.innerHTML = reversed.map(e => {
+                const time = formatTime(e.timestamp);
+                const details = e.details ? JSON.stringify(e.details, null, 2) : null;
+
+                return `
+                    <div class="log-entry channel-${e.channel}" onclick="toggleDetails(this)">
+                        <span class="log-time">${time}</span>
+                        <span class="log-channel">
+                            <span class="log-channel-icon">${e.icon || ''}</span>
+                            <span class="log-channel-name">${e.channel}</span>
+                        </span>
+                        <span class="log-message severity-${e.severity}">${escapeHtml(e.message)}</span>
+                        ${details ? `<div class="log-details">${escapeHtml(details)}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            // Update title
+            const activeList = [...activeChannels];
+            if (activeList.length === 7) {
+                document.getElementById('log-title').textContent = 'All Channels';
+            } else if (activeList.length === 1) {
+                document.getElementById('log-title').textContent = capitalize(activeList[0]);
+            } else {
+                document.getElementById('log-title').textContent = `${activeList.length} Channels`;
+            }
+
+            if (autoScroll) {
+                scrollToBottom();
+            }
+        }
+
+        function formatTime(ts) {
+            const d = new Date(ts);
+            return d.toLocaleTimeString('en-US', { hour12: false });
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function capitalize(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+
+        function toggleDetails(el) {
+            el.classList.toggle('expanded');
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('log-scroll');
+            container.scrollTop = container.scrollHeight;
+            hideNewEventsPill();
+        }
+
+        function showNewEventsPill(count) {
+            const pill = document.getElementById('new-events-pill');
+            pill.textContent = `${count} new event${count > 1 ? 's' : ''}`;
+            pill.style.display = 'block';
+        }
+
+        function hideNewEventsPill() {
+            document.getElementById('new-events-pill').style.display = 'none';
+        }
+
+        // Track scroll position for auto-scroll
+        document.getElementById('log-scroll').addEventListener('scroll', (e) => {
+            const el = e.target;
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+            autoScroll = atBottom;
+            if (atBottom) {
+                hideNewEventsPill();
+            }
+        });
+
+        // Initial fetch
+        fetchEvents();
+
+        // Poll every 2 seconds
+        pollInterval = setInterval(fetchEvents, 2000);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            clearInterval(pollInterval);
+        });
+    </script>
+</body>
+</html>

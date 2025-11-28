@@ -321,6 +321,15 @@ class TimeEstimator:
         return "unknown", 24.0  # Default guess
 
     @staticmethod
+    def detect_flash_attention() -> bool:
+        """Check if Flash Attention 2 is installed."""
+        try:
+            import flash_attn
+            return True
+        except ImportError:
+            return False
+
+    @staticmethod
     def estimate_memory(
         model_size_b: float,
         batch_size: int,
@@ -329,7 +338,8 @@ class TimeEstimator:
         gradient_checkpointing: bool = True,
         num_layers: int = None,
         num_heads: int = None,
-        hidden_dim: int = None
+        hidden_dim: int = None,
+        use_flash_attention: bool = None
     ) -> Dict[str, float]:
         """
         Estimate GPU memory usage for training.
@@ -365,14 +375,19 @@ class TimeEstimator:
                 gradients = trainable_params × 4 bytes
                 activations = similar but reduced due to frozen base
 
-        Note: Attention matrices scale with seq_length² - this dominates VRAM
-        for long sequences. Gradient checkpointing helps by recomputing activations.
+        Note: Attention memory depends on implementation:
+            - SDPA/standard: O(seq²) - attention matrices stored in memory
+            - Flash Attention 2: O(seq) - no attention matrices materialized
+        Flash Attention auto-detected if use_flash_attention=None.
 
         Example:
             # Qwen3-0.6B, batch_size=1, max_length=2048, bf16 full training
             mem = TimeEstimator.estimate_memory(0.6, 1, use_4bit=False)
-            # Returns ~17 GB (attention matrices are 6+ GB alone!)
+            # With FA2: ~12 GB, without FA2: ~17 GB
         """
+        # Auto-detect Flash Attention if not specified
+        if use_flash_attention is None:
+            use_flash_attention = TimeEstimator.detect_flash_attention()
         # Auto-estimate architecture params based on model size
         # These are approximate - real values vary by architecture
         if num_layers is None:
@@ -440,13 +455,19 @@ class TimeEstimator:
             # Gradients accumulated in fp32 = 4 bytes per param
             gradient_memory = params_billion * 4
 
-            # Activations: hidden states + attention matrices
+            # Activations: hidden states + attention
             # Hidden states: layers × batch × seq × hidden × 2 bytes
             hidden_memory = (num_layers * batch_size * max_length * hidden_dim * 2) / 1e9
 
-            # Attention matrices: layers × batch × heads × seq × seq × 4 bytes
-            # This is the BIG one - scales with seq_length²!
-            attention_memory = (num_layers * batch_size * num_heads * max_length * max_length * 4) / 1e9
+            if use_flash_attention:
+                # Flash Attention 2: O(seq) memory - no attention matrices materialized
+                # Only need workspace for Q, K, V projections
+                # Memory: layers × batch × seq × hidden × 3 (Q, K, V) × 2 bytes
+                attention_memory = (num_layers * batch_size * max_length * hidden_dim * 3 * 2) / 1e9
+            else:
+                # SDPA/standard: O(seq²) - full attention matrices in memory
+                # Attention matrices: layers × batch × heads × seq × seq × 4 bytes
+                attention_memory = (num_layers * batch_size * num_heads * max_length * max_length * 4) / 1e9
 
             activation_memory = hidden_memory + attention_memory
 

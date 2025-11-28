@@ -4,6 +4,78 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-11-28 - Skill Engine Implementation
+
+### What
+Complete implementation of the Skill Engine - a unified interface for skill training, evaluation, and per-primitive accuracy tracking.
+
+### Core Components
+
+**Skill Engine** (`guild/skills/engine.py`)
+- Central manager for all skill operations
+- Unified `Skill` abstraction for training + eval + scoring
+- Per-primitive accuracy tracking in SkillState
+- State persistence to `status/skill_states.json`
+
+**Primitives System** (`guild/skills/primitives.py`)
+- 39 primitives across 5 tracks (arithmetic, binary, logic, string, code)
+- `PrimitiveId` for atomic testable concepts
+- Version tracking for definition changes
+
+**Adapters** (`guild/skills/adapters/`)
+- `GeneratorAdapter` wraps SkillClient for training data
+- `PassiveAdapter` wraps PassiveModule for eval
+- `CompositeSkill` combines both for full capability
+
+### New Passives (7)
+| Passive | Category | Primitives |
+|---------|----------|------------|
+| `binary_arithmetic` | math | 10 (BIN skill) |
+| `word_puzzles` | reasoning | 5 (SY skill) |
+| `code_trace` | code | 6 |
+| `language_basics` | reasoning | 5 |
+| `sequence` | reasoning | 5 |
+| `memory` | memory | 5 |
+| `combinatorics` | math | 5 |
+
+**Total passives: 11** (was 4)
+
+### Tavern Integration
+- `/api/engine/health` - Engine status
+- `/api/engine/primitives` - All primitives
+- `/api/engine/primitive-summary` - Per-primitive accuracy
+- `/api/engine/skill/{id}/primitives` - Skill primitives
+- `/api/engine/skill/{id}/state` - Skill state
+- Guild UI primitives visualization section
+
+### Targeted Sparring (`guild/targeted_sparring.py`)
+- Identifies weak primitives below threshold
+- Generates problems focusing on struggling areas
+- `--report` flag for weakness analysis
+
+### YAML Updates
+- `configs/skills/bin.yaml` - 10 primitives + `passive_id: binary_arithmetic`
+- `configs/skills/sy.yaml` - 7 primitives + `passive_id: word_puzzles`
+- `configs/skills/_template.yaml` - Primitives section documented
+
+### Usage
+```python
+from guild.skills import get_engine
+
+engine = get_engine()
+batch = engine.generate_eval_batch("bin", level=1, count=10)
+result, state = engine.run_eval("bin", answers, level=1)
+print(result.per_primitive_accuracy)
+# {'binary_add_no_carry': 0.95, 'bitwise_and': 0.80, ...}
+```
+
+### Stats
+- New files: 15
+- Modified files: 13
+- Lines added: ~6,000
+
+---
+
 ## 2025-11-28 - TrainerEngine Refactor Complete
 
 ### What

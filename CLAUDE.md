@@ -201,6 +201,11 @@ The Tavern displays data. To feel like a **complete game**, we need:
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
 Latest updates (2025-11-28):
+- **Skill Engine** - Unified interface for skill training, eval, and per-primitive accuracy
+  - 11 passives (7 new), 39 primitives in catalog
+  - Per-primitive accuracy tracking identifies specific weaknesses
+  - Targeted sparring focuses on weak primitives
+  - Tavern API + Guild UI visualization
 - **TrainerEngine Refactor** - Complete 5-phase refactor of training architecture
   - TrainerEngine now owns full HF training pipeline (model loading, dataset prep, training)
   - LiveMonitorCallback extracted to `trainer/monitoring/callbacks.py`
@@ -1028,67 +1033,122 @@ OBSERVATIONS/
 
 ---
 
-## 🎯 SKILL SYSTEM (Updated 2025-11-27)
+## 🎯 SKILL SYSTEM (Updated 2025-11-28)
 
 **YAML configs are the single source of truth for skills.**
+
+### Skill Engine (NEW)
+
+The Skill Engine provides a unified interface for all skill operations:
+
+```python
+from guild.skills import get_engine
+
+engine = get_engine()
+
+# Get a skill (unified training + eval interface)
+skill = engine.get("bin")
+
+# Generate eval problems locally (no API needed)
+batch = engine.generate_eval_batch("bin", level=1, count=10)
+
+# Score with per-primitive tracking
+result, state = engine.run_eval("bin", model_answers, level=1)
+print(result.per_primitive_accuracy)
+# {'binary_add_no_carry': 0.95, 'bitwise_and': 0.80, ...}
+```
 
 ### Skill Configs
 
 Location: `configs/skills/*.yaml`
 
-| File | Skill | Icon | Levels | API |
-|------|-------|------|--------|-----|
-| `sy.yaml` | Word Weaving | 🧩 | 50 | localhost:8080 |
-| `bin.yaml` | Binary Alchemy | 🔢 | 30 | localhost:8090 |
-| `_template.yaml` | Template for new skills | - | - | - |
+| File | Skill | Icon | Levels | Primitives | Passive |
+|------|-------|------|--------|------------|---------|
+| `sy.yaml` | Word Weaving | 🧩 | 50 | 7 | word_puzzles |
+| `bin.yaml` | Binary Alchemy | 🔢 | 30 | 10 | binary_arithmetic |
+| `_template.yaml` | Template | - | - | - | - |
 
-### Usage
+### Passives (11 total)
+
+| Passive | Category | Primitives | Description |
+|---------|----------|------------|-------------|
+| `arithmetic` | arithmetic | 5 | Basic number sense |
+| `binary_arithmetic` | math | 10 | BIN skill eval |
+| `code_trace` | code | 6 | Code execution tracing |
+| `combinatorics` | math | 5 | Permutations, combinations |
+| `counting` | counting | 4 | Letter/word counting |
+| `language_basics` | reasoning | 5 | Synonyms, antonyms, plurals |
+| `logic` | logic | 4 | Boolean operations |
+| `memory` | memory | 5 | Fact retention |
+| `sequence` | reasoning | 5 | Pattern recognition |
+| `string_craft` | string_craft | 4 | String manipulation |
+| `word_puzzles` | reasoning | 5 | SY skill eval |
+
+### Primitives
+
+Primitives are atomic testable concepts within skills. Each problem is tagged with a `primitive_id`:
 
 ```python
-from guild.skills import get_skill, get_trainer, list_skills
+from guild.skills.primitives import list_tracks, PRIMITIVE_CATALOG
 
-# List available skills
-skills = list_skills()  # ['bin', 'sy']
+# 5 tracks: arithmetic, binary, logic, string, code
+print(list_tracks())
 
-# Load skill config (all metadata from YAML)
-skill = get_skill('sy')
-print(skill.icon)       # 🧩
-print(skill.color)      # #8B5CF6
-print(skill.max_level)  # 50
-print(skill.api_url)    # http://localhost:8080
-
-# Get trainer (API client) for generating samples
-trainer = get_trainer('sy')
-batch = trainer.sample(level=5, count=100)
+# 39 primitives in catalog
+for track, prims in PRIMITIVE_CATALOG.items():
+    print(f"{track}: {len(prims)} primitives")
 ```
 
-### Adding a New Skill
+### Targeted Sparring
 
-1. Copy `configs/skills/_template.yaml` to `configs/skills/{id}.yaml`
-2. Fill in all required fields (see template for structure)
-3. Implement the API server in singleSKILL
-4. That's it - no code changes needed in TRAINING
+Focus training on weak primitives:
 
-### Key Design Principles
+```bash
+# Report weak primitives (< 80% accuracy)
+python3 guild/targeted_sparring.py --report
 
-- **Combinatorially Infinite**: Every skill MUST have infinite problem space
-- **Static Eval Sets**: 5 samples per level, seeded for reproducibility
-- **Signal Degradation**: Higher levels = weaker hints (for SY) or harder params (for BIN)
+# Generate problems targeting weak primitives
+python3 guild/targeted_sparring.py --skill bin --threshold 0.8 --count 100
+```
+
+### Tavern API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `/api/engine/health` | Engine status |
+| `/api/engine/primitives` | All primitives |
+| `/api/engine/primitive-summary` | Per-primitive accuracy |
+| `/api/engine/skill/{id}/primitives` | Skill primitives |
+| `/api/engine/skill/{id}/state` | Skill state |
 
 ### Files
 
 ```
 configs/skills/
-├── _template.yaml   # Template with all required fields
-├── sy.yaml          # SY - Syllacrostic puzzles (50 levels)
-└── bin.yaml         # BIN - Binary arithmetic (30 levels)
+├── _template.yaml   # Template with primitives section
+├── sy.yaml          # SY - 7 primitives, passive_id: word_puzzles
+└── bin.yaml         # BIN - 10 primitives, passive_id: binary_arithmetic
 
 guild/skills/
-├── types.py         # SkillConfig, SkillDisplay, SkillAPI, SkillEval
+├── engine.py        # SkillEngine - central manager
+├── primitives.py    # PrimitiveId, PRIMITIVE_CATALOG
+├── eval_types.py    # EvalProblem, EvalBatch, EvalResult
+├── skill.py         # Skill ABC
+├── composite.py     # CompositeSkill (generator + passive)
+├── adapters/        # GeneratorAdapter, PassiveAdapter
+├── types.py         # SkillConfig, SkillState
 ├── loader.py        # get_trainer(), load_skill_config()
-├── registry.py      # SkillRegistry
-├── contract.py      # SkillClient (API client)
-└── state_manager.py # Runtime state tracking
+└── registry.py      # SkillRegistry
+
+guild/passives/
+├── binary_arithmetic.py  # BIN skill (10 primitives)
+├── word_puzzles.py       # SY skill (5 primitives)
+├── code_trace.py         # Code tracing (6 primitives)
+├── combinatorics.py      # Math counting (5 primitives)
+├── language_basics.py    # Language (5 primitives)
+├── sequence.py           # Patterns (5 primitives)
+├── memory.py             # Facts (5 primitives)
+└── ... (4 more)
 ```
 
 ---

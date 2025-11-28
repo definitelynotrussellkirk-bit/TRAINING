@@ -100,6 +100,7 @@ from training_queue import TrainingQueue
 from training_controller import TrainingController
 from atomic_ops import write_json_atomic, safe_file_operation
 from data_file_impact import DataFileImpactTracker
+from job_logger import JobLogger
 
 # Data Manager (for auto-generation with quality testing)
 sys.path.insert(0, str(Path(__file__).parent.parent / "data_manager"))
@@ -290,6 +291,10 @@ class TrainingDaemon:
 
         # Data lineage tracker (tracks validation outcomes by generator/validator)
         self.lineage_tracker = LineageTracker(self.base_dir / "status")
+
+        # Job logger - first-class job abstraction for tracking file lifecycles
+        self.job_logger = JobLogger(self.base_dir / "status" / "job_history.jsonl")
+        self.current_job_id: str | None = None  # Track current job being processed
 
         # Register signal handlers
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -1254,6 +1259,180 @@ class TrainingDaemon:
             pass
         return {'step': None, 'loss': None, 'accuracy': None, 'val_loss': None}
 
+    def _get_file_priority(self, file_path: Path) -> str:
+        """Determine priority of a file based on its queue location."""
+        queue_dir = self.base_dir / "queue"
+        file_str = str(file_path)
+        if str(queue_dir / "high") in file_str:
+            return "high"
+        elif str(queue_dir / "low") in file_str:
+            return "low"
+        return "normal"
+
+    def _get_current_checkpoint(self) -> str | None:
+        """Get the name of the most recent checkpoint in current_model."""
+        try:
+            checkpoints = sorted(
+                self.current_model_dir.glob("checkpoint-*"),
+                key=lambda p: int(p.name.split("-")[1]) if p.name.split("-")[1].isdigit() else 0,
+                reverse=True
+            )
+            if checkpoints:
+                return checkpoints[0].name
+        except Exception:
+            pass
+        return None
+
+    def _detect_gpu_type(self) -> str | None:
+        """Detect GPU type using nvidia-smi."""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                name = result.stdout.strip().split('\n')[0]
+                if "4090" in name:
+                    return "RTX 4090"
+                elif "3090" in name:
+                    return "RTX 3090"
+                elif "A100" in name:
+                    return "A100"
+                return name
+        except Exception:
+            pass
+        return None
+
+    def print_plan(self) -> None:
+        """
+        Dry-run mode: print ETAs for all queued files without training.
+
+        Uses TimeEstimator to predict training time, memory, and completion
+        for each file in the queue. Useful for capacity planning.
+        """
+        from time_estimator import TimeEstimator
+
+        print("\n" + "=" * 80)
+        print("TRAINING PLAN (DRY RUN)")
+        print("=" * 80)
+
+        queue_dir = self.base_dir / "queue"
+
+        # Gather queued files by priority
+        jobs = []
+        for priority in ("high", "normal", "low"):
+            priority_dir = queue_dir / priority
+            if not priority_dir.exists():
+                continue
+            for f in sorted(priority_dir.glob("*.jsonl")):
+                try:
+                    num_examples = sum(1 for _ in open(f, "r", encoding="utf-8"))
+                    jobs.append((priority, f, num_examples))
+                except Exception as e:
+                    print(f"  ⚠️  Could not read {f.name}: {e}")
+
+        if not jobs:
+            print("\n✅ Queue is empty – nothing to plan.\n")
+            return
+
+        # Get config values for estimation
+        batch_size = self.config.get("batch_size", 1)
+        num_epochs = 1  # Daemon always trains 1 epoch per file
+
+        # Infer model size from model name or default
+        model_name = self.config.get("model_name", "qwen3_0.6b")
+        if "0.6" in model_name or "0.5" in model_name:
+            model_size_b = 0.6
+        elif "1.5" in model_name:
+            model_size_b = 1.5
+        elif "3b" in model_name.lower():
+            model_size_b = 3.0
+        elif "7b" in model_name.lower():
+            model_size_b = 7.0
+        else:
+            model_size_b = 1.0  # Default
+
+        # Detect GPU
+        gpu_type, vram = TimeEstimator.detect_gpu()
+
+        print(f"\n🖥️  GPU: {gpu_type} ({vram:.0f} GB VRAM)")
+        print(f"📊 Config: batch_size={batch_size}, model_size={model_size_b}B")
+        print(f"📁 Files in queue: {len(jobs)}")
+        print()
+
+        cumulative_seconds = 0
+        total_examples = 0
+
+        for i, (priority, path, num_examples) in enumerate(jobs, 1):
+            # Estimate training time
+            estimate = TimeEstimator.estimate_training(
+                num_examples=num_examples,
+                batch_size=batch_size,
+                num_epochs=num_epochs,
+                model_size_b=model_size_b,
+                gpu_type=gpu_type
+            )
+            cumulative_seconds += estimate.total_seconds
+            total_examples += num_examples
+
+            # Calculate cumulative completion time
+            cumulative_completion = (
+                datetime.now() + timedelta(seconds=cumulative_seconds)
+            ).strftime("%Y-%m-%d %I:%M %p")
+
+            print(f"[{i}/{len(jobs)}] {path.name} [{priority}]")
+            print(f"     • Examples: {num_examples:,}")
+            print(f"     • Est. time: {TimeEstimator.format_duration(estimate.total_seconds)} ({estimate.total_hours:.1f}h)")
+            print(f"     • Est. VRAM: ~{estimate.memory_gb:.1f} GB")
+            print(f"     • Job completion: {estimate.estimated_completion}")
+            print(f"     • Queue completion: {cumulative_completion}")
+            print()
+
+        # Summary
+        print("=" * 80)
+        print("SUMMARY")
+        print("=" * 80)
+        print(f"  Total files: {len(jobs)}")
+        print(f"  Total examples: {total_examples:,}")
+        print(f"  Total time: {TimeEstimator.format_duration(cumulative_seconds)} ({cumulative_seconds/3600:.1f}h)")
+        print(f"  Queue completion: {(datetime.now() + timedelta(seconds=cumulative_seconds)).strftime('%Y-%m-%d %I:%M %p')}")
+        print()
+
+        # Write plan to status file for API consumption
+        plan_file = self.base_dir / "status" / "plan.json"
+        try:
+            plan_data = {
+                "generated_at": datetime.now().isoformat(),
+                "gpu_type": gpu_type,
+                "total_files": len(jobs),
+                "total_examples": total_examples,
+                "total_hours": round(cumulative_seconds / 3600, 2),
+                "estimated_completion": (datetime.now() + timedelta(seconds=cumulative_seconds)).isoformat(),
+                "files": [
+                    {
+                        "name": path.name,
+                        "priority": priority,
+                        "num_examples": num_examples,
+                        "estimated_hours": round(TimeEstimator.estimate_training(
+                            num_examples=num_examples,
+                            batch_size=batch_size,
+                            num_epochs=num_epochs,
+                            model_size_b=model_size_b,
+                            gpu_type=gpu_type
+                        ).total_hours, 2)
+                    }
+                    for priority, path, num_examples in jobs
+                ]
+            }
+            with open(plan_file, "w") as f:
+                json.dump(plan_data, f, indent=2)
+            print(f"📝 Plan written to: {plan_file}")
+        except Exception as e:
+            print(f"⚠️  Could not write plan file: {e}")
+
     def run_checkpoint_retention(self, force: bool = False):
         """
         Enforce checkpoint retention using RetentionManager.
@@ -1464,6 +1643,24 @@ class TrainingDaemon:
                             val_loss=start_metrics['val_loss']
                         )
 
+                        # Create job record and start tracking
+                        num_examples = sum(1 for _ in open(data_file, 'r', encoding='utf-8'))
+                        job = self.job_logger.create_job(
+                            file_name=data_file.name,
+                            file_path=str(data_file),
+                            priority=self._get_file_priority(data_file),
+                            num_examples=num_examples
+                        )
+                        self.current_job_id = job.job_id
+
+                        # Record job start with checkpoint info
+                        self.job_logger.start_job(
+                            job_id=self.current_job_id,
+                            checkpoint_used=self._get_current_checkpoint(),
+                            start_step=start_metrics['step'],
+                            gpu_type=self._detect_gpu_type()
+                        )
+
                         # Train on file
                         success = self.train_on_file(
                             data_file,
@@ -1481,15 +1678,41 @@ class TrainingDaemon:
                             val_loss=end_metrics['val_loss']
                         )
 
-                        # Handle result
+                        # Handle result and log job completion
                         if success:
                             self.queue.mark_completed(data_file, delete_file=True)
+                            # Log job completion with final metrics
+                            if self.current_job_id:
+                                self.job_logger.complete_job(
+                                    job_id=self.current_job_id,
+                                    final_step=end_metrics['step'],
+                                    final_loss=end_metrics['loss'],
+                                    final_val_loss=end_metrics['val_loss'],
+                                    best_checkpoint_after=self._get_current_checkpoint()
+                                )
                         elif self.controller.should_skip_current_file():
                             self.controller.clear_skip()
                             self.queue.mark_skipped(data_file, reason="Skipped by user")
                             self.logger.info("⏭️  Skipped by user")
+                            # Log job skip
+                            if self.current_job_id:
+                                self.job_logger.skip_job(
+                                    job_id=self.current_job_id,
+                                    reason="Skipped by user"
+                                )
                         else:
                             self.queue.mark_failed(data_file, error="Training failed", keep_file=True)
+                            # Log job failure
+                            if self.current_job_id:
+                                self.job_logger.fail_job(
+                                    job_id=self.current_job_id,
+                                    reason="Training failed",
+                                    final_step=end_metrics['step'],
+                                    final_loss=end_metrics['loss']
+                                )
+
+                        # Clear current job ID
+                        self.current_job_id = None
 
                         # Update queue status for next iteration
                         queue_status = self.queue.get_queue_status()
@@ -1583,12 +1806,17 @@ def main():
     # Import paths module for auto-detection
     from paths import get_base_dir
 
-    parser = argparse.ArgumentParser(description="Training Daemon for RTX 3090")
+    parser = argparse.ArgumentParser(description="Training Daemon for RTX 4090")
     parser.add_argument(
         "--base-dir",
         type=str,
         default=None,
         help="Base directory for training system (default: auto-detect or $TRAINING_BASE_DIR)"
+    )
+    parser.add_argument(
+        "--plan",
+        action="store_true",
+        help="Dry-run mode: show ETAs for all queued files without training"
     )
 
     args = parser.parse_args()
@@ -1596,6 +1824,13 @@ def main():
     # Use provided base_dir or auto-detect
     base_dir = Path(args.base_dir) if args.base_dir else get_base_dir()
     daemon = TrainingDaemon(base_dir)
+
+    # Plan mode: just print ETAs and exit
+    if args.plan:
+        daemon.setup_directories()
+        daemon.print_plan()
+        sys.exit(0)
+
     daemon.run()
 
 

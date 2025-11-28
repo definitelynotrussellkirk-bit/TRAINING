@@ -18,6 +18,146 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
+
+class TrainingHistoryLogger:
+    """
+    Append-only training history logger for time-series metrics.
+
+    Writes training metrics to daily JSONL files for historical analysis:
+    - Loss, validation loss, val/train gap over time
+    - Throughput and GPU utilization
+    - Alerts and accuracy
+
+    Usage:
+        logger = TrainingHistoryLogger(logs_dir)
+        logger.append(step=1000, loss=0.45, val_loss=0.52, ...)
+    """
+
+    def __init__(self, logs_dir: Path, history_interval: int = 50):
+        """
+        Initialize training history logger.
+
+        Args:
+            logs_dir: Directory for log files (e.g., base_dir/logs/training)
+            history_interval: Append to history every N steps
+        """
+        self.logs_dir = Path(logs_dir)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self.history_interval = history_interval
+        self.last_logged_step = -1
+
+    def _get_history_file(self) -> Path:
+        """Get path to today's history file."""
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        return self.logs_dir / f"training_history_{date_str}.jsonl"
+
+    def should_log(self, step: int) -> bool:
+        """Check if we should log at this step."""
+        if step <= self.last_logged_step:
+            return False
+        if step % self.history_interval == 0:
+            return True
+        return False
+
+    def append(
+        self,
+        step: int,
+        epoch: float,
+        loss: float,
+        val_loss: Optional[float] = None,
+        val_train_gap: Optional[float] = None,
+        accuracy_percent: Optional[float] = None,
+        tokens_per_sec: Optional[float] = None,
+        tokens_per_sec_avg: Optional[float] = None,
+        gpu_vram_gb: Optional[float] = None,
+        gpu_util_percent: Optional[float] = None,
+        loss_trend: Optional[str] = None,
+        streaming_ce: Optional[float] = None,
+        active_alerts: Optional[List[Dict]] = None,
+        current_file: Optional[str] = None,
+        job_id: Optional[str] = None
+    ) -> None:
+        """
+        Append a training metrics record to the history file.
+
+        Args:
+            step: Current training step
+            epoch: Current epoch (can be fractional)
+            loss: Training loss
+            val_loss: Validation loss (if available)
+            val_train_gap: val_loss - loss
+            accuracy_percent: Current accuracy
+            tokens_per_sec: Current throughput
+            tokens_per_sec_avg: Average throughput
+            gpu_vram_gb: GPU VRAM used
+            gpu_util_percent: GPU utilization
+            loss_trend: "improving", "stable", "degrading"
+            streaming_ce: EMA-smoothed cross-entropy
+            active_alerts: List of active alerts
+            current_file: Current training file
+            job_id: Job ID for linking to job history
+        """
+        record = {
+            "ts": datetime.now().isoformat(),
+            "step": step,
+            "epoch": epoch,
+            "loss": loss,
+            "streaming_ce": streaming_ce,
+            "loss_trend": loss_trend,
+            "val_loss": val_loss,
+            "val_train_gap": val_train_gap,
+            "accuracy_percent": accuracy_percent,
+            "tokens_per_sec": tokens_per_sec,
+            "tokens_per_sec_avg": tokens_per_sec_avg,
+            "gpu_vram_gb": gpu_vram_gb,
+            "gpu_util_percent": gpu_util_percent,
+            "active_alerts": [a.get("type") for a in (active_alerts or [])] if active_alerts else [],
+            "current_file": current_file,
+            "job_id": job_id
+        }
+
+        # Remove None values to keep file compact
+        record = {k: v for k, v in record.items() if v is not None}
+
+        try:
+            history_file = self._get_history_file()
+            with open(history_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                f.flush()
+            self.last_logged_step = step
+        except Exception:
+            pass  # Don't break training for logging errors
+
+    def get_recent(self, limit: int = 1000) -> List[Dict]:
+        """
+        Get recent history records from today's file.
+
+        Args:
+            limit: Maximum number of records to return
+
+        Returns:
+            List of history records, most recent first
+        """
+        history_file = self._get_history_file()
+        if not history_file.exists():
+            return []
+
+        records = []
+        try:
+            with open(history_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            records.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+        except Exception:
+            return []
+
+        # Return most recent first
+        return records[-limit:][::-1]
+
 THINKING_EMOJI = "🤔"
 THINKING_PREFIX = THINKING_EMOJI * 4 + "\n"
 THINKING_INSTRUCTION = f"For this task, think with {THINKING_EMOJI} /four/ times."
@@ -146,7 +286,8 @@ class TrainingStatusWriter:
         status_file: Path,
         max_output_tokens: int = 2048,
         context_window: int = 2048,
-        model_name: Optional[str] = None
+        model_name: Optional[str] = None,
+        history_interval: int = 50
     ):
         self.status_file = Path(status_file)
         self.status_file.parent.mkdir(parents=True, exist_ok=True)
@@ -176,6 +317,17 @@ class TrainingStatusWriter:
         self.inference_log_dir = self.status_file.parent / "logs"
         self.inference_log_dir.mkdir(parents=True, exist_ok=True)
         self.pattern_layer_log = self.inference_log_dir / "pattern_layer_history.jsonl"
+
+        # Training history logger - time-series metrics for charting
+        self.history_logger = TrainingHistoryLogger(
+            logs_dir=self.status_file.parent.parent / "logs" / "training",
+            history_interval=history_interval
+        )
+        self.current_job_id: Optional[str] = None  # Set by daemon for job linking
+
+        # Loss history for tracking trends
+        self.loss_history: List[float] = []
+        self.loss_history_max = 200
     def _ensure_thinking_instruction(self, content: Optional[str]) -> Optional[str]:
         """Append the four-emoji instruction if it's missing."""
         if content is None:
@@ -336,6 +488,34 @@ class TrainingStatusWriter:
             self.penalty_stats_snapshot = logit_penalty_stats
         if penalty_heatmap is not None:
             self.penalty_heatmap = penalty_heatmap
+
+        # Append to training history (time-series for charting)
+        if self.history_logger.should_log(step):
+            # Get GPU stats from vram_samples if available
+            gpu_vram_gb = None
+            gpu_util_percent = None
+            if self.vram_samples:
+                latest = self.vram_samples[-1]
+                gpu_vram_gb = latest.get("vram_used_gb")
+                gpu_util_percent = latest.get("gpu_util")
+
+            self.history_logger.append(
+                step=step,
+                epoch=epoch,
+                loss=loss,
+                val_loss=val_loss,
+                val_train_gap=val_train_gap,
+                accuracy_percent=accuracy_pct,
+                tokens_per_sec=tokens_per_sec,
+                tokens_per_sec_avg=tokens_per_sec_avg,
+                gpu_vram_gb=gpu_vram_gb,
+                gpu_util_percent=gpu_util_percent,
+                loss_trend=loss_trend,
+                streaming_ce=None,  # Streaming CE added later if available
+                active_alerts=active_alerts,
+                current_file=current_file,
+                job_id=self.current_job_id
+            )
 
         status = TrainingStatus(
             status="training",

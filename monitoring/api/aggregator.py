@@ -27,6 +27,8 @@ from .plugins.system_health import SystemHealthPlugin
 from .plugins.retention import RetentionPlugin
 from .plugins.scheduler import SchedulerPlugin
 from .plugins.inference_model import InferenceModelPlugin
+from .plugins.job_history import JobHistoryPlugin
+from .plugins.alerts import AlertsPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +132,16 @@ class DataAggregator:
             # Currently loaded inference model (3090 port 8765)
             self.registry.register(InferenceModelPlugin(
                 config=self.config.get('inference_model', {})
+            ))
+
+            # Job history (local, tracks training file lifecycle)
+            self.registry.register(JobHistoryPlugin(
+                config=self.config.get('job_history', {})
+            ))
+
+            # Alerts (local, recent alerts and notifications)
+            self.registry.register(AlertsPlugin(
+                config=self.config.get('alerts', {})
             ))
 
             logger.info(f"Registered {len(self.registry.plugins)} default plugins")
@@ -243,6 +255,31 @@ class DataAggregator:
                         'temperature_c': data.get('temperature_c')
                     }
 
+        # Extract job history summary
+        if 'job_history' in plugin_results:
+            job_result = plugin_results['job_history']
+            if job_result['success']:
+                data = job_result['data']
+                summary['jobs'] = {
+                    'total': data.get('total_jobs', 0),
+                    'completed': data.get('completed_count', 0),
+                    'failed': data.get('failed_count', 0),
+                    'running': data.get('running_count', 0),
+                    'total_hours': data.get('total_hours', 0)
+                }
+
+        # Extract alerts summary
+        if 'alerts' in plugin_results:
+            alerts_result = plugin_results['alerts']
+            if alerts_result['success']:
+                data = alerts_result['data']
+                summary['alerts'] = {
+                    'total_24h': data.get('total_alerts_24h', 0),
+                    'critical': data.get('critical_count', 0),
+                    'warning': data.get('warning_count', 0),
+                    'active_issues': len(data.get('active_issues', []))
+                }
+
         # Determine overall system status
         critical_plugins = ['training_status', 'gpu_4090']
         critical_healthy = all(
@@ -250,9 +287,16 @@ class DataAggregator:
             for name in critical_plugins
         )
 
+        # Also consider active alerts when determining status
+        active_issues = 0
+        if 'alerts' in plugin_results and plugin_results['alerts']['success']:
+            active_issues = len(plugin_results['alerts']['data'].get('active_issues', []))
+
         if critical_healthy:
-            if summary['plugins_failed'] == 0:
+            if summary['plugins_failed'] == 0 and active_issues == 0:
                 summary['system_status'] = 'healthy'
+            elif active_issues > 0:
+                summary['system_status'] = 'warning'
             else:
                 summary['system_status'] = 'degraded'
         else:

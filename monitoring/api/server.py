@@ -542,6 +542,208 @@ def api_lineage():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/training/history')
+def api_training_history():
+    """
+    Get training history time-series data.
+
+    Query params:
+        limit: Max records to return (default 500)
+        date: Specific date (YYYY-MM-DD), defaults to today
+
+    Returns historical training metrics for charting:
+    - loss, val_loss, val_train_gap over time
+    - throughput (tokens/sec)
+    - GPU utilization
+    - alerts
+    """
+    try:
+        limit = min(int(request.args.get('limit', 500)), 5000)
+        date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+
+        logs_dir = get_base_dir() / 'logs' / 'training'
+        history_file = logs_dir / f'training_history_{date}.jsonl'
+
+        if not history_file.exists():
+            return jsonify({
+                'date': date,
+                'records': [],
+                'count': 0,
+                'message': f'No history for {date}'
+            })
+
+        records = []
+        with open(history_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        records.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+
+        # Return most recent first, limited
+        records = records[-limit:][::-1]
+
+        return jsonify({
+            'date': date,
+            'records': records,
+            'count': len(records)
+        })
+
+    except Exception as e:
+        logger.error(f"Error in /api/training/history: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/jobs')
+def api_jobs():
+    """
+    Get job history.
+
+    Query params:
+        limit: Max jobs to return (default 20)
+        status: Filter by status (completed, failed, skipped, etc.)
+        filename: Filter by filename
+
+    Returns recent job records with metrics.
+    """
+    try:
+        limit = min(int(request.args.get('limit', 20)), 100)
+        status_filter = request.args.get('status')
+        filename_filter = request.args.get('filename')
+
+        job_file = get_status_dir() / 'job_history.jsonl'
+
+        if not job_file.exists():
+            return jsonify({
+                'jobs': [],
+                'count': 0,
+                'stats': {
+                    'total_jobs': 0,
+                    'by_status': {}
+                }
+            })
+
+        # Read and dedupe jobs (later entries override earlier for same job_id)
+        jobs = {}
+        with open(job_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        record = json.loads(line)
+                        job_id = record.get('job_id')
+                        if job_id:
+                            jobs[job_id] = record
+                    except json.JSONDecodeError:
+                        continue
+
+        # Apply filters
+        filtered = list(jobs.values())
+        if status_filter:
+            filtered = [j for j in filtered if j.get('status') == status_filter]
+        if filename_filter:
+            filtered = [j for j in filtered if filename_filter in j.get('file_name', '')]
+
+        # Sort by created_at descending
+        filtered.sort(key=lambda j: j.get('created_at', ''), reverse=True)
+        filtered = filtered[:limit]
+
+        # Compute stats
+        by_status = {}
+        total_hours = 0
+        for job in jobs.values():
+            status = job.get('status', 'unknown')
+            by_status[status] = by_status.get(status, 0) + 1
+            if job.get('actual_hours'):
+                total_hours += job['actual_hours']
+
+        return jsonify({
+            'jobs': filtered,
+            'count': len(filtered),
+            'stats': {
+                'total_jobs': len(jobs),
+                'by_status': by_status,
+                'total_hours': round(total_hours, 2)
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error in /api/jobs: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/jobs/<job_id>')
+def api_job_detail(job_id):
+    """
+    Get details for a specific job.
+
+    Returns all records for a job (showing lifecycle).
+    """
+    try:
+        job_file = get_status_dir() / 'job_history.jsonl'
+
+        if not job_file.exists():
+            return jsonify({'error': 'Job not found', 'job_id': job_id}), 404
+
+        # Read all records for this job
+        records = []
+        with open(job_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        record = json.loads(line)
+                        if record.get('job_id') == job_id:
+                            records.append(record)
+                    except json.JSONDecodeError:
+                        continue
+
+        if not records:
+            return jsonify({'error': 'Job not found', 'job_id': job_id}), 404
+
+        # Return the latest state plus all history
+        return jsonify({
+            'job_id': job_id,
+            'current': records[-1],  # Latest state
+            'history': records,
+            'lifecycle_count': len(records)
+        })
+
+    except Exception as e:
+        logger.error(f"Error in /api/jobs/{job_id}: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/plan')
+def api_plan():
+    """
+    Get the current training plan (from --plan mode).
+
+    Returns ETAs and estimates for all queued files.
+    """
+    try:
+        plan_file = get_status_dir() / 'plan.json'
+
+        if not plan_file.exists():
+            # Generate on-the-fly if no plan file exists
+            return jsonify({
+                'message': 'No plan available. Run daemon with --plan flag to generate.',
+                'generated_at': None,
+                'files': []
+            })
+
+        with open(plan_file, 'r') as f:
+            plan = json.load(f)
+
+        return jsonify(plan)
+
+    except Exception as e:
+        logger.error(f"Error in /api/plan: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.errorhandler(404)
 def not_found(e):
     """Handle 404 errors"""
@@ -555,7 +757,10 @@ def not_found(e):
             '/api/cache/clear',
             '/api/queue',
             '/api/curriculum-state',
-            '/api/lineage'
+            '/api/lineage',
+            '/api/training/history',
+            '/api/jobs',
+            '/api/plan'
         ]
     }), 404
 

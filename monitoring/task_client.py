@@ -17,21 +17,44 @@ Usage:
     # Check if scheduler is healthy
     if client.is_healthy():
         client.submit("live_prediction", {"prompts": ["Hello"]})
+
+This client is built on core.services.ServiceClient for standardized
+network handling, retries, and error semantics.
 """
 
-import json
 import logging
 import time
 from typing import Any, Dict, Optional
-from urllib.parse import urljoin
 
-import requests
+from core.services import (
+    ServiceClient,
+    ServiceConfig,
+    ServiceId,
+    ServiceError,
+    ServiceHttpError,
+    ServiceUnavailable,
+    get_service_config,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class TaskClient:
-    """Client for interacting with the GPU Task Scheduler"""
+    """
+    Client for interacting with the GPU Task Scheduler.
+
+    Built on ServiceClient for consistent retry, timeout, and error handling.
+
+    Example usage:
+        client = TaskClient()
+
+        # Submit a task and wait
+        result = client.submit_and_wait("curriculum_eval", {"skill": "syllo"})
+
+        # Check scheduler health
+        if client.is_healthy():
+            client.submit("baseline_test", {"skill": "binary"})
+    """
 
     def __init__(
         self,
@@ -47,15 +70,24 @@ class TaskClient:
             timeout: Default request timeout in seconds
             max_retries: Max retries for failed requests
         """
-        if scheduler_url is None:
-            try:
-                from core.hosts import get_service_url
-                scheduler_url = get_service_url("scheduler")
-            except (ImportError, Exception):
-                scheduler_url = "http://inference.local:8766"
-        self.scheduler_url = scheduler_url.rstrip("/")
-        self.timeout = timeout
-        self.max_retries = max_retries
+        # Get base config from service registry
+        config = get_service_config("scheduler")
+
+        # Override with constructor parameters
+        if scheduler_url:
+            config.base_url = scheduler_url
+        config.timeout_s = float(timeout)
+        config.max_retries = max_retries
+
+        # Create underlying ServiceClient
+        self._client = ServiceClient(config)
+
+        logger.info(f"TaskClient initialized: {config.base_url}")
+
+    @property
+    def scheduler_url(self) -> str:
+        """URL of the scheduler (for backward compatibility)."""
+        return self._client.base_url
 
     def _request(
         self,
@@ -64,32 +96,25 @@ class TaskClient:
         data: Optional[Dict] = None,
         timeout: Optional[int] = None
     ) -> Optional[Dict]:
-        """Make a request to the scheduler API"""
-        url = f"{self.scheduler_url}{endpoint}"
-        timeout = timeout or self.timeout
-
-        for attempt in range(self.max_retries):
-            try:
-                if method == "GET":
-                    resp = requests.get(url, timeout=timeout)
-                elif method == "POST":
-                    resp = requests.post(url, json=data, timeout=timeout)
-                elif method == "DELETE":
-                    resp = requests.delete(url, timeout=timeout)
-                else:
-                    raise ValueError(f"Unknown method: {method}")
-
-                if resp.ok:
-                    return resp.json()
-                else:
-                    logger.warning(f"Request failed: {resp.status_code} - {resp.text}")
-
-            except requests.exceptions.RequestException as e:
-                logger.warning(f"Request attempt {attempt + 1} failed: {e}")
-                if attempt < self.max_retries - 1:
-                    time.sleep(1)
-
-        return None
+        """Make a request to the scheduler API."""
+        try:
+            if method == "GET":
+                return self._client.get_json(endpoint, timeout=timeout)
+            elif method == "POST":
+                return self._client.post_json(endpoint, json=data, timeout=timeout)
+            elif method == "DELETE":
+                return self._client.delete(endpoint, timeout=timeout)
+            else:
+                raise ValueError(f"Unknown method: {method}")
+        except ServiceUnavailable as e:
+            logger.warning(f"Scheduler unavailable: {e}")
+            return None
+        except ServiceHttpError as e:
+            logger.warning(f"Scheduler HTTP error: {e}")
+            return None
+        except ServiceError as e:
+            logger.warning(f"Scheduler error: {e}")
+            return None
 
     def is_healthy(self) -> bool:
         """Check if the scheduler is healthy and running"""
@@ -346,9 +371,23 @@ def submit_and_wait(
     return get_client().submit_and_wait(task_type, params, priority, timeout)
 
 
+# Re-export exceptions for convenience
+__all__ = [
+    "TaskClient",
+    "SchedulerAwareDaemon",
+    "get_client",
+    "submit_task",
+    "submit_and_wait",
+    "ServiceError",
+    "ServiceHttpError",
+    "ServiceUnavailable",
+]
+
+
 if __name__ == "__main__":
     # Simple test
     import argparse
+    import json
 
     parser = argparse.ArgumentParser(description="Task Client Test")
     parser.add_argument("--url", default=None,
@@ -360,7 +399,7 @@ if __name__ == "__main__":
 
     client = TaskClient(args.url)
 
-    print(f"Checking scheduler at {args.url}...")
+    print(f"Checking scheduler at {client.scheduler_url}...")
     if client.is_healthy():
         print("Scheduler is healthy!")
 

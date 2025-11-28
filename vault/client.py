@@ -27,16 +27,26 @@ RPG Flavor:
     The VaultKeeper Client is a Sending Stone - a magical item that
     allows communication with the VaultKeeper across any distance.
     Hold it and speak your query, and the Keeper shall respond.
+
+This client is built on core.services.ServiceClient for standardized
+network handling, retries, and error semantics.
 """
 
-import json
 import logging
-import urllib.request
-import urllib.error
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlencode
+
+from core.services import (
+    ServiceClient,
+    ServiceConfig,
+    ServiceId,
+    ServiceError,
+    ServiceHttpError,
+    ServiceUnavailable,
+    ServiceDecodeError,
+    get_service_config,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vault_client")
@@ -168,6 +178,8 @@ class VaultKeeperClient:
     """
     Client for querying the VaultKeeper service.
 
+    Built on ServiceClient for consistent retry, timeout, and error handling.
+
     Usage:
         client = VaultKeeperClient("trainer.local:8767")
 
@@ -194,57 +206,53 @@ class VaultKeeperClient:
             host: VaultKeeper host:port (e.g., "trainer.local:8767")
             timeout: Request timeout in seconds
         """
-        # Normalize host
-        if not host.startswith("http"):
-            host = f"http://{host}"
-        self.base_url = host.rstrip("/")
-        self.timeout = timeout
+        # Get base config from service registry
+        config = get_service_config("vault")
 
-    def _request(
-        self,
-        method: str,
-        endpoint: str,
-        params: Optional[Dict[str, str]] = None,
-        body: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """Make an HTTP request to the keeper."""
-        url = f"{self.base_url}{endpoint}"
+        # Override with constructor parameters if host is explicitly provided
+        if host != "localhost:8767":  # Non-default provided
+            if not host.startswith("http"):
+                host = f"http://{host}"
+            config.base_url = host.rstrip("/")
 
-        if params:
-            url = f"{url}?{urlencode(params)}"
+        config.timeout_s = float(timeout)
 
-        data = None
-        if body:
-            data = json.dumps(body).encode("utf-8")
+        # Create underlying ServiceClient
+        self._client = ServiceClient(config)
 
-        request = urllib.request.Request(
-            url,
-            method=method,
-            data=data,
-            headers={"Content-Type": "application/json"} if data else {},
-        )
+        logger.info(f"VaultKeeperClient initialized: {config.base_url}")
 
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            try:
-                error_body = json.loads(e.read().decode("utf-8"))
-                return error_body
-            except Exception:
-                return {"error": f"HTTP {e.code}: {e.reason}"}
-        except urllib.error.URLError as e:
-            return {"error": f"Connection failed: {e.reason}"}
-        except Exception as e:
-            return {"error": str(e)}
+    @property
+    def base_url(self) -> str:
+        """Base URL of the VaultKeeper (for backward compatibility)."""
+        return self._client.base_url
 
     def _get(self, endpoint: str, params: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Make a GET request."""
-        return self._request("GET", endpoint, params=params)
+        try:
+            return self._client.get_json(endpoint, params=params)
+        except ServiceHttpError as e:
+            # Return error dict for backward compatibility
+            return {"error": f"HTTP {e.status}: {e.body}"}
+        except ServiceUnavailable as e:
+            return {"error": f"Connection failed: {e}"}
+        except ServiceDecodeError as e:
+            return {"error": f"Invalid JSON: {e}"}
+        except ServiceError as e:
+            return {"error": str(e)}
 
     def _post(self, endpoint: str, body: Dict[str, Any]) -> Dict[str, Any]:
         """Make a POST request."""
-        return self._request("POST", endpoint, body=body)
+        try:
+            return self._client.post_json(endpoint, json=body)
+        except ServiceHttpError as e:
+            return {"error": f"HTTP {e.status}: {e.body}"}
+        except ServiceUnavailable as e:
+            return {"error": f"Connection failed: {e}"}
+        except ServiceDecodeError as e:
+            return {"error": f"Invalid JSON: {e}"}
+        except ServiceError as e:
+            return {"error": str(e)}
 
     # =========================================================================
     # HEALTH & STATUS
@@ -570,3 +578,25 @@ def fetch(asset_id: str, destination: str, host: str = "localhost:8767") -> Fetc
 def ensure_local(asset_id: str, host: str = "localhost:8767") -> Optional[str]:
     """Convenience function to ensure an asset is local."""
     return get_client(host).ensure_local(asset_id)
+
+
+# Re-export exceptions for convenience
+__all__ = [
+    # Main client
+    "VaultKeeperClient",
+    # Data classes
+    "LocationInfo",
+    "LocateResult",
+    "FetchResult",
+    "AssetInfo",
+    # Convenience functions
+    "get_client",
+    "locate",
+    "fetch",
+    "ensure_local",
+    # Exceptions (from core.services)
+    "ServiceError",
+    "ServiceHttpError",
+    "ServiceUnavailable",
+    "ServiceDecodeError",
+]

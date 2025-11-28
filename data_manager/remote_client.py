@@ -2,68 +2,116 @@
 """
 Remote GPU Client - Interface to RTX 3090 inference server
 Handles all communication with inference server
+
+This client is built on core.services.ServiceClient for standardized
+network handling, retries, and error semantics.
 """
 
-import json
 import logging
 from typing import Dict, List, Any, Optional
-from urllib import request, error
-from datetime import datetime
+
+from core.services import (
+    ServiceClient,
+    ServiceConfig,
+    ServiceId,
+    ServiceError,
+    ServiceHttpError,
+    ServiceUnavailable,
+    ServiceDecodeError,
+    get_service_config,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class RemoteGPUClient:
-    """Client for remote RTX 3090 inference server"""
+    """
+    Client for remote RTX 3090 inference server.
+
+    Built on ServiceClient for consistent retry, timeout, and error handling.
+    """
 
     def __init__(self, host: Optional[str] = None, port: Optional[int] = None, timeout: int = 300):
-        # Use host registry for defaults
-        if host is None or port is None:
+        """
+        Initialize RemoteGPUClient.
+
+        Args:
+            host: Remote host (defaults to host registry)
+            port: Remote port (defaults to host registry)
+            timeout: Request timeout in seconds
+        """
+        # Get base config from service registry
+        config = get_service_config("inference")
+
+        # Override with constructor parameters if provided
+        if host is not None or port is not None:
+            # Use host registry for missing values
             try:
                 from core.hosts import get_host
                 inference_host = get_host("3090")
-                if host is None:
-                    host = inference_host.host
-                if port is None:
-                    port = inference_host.services.get("inference", {}).get("port", 8765)
+                host = host or inference_host.host
+                port = port or inference_host.services.get("inference", {}).get("port", 8765)
             except Exception:
-                # Fallback if host registry unavailable
                 host = host or "inference.local"
                 port = port or 8765
+            config.base_url = f"http://{host}:{port}"
 
-        self.host = host
-        self.port = port
+        config.timeout_s = float(timeout)
+
+        # Store for backward compatibility
+        self._host = host
+        self._port = port
         self.timeout = timeout
-        self.base_url = f"http://{host}:{port}"
+
+        # Create underlying ServiceClient
+        self._client = ServiceClient(config)
+
+        logger.info(f"RemoteGPUClient initialized: {config.base_url}")
+
+    @property
+    def host(self) -> str:
+        """Host of the remote server."""
+        # Extract host from base_url
+        url = self._client.base_url
+        # http://host:port -> host
+        return url.replace("http://", "").replace("https://", "").split(":")[0]
+
+    @property
+    def port(self) -> int:
+        """Port of the remote server."""
+        url = self._client.base_url
+        try:
+            return int(url.split(":")[-1])
+        except (ValueError, IndexError):
+            return 8765
+
+    @property
+    def base_url(self) -> str:
+        """Base URL of the remote server."""
+        return self._client.base_url
 
     def health_check(self) -> Dict[str, Any]:
         """Check if remote server is alive and get GPU stats"""
         try:
-            url = f"{self.base_url}/health"
-            with request.urlopen(url, timeout=10) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except error.URLError as e:
+            return self._client.get_json("/health", timeout=10)
+        except ServiceError as e:
             logger.error(f"Health check failed: {e}")
             return {"status": "error", "error": str(e)}
 
     def get_gpu_stats(self) -> Dict[str, Any]:
         """Get detailed GPU statistics"""
         try:
-            url = f"{self.base_url}/gpu"
-            with request.urlopen(url, timeout=10) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except error.URLError as e:
+            return self._client.get_json("/gpu", timeout=10)
+        except ServiceError as e:
             logger.error(f"GPU stats failed: {e}")
             return {"error": str(e)}
 
     def list_models(self) -> List[str]:
         """List available models on remote server"""
         try:
-            url = f"{self.base_url}/models"
-            with request.urlopen(url, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                return data.get("models", [])
-        except error.URLError as e:
+            data = self._client.get_json("/models", timeout=10)
+            return data.get("models", [])
+        except ServiceError as e:
             logger.error(f"List models failed: {e}")
             return []
 
@@ -80,46 +128,41 @@ class RemoteGPUClient:
         Returns:
             List of generated examples
         """
-        url = f"{self.base_url}/generate"
-
         request_data = {"count": count}
         if seed is not None:
             request_data["seed"] = seed
         if payload:
             request_data.update(payload)
 
-        data = json.dumps(request_data).encode("utf-8")
-        headers = {"Content-Type": "application/json"}
-
         try:
-            req = request.Request(url, data=data, headers=headers, method="POST")
-            with request.urlopen(req, timeout=self.timeout) as resp:
-                body = resp.read().decode("utf-8")
-                result = json.loads(body)
+            result = self._client.post_json("/generate", json=request_data)
 
-                # Handle different response formats
-                if isinstance(result, dict):
-                    if "examples" in result:
-                        return result["examples"]
-                    elif "puzzles" in result:
-                        return result["puzzles"]
-                    elif "data" in result:
-                        return result["data"]
-                    else:
-                        # Assume the dict itself is the data
-                        return [result]
-                elif isinstance(result, list):
-                    return result
+            # Handle different response formats
+            if isinstance(result, dict):
+                if "examples" in result:
+                    return result["examples"]
+                elif "puzzles" in result:
+                    return result["puzzles"]
+                elif "data" in result:
+                    return result["data"]
                 else:
-                    logger.warning(f"Unexpected response format: {type(result)}")
-                    return []
+                    # Assume the dict itself is the data
+                    return [result]
+            elif isinstance(result, list):
+                return result
+            else:
+                logger.warning(f"Unexpected response format: {type(result)}")
+                return []
 
-        except error.URLError as e:
+        except ServiceUnavailable as e:
             logger.error(f"Data generation failed: {e}")
             raise RuntimeError(f"Remote generation failed: {e}") from e
-        except json.JSONDecodeError as e:
+        except ServiceDecodeError as e:
             logger.error(f"Invalid JSON response: {e}")
             raise RuntimeError(f"Invalid response from server: {e}") from e
+        except ServiceError as e:
+            logger.error(f"Data generation failed: {e}")
+            raise RuntimeError(f"Remote generation failed: {e}") from e
 
     def inference(self, prompt: str, max_tokens: int = 512,
                   temperature: float = 0.7) -> Dict[str, Any]:
@@ -134,22 +177,15 @@ class RemoteGPUClient:
         Returns:
             Inference result
         """
-        url = f"{self.base_url}/inference"
-
         request_data = {
             "prompt": prompt,
             "max_tokens": max_tokens,
             "temperature": temperature
         }
 
-        data = json.dumps(request_data).encode("utf-8")
-        headers = {"Content-Type": "application/json"}
-
         try:
-            req = request.Request(url, data=data, headers=headers, method="POST")
-            with request.urlopen(req, timeout=self.timeout) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except error.URLError as e:
+            return self._client.post_json("/inference", json=request_data)
+        except ServiceError as e:
             logger.error(f"Inference failed: {e}")
             raise RuntimeError(f"Remote inference failed: {e}") from e
 
@@ -173,3 +209,13 @@ class RemoteGPUClient:
 
     def __repr__(self):
         return f"RemoteGPUClient({self.host}:{self.port})"
+
+
+# Re-export exceptions for convenience
+__all__ = [
+    "RemoteGPUClient",
+    "ServiceError",
+    "ServiceHttpError",
+    "ServiceUnavailable",
+    "ServiceDecodeError",
+]

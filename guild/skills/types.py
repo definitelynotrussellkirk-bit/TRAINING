@@ -105,6 +105,12 @@ class SkillConfig:
     rpg_name: Optional[str] = None
     rpg_description: Optional[str] = None
 
+    # Primitive definitions (from YAML primitives section)
+    primitives: list[dict] = field(default_factory=list)
+
+    # Passive module ID for local eval (if null, uses category match)
+    passive_id: Optional[str] = None
+
     def get_threshold(self, level: int) -> float:
         """Get accuracy threshold for a level."""
         if level in self.accuracy_thresholds:
@@ -157,6 +163,16 @@ class SkillState(SerializableMixin):
     last_trial_step: Optional[int] = None
     consecutive_trial_failures: int = 0
 
+    # Primitive tracking (NEW - Skill Engine)
+    primitive_accuracy: dict[str, float] = field(default_factory=dict)
+    primitive_history: dict[str, list[bool]] = field(default_factory=dict)
+
+    # Eval tracking (NEW - Skill Engine)
+    total_evals: int = 0
+    total_samples_seen: int = 0
+    last_eval_accuracy: Optional[float] = None
+    last_eval_timestamp: Optional[float] = None
+
     @property
     def recent_results(self) -> list[bool]:
         """Get recent results list."""
@@ -201,6 +217,13 @@ class SkillState(SerializableMixin):
             "eligible_for_trial": self.eligible_for_trial,
             "last_trial_step": self.last_trial_step,
             "consecutive_trial_failures": self.consecutive_trial_failures,
+            # Skill Engine fields
+            "primitive_accuracy": self.primitive_accuracy,
+            "primitive_history": self.primitive_history,
+            "total_evals": self.total_evals,
+            "total_samples_seen": self.total_samples_seen,
+            "last_eval_accuracy": self.last_eval_accuracy,
+            "last_eval_timestamp": self.last_eval_timestamp,
         }
 
     @classmethod
@@ -215,4 +238,11 @@ class SkillState(SerializableMixin):
         state.eligible_for_trial = data.get("eligible_for_trial", False)
         state.last_trial_step = data.get("last_trial_step")
         state.consecutive_trial_failures = data.get("consecutive_trial_failures", 0)
+        # Skill Engine fields
+        state.primitive_accuracy = data.get("primitive_accuracy", {})
+        state.primitive_history = data.get("primitive_history", {})
+        state.total_evals = data.get("total_evals", 0)
+        state.total_samples_seen = data.get("total_samples_seen", 0)
+        state.last_eval_accuracy = data.get("last_eval_accuracy")
+        state.last_eval_timestamp = data.get("last_eval_timestamp")
         return state

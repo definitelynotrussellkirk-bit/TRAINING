@@ -49,6 +49,7 @@ class LogicPassive(PassiveModule):
         return {
             "prompt": f"What is {self._bool_to_str(a)} AND {self._bool_to_str(b)}?",
             "expected": self._bool_to_str(result),
+            "primitive_id": "truth_table_basic",
             "type": "and",
         }
 
@@ -59,6 +60,7 @@ class LogicPassive(PassiveModule):
         return {
             "prompt": f"What is {self._bool_to_str(a)} OR {self._bool_to_str(b)}?",
             "expected": self._bool_to_str(result),
+            "primitive_id": "truth_table_basic",
             "type": "or",
         }
 
@@ -69,6 +71,7 @@ class LogicPassive(PassiveModule):
         return {
             "prompt": f"What is {self._bool_to_str(a)} XOR {self._bool_to_str(b)}?",
             "expected": self._bool_to_str(result),
+            "primitive_id": "xor_vs_or",
             "type": "xor",
         }
 
@@ -78,6 +81,7 @@ class LogicPassive(PassiveModule):
         return {
             "prompt": f"What is NOT {self._bool_to_str(a)}?",
             "expected": self._bool_to_str(result),
+            "primitive_id": "truth_table_basic",
             "type": "not",
         }
 
@@ -90,6 +94,7 @@ class LogicPassive(PassiveModule):
         return {
             "prompt": f"What is ({self._bool_to_str(a)} AND {self._bool_to_str(b)}) OR {self._bool_to_str(c)}?",
             "expected": self._bool_to_str(result),
+            "primitive_id": "de_morgan",
             "type": "compound",
         }
 

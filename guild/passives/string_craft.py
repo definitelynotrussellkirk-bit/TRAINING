@@ -51,6 +51,7 @@ class StringCraftPassive(PassiveModule):
         return {
             "prompt": f"What is '{word}' reversed?",
             "expected": reversed_word,
+            "primitive_id": "reverse_string",
             "type": "reverse",
         }
 
@@ -61,6 +62,7 @@ class StringCraftPassive(PassiveModule):
         return {
             "prompt": f"Is '{word}' a palindrome? Answer yes or no.",
             "expected": answer,
+            "primitive_id": "palindrome_check",
             "type": "palindrome",
         }
 
@@ -71,6 +73,7 @@ class StringCraftPassive(PassiveModule):
         return {
             "prompt": f"What are the first {n} characters of '{word}'?",
             "expected": result,
+            "primitive_id": "substring_check",
             "type": "first_n",
         }
 
@@ -81,6 +84,7 @@ class StringCraftPassive(PassiveModule):
         return {
             "prompt": f"What are the last {n} characters of '{word}'?",
             "expected": result,
+            "primitive_id": "substring_check",
             "type": "last_n",
         }
 
@@ -90,6 +94,7 @@ class StringCraftPassive(PassiveModule):
         return {
             "prompt": f"What is '{word}' in uppercase?",
             "expected": result,
+            "primitive_id": "sort_letters",  # Using sort_letters as closest primitive
             "type": "uppercase",
         }
 

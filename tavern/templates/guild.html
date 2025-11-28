@@ -225,6 +225,79 @@
             color: var(--text-dim);
         }
 
+        /* Primitives Section */
+        .primitives-section {
+            margin-top: 2rem;
+        }
+
+        .primitives-tracks {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .track-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        .track-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .track-name {
+            font-weight: 600;
+            font-size: 1rem;
+            text-transform: capitalize;
+        }
+
+        .track-count {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            background: var(--bg-hover);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .primitive-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .primitive-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: var(--bg-hover);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .primitive-name {
+            color: var(--text);
+        }
+
+        .primitive-accuracy {
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .primitive-accuracy.good { color: var(--success); background: rgba(34, 197, 94, 0.1); }
+        .primitive-accuracy.ok { color: var(--warning); background: rgba(245, 158, 11, 0.1); }
+        .primitive-accuracy.bad { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+        .primitive-accuracy.none { color: var(--text-dim); }
+
         .drift-indicator {
             display: inline-block;
             padding: 2px 8px;
@@ -331,6 +404,17 @@
             </div>
         </div>
 
+        <!-- Primitives (Skill Engine) -->
+        <div class="primitives-section">
+            <h2 class="section-title">🧩 Primitives (Per-Concept Accuracy)</h2>
+            <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.875rem;">
+                Fine-grained accuracy tracking for atomic concepts within each skill. Identifies specific weaknesses.
+            </p>
+            <div class="primitives-tracks" id="primitivesGrid">
+                <div class="loading">Loading primitives...</div>
+            </div>
+        </div>
+
         <!-- Task Master (Background Tasks) -->
         <div class="task-master-section" style="margin-top: 2rem;">
             <h2 class="section-title">🤖 Task Master (3090)</h2>
@@ -408,6 +492,9 @@
                 const curriculumRes = await fetch('/api/curriculum');
                 const curriculum = await curriculumRes.json();
                 renderSummary(skills, passives, curriculum, skillsData.total_mastered || 0);
+
+                // Load primitives (Skill Engine)
+                loadPrimitives();
 
             } catch (err) {
                 console.error('Failed to load guild data:', err);
@@ -526,6 +613,85 @@
                 document.getElementById('lastEval').textContent =
                     ago < 60 ? `${ago}m ago` : `${Math.round(ago/60)}h ago`;
             }
+        }
+
+        // Primitives - Skill Engine per-concept accuracy
+        async function loadPrimitives() {
+            try {
+                const res = await fetch('/api/engine/primitive-summary');
+                const data = await res.json();
+                renderPrimitives(data);
+            } catch (err) {
+                console.error('Failed to load primitives:', err);
+                document.getElementById('primitivesGrid').innerHTML =
+                    '<div class="loading">Skill Engine not available</div>';
+            }
+        }
+
+        function renderPrimitives(data) {
+            const grid = document.getElementById('primitivesGrid');
+            const skillStates = data.skill_states || {};
+
+            if (Object.keys(skillStates).length === 0) {
+                grid.innerHTML = '<div class="loading">No primitive data yet (run evals to populate)</div>';
+                return;
+            }
+
+            // Group primitives by skill
+            const html = Object.entries(skillStates).map(([skillId, state]) => {
+                const primitiveAcc = state.primitive_accuracy || {};
+                const primitives = Object.entries(primitiveAcc);
+
+                if (primitives.length === 0) {
+                    return `
+                        <div class="track-card">
+                            <div class="track-header">
+                                <span class="track-name">${skillId.toUpperCase()}</span>
+                                <span class="track-count">L${state.level} · ${state.total_evals || 0} evals</span>
+                            </div>
+                            <div class="primitive-list">
+                                <div style="color: var(--text-dim); font-size: 0.85rem; text-align: center; padding: 1rem;">
+                                    No primitive data yet
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Sort by accuracy (worst first) to highlight weaknesses
+                primitives.sort((a, b) => a[1] - b[1]);
+
+                const primitiveHtml = primitives.map(([name, acc]) => {
+                    const accClass = acc >= 0.8 ? 'good' : acc >= 0.5 ? 'ok' : 'bad';
+                    const displayName = name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    return `
+                        <div class="primitive-item">
+                            <span class="primitive-name">${displayName}</span>
+                            <span class="primitive-accuracy ${accClass}">${(acc * 100).toFixed(0)}%</span>
+                        </div>
+                    `;
+                }).join('');
+
+                const avgAcc = primitives.reduce((sum, [_, acc]) => sum + acc, 0) / primitives.length;
+                const avgClass = avgAcc >= 0.8 ? 'good' : avgAcc >= 0.5 ? 'ok' : 'bad';
+
+                return `
+                    <div class="track-card">
+                        <div class="track-header">
+                            <span class="track-name">${skillId.toUpperCase()}</span>
+                            <span class="track-count">
+                                L${state.level} · ${primitives.length} primitives ·
+                                <span class="primitive-accuracy ${avgClass}" style="display: inline;">${(avgAcc * 100).toFixed(0)}% avg</span>
+                            </span>
+                        </div>
+                        <div class="primitive-list">
+                            ${primitiveHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            grid.innerHTML = html;
         }
 
         // Task Master - Background task status

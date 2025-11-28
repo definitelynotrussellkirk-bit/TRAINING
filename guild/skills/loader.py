@@ -218,6 +218,12 @@ def _dict_to_skill_config(data: dict) -> SkillConfig:
     rpg_name = data.get("rpg_name")
     rpg_description = data.get("rpg_description")
 
+    # Primitives (from YAML primitives section)
+    primitives = data.get("primitives", [])
+
+    # Passive module ID for local eval
+    passive_id = data.get("passive_id")
+
     return SkillConfig(
         id=skill_id,
         name=name,
@@ -235,6 +241,8 @@ def _dict_to_skill_config(data: dict) -> SkillConfig:
         xp_multiplier=xp_multiplier,
         rpg_name=rpg_name,
         rpg_description=rpg_description,
+        primitives=primitives,
+        passive_id=passive_id,
     )
 
 

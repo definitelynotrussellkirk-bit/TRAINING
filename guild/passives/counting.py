@@ -54,6 +54,7 @@ class CountingPassive(PassiveModule):
         return {
             "prompt": f"How many letters are in the word '{word}'?",
             "expected": str(count),
+            "primitive_id": "string_length",
             "type": "letter_count",
         }
 
@@ -63,6 +64,7 @@ class CountingPassive(PassiveModule):
         return {
             "prompt": f"How many vowels are in the word '{word}'?",
             "expected": str(count),
+            "primitive_id": "count_char",
             "type": "vowel_count",
         }
 
@@ -73,6 +75,7 @@ class CountingPassive(PassiveModule):
         return {
             "prompt": f"How many words are in this sentence: '{sentence}'?",
             "expected": str(num_words),
+            "primitive_id": "count_objects",
             "type": "word_count",
         }
 
@@ -84,6 +87,7 @@ class CountingPassive(PassiveModule):
         return {
             "prompt": f"How many times does the letter '{letter}' appear in '{word}'?",
             "expected": str(count),
+            "primitive_id": "count_char",
             "type": "specific_letter",
         }
 
@@ -93,6 +97,7 @@ class CountingPassive(PassiveModule):
         return {
             "prompt": f"How many consonants are in the word '{word}'?",
             "expected": str(count),
+            "primitive_id": "count_char",
             "type": "consonant_count",
         }
 

@@ -290,3 +290,92 @@ rpg_description: >
   and conversions from tiny 2-bit whispers to thundering 32-bit operations.
   At higher levels, the symbols themselves shift - masters see through
   any notation to the patterns beneath.
+
+# =============================================================================
+# PRIMITIVES (Skill Engine - Atomic Testable Concepts)
+# =============================================================================
+primitives:
+  - name: binary_add_no_carry
+    track: binary
+    version: v1
+    display_name: "Binary Add (No Carry)"
+    description: "Add binary numbers where no column requires carrying"
+    difficulty: 2
+    tags: [add, foundation]
+
+  - name: binary_add_with_carry
+    track: binary
+    version: v1
+    display_name: "Binary Add (Carry)"
+    description: "Add binary numbers with carrying between columns"
+    difficulty: 3
+    prerequisites: [binary_add_no_carry]
+    tags: [add, carry]
+
+  - name: binary_sub_no_borrow
+    track: binary
+    version: v1
+    display_name: "Binary Sub (No Borrow)"
+    description: "Subtract binary numbers without borrowing"
+    difficulty: 2
+    tags: [subtract]
+
+  - name: binary_sub_with_borrow
+    track: binary
+    version: v1
+    display_name: "Binary Sub (Borrow)"
+    description: "Subtract binary numbers with borrowing"
+    difficulty: 3
+    prerequisites: [binary_sub_no_borrow]
+    tags: [subtract, borrow]
+
+  - name: bitwise_and
+    track: binary
+    version: v1
+    display_name: "Bitwise AND"
+    description: "Compute bitwise AND of two binary numbers"
+    difficulty: 2
+    tags: [bitwise]
+
+  - name: bitwise_or
+    track: binary
+    version: v1
+    display_name: "Bitwise OR"
+    description: "Compute bitwise OR of two binary numbers"
+    difficulty: 2
+    tags: [bitwise]
+
+  - name: bitwise_xor
+    track: binary
+    version: v1
+    display_name: "Bitwise XOR"
+    description: "Compute bitwise XOR of two binary numbers"
+    difficulty: 3
+    tags: [bitwise]
+
+  - name: binary_compare
+    track: binary
+    version: v1
+    display_name: "Compare Binary"
+    description: "Compare magnitude of two binary numbers"
+    difficulty: 2
+    tags: [compare]
+
+  - name: binary_to_decimal
+    track: binary
+    version: v1
+    display_name: "Binary to Decimal"
+    description: "Convert binary representation to decimal"
+    difficulty: 2
+    tags: [convert]
+
+  - name: decimal_to_binary
+    track: binary
+    version: v1
+    display_name: "Decimal to Binary"
+    description: "Convert decimal number to binary representation"
+    difficulty: 3
+    tags: [convert]
+
+# Passive module for eval (enables local eval without API)
+passive_id: binary_arithmetic

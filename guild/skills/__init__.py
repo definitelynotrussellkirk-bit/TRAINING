@@ -29,6 +29,22 @@ Usage:
     init_state_manager(Path("status"))
     manager = get_state_manager()
     manager.record_accuracy("sy", 0.85, step=1000)
+
+SKILL ENGINE (NEW - 2025-11-28):
+    The Skill Engine provides a unified interface for all skill operations.
+
+    from guild.skills import get_engine
+
+    engine = get_engine()
+
+    # Get a skill (unified interface for training + eval)
+    skill = engine.get("binary")
+
+    # Generate training data
+    training = skill.generate_training_batch(level=5, count=100)
+
+    # Run eval and update state
+    result, state = engine.run_eval("binary", model_answers, level=5)
 """
 
 # Types
@@ -86,6 +102,39 @@ from guild.skills.verify import (
     print_verification_report,
 )
 
+# Primitives (NEW - Skill Engine)
+from guild.skills.primitives import (
+    PrimitiveId,
+    PrimitiveMeta,
+    get_primitive,
+    list_primitives,
+    list_tracks,
+    PRIMITIVE_CATALOG,
+)
+
+# Eval types (NEW - Skill Engine)
+from guild.skills.eval_types import (
+    EvalProblem,
+    EvalBatch,
+    EvalResult,
+    EvalResultItem,
+    score_batch,
+)
+
+# Skill ABC (NEW - Skill Engine)
+from guild.skills.skill import Skill
+
+# Composite skill (NEW - Skill Engine)
+from guild.skills.composite import CompositeSkill, LocalSkill
+
+# Engine (NEW - Skill Engine)
+from guild.skills.engine import (
+    SkillEngine,
+    get_engine,
+    reset_engine,
+    init_engine,
+)
+
 __all__ = [
     # Types
     "SkillCategory",
@@ -127,4 +176,26 @@ __all__ = [
     "verify_skill",
     "verify_all_skills",
     "print_verification_report",
+    # Primitives (NEW - Skill Engine)
+    "PrimitiveId",
+    "PrimitiveMeta",
+    "get_primitive",
+    "list_primitives",
+    "list_tracks",
+    "PRIMITIVE_CATALOG",
+    # Eval types (NEW - Skill Engine)
+    "EvalProblem",
+    "EvalBatch",
+    "EvalResult",
+    "EvalResultItem",
+    "score_batch",
+    # Skill ABC (NEW - Skill Engine)
+    "Skill",
+    "CompositeSkill",
+    "LocalSkill",
+    # Engine (NEW - Skill Engine)
+    "SkillEngine",
+    "get_engine",
+    "reset_engine",
+    "init_engine",
 ]

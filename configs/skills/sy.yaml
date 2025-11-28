@@ -253,3 +253,69 @@ rpg_description: >
   sound fragments and cryptic clues, masters weave complete words while
   using each tile exactly once. At higher levels, decoys cloud the bank
   and hints grow sparse. True masters hear words in the chaos.
+
+# =============================================================================
+# PRIMITIVES (Skill Engine - Atomic Testable Concepts)
+# =============================================================================
+primitives:
+  - name: syllable_assembly_ordered
+    track: reasoning
+    version: v1
+    display_name: "Syllable Assembly (Ordered)"
+    description: "Assemble word from syllables given in order"
+    difficulty: 1
+    tags: [assembly, foundation]
+
+  - name: syllable_assembly_shuffled
+    track: reasoning
+    version: v1
+    display_name: "Syllable Assembly (Shuffled)"
+    description: "Assemble word from shuffled syllables with definition hint"
+    difficulty: 2
+    prerequisites: [syllable_assembly_ordered]
+    tags: [assembly, puzzle]
+
+  - name: syllable_count
+    track: reasoning
+    version: v1
+    display_name: "Syllable Count"
+    description: "Count syllables in a word"
+    difficulty: 1
+    tags: [counting, foundation]
+
+  - name: definition_to_word
+    track: reasoning
+    version: v1
+    display_name: "Definition to Word"
+    description: "Identify word from its definition"
+    difficulty: 2
+    tags: [vocabulary]
+
+  - name: word_from_bank
+    track: reasoning
+    version: v1
+    display_name: "Word from Bank"
+    description: "Form word from syllable bank including distractors"
+    difficulty: 3
+    prerequisites: [syllable_assembly_shuffled]
+    tags: [assembly, puzzle, distractors]
+
+  - name: multi_word_assembly
+    track: reasoning
+    version: v1
+    display_name: "Multi-Word Assembly"
+    description: "Assemble multiple words from shared syllable bank"
+    difficulty: 4
+    prerequisites: [word_from_bank]
+    tags: [assembly, puzzle, advanced]
+
+  - name: json_output_format
+    track: reasoning
+    version: v1
+    display_name: "JSON Output Format"
+    description: "Produce correctly structured JSON solution output"
+    difficulty: 2
+    tags: [format, structure]
+
+# Passive module for local eval
+passive_id: word_puzzles

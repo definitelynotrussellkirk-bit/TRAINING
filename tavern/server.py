@@ -472,6 +472,20 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/passives/summary":
             self._serve_passives_summary()
 
+        # Skill Engine - Primitives API
+        elif path == "/api/engine/health":
+            self._serve_engine_health()
+        elif path == "/api/engine/primitives":
+            self._serve_all_primitives()
+        elif path == "/api/engine/primitive-summary":
+            self._serve_primitive_summary()
+        elif path.startswith("/api/engine/skill/") and path.endswith("/primitives"):
+            skill_id = path.replace("/api/engine/skill/", "").replace("/primitives", "")
+            self._serve_skill_primitives(skill_id)
+        elif path.startswith("/api/engine/skill/") and path.endswith("/state"):
+            skill_id = path.replace("/api/engine/skill/", "").replace("/state", "")
+            self._serve_skill_state(skill_id)
+
         # Mantra - System prompt that's injected into all training
         elif path == "/mantra":
             self._serve_mantra()
@@ -3492,6 +3506,157 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Passives summary error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    # =========================================================================
+    # Skill Engine API - Primitives and State
+    # =========================================================================
+
+    def _serve_engine_health(self):
+        """Get Skill Engine health status."""
+        try:
+            from guild.skills import get_engine
+            engine = get_engine()
+            health = engine.health_check()
+            health["skills_available"] = engine.list_skills()
+            self._send_json(health)
+        except ImportError as e:
+            self._send_json({
+                "error": f"Skill Engine not available: {e}",
+                "total_skills": 0,
+            }, 503)
+        except Exception as e:
+            logger.error(f"Engine health error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_all_primitives(self):
+        """List all primitives across all skills."""
+        try:
+            from guild.skills import get_engine
+            from guild.skills.primitives import PRIMITIVE_CATALOG
+
+            engine = get_engine()
+            primitives = {}
+
+            # Get primitives from loaded skills
+            for skill_id in engine.list_skills():
+                try:
+                    skill = engine.get(skill_id)
+                    for prim in skill.primitives:
+                        primitives[str(prim)] = {
+                            "skill_id": skill_id,
+                            "name": prim.name,
+                            "track": prim.track,
+                            "version": prim.version,
+                        }
+                except Exception as e:
+                    logger.warning(f"Could not load skill {skill_id}: {e}")
+
+            # Also include catalog primitives
+            catalog_count = sum(len(prims) for prims in PRIMITIVE_CATALOG.values())
+
+            self._send_json({
+                "primitives": primitives,
+                "count": len(primitives),
+                "catalog_tracks": list(PRIMITIVE_CATALOG.keys()),
+                "catalog_count": catalog_count,
+            })
+
+        except ImportError as e:
+            self._send_json({"error": f"Skill Engine not available: {e}"}, 503)
+        except Exception as e:
+            logger.error(f"All primitives error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_primitive_summary(self):
+        """Get per-primitive accuracy summary across all skills."""
+        try:
+            from guild.skills import get_engine
+
+            engine = get_engine()
+            summary = engine.get_primitive_summary()
+
+            # Get states for additional info
+            states = engine.all_states()
+            states_data = {
+                skill_id: {
+                    "level": state.level,
+                    "xp_total": state.xp_total,
+                    "total_evals": state.total_evals,
+                    "last_eval_accuracy": state.last_eval_accuracy,
+                    "primitive_accuracy": state.primitive_accuracy,
+                }
+                for skill_id, state in states.items()
+            }
+
+            self._send_json({
+                "primitive_accuracy": summary,
+                "skill_states": states_data,
+            })
+
+        except ImportError as e:
+            self._send_json({"error": f"Skill Engine not available: {e}"}, 503)
+        except Exception as e:
+            logger.error(f"Primitive summary error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_skill_primitives(self, skill_id: str):
+        """Get primitives for a specific skill."""
+        try:
+            from guild.skills import get_engine
+
+            engine = get_engine()
+            skill = engine.get(skill_id)
+
+            primitives = [
+                {
+                    "name": prim.name,
+                    "track": prim.track,
+                    "version": prim.version,
+                    "id": str(prim),
+                }
+                for prim in skill.primitives
+            ]
+
+            self._send_json({
+                "skill_id": skill_id,
+                "primitives": primitives,
+                "count": len(primitives),
+            })
+
+        except KeyError:
+            self._send_json({"error": f"Skill not found: {skill_id}"}, 404)
+        except ImportError as e:
+            self._send_json({"error": f"Skill Engine not available: {e}"}, 503)
+        except Exception as e:
+            logger.error(f"Skill primitives error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_skill_state(self, skill_id: str):
+        """Get state for a specific skill including per-primitive accuracy."""
+        try:
+            from guild.skills import get_engine
+
+            engine = get_engine()
+            state = engine.get_state(skill_id)
+
+            self._send_json({
+                "skill_id": skill_id,
+                "level": state.level,
+                "xp_total": state.xp_total,
+                "accuracy": state.accuracy,
+                "total_evals": state.total_evals,
+                "total_samples_seen": state.total_samples_seen,
+                "last_eval_accuracy": state.last_eval_accuracy,
+                "last_eval_timestamp": state.last_eval_timestamp,
+                "primitive_accuracy": state.primitive_accuracy,
+                "primitive_history": state.primitive_history,
+            })
+
+        except ImportError as e:
+            self._send_json({"error": f"Skill Engine not available: {e}"}, 503)
+        except Exception as e:
+            logger.error(f"Skill state error: {e}")
             self._send_json({"error": str(e)}, 500)
 
     def _handle_oracle_load(self):

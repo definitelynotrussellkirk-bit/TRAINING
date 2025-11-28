@@ -133,6 +133,27 @@ rpg_description: >
   What does mastery look like? What challenges await?
 
 # -----------------------------------------------------------------------------
+# PRIMITIVES (NEW - Skill Engine)
+# -----------------------------------------------------------------------------
+# Primitives are atomic testable concepts within this skill.
+# Each problem generated should map to one primitive for fine-grained tracking.
+#
+# primitives:
+#   - name: primitive_name          # Unique name within skill
+#     track: category               # Track/category (e.g., arithmetic, logic, binary)
+#     version: v1                   # Version - bump when definition changes
+#     display_name: "Human Name"    # Display name for UI
+#     description: "What this tests"
+#     difficulty: 1                 # 1-10 difficulty scale
+#     prerequisites: []             # Other primitive names that should be mastered first
+#     tags: []                      # Searchable tags
+
+primitives: []  # Define primitives for this skill
+
+# Passive ID for eval generation (must match a passive in guild/passives/)
+passive_id: null  # e.g., "arithmetic", "logic", "counting"
+
+# -----------------------------------------------------------------------------
 # OPTIONAL SECTIONS
 # -----------------------------------------------------------------------------
 

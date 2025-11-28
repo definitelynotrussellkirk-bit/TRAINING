@@ -45,6 +45,7 @@ class ArithmeticPassive(PassiveModule):
         return {
             "prompt": f"What is the sum of the digits in {num}?",
             "expected": str(answer),
+            "primitive_id": "digit_sum",
             "type": "digit_sum",
         }
 
@@ -54,6 +55,7 @@ class ArithmeticPassive(PassiveModule):
         return {
             "prompt": f"Is {num} even or odd?",
             "expected": answer,
+            "primitive_id": "parity",
             "type": "even_odd",
         }
 
@@ -66,6 +68,7 @@ class ArithmeticPassive(PassiveModule):
         return {
             "prompt": f"Which is larger: {a} or {b}?",
             "expected": answer,
+            "primitive_id": "compare_integers",
             "type": "comparison",
         }
 
@@ -76,6 +79,7 @@ class ArithmeticPassive(PassiveModule):
         return {
             "prompt": f"What is {a} mod {b}?",
             "expected": str(answer),
+            "primitive_id": "modulo",
             "type": "modulo",
         }
 
@@ -83,6 +87,14 @@ class ArithmeticPassive(PassiveModule):
         a = random.randint(1, 50)
         b = random.randint(1, 50)
         op = random.choice(['+', '-', '*'])
+
+        # Map operations to primitive IDs
+        primitive_map = {
+            '+': 'add_two_digit',
+            '-': 'sub_two_digit',
+            '*': 'mul_single_digit',
+        }
+
         if op == '+':
             answer = a + b
         elif op == '-':
@@ -92,6 +104,7 @@ class ArithmeticPassive(PassiveModule):
         return {
             "prompt": f"What is {a} {op} {b}?",
             "expected": str(answer),
+            "primitive_id": primitive_map[op],
             "type": "basic_ops",
         }
 

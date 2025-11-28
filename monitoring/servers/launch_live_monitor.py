@@ -34,7 +34,7 @@ GPU_3090_CACHE = {
 
 def poll_3090_gpu():
     """Background thread to poll 3090 API every 10 seconds"""
-    REMOTE_API = "http://192.168.x.x:8765"
+    REMOTE_API = "http://inference.local:8765"
 
     print("  ✓ 3090 GPU polling thread started")
 
@@ -565,7 +565,7 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 import subprocess
                 # Fetch predictions from 3090 where daemon is running
                 result = subprocess.run(
-                    ['ssh', '192.168.x.x', 'cat /home/user/TRAINING/status/latest_predictions.json'],
+                    ['ssh', 'inference.local', 'cat {BASE_DIR}/status/latest_predictions.json'],
                     capture_output=True,
                     text=True,
                     timeout=5

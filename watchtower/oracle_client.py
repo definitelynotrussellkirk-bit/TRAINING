@@ -56,7 +56,7 @@ class OracleClient(_PredictionClient):
 
     def __init__(
         self,
-        crystal_tower: str = "http://192.168.x.x:8765",
+        crystal_tower: Optional[str] = None,
         timeout: int = 120,
         max_attempts: int = 3,
         attempt_delay: float = 2.0,
@@ -67,13 +67,22 @@ class OracleClient(_PredictionClient):
         Initialize Oracle client.
 
         Args:
-            crystal_tower: URL of the Crystal Tower (inference server)
+            crystal_tower: URL of the Crystal Tower (inference server) - auto-detects from host registry if None
             timeout: Request timeout in seconds
             max_attempts: Maximum prophecy attempts
             attempt_delay: Delay between attempts
             seeker_key: Read-level API key (for seeking prophecies)
             high_priest_key: Admin-level API key (for rebirth)
         """
+        # Auto-detect inference server URL from host registry
+        if crystal_tower is None:
+            try:
+                from core.hosts import get_service_url
+                crystal_tower = get_service_url("inference")
+            except Exception:
+                # Fallback if host registry unavailable
+                crystal_tower = "http://inference.local:8765"
+
         super().__init__(
             base_url=crystal_tower,
             timeout=timeout,
@@ -255,9 +264,9 @@ class OracleClient(_PredictionClient):
 
 # Convenience function
 def get_oracle_client(
-    crystal_tower: str = "http://192.168.x.x:8765",
+    crystal_tower: Optional[str] = None,
 ) -> OracleClient:
-    """Get an OracleClient for the Crystal Tower."""
+    """Get an OracleClient for the Crystal Tower (auto-detects URL if not provided)."""
     return OracleClient(crystal_tower=crystal_tower)
 
 

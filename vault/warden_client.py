@@ -8,7 +8,7 @@ Usage:
     from vault.warden_client import WardenClient, get_all_zone_health
 
     # Query a specific warden
-    client = WardenClient("192.168.x.x", 8760)
+    client = WardenClient("trainer.local", 8760)
     health = client.get_health()
     print(f"Zone {health['zone_id']}: {health['status']}")
 

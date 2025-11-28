@@ -1,7 +1,10 @@
 #!/bin/bash
 # Restart monitoring server
 
-cd /path/to/training
+# Auto-detect base directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+cd "$BASE_DIR"
 
 # Kill any existing monitor servers
 pkill -9 -f launch_live_monitor.py

@@ -306,7 +306,7 @@ registry = StorageRegistry(base_dir)
 registry.register_stronghold(
     name="synology_main",
     stronghold_type=StrongholdType.NAS,
-    host="192.168.x.x"
+    host="nas.local"
 )
 ```
 
@@ -337,12 +337,12 @@ The VaultKeeper tracks where every asset (checkpoint, model, data, config) lives
 from vault import ask_vault_first
 
 # OLD WAY (hardcoded path):
-model_path = "/path/to/training/models/checkpoint-175000"
+model_path = "$TRAINING_BASE_DIR/models/checkpoint-175000"
 
 # NEW WAY (ask vault first):
 model_path = ask_vault_first(
     "checkpoint_175000",
-    fallback="/path/to/training/models/checkpoint-175000"
+    fallback="$TRAINING_BASE_DIR/models/checkpoint-175000"
 )
 
 # The keeper will:
@@ -379,9 +379,9 @@ result = keeper.fetch("checkpoint_175000", "/tmp/local_copy")
 nohup python3 vault/server.py --port 8767 > logs/vault_keeper.log 2>&1 &
 
 # Query from 3090
-curl http://192.168.x.x:8767/api/locate/checkpoint_175000
-curl http://192.168.x.x:8767/api/stats
-curl http://192.168.x.x:8767/api/checkpoints
+curl http://trainer.local:8767/api/locate/checkpoint_175000
+curl http://trainer.local:8767/api/stats
+curl http://trainer.local:8767/api/checkpoints
 ```
 
 ### Client Library (for remote devices)
@@ -390,7 +390,7 @@ curl http://192.168.x.x:8767/api/checkpoints
 from vault.client import VaultKeeperClient
 
 # On 3090, connect to 4090's VaultKeeper
-client = VaultKeeperClient("192.168.x.x:8767")
+client = VaultKeeperClient("trainer.local:8767")
 
 # Find checkpoint
 result = client.locate("checkpoint_175000")
@@ -526,7 +526,7 @@ from core.checkpoint_ledger import RemoteLedgerClient, get_ledger_client
 ledger = get_ledger_client()  # Uses local ledger on 4090, remote API elsewhere
 
 # Option 2: Explicit remote client
-client = RemoteLedgerClient("http://192.168.x.x:8767/api/ledger")
+client = RemoteLedgerClient("http://trainer.local:8767/api/ledger")
 
 # Same interface as local ledger
 latest = client.get_latest()
@@ -558,8 +558,8 @@ The Host Registry defines where all services run. Components query it instead of
 from core.hosts import get_service_url, get_host, is_trainer_local
 
 # Get service URL
-ledger_url = get_service_url("ledger")  # http://192.168.x.x:8767/api/ledger
-inference_url = get_service_url("inference")  # http://192.168.x.x:8765
+ledger_url = get_service_url("ledger")  # http://trainer.local:8767/api/ledger
+inference_url = get_service_url("inference")  # http://inference.local:8765
 
 # Check if we're on the trainer
 if is_trainer_local():
@@ -571,7 +571,7 @@ else:
 # Get host config
 host = get_host("3090")
 print(host.name)  # "Inference Server"
-print(host.models_dir)  # /path/to/models
+print(host.models_dir)  # ~/llm/models
 ```
 
 ### Configuration (`config/hosts.json`)
@@ -581,7 +581,7 @@ print(host.models_dir)  # /path/to/models
   "hosts": {
     "4090": {
       "name": "Training Server",
-      "host": "192.168.x.x",
+      "host": "trainer.local",
       "role": "trainer",
       "services": {
         "vault": {"port": 8767, "path": "/api"},
@@ -592,7 +592,7 @@ print(host.models_dir)  # /path/to/models
     },
     "3090": {
       "name": "Inference Server",
-      "host": "192.168.x.x",
+      "host": "inference.local",
       "role": "inference",
       "services": {
         "inference": {"port": 8765}
@@ -790,7 +790,7 @@ Each zone (4090, 3090, NAS) can run a Branch Officer daemon that tracks local as
 
 ```bash
 # On 3090
-python3 vault/branch_officer.py --zone 3090 --port 8768 --base-dir /path/to/models
+python3 vault/branch_officer.py --zone 3090 --port 8768 --base-dir ~/llm/models
 
 # On NAS
 python3 vault/branch_officer.py --zone nas --port 8768 --base-dir /volume1/data/llm_training
@@ -814,13 +814,13 @@ from vault import push_to_zone, pull_from_zone
 
 # Push checkpoint to 3090
 result = push_to_zone(
-    "/path/to/training/current_model/checkpoint-190000-20251127-1430",
+    "$TRAINING_BASE_DIR/current_model/checkpoint-190000-20251127-1430",
     "3090"
 )
 
 # Pull from 3090
 result = pull_from_zone(
-    "/path/to/models/checkpoint-190000-20251127-1430",
+    "~/llm/models/checkpoint-190000-20251127-1430",
     "3090"
 )
 ```
@@ -832,7 +832,7 @@ result = pull_from_zone(
 **Reorganized 2025-11-22** - All files organized + RPG wrappers added 2025-11-26
 
 ```
-/path/to/training/
+$TRAINING_BASE_DIR/
 │
 ├── CLAUDE.md                    # This file (Claude instructions)
 ├── config.json                  # Active configuration

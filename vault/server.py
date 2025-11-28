@@ -14,8 +14,8 @@ Usage:
     python3 vault/server.py --port 8767
 
     # Query from remote
-    curl http://192.168.x.x:8767/api/locate/checkpoint_175000
-    curl http://192.168.x.x:8767/api/stats
+    curl http://trainer.local:8767/api/locate/checkpoint_175000
+    curl http://trainer.local:8767/api/stats
 
 RPG Flavor:
     The VaultKeeper Server is the Oracle's Window - a magical portal

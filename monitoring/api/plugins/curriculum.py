@@ -24,7 +24,7 @@ class CurriculumPlugin(RemoteFilePlugin):
     AND local curriculum state for data flow status.
 
     Data sources:
-    - Remote: ssh://192.168.x.x/~/TRAINING/status/curriculum_optimization.json
+    - Remote: ssh://inference.local/~/TRAINING/status/curriculum_optimization.json
     - Local: data_manager/curriculum_state.json
 
     Refresh: Every 5 minutes

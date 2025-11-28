@@ -17,7 +17,7 @@ The Data Manager acts as both a **data pipeline orchestrator** and **test suite*
 │       │                   │                     │          │
 │       ▼                   ▼                     ▼          │
 │  RTX 3090           5 Test Suites      Priority Queue     │
-│  192.168.x.x     - Format                              │
+│  inference.local     - Format                              │
 │                     - Length                              │
 │                     - Diversity                           │
 │                     - Balance                             │
@@ -28,7 +28,7 @@ The Data Manager acts as both a **data pipeline orchestrator** and **test suite*
 ## Components
 
 ### 1. **RemoteGPUClient** (`remote_client.py`)
-- Communicates with RTX 3090 inference server (192.168.x.x:8765)
+- Communicates with RTX 3090 inference server (inference.local:8765)
 - Health checks and GPU monitoring
 - Data generation requests
 - Inference API
@@ -87,7 +87,7 @@ with open('config.json') as f:
     config = json.load(f)
 
 # Create manager
-manager = DataManager('/path/to/training', config)
+manager = DataManager('$TRAINING_BASE_DIR', config)
 
 # Check remote status
 manager.check_remote_status()
@@ -123,7 +123,7 @@ In `config.json`:
 {
   "auto_generate": {
     "enabled": true,
-    "host": "192.168.x.x",
+    "host": "inference.local",
     "port": 8765,
     "count": 100000,
     "priority": "normal",
@@ -322,10 +322,10 @@ checks.append(("my_metric", self._check_my_metric))
 **Remote GPU unreachable:**
 ```bash
 # Check network
-ping 192.168.x.x
+ping inference.local
 
 # Check API
-curl http://192.168.x.x:8765/health
+curl http://inference.local:8765/health
 ```
 
 **Quality tests failing:**

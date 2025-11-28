@@ -420,7 +420,7 @@ This lets you calculate: "How much XP does each level cost?"
 
 ## 6.2 The 3090 Inn (Central Hub)
 
-**Location:** RTX 3090 server (192.168.x.x)
+**Location:** RTX 3090 server (inference.local)
 
 The Inn is where everything is managed, but not where heavy fighting happens.
 
@@ -465,7 +465,7 @@ Where the Hero actually fights. All training happens here.
 
 ## 6.4 The Deep Vault (Archive)
 
-**Location:** Synology NAS (192.168.x.x)
+**Location:** Synology NAS (nas.local)
 
 The Grand Archive beneath the Inn.
 

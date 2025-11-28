@@ -52,7 +52,7 @@ class TaskClient:
                 from core.hosts import get_service_url
                 scheduler_url = get_service_url("scheduler")
             except (ImportError, Exception):
-                scheduler_url = "http://192.168.x.x:8766"
+                scheduler_url = "http://inference.local:8766"
         self.scheduler_url = scheduler_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries

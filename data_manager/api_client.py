@@ -30,7 +30,7 @@ class InferenceAPIClient:
                 base_url = get_service_url("inference")
             except Exception:
                 # Fallback if host registry unavailable
-                base_url = "http://192.168.x.x:8765"
+                base_url = "http://inference.local:8765"
 
         self.base_url = base_url
 

@@ -79,7 +79,7 @@ class CurriculumEvalLoop:
                     inference_port = int(match.group(2))
             except (ImportError, Exception):
                 if inference_host is None:
-                    inference_host = "192.168.x.x"
+                    inference_host = "inference.local"
                 if inference_port is None:
                     inference_port = 8765
 

@@ -14,11 +14,11 @@ Features:
 Usage:
     # As module
     from monitoring.storage_manager import StorageManager
-    mgr = StorageManager(host="192.168.x.x", username="user", password="...")
+    mgr = StorageManager(host="nas.local", username="user", password="...")
     status = mgr.get_status()
 
     # As daemon
-    python3 storage_manager.py --host 192.168.x.x --interval 300
+    python3 storage_manager.py --host nas.local --interval 300
 """
 
 import json
@@ -631,7 +631,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Synology Storage Manager")
-    parser.add_argument("--host", default="192.168.x.x", help="Synology NAS IP")
+    parser.add_argument("--host", default="nas.local", help="Synology NAS IP")
     parser.add_argument("--username", default="user", help="DSM username")
     parser.add_argument("--password", help="DSM password (or use --creds-file)")
     parser.add_argument("--creds-file", help="JSON file with credentials")

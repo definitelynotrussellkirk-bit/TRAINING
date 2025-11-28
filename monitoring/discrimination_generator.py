@@ -79,7 +79,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 SYLLO_API = "http://localhost:8080"
-INFERENCE_API = "http://192.168.x.x:8765"
+INFERENCE_API = "http://inference.local:8765"
 API_KEY = os.environ.get("INFERENCE_ADMIN_KEY", "admin123")
 
 # Ratio configuration

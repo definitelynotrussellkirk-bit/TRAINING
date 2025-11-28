@@ -463,7 +463,7 @@ class SmartMonitor:
 
 def main():
     parser = argparse.ArgumentParser(description="Smart training monitor with anomaly detection")
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base training directory')
+    parser.add_argument('--base-dir', default='{BASE_DIR}', help='Base training directory')
     parser.add_argument('--loss-spike-threshold', type=float, default=0.3, help='Loss spike threshold (0.3 = 30%)')
     parser.add_argument('--accuracy-drop-threshold', type=float, default=10, help='Accuracy drop threshold (10 = 10%%)')
     parser.add_argument('--poll-interval', type=int, default=10, help='Polling interval in seconds')

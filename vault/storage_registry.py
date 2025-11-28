@@ -28,7 +28,7 @@ Usage:
     registry.register_stronghold(
         name="synology_citadel",
         stronghold_type=StrongholdType.NAS,
-        host="192.168.x.x",
+        host="nas.local",
         profile=StorageProfile(
             allocation_tb=10,
             retention_days=30,
@@ -226,7 +226,7 @@ class StorageRegistry:
         registry.register_stronghold(
             name="synology",
             stronghold_type=StrongholdType.NAS,
-            host="192.168.x.x",
+            host="nas.local",
             share="data",
             base_path="llm_training",
             profile=StorageProfile(allocation_tb=10)

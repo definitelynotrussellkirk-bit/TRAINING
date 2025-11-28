@@ -44,7 +44,7 @@ class PreviewEngine:
                 from core.hosts import get_service_url
                 remote_api_url = get_service_url("inference")
             except (ImportError, Exception):
-                remote_api_url = "http://192.168.x.x:8765"
+                remote_api_url = "http://inference.local:8765"
         self.base_dir = Path(base_dir)
         self.remote_api_url = remote_api_url
         self.validation_file = self.base_dir / validation_file

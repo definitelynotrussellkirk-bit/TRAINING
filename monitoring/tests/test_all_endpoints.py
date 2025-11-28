@@ -27,7 +27,7 @@ class EndpointTester:
             'failed': [],
             'warnings': []
         }
-        self.base_dir = Path('/path/to/training')
+        self.base_dir = Path('{BASE_DIR}')
 
     def test(self, name, func):
         """Run a test and record result"""
@@ -98,54 +98,54 @@ def main():
     print(f"\n{BLUE}[1] LOCAL STATUS FILES (4090){RESET}")
 
     tester.test("training_status.json", lambda: test_json_file(
-        Path('/path/to/training/status/training_status.json'),
+        Path('{BASE_DIR}/status/training_status.json'),
         required_fields=['status', 'current_step', 'total_steps', 'loss']
     ))
 
     tester.test("latest_preview.json", lambda: test_json_file(
-        Path('/path/to/training/status/latest_preview.json'),
+        Path('{BASE_DIR}/status/latest_preview.json'),
         required_fields=['step']
     ))
 
     tester.test("curriculum_state.json", lambda: test_json_file(
-        Path('/path/to/training/status/curriculum_state.json')
+        Path('{BASE_DIR}/status/curriculum_state.json')
     ))
 
     tester.test("3090_watchdog_status.json", lambda: test_json_file(
-        Path('/path/to/training/status/3090_watchdog_status.json')
+        Path('{BASE_DIR}/status/3090_watchdog_status.json')
     ))
 
     # ==================== REMOTE STATUS FILES (3090) ====================
     print(f"\n{BLUE}[2] REMOTE STATUS FILES (3090){RESET}")
 
     tester.test("curriculum_optimization.json (3090)", lambda: test_remote_json(
-        '192.168.x.x',
+        'inference.local',
         '~/TRAINING/status/curriculum_optimization.json',
         required_fields=['evaluations']
     ))
 
     tester.test("model_comparisons.json (3090)", lambda: test_remote_json(
-        '192.168.x.x',
+        'inference.local',
         '~/TRAINING/status/model_comparisons.json'
     ))
 
     tester.test("regression_monitoring.json (3090)", lambda: test_remote_json(
-        '192.168.x.x',
+        'inference.local',
         '~/TRAINING/status/regression_monitoring.json'
     ))
 
     tester.test("confidence_calibration.json (3090)", lambda: test_remote_json(
-        '192.168.x.x',
+        'inference.local',
         '~/TRAINING/status/confidence_calibration.json'
     ))
 
     tester.test("adversarial_mining.json (3090)", lambda: test_remote_json(
-        '192.168.x.x',
+        'inference.local',
         '~/TRAINING/status/adversarial_mining.json'
     ))
 
     tester.test("checkpoint_sync.json (3090)", lambda: test_remote_json(
-        '192.168.x.x',
+        'inference.local',
         '~/TRAINING/status/checkpoint_sync.json'
     ))
 
@@ -177,7 +177,7 @@ def main():
     print(f"\n{BLUE}[4] GPU STATS{RESET}")
 
     tester.test("nvidia-smi (4090)", lambda: test_nvidia_smi('local'))
-    tester.test("nvidia-smi (3090)", lambda: test_nvidia_smi('192.168.x.x'))
+    tester.test("nvidia-smi (3090)", lambda: test_nvidia_smi('inference.local'))
 
     # ==================== MONITORING PROCESSES ====================
     print(f"\n{BLUE}[5] MONITORING PROCESSES{RESET}")
@@ -333,7 +333,7 @@ def test_remote_processes():
     """Test remote monitoring processes"""
     try:
         result = subprocess.run(
-            ['ssh', '192.168.x.x', 'ps aux | grep python3 | grep monitoring | grep -v grep | wc -l'],
+            ['ssh', 'inference.local', 'ps aux | grep python3 | grep monitoring | grep -v grep | wc -l'],
             capture_output=True,
             text=True,
             timeout=5
@@ -351,7 +351,7 @@ def test_remote_processes():
 def test_queue_access():
     """Test queue directory access"""
     try:
-        queue_dir = Path('/path/to/training/queue')
+        queue_dir = Path('{BASE_DIR}/queue')
         if not queue_dir.exists():
             return {'status': 'fail', 'error': 'Queue directory not found'}
 

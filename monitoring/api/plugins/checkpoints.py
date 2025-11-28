@@ -19,7 +19,7 @@ class CheckpointSyncPlugin(RemoteFilePlugin):
     """
     Fetches checkpoint sync status from the 3090 intelligence machine.
 
-    Data source: ssh://192.168.x.x/~/TRAINING/status/checkpoint_sync.json
+    Data source: ssh://inference.local/~/TRAINING/status/checkpoint_sync.json
     Refresh: Every 5 minutes
     Critical: Yes (checkpoint availability is critical)
     """

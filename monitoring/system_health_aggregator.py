@@ -37,7 +37,7 @@ except ImportError:
         return Path(__file__).parent.parent
     def get_status_dir():
         return get_base_dir() / "status"
-    REMOTE_HOST = "192.168.x.x"
+    REMOTE_HOST = "inference.local"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -92,7 +92,7 @@ EXPECTED_PROCESSES = {
         {"name": "deployment_orchestrator", "pattern": "deployment_orchestrator.py", "critical": False},
     ],
     "3090": [
-        # Note: inference server runs as main.py in /home/user/llm
+        # Note: inference server runs as main.py in {INFERENCE_HOME}
         {"name": "inference_server", "pattern": "python3 main.py", "critical": True},
         {"name": "gpu_task_scheduler", "pattern": "gpu_task_scheduler.py", "critical": False},
         {"name": "self_correction_loop", "pattern": "self_correction_loop.py", "critical": False},

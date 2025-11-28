@@ -33,7 +33,7 @@ class InferenceModelPlugin(BasePlugin):
     - VRAM usage
     - Load timestamp
 
-    Data source: http://192.168.x.x:8765/models/info
+    Data source: http://inference.local:8765/models/info
     Refresh: Every 30 seconds
     Critical: Yes (shows what model is actually serving)
     """

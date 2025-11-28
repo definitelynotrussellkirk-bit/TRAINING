@@ -19,7 +19,7 @@ class ConfidencePlugin(RemoteFilePlugin):
     """
     Fetches confidence calibration results from the 3090 intelligence machine.
 
-    Data source: ssh://192.168.x.x/~/TRAINING/status/confidence_calibration.json
+    Data source: ssh://inference.local/~/TRAINING/status/confidence_calibration.json
     Refresh: Every 10 minutes
     Critical: No
     """

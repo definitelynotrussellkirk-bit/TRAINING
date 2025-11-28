@@ -66,7 +66,7 @@ class PredictionClient:
                 from core.hosts import get_service_url
                 base_url = get_service_url("inference")
             except (ImportError, Exception):
-                base_url = "http://192.168.x.x:8765"
+                base_url = "http://inference.local:8765"
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self.max_retries = max_retries
@@ -153,7 +153,7 @@ class PredictionClient:
         Requires admin API key (INFERENCE_ADMIN_KEY).
 
         Args:
-            model_path: Full path to checkpoint, e.g. /path/to/models/checkpoint-175000
+            model_path: Full path to checkpoint, e.g. {INFERENCE_HOME}/models/checkpoint-175000
 
         Returns:
             {

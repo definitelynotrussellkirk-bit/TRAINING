@@ -32,7 +32,7 @@ class SchedulerPlugin(BasePlugin):
     - GPU utilization (target: 20-80%)
     - Task completion stats
 
-    Data source: http://192.168.x.x:8766/api/metrics, /api/health
+    Data source: http://inference.local:8766/api/metrics, /api/health
     Refresh: Every 30 seconds
     Critical: Yes (scheduler down = no GPU task execution)
     """

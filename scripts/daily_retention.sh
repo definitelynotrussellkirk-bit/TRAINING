@@ -11,7 +11,7 @@
 #   ./daily_retention.sh [--dry-run]
 #
 # Cron example (runs daily at 3 AM):
-#   0 3 * * * /path/to/training/scripts/daily_retention.sh >> /path/to/training/logs/retention.log 2>&1
+#   0 3 * * * $TRAINING_BASE_DIR/scripts/daily_retention.sh >> $TRAINING_BASE_DIR/logs/retention.log 2>&1
 
 set -e  # Exit on error
 

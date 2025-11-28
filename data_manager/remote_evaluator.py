@@ -37,7 +37,7 @@ class RemoteEvaluator:
                     port = inference_host.services.get("inference", {}).get("port", 8765)
             except Exception:
                 # Fallback if host registry unavailable
-                host = host or "192.168.x.x"
+                host = host or "inference.local"
                 port = port or 8765
 
         self.host = host

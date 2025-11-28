@@ -19,7 +19,7 @@
 - Logs all events to logs/watchdog.log
 
 **What it expects:**
-- `BASE_DIR`: /path/to/training
+- `BASE_DIR`: $TRAINING_BASE_DIR
 - `.daemon.pid`: PID file for daemon
 - `status/training_status.json`: Progress tracking
 - `training_output.log`: Daemon output log
@@ -194,7 +194,7 @@ python3 safety/verify_checkpoint_resume.py
 All tools expect this directory structure:
 
 ```
-/path/to/training/
+$TRAINING_BASE_DIR/
 ├── config.json                  # Main config
 ├── .daemon.pid                  # Daemon process ID
 ├── .config_lock.json            # Config at training start
@@ -281,7 +281,7 @@ All tools expect this directory structure:
 **Last verified:** 2025-11-24
 **Training architecture:** Full model fine-tuning (no LoRA)
 **Daemon location:** core/training_daemon.py
-**Config location:** /path/to/training/config.json
+**Config location:** $TRAINING_BASE_DIR/config.json
 
 **Action items:**
 - [ ] Update verify_checkpoint_resume.py for full model architecture

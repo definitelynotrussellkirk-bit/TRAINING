@@ -64,6 +64,11 @@ configs/facilities/local.yaml
 configs/**/*.local.yaml
 *.local.yaml
 
+# Host registry (contains actual LAN IPs - use hosts.example.json as template)
+config/hosts.json
+config/storage_registry.json
+config/secrets.json
+
 # Guild runtime state
 status/hero_state.json
 status/run_*.json

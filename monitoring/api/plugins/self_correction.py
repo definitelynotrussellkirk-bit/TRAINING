@@ -19,7 +19,7 @@ class SelfCorrectionPlugin(RemoteFilePlugin):
     """
     Fetches self-correction loop results from the 3090 intelligence machine.
 
-    Data source: ssh://192.168.x.x/~/TRAINING/status/self_correction.json
+    Data source: ssh://inference.local/~/TRAINING/status/self_correction.json
     Refresh: Every 5 minutes
     Critical: No
     """

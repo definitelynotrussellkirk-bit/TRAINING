@@ -9,8 +9,8 @@ BASE_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 TRAINING_CHECKPOINT_DIR="$BASE_DIR/models/current_model"
 
 # Get remote host from config or env var
-REMOTE_HOST="${INFERENCE_HOST:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").host)' 2>/dev/null || echo "192.168.x.x")}"
-REMOTE_USER="${REMOTE_USER:-user}"
+REMOTE_HOST="${INFERENCE_HOST:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").host)' 2>/dev/null || echo "inference.local")}"
+REMOTE_USER="${INFERENCE_SSH_USER:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").ssh_user)' 2>/dev/null || echo "$USER")}"
 REMOTE_DIR="~/TRAINING/models/current_model"
 SYNC_INTERVAL=300  # 5 minutes
 

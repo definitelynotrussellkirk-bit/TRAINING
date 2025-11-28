@@ -47,7 +47,7 @@ class TransferBaselineRunner:
                 from core.hosts import get_service_url
                 api_url = get_service_url("inference")
             except (ImportError, Exception):
-                api_url = "http://192.168.x.x:8765"
+                api_url = "http://inference.local:8765"
         if base_dir is None:
             from core.paths import require_base_dir
             base_dir = str(require_base_dir())

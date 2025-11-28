@@ -19,7 +19,7 @@ class TestingPlugin(RemoteFilePlugin):
     """
     Fetches automated testing results from the 3090 intelligence machine.
 
-    Data source: ssh://192.168.x.x/~/TRAINING/status/automated_testing.json
+    Data source: ssh://inference.local/~/TRAINING/status/automated_testing.json
     Refresh: Every 10 minutes
     Critical: Yes (test failures indicate problems)
     """

@@ -22,9 +22,9 @@ Usage:
     # On NAS (Storage)
     python3 vault/zone_warden.py --zone nas
 
-    # Query from anywhere
-    curl http://192.168.x.x:8760/health
-    curl http://192.168.x.x:8760/services
+    # Query from anywhere (use actual host from config/hosts.json)
+    curl http://trainer.local:8760/health
+    curl http://trainer.local:8760/services
 
 RPG Flavor:
     The Warden keeps vigilant watch over their assigned territory.

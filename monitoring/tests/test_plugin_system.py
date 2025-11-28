@@ -5,7 +5,7 @@ Phase 2, Task 2.1: Verify base plugin system works
 """
 
 import sys
-sys.path.insert(0, '/path/to/training')
+sys.path.insert(0, '{BASE_DIR}')
 
 from monitoring.api.plugins.base import BasePlugin, LocalFilePlugin, PluginError
 from monitoring.api.plugins import PluginRegistry
@@ -142,7 +142,7 @@ def test_local_file_plugin():
 
     class TrainingStatusPlugin(LocalFilePlugin):
         def __init__(self):
-            super().__init__('/path/to/training/status/training_status.json')
+            super().__init__('{BASE_DIR}/status/training_status.json')
 
         def get_name(self):
             return 'training_status'

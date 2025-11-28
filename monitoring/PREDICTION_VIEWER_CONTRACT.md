@@ -190,7 +190,7 @@ When manually grading predictions:
 ```
 1. Training Step N completed
 2. preview_engine.py triggers (every 1000 steps)
-3. Sends prompts to RTX 3090 inference API (192.168.x.x:8765)
+3. Sends prompts to RTX 3090 inference API (inference.local:8765)
 4. Receives model outputs
 5. Saves to status/latest_predictions.json
 6. Dashboard polls /api/predictions every 10s

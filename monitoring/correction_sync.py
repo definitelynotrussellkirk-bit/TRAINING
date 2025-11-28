@@ -71,7 +71,7 @@ class CorrectionSync:
                 from core.hosts import get_host
                 remote_host = get_host("3090").host
             except (ImportError, Exception):
-                remote_host = "192.168.x.x"
+                remote_host = "inference.local"
         if remote_base is None:
             from core.hosts import get_trainer_base_dir; remote_base = get_trainer_base_dir()
         self.base_dir = Path(base_dir)

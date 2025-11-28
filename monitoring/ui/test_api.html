@@ -67,7 +67,7 @@
 
     <div>
         <button onclick="testLocalhost()">Test localhost:8081</button>
-        <button onclick="testIP()">Test 192.168.x.x:8081</button>
+        <button onclick="testIP()">Test trainer.local:8081</button>
         <button onclick="testBoth()">Test Both</button>
     </div>
 
@@ -75,7 +75,7 @@
 
     <script>
         const LOCALHOST_URL = 'http://localhost:8081/api/unified';
-        const IP_URL = 'http://192.168.x.x:8081/api/unified';
+        const IP_URL = 'http://trainer.local:8081/api/unified';
 
         function updateStatus(message, type) {
             const statusDiv = document.getElementById('status');
@@ -152,14 +152,14 @@
 
         async function testIP() {
             document.getElementById('results').innerHTML = '';
-            await testEndpoint(IP_URL, '192.168.x.x:8081');
+            await testEndpoint(IP_URL, 'trainer.local:8081');
         }
 
         async function testBoth() {
             document.getElementById('results').innerHTML = '';
             const localhostWorks = await testEndpoint(LOCALHOST_URL, 'localhost:8081');
             await new Promise(resolve => setTimeout(resolve, 1000));
-            const ipWorks = await testEndpoint(IP_URL, '192.168.x.x:8081');
+            const ipWorks = await testEndpoint(IP_URL, 'trainer.local:8081');
 
             if (localhostWorks && ipWorks) {
                 updateStatus('Both endpoints working!', 'success');

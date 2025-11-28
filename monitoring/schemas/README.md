@@ -20,13 +20,13 @@ This directory contains JSON Schema definitions for all data sources in the Mast
 ### Remote (3090 RTX Intelligence Machine)
 
 2. **curriculum_optimization.schema.json**
-   - Source: `ssh://192.168.x.x/~/TRAINING/status/curriculum_optimization.json`
+   - Source: `ssh://inference.local/~/TRAINING/status/curriculum_optimization.json`
    - Refresh: Every 5 minutes
    - Critical Fields: `evaluations[].difficulties.{easy,medium,hard}.accuracy`
    - Size: ~2KB per update
 
 3. **adversarial_mining.schema.json**
-   - Source: `ssh://192.168.x.x/~/TRAINING/status/adversarial_mining.json`
+   - Source: `ssh://inference.local/~/TRAINING/status/adversarial_mining.json`
    - Refresh: Every 5 minutes
    - Critical Fields: `mining_runs[].stats.incorrect_predictions`
    - Size: ~2KB per update

@@ -313,7 +313,7 @@ GENERATOR_VERSION = "1.1.0"  # Was "1.0.0"
 curl http://localhost:8081/api/storage
 
 # Sync via GPU scheduler
-curl -X POST http://192.168.x.x:8766/api/tasks/submit \
+curl -X POST http://inference.local:8766/api/tasks/submit \
   -d '{"task_type": "storage_sync", "params": {"local_path": "...", "folder_type": "checkpoints"}}'
 ```
 
@@ -336,7 +336,7 @@ curl -X POST http://192.168.x.x:8766/api/tasks/submit \
 - `data_manager/manager.py` - Rewritten to use skill APIs + curriculum
 - `data_manager/skill_api_client.py` - Client for singleSKILL APIs
 - `data_manager/curriculum_manager.py` - Difficulty progression logic
-- `config.json` - Updated `auto_generate` section (count: 100, switched from remote 192.168.x.x to local skill APIs: host: "localhost", port: 8080)
+- `config.json` - Updated `auto_generate` section (count: 100, switched from remote inference.local to local skill APIs: host: "localhost", port: 8080)
 
 ### Generated File Naming
 - Old: `syllo_autogen_TIMESTAMP_countN.jsonl`

@@ -10,7 +10,7 @@ Usage:
     from vault.client import VaultKeeperClient
 
     # Connect to keeper (on 4090)
-    client = VaultKeeperClient("192.168.x.x:8767")
+    client = VaultKeeperClient("trainer.local:8767")
 
     # Find checkpoint
     result = client.locate("checkpoint_175000")
@@ -169,7 +169,7 @@ class VaultKeeperClient:
     Client for querying the VaultKeeper service.
 
     Usage:
-        client = VaultKeeperClient("192.168.x.x:8767")
+        client = VaultKeeperClient("trainer.local:8767")
 
         # Check health
         if client.is_healthy():
@@ -191,7 +191,7 @@ class VaultKeeperClient:
         Initialize the client.
 
         Args:
-            host: VaultKeeper host:port (e.g., "192.168.x.x:8767")
+            host: VaultKeeper host:port (e.g., "trainer.local:8767")
             timeout: Request timeout in seconds
         """
         # Normalize host

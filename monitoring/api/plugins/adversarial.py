@@ -19,7 +19,7 @@ class AdversarialPlugin(RemoteFilePlugin):
     """
     Fetches adversarial mining results from the 3090 intelligence machine.
 
-    Data source: ssh://192.168.x.x/~/TRAINING/status/adversarial_mining.json
+    Data source: ssh://inference.local/~/TRAINING/status/adversarial_mining.json
     Refresh: Every 5 minutes
     Critical: No
     """

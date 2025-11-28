@@ -686,7 +686,7 @@ def main():
                             "If not specified, auto-detects from inference server.")
     parser.add_argument('--use-scheduler', action='store_true',
                        help='Submit tasks to GPU Task Scheduler instead of running directly')
-    parser.add_argument('--scheduler-url', default='http://192.168.x.x:8766',
+    parser.add_argument('--scheduler-url', default='http://inference.local:8766',
                        help='GPU Task Scheduler URL')
 
     args = parser.parse_args()

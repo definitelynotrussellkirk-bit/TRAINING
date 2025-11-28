@@ -29,7 +29,7 @@ Usage:
     python3 gpu_task_scheduler.py --port 8766
 
     # From 4090 or anywhere:
-    curl -X POST http://192.168.x.x:8766/api/tasks/submit \
+    curl -X POST http://inference.local:8766/api/tasks/submit \
          -H "Content-Type: application/json" \
          -d '{"task_type": "curriculum_eval", "params": {...}}'
 """
@@ -1171,9 +1171,21 @@ class TaskExecutor:
                 if not creds.get("password"):
                     return {"task": "storage_check", "error": "No credentials found"}
 
+                # Get NAS host from host registry
+                nas_host = None
+                nas_user = None
+                try:
+                    from core.hosts import get_host
+                    nas = get_host("nas")
+                    if nas:
+                        nas_host = nas.host
+                        nas_user = nas.ssh_user
+                except Exception:
+                    pass
+
                 mgr = module.StorageManager(
-                    host=creds.get("host", "192.168.x.x"),
-                    username=creds.get("username", "user"),
+                    host=creds.get("host", nas_host or "nas.local"),
+                    username=creds.get("username", nas_user or "user"),
                     password=creds["password"],
                     port=creds.get("port", 5001),
                     base_dir=base_dir

@@ -16,7 +16,7 @@ import os
 import requests
 from typing import Dict, Optional, List, Any
 
-DEFAULT_API_URL = "http://192.168.x.x:8765"
+DEFAULT_API_URL = "http://inference.local:8765"
 DEFAULT_API_KEY = "admin123"
 
 

@@ -13,7 +13,7 @@ from pathlib import Path
 import requests
 from typing import Tuple, List
 
-def run_inference_via_api(prompt: str, api_url: str = "http://192.168.x.x:5001/v1/chat/completions") -> str:
+def run_inference_via_api(prompt: str, api_url: str = "http://inference.local:5001/v1/chat/completions") -> str:
     """Run inference via API"""
     payload = {
         "messages": [{"role": "user", "content": prompt}],
@@ -96,7 +96,7 @@ def test_validation_file(
 
 def main():
     parser = argparse.ArgumentParser(description='Run validation via API')
-    parser.add_argument('--api-url', default='http://192.168.x.x:5001/v1/chat/completions',
+    parser.add_argument('--api-url', default='http://inference.local:5001/v1/chat/completions',
                        help='API endpoint URL')
     parser.add_argument('--samples', type=int, default=10,
                        help='Samples per difficulty level')

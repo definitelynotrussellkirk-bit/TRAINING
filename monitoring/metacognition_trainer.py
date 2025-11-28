@@ -40,12 +40,12 @@ try:
         try:
             return get_service_url("inference")
         except Exception:
-            return "http://192.168.x.x:8765"
+            return "http://inference.local:8765"
 except ImportError:
     def get_base_dir():
         from core.paths import get_base_dir; return get_base_dir()
     def get_remote_api_url():
-        return "http://192.168.x.x:8765"
+        return "http://inference.local:8765"
 
 logging.basicConfig(
     level=logging.INFO,

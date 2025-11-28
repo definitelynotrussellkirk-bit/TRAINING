@@ -5,7 +5,7 @@ Orientation for LLM/code agents working in this TRAINING repo. Two-GPU split sta
 ## Snapshot (2025-11-27)
 - Active hero: DIO (Qwen3-0.6B) campaign-001 (Binary+SY) ~184k steps; `control/state.json` shows idle (recovered) with active pointer in `control/active_campaign.json` → `campaigns/active/`.
 - Daemons run under The Weaver (`.pids/`): training_daemon, Tavern UI (8888), VaultKeeper (8767), data flow/autogen; start via `scripts/start_all.sh`, stop via `scripts/stop_all.sh`.
-- Host registry: `config/hosts.json` v3 (4090 trainer 192.168.x.x, 3090 inference 192.168.x.x, NAS storage) with zone warden on 8760; use `core/hosts.py` instead of hardcoded IPs.
+- Host registry: `config/hosts.json` v3 (4090 trainer trainer.local, 3090 inference inference.local, NAS storage) with zone warden on 8760; use `core/hosts.py` instead of hardcoded IPs.
 - Models/checkpoints: base `models/Qwen3-0.6B/`; active checkpoints in `current_model/` with `.ledger.json` sidecars and index at `status/checkpoint_ledger.json` (do not delete). TITAN (Qwen3-4B) hero available via `configs/heroes/titan-qwen3-4b.yaml` + `scripts/train_4b_full.py` (paged 8-bit Adam + Liger).
 - Data lineage + baselines: generator/validator versions tracked in `status/data_lineage.json` (requires `.meta.json` sidecars); transfer/skill baselines live in `status/baselines/` for dashboards and `skill_metrics`.
 
@@ -34,7 +34,7 @@ Orientation for LLM/code agents working in this TRAINING repo. Two-GPU split sta
 - Autogen uses curriculum in `data_manager/curriculum_state.json` (active skill/level). Generated files named `train_<skill>_level<level>_<count>_<timestamp>.jsonl`.
 - Lineage: generators/validators carry VERSION constants and must write `.meta.json` sidecars; aggregated stats at `status/data_lineage.json` and `/api/lineage`.
 - Validation sets reorganized under `data/validation/{benchmarks,binary,primitives,syllo_10level}/`; baselines consumed from `status/baselines/`.
-- Remote eval/inference stays on 3090 (`inference`: 192.168.x.x:8765 with auth); local skill APIs (8080/8090) are allowed for data generation only.
+- Remote eval/inference stays on 3090 (`inference`: inference.local:8765 with auth); local skill APIs (8080/8090) are allowed for data generation only.
 
 ## Monitoring & Analytics
 - Unified API (8081) aggregates plugins above; clear cache via `/api/cache/clear`. Health at `/api/health`, unified payload `/api/unified`, queue `/api/queue`, curriculum `/api/curriculum-state`, lineage `/api/lineage`.

@@ -11,7 +11,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TRAINING_DIR="${TRAINING_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 # Get remote host from config or env var
-REMOTE_HOST="${INFERENCE_HOST:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").host)' 2>/dev/null || echo "192.168.x.x")}"
+REMOTE_HOST="${INFERENCE_HOST:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").host)' 2>/dev/null || echo "inference.local")}"
+REMOTE_USER="${INFERENCE_SSH_USER:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").ssh_user)' 2>/dev/null || echo "$USER")}"
 API_PORT="${INFERENCE_PORT:-8765}"
 
 echo "================================================================================"
@@ -26,7 +27,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🌐 NETWORK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if ssh -o ConnectTimeout=5 "$REMOTE_HOST" "echo 'SSH OK'" &> /dev/null; then
+if ssh -o ConnectTimeout=5 "$REMOTE_USER@$REMOTE_HOST" "echo 'SSH OK'" &> /dev/null; then
     echo "✅ SSH Connection: OK"
 else
     echo "❌ SSH Connection: FAILED"
@@ -49,10 +50,10 @@ else
 fi
 
 # Check process
-PROCESS_COUNT=$(ssh "$REMOTE_HOST" "ps aux | grep 'python3 main.py' | grep -v grep | wc -l")
+PROCESS_COUNT=$(ssh "$REMOTE_USER@$REMOTE_HOST" "ps aux | grep 'python3 main.py' | grep -v grep | wc -l")
 if [ "$PROCESS_COUNT" -eq 1 ]; then
     echo "✅ Process Status: Running (1 process)"
-    PID=$(ssh "$REMOTE_HOST" "pgrep -f 'python3 main.py'")
+    PID=$(ssh "$REMOTE_USER@$REMOTE_HOST" "pgrep -f 'python3 main.py'")
     echo "   PID: $PID"
 elif [ "$PROCESS_COUNT" -eq 0 ]; then
     echo "❌ Process Status: NOT RUNNING"
@@ -65,7 +66,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🎮 GPU STATUS"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-GPU_INFO=$(ssh "$REMOTE_HOST" "nvidia-smi --query-gpu=name,temperature.gpu,memory.used,memory.total,utilization.gpu --format=csv,noheader,nounits")
+GPU_INFO=$(ssh "$REMOTE_USER@$REMOTE_HOST" "nvidia-smi --query-gpu=name,temperature.gpu,memory.used,memory.total,utilization.gpu --format=csv,noheader,nounits")
 
 if [ -n "$GPU_INFO" ]; then
     IFS=', ' read -r GPU_NAME GPU_TEMP VRAM_USED VRAM_TOTAL GPU_UTIL <<< "$GPU_INFO"
@@ -149,10 +150,10 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "💻 SYSTEM INFO"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-UPTIME=$(ssh "$REMOTE_HOST" "uptime -p")
+UPTIME=$(ssh "$REMOTE_USER@$REMOTE_HOST" "uptime -p")
 echo "Uptime: $UPTIME"
 
-LOAD=$(ssh "$REMOTE_HOST" "uptime | awk -F'load average:' '{print \$2}'")
+LOAD=$(ssh "$REMOTE_USER@$REMOTE_HOST" "uptime | awk -F'load average:' '{print \$2}'")
 echo "Load Average:$LOAD"
 
 echo ""
@@ -169,6 +170,6 @@ echo "  tail -f logs/3090_health/dashboard.log"
 echo "  tail -f logs/memory_guardian/guardian.log"
 echo ""
 echo "Manual recovery:"
-echo "  ssh $REMOTE_HOST 'pkill -f main.py && cd ~/llm && source venv/bin/activate && nohup python3 main.py > logs/api_server.log 2>&1 &'"
+echo "  ssh $REMOTE_USER@$REMOTE_HOST 'pkill -f main.py && cd ~/llm && source venv/bin/activate && nohup python3 main.py > logs/api_server.log 2>&1 &'"
 echo ""
 echo "================================================================================"

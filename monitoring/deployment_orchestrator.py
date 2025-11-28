@@ -88,13 +88,13 @@ class DeploymentOrchestrator:
                 from core.hosts import get_host
                 remote_host = get_host("3090").host
             except (ImportError, Exception):
-                remote_host = "192.168.x.x"
+                remote_host = "inference.local"
         if remote_api_url is None:
             try:
                 from core.hosts import get_service_url
                 remote_api_url = get_service_url("inference")
             except (ImportError, Exception):
-                remote_api_url = "http://192.168.x.x:8765"
+                remote_api_url = "http://inference.local:8765"
         self.base_dir = Path(base_dir)
         self.remote_host = remote_host
         self.remote_api_url = remote_api_url.rstrip('/')

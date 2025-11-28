@@ -47,8 +47,8 @@ class SkillMetricsPlugin(BasePlugin):
     Fetches skill metrics from baseline evaluation results.
 
     Data sources:
-    - Local: /path/to/training/status/baselines/*.json
-    - Remote: ssh://192.168.x.x/~/TRAINING/status/baselines/*.json
+    - Local: {BASE_DIR}/status/baselines/*.json
+    - Remote: ssh://inference.local/~/TRAINING/status/baselines/*.json
 
     Skills tracked:
     - TRAINED: syllable, binary (what we train on)

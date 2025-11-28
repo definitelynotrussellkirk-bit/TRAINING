@@ -17,7 +17,7 @@ Usage:
     registry.register(Zone(
         zone_id="3090",
         name="Inference Server",
-        host="192.168.x.x",
+        host="inference.local",
         port=8768,
     ))
 
@@ -337,16 +337,18 @@ class ZoneRegistry:
         try:
             nas_host = get_host("nas")
             if nas_host:
+                # Use models_dir from host config, or construct from checkpoints_dir
+                nas_base = nas_host.models_dir or (Path(nas_host.checkpoints_dir).parent if nas_host.checkpoints_dir else "/volume1/data/llm_training")
                 zones.append(Zone(
                     zone_id="nas",
-                    name="Synology NAS",
+                    name=nas_host.name or "Synology NAS",
                     zone_type=ZoneType.STORAGE,
                     host=nas_host.host,
                     port=8768,
-                    ssh_user="admin",
-                    base_path="/volume1/data/llm_training",
-                    checkpoint_path="/volume1/data/llm_training/checkpoints",
-                    model_path="/volume1/data/llm_training/models",
+                    ssh_user=nas_host.ssh_user or "admin",
+                    base_path=nas_base,
+                    checkpoint_path=nas_host.checkpoints_dir or f"{nas_base}/checkpoints",
+                    model_path=nas_host.models_dir or f"{nas_base}/models",
                     can_store=True,
                 ))
         except:

@@ -173,7 +173,7 @@ class TestSelfCorrectionImpact:
 
         # Should use auto-detected paths
         assert monitor.base_dir.exists()
-        assert "192.168.x.x" in monitor.api_url or "localhost" in monitor.api_url
+        assert "inference.local" in monitor.api_url or "localhost" in monitor.api_url
 
     def test_effectiveness_summary_empty(self):
         """Should handle empty effectiveness data"""

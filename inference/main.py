@@ -18,7 +18,18 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # ===== Configuration =====
-BASE_DIR = Path.home() / "llm"
+# Detect if we're on the 3090 inference server or somewhere else
+try:
+    from core.hosts import get_host
+    host_3090 = get_host("3090")
+    if host_3090 and host_3090.models_dir:
+        BASE_DIR = Path(host_3090.models_dir)
+    else:
+        BASE_DIR = Path.home() / "llm"
+except Exception:
+    # Fallback if host registry unavailable
+    BASE_DIR = Path.home() / "llm"
+
 MODELS_DIR = BASE_DIR / "models"
 RUNS_DIR = BASE_DIR / "runs"
 DATASETS_DIR = BASE_DIR / "datasets"

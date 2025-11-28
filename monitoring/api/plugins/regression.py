@@ -19,7 +19,7 @@ class RegressionPlugin(RemoteFilePlugin):
     """
     Fetches regression monitoring results from the 3090 intelligence machine.
 
-    Data source: ssh://192.168.x.x/~/TRAINING/status/regression_monitoring.json
+    Data source: ssh://inference.local/~/TRAINING/status/regression_monitoring.json
     Refresh: Every 5 minutes
     Critical: Yes (regressions must be caught immediately)
     """

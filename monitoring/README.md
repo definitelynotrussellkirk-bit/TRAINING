@@ -414,8 +414,8 @@ python3 monitoring/data_generation_automation.py \
 **Usage:**
 ```bash
 python3 monitoring/checkpoint_sync_daemon.py \
-  --remote-host 192.168.x.x \
-  --remote-dir /path/to/training/current_model \
+  --remote-host trainer.local \
+  --remote-dir $TRAINING_BASE_DIR/current_model \
   --local-dir /home/user/TRAINING/current_model \
   --interval 300 --keep 3
 ```
@@ -436,7 +436,7 @@ python3 monitoring/checkpoint_sync_daemon.py \
 - Validation metrics
 - Think tag tracking
 
-**Access:** http://192.168.x.x:8080/live_monitor_ui_v2.html
+**Access:** http://inference.local:8080/live_monitor_ui_v2.html
 
 ### API Server (Port 5000)
 **File:** `api/server.py`
@@ -469,7 +469,7 @@ GET  /api/checkpoints         - Checkpoint sync
 GET  /api/gpu                 - GPU stats
 ```
 
-**Access:** http://192.168.x.x:5000/api/status
+**Access:** http://inference.local:5000/api/status
 
 ---
 
@@ -515,7 +515,7 @@ with open("status/model_comparisons.json") as f:
 ### On RTX 3090 (Inference + Monitoring)
 
 ```bash
-ssh 192.168.x.x
+ssh inference.local
 
 cd ~/TRAINING
 
@@ -556,8 +556,8 @@ nohup python3 monitoring/automated_testing_daemon.py \
 
 # 10. Checkpoint Sync
 nohup python3 monitoring/checkpoint_sync_daemon.py \
-  --remote-host 192.168.x.x \
-  --remote-dir /path/to/training/current_model \
+  --remote-host trainer.local \
+  --remote-dir $TRAINING_BASE_DIR/current_model \
   --local-dir /home/user/TRAINING/current_model \
   --interval 300 --keep 3 \
   > logs/checkpoint_sync.log 2>&1 &

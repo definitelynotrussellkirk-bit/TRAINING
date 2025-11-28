@@ -6,12 +6,11 @@
 
 set -e
 
-# Patterns to check (these should not appear in code)
+# Patterns to check (these should not appear in production code)
+# NOTE: These literal strings are for grep detection - not hardcoding!
 FORBIDDEN_PATTERNS=(
-    "/path/to/training"
-    "192.168.x.x"
-    "192.168.x.x"
-    "192.168.x.x"
+    "/home/[a-z]*/Desktop/TRAINING"  # User-specific paths
+    "192\\.168\\.[0-9]+\\.[0-9]+"    # Private LAN IPs
 )
 
 # Files/directories to skip (docs, scratch, config files are OK)

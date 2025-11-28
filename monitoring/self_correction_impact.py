@@ -46,7 +46,7 @@ except ImportError:
     def get_status_dir():
         return get_base_dir() / "status"
     def get_remote_api_url():
-        return "http://192.168.x.x:8765"
+        return "http://inference.local:8765"
 
 logging.basicConfig(
     level=logging.INFO,

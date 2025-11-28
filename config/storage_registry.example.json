@@ -1,0 +1,73 @@
+{
+  "_comment": "Storage registry template - Copy to storage_registry.json and customize",
+  "version": "1.0",
+  "updated_at": null,
+  "strongholds": [
+    {
+      "name": "local_vault",
+      "stronghold_type": "local",
+      "description": "Primary local storage",
+      "host": null,
+      "share": null,
+      "base_path": "/path/to/TRAINING",
+      "mount_point": null,
+      "profile": {
+        "allocation_tb": 2.0,
+        "max_size_gb": null,
+        "retention_days": null,
+        "sync_schedule": "on_save",
+        "store_checkpoints": true,
+        "store_models": true,
+        "store_backups": true,
+        "store_logs": false,
+        "store_snapshots": true,
+        "auto_cleanup": true,
+        "cleanup_threshold_pct": 90.0
+      },
+      "status": "active",
+      "last_checked": null,
+      "last_sync": null,
+      "credentials_key": null,
+      "used_gb": 0.0,
+      "free_gb": 0.0,
+      "total_gb": 0.0
+    },
+    {
+      "name": "nas_primary",
+      "stronghold_type": "nas",
+      "description": "NAS for remote archival storage",
+      "host": "nas.local",
+      "share": "data",
+      "base_path": "llm_training",
+      "mount_point": null,
+      "profile": {
+        "allocation_tb": 10,
+        "max_size_gb": null,
+        "retention_days": null,
+        "sync_schedule": "daily",
+        "store_checkpoints": true,
+        "store_models": true,
+        "store_backups": true,
+        "store_logs": false,
+        "store_snapshots": true,
+        "auto_cleanup": true,
+        "cleanup_threshold_pct": 90.0
+      },
+      "status": "unknown",
+      "last_checked": null,
+      "last_sync": null,
+      "credentials_key": "nas_creds",
+      "used_gb": 0.0,
+      "free_gb": 0.0,
+      "total_gb": 0.0
+    }
+  ],
+  "_notes": [
+    "SETUP: Copy this file to storage_registry.json and customize",
+    "",
+    "stronghold_type: 'local', 'nas', or 'remote'",
+    "base_path: Root directory for this stronghold's data",
+    "host: IP or hostname for remote strongholds",
+    "credentials_key: Reference to secrets.json for auth"
+  ]
+}

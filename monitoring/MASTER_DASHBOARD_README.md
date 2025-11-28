@@ -97,7 +97,7 @@ The unified API must be running on port 8081:
 ps aux | grep "monitoring/api/server.py" | grep -v grep
 
 # Start if not running
-cd /path/to/training
+cd $TRAINING_BASE_DIR
 nohup python3 monitoring/api/server.py > logs/unified_api.log 2>&1 &
 
 # Verify
@@ -195,7 +195,7 @@ curl http://localhost:8081/api/unified
 **Restart API server:**
 ```bash
 pkill -f "monitoring/api/server.py"
-cd /path/to/training
+cd $TRAINING_BASE_DIR
 nohup python3 monitoring/api/server.py > logs/unified_api.log 2>&1 &
 ```
 
@@ -220,7 +220,7 @@ ps aux | grep launch_live_monitor
 
 Or access directly via file:
 ```bash
-firefox /path/to/training/monitoring/ui/master_dashboard.html
+firefox $TRAINING_BASE_DIR/monitoring/ui/master_dashboard.html
 ```
 
 ### Data Not Updating

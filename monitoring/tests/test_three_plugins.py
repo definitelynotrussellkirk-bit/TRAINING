@@ -5,7 +5,7 @@ Phase 2, Task 2.2
 """
 
 import sys
-sys.path.insert(0, '/path/to/training')
+sys.path.insert(0, '{BASE_DIR}')
 
 from monitoring.api.plugins.training_status import TrainingStatusPlugin
 from monitoring.api.plugins.curriculum import CurriculumPlugin

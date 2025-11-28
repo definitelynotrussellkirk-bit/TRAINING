@@ -107,7 +107,7 @@ def calculate_statistical_power(n: int, p1: float = 0.7, p2: float = 0.75, alpha
 
 def test_validation_set(
     validation_file: Path,
-    api_url: str = "http://192.168.x.x:5001/v1/chat/completions",
+    api_url: str = "http://inference.local:5001/v1/chat/completions",
     max_samples: int = None
 ) -> Tuple[int, int, float]:
     """
@@ -180,7 +180,7 @@ def test_validation_set(
 def run_benchmark(
     validation_dir: Path,
     sample_sizes: List[int],
-    api_url: str = "http://192.168.x.x:5001/v1/chat/completions"
+    api_url: str = "http://inference.local:5001/v1/chat/completions"
 ) -> List[BenchmarkResult]:
     """Run benchmarks across different sample sizes"""
     results = []
@@ -345,7 +345,7 @@ def main():
     parser.add_argument(
         '--api-url',
         type=str,
-        default='http://192.168.x.x:5001/v1/chat/completions',
+        default='http://inference.local:5001/v1/chat/completions',
         help='API endpoint URL'
     )
     parser.add_argument(

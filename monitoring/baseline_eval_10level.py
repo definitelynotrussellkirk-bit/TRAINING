@@ -54,7 +54,7 @@ def get_default_inference_url():
         from core.hosts import get_service_url
         return get_service_url("inference")
     except (ImportError, Exception):
-        return "http://192.168.x.x:8765"
+        return "http://inference.local:8765"
 
 def get_default_base_dir():
     """Get default base directory"""

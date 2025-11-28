@@ -19,8 +19,8 @@ Usage:
     python3 vault/branch_officer.py --zone nas --port 8768 --base-dir /volume1/data/llm_training
 
     # Query from 4090
-    curl http://192.168.x.x:8768/status
-    curl http://192.168.x.x:8768/assets
+    curl http://inference.local:8768/status
+    curl http://inference.local:8768/assets
 
 RPG Flavor:
     Branch Officers are loyal sentinels stationed at distant strongholds.

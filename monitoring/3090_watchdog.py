@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 3090 Process Watchdog - Auto-restart and health monitoring
-Ensures the API server on 192.168.x.x stays running 24/7
+Ensures the API server on inference.local stays running 24/7
 """
 
 import subprocess

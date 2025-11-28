@@ -92,6 +92,6 @@ echo "  cat status/deployment_status.json | jq ."
 
 echo ""
 echo "3090 Status:"
-INFERENCE_HOST="${INFERENCE_HOST:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").host)' 2>/dev/null || echo "192.168.x.x")}"
+INFERENCE_HOST="${INFERENCE_HOST:-$(python3 -c 'from core.hosts import get_host; print(get_host("3090").host)' 2>/dev/null || echo "inference.local")}"
 echo "  curl http://$INFERENCE_HOST:8765/health | jq ."
 echo "  curl http://$INFERENCE_HOST:8765/models/info | jq ."

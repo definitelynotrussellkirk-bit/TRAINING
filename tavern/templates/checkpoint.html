@@ -659,7 +659,7 @@
                     `;
                 }
 
-                // Skill evals
+                // Skill evals summary
                 if (evaluations.skill_evals?.length > 0) {
                     for (const eval_ of evaluations.skill_evals) {
                         html += `
@@ -671,6 +671,45 @@
                             </div>
                         `;
                     }
+                }
+
+                // Detailed results with model responses
+                if (evaluations.detailed_results?.length > 0) {
+                    html += '</div>';  // Close metrics grid
+                    html += '<div style="margin-top: 1.5rem;">';
+                    for (const detail of evaluations.detailed_results) {
+                        html += `
+                            <div style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                                <div style="font-weight: 600; margin-bottom: 0.5rem;">
+                                    ${detail.skill} L${detail.level} @ step ${detail.step} — ${(detail.accuracy * 100).toFixed(0)}% (${detail.correct}/${detail.total})
+                                </div>
+                        `;
+                        if (detail.results?.length > 0) {
+                            html += '<div style="font-size: 0.85rem; max-height: 300px; overflow-y: auto;">';
+                            for (const r of detail.results.slice(0, 10)) {  // Show first 10
+                                const statusIcon = r.correct ? '✅' : '❌';
+                                const modelAns = (r.model_answer || '').substring(0, 100);
+                                const expected = (r.expected || '').substring(0, 100);
+                                html += `
+                                    <div style="padding: 0.5rem; margin: 0.25rem 0; background: var(--bg-dark); border-radius: 4px;">
+                                        <div>${statusIcon} <strong>${r.problem_id || 'Problem'}</strong></div>
+                                        <div style="color: var(--text-muted); margin-top: 0.25rem;">
+                                            <span style="color: #4CAF50;">Expected:</span> <code>${expected}</code>
+                                        </div>
+                                        <div style="color: var(--text-muted);">
+                                            <span style="color: #ff9800;">Got:</span> <code>${modelAns || '(empty)'}</code>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                            if (detail.results.length > 10) {
+                                html += `<div style="color: var(--text-muted); padding: 0.5rem;">... and ${detail.results.length - 10} more</div>`;
+                            }
+                            html += '</div>';
+                        }
+                        html += '</div>';
+                    }
+                    html += '</div><div class="metrics-grid">';  // Reopen for passives
                 }
 
                 // Passive evals

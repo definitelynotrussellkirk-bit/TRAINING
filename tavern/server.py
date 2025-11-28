@@ -2580,6 +2580,35 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 except Exception:
                     pass
 
+            # 4. Detailed eval results with model responses from eval_results_history.json
+            results_file = BASE_DIR / "status" / "eval_results_history.json"
+            if results_file.exists():
+                try:
+                    with open(results_file) as f:
+                        results_data = json.load(f)
+                    # Find results near this step
+                    detailed_results = []
+                    for skill_id, levels in results_data.items():
+                        for level, evals_list in levels.items():
+                            for eval_entry in evals_list:
+                                eval_step = eval_entry.get("step", 0)
+                                if abs(eval_step - step) <= 500:
+                                    detailed_results.append({
+                                        "skill": skill_id,
+                                        "level": int(level),
+                                        "step": eval_step,
+                                        "accuracy": eval_entry.get("accuracy", 0),
+                                        "correct": eval_entry.get("correct", 0),
+                                        "total": eval_entry.get("total", 0),
+                                        "timestamp": eval_entry.get("timestamp"),
+                                        "results": eval_entry.get("results", []),  # Individual problem results
+                                    })
+                    if detailed_results:
+                        evals["detailed_results"] = detailed_results
+                        evals["has_data"] = True
+                except Exception:
+                    pass
+
         except Exception as e:
             logger.warning(f"Failed to load evals for checkpoint {step}: {e}")
 

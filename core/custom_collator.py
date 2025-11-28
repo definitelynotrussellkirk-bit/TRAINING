@@ -224,6 +224,10 @@ class DataCollatorForCompletionOnly:
         # For each example in batch, mask everything before the response
         labels = batch['labels'].clone()
 
+        # Get the <|im_end|> token ID to find response boundaries
+        im_end_token = self.tokenizer.encode("<|im_end|>", add_special_tokens=False)
+        im_end_id = im_end_token[0] if im_end_token else None
+
         for idx, input_ids in enumerate(batch['input_ids']):
             # Find ALL occurrences of response template (handles packed sequences)
             input_ids_list = input_ids.tolist()
@@ -239,18 +243,15 @@ class DataCollatorForCompletionOnly:
                 # Start with all masked
                 labels[idx, :] = self.ignore_index
 
-                # Unmask only the response portions (between template and next instruction)
-                # For packed sequences: mask instruction, train response, mask instruction, train response...
-                for pos_idx, response_start in enumerate(response_positions):
-                    # Find end of this response (next template start, or end of sequence)
-                    if pos_idx + 1 < len(response_positions):
-                        # There's another response after this one
-                        # Response ends at the start of next template (not response_start)
-                        next_template_start = response_positions[pos_idx + 1] - response_template_length
-                        response_end = next_template_start
-                    else:
-                        # Last response - goes to end of sequence
-                        response_end = len(input_ids_list)
+                # Unmask only the response portions (from template to <|im_end|>)
+                for response_start in response_positions:
+                    # Find the <|im_end|> token that ends this response
+                    response_end = len(input_ids_list)  # Default to end
+                    if im_end_id is not None:
+                        for j in range(response_start, len(input_ids_list)):
+                            if input_ids_list[j] == im_end_id:
+                                response_end = j + 1  # Include the <|im_end|> token
+                                break
 
                     # Unmask the response portion (set labels to actual token IDs)
                     labels[idx, response_start:response_end] = batch['input_ids'][idx, response_start:response_end]

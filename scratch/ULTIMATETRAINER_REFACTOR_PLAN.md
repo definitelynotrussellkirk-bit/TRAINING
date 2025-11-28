@@ -1,8 +1,8 @@
 # UltimateTrainer Refactor Plan
 
-> **Status:** PHASE 1-3, 5 COMPLETE | Phase 4 PENDING
+> **Status:** ALL PHASES COMPLETE ✅
 > **Created:** 2025-11-28
-> **Updated:** 2025-11-28 (Implementation complete)
+> **Updated:** 2025-11-28 (Phase 4 complete)
 > **Goal:** Refactor UltimateTrainer to delegate HF training to TrainerEngine while preserving all existing functionality
 
 ## Implementation Summary
@@ -28,14 +28,17 @@
   - Added `_run_with_engine()` method for delegation
   - Existing code path preserved as default
 
+- **Phase 4:** Extracted LiveMonitorCallback to separate module ✅
+  - Updated `trainer/monitoring/callbacks.py` with full production features
+  - Added `on_save()` for checkpoint ledger, eval queuing, remote sync
+  - Added `remote_eval_config` support
+  - Removed stale inference preview code (offloaded to 3090)
+  - Removed 526 lines from `core/train.py`
+  - `core/train.py` now imports from `trainer.monitoring.callbacks`
+
 - **Phase 5:** Added tests (19 tests, all passing)
   - `tests/test_trainer_engine.py`
   - Tests for TrainingResult, MonitorContext, config, helpers, checkpoint resumption, masking
-
-### Pending
-- **Phase 4:** Extract LiveMonitorCallback to separate module
-  - Currently ~400 lines inline in `train()`
-  - Would reduce `core/train.py` by ~500 lines
 
 ### How to Test the New Engine Path
 

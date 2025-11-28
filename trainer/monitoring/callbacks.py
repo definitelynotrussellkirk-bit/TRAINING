@@ -10,6 +10,9 @@ import os
 import time
 import torch
 import math
+import subprocess
+import threading
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from collections import OrderedDict
@@ -20,6 +23,13 @@ from core.logit_penalty import reset_processor_states, collect_penalty_stats
 from monitoring.servers.pattern_tracker import PatternTracker, get_default_patterns
 from monitoring.servers.layer_monitor import LayerMonitor
 
+# Optional imports for remote evaluation
+try:
+    from data_manager.remote_evaluator import RemoteEvaluator
+    REMOTE_EVAL_AVAILABLE = True
+except ImportError:
+    REMOTE_EVAL_AVAILABLE = False
+
 
 class LiveMonitorCallback(TrainerCallback):
     """
@@ -27,13 +37,14 @@ class LiveMonitorCallback(TrainerCallback):
 
     Provides:
     - Progress tracking (steps, loss, learning rate)
-    - Live inference previews
     - Validation loss tracking (micro-eval)
     - Throughput monitoring (tokens/sec, VRAM usage)
     - Pattern tracking (heatmaps)
     - Layer monitoring
     - Control signal handling (pause/stop)
     - Smart alerts (throughput drops, val gaps, etc.)
+    - Checkpoint ledger recording (on_save)
+    - Remote evaluation sync (on_save)
     """
 
     def __init__(
@@ -58,7 +69,8 @@ class LiveMonitorCallback(TrainerCallback):
         micro_eval_inputs=None,
         micro_eval_interval: int = 500,
         logits_processor=None,
-        layer_monitor: Optional[LayerMonitor] = None
+        layer_monitor: Optional[LayerMonitor] = None,
+        remote_eval_config: Optional[Dict] = None
     ):
         """
         Initialize LiveMonitorCallback.
@@ -85,6 +97,7 @@ class LiveMonitorCallback(TrainerCallback):
             micro_eval_interval: Micro eval interval
             logits_processor: Logits processor for generation
             layer_monitor: Optional layer monitor
+            remote_eval_config: Remote evaluation configuration
         """
         self.monitor = monitor
         self.status_writer = status_writer
@@ -96,14 +109,30 @@ class LiveMonitorCallback(TrainerCallback):
         self.evolution_tracker = evolution_tracker
         self.controller = controller  # Training control system
         self.fixed_val_dataset = fixed_val_dataset  # Fixed validation set
+
+        # Remote evaluation setup
+        self.remote_eval_config = remote_eval_config or {}
+        self.remote_evaluator = None
+        if REMOTE_EVAL_AVAILABLE and self.remote_eval_config.get("enabled", False):
+            try:
+                # Get defaults from hosts.json if not in config
+                from core.hosts import get_host
+                inference = get_host("3090")
+                default_host = inference.host if inference else "localhost"
+                default_port = inference.services.get("inference", {}).port if inference else 8765
+                self.remote_evaluator = RemoteEvaluator(
+                    host=self.remote_eval_config.get("host", default_host),
+                    port=self.remote_eval_config.get("port", default_port)
+                )
+                print(f"✅ Remote eval enabled: {self.remote_eval_config.get('host', default_host)}:{self.remote_eval_config.get('port', default_port)}")
+            except Exception as e:
+                print(f"⚠️  Remote eval setup failed: {e}")
+                self.remote_evaluator = None
+        self.last_remote_eval_step = 0
+
         self.last_update_time = time.time()
         self.last_prompt_snapshot_time = time.time()
-        self.update_interval = 2  # Status JSON refresh cadence (seconds)
-        self.prompt_snapshot_interval = 20  # Update prompt/golden cache without inference
-
-        # Keep inference lightweight: short outputs, frequent previews
-        self.inference_interval_steps = max(10, (self.eval_steps or 200) // 10)
-        self.last_inference_step = 0
+        self.update_interval = 1  # Status JSON refresh cadence (seconds)
 
         # Micro-eval settings
         self.micro_eval_inputs = micro_eval_inputs
@@ -165,7 +194,9 @@ class LiveMonitorCallback(TrainerCallback):
         """Called after each training step."""
         current_time = time.time()
         current_loss = state.log_history[-1].get('loss', 0.0) if state.log_history else 0.0
-        current_lr = state.log_history[-1].get('learning_rate', args.learning_rate) if state.log_history else args.learning_rate
+        # Use configured LR for constant scheduler
+        # Don't rely on log_history which has stale values from checkpoint resume
+        current_lr = args.learning_rate
         current_epoch = state.epoch if state.epoch else 0
 
         # Track loss stability
@@ -245,7 +276,6 @@ class LiveMonitorCallback(TrainerCallback):
                 current_vram = max(torch.cuda.memory_allocated(), torch.cuda.memory_reserved()) / (1024 ** 3)
             except Exception:
                 current_vram = None
-
         ratio = None
         if current_vram is not None and self.total_vram:
             ratio = current_vram / self.total_vram
@@ -256,7 +286,6 @@ class LiveMonitorCallback(TrainerCallback):
                 self.low_vram_counter = 0
         else:
             self.low_vram_counter = 0
-
         if steps_per_sec:
             samples_per_sec = steps_per_sec * self.effective_batch
             self.queue_velocity = {
@@ -264,7 +293,6 @@ class LiveMonitorCallback(TrainerCallback):
                 "samples_per_hour": samples_per_sec * 3600,
                 "effective_batch": self.effective_batch,
             }
-
         if tokens_per_sec is not None and current_vram is not None:
             self.vram_samples.append({
                 "step": state.global_step,
@@ -277,26 +305,8 @@ class LiveMonitorCallback(TrainerCallback):
 
         self.prev_step_time = current_time
 
-        # Lightweight micro-eval on tiny fixed set
+        # Micro-eval DISABLED - use 3090 for all evaluation
         val_loss = self.last_val_loss
-        if (
-            self.micro_eval_inputs is not None
-            and state.global_step > 0
-            and state.global_step % self.micro_eval_interval == 0
-            and state.global_step != self.last_micro_eval_step
-        ):
-            try:
-                self.model_ref.eval()
-                with torch.no_grad():
-                    micro_inputs = {k: v.to(self.model_ref.device) for k, v in self.micro_eval_inputs.items()}
-                    outputs = self.model_ref(**micro_inputs, labels=micro_inputs["input_ids"])
-                    val_loss = outputs.loss.item()
-                    self.last_val_loss = val_loss
-                    self.last_micro_eval_step = state.global_step
-            except Exception as e:
-                print(f"Warning: Micro-eval failed at step {state.global_step}: {e}")
-            finally:
-                self.model_ref.train()
 
         # Build simple alerts within the 10% overhead budget
         alerts = []
@@ -367,7 +377,7 @@ class LiveMonitorCallback(TrainerCallback):
                 epoch=int(current_epoch),
                 loss=current_loss,
                 lr=current_lr,
-                val_loss=self.last_val_loss,
+                val_loss=self.last_val_loss,  # Use validation loss from on_evaluate callback
                 batch_step=batch_step,
                 batch_total_steps=self.batch_total_steps,
                 batch_number=self.batch_number,
@@ -387,184 +397,7 @@ class LiveMonitorCallback(TrainerCallback):
             )
             self.last_update_time = current_time
 
-        # Inference updates (periodic) - show a live example with golden/model output
-        if (
-            self.raw_train_examples
-            and state.global_step > 0
-            and (state.global_step - self.last_inference_step) >= self.inference_interval_steps
-            and state.global_step != self.last_inference_step
-        ):
-            try:
-                print(f"[InferencePreview] step={state.global_step} interval={self.inference_interval_steps} last={self.last_inference_step}")
-                # Get the raw example from ORIGINAL dataset (before tokenization)
-                if self.raw_train_examples and len(self.raw_train_examples) > 0:
-                    # Get example based on current step (with wraparound)
-                    dataset_idx = state.global_step % len(self.raw_train_examples)
-                    current_example = self.raw_train_examples[dataset_idx]
-
-                    # Extract messages
-                    if 'messages' in current_example:
-                        # Extract from messages
-                        messages = current_example['messages']
-                        system_msg = next((m['content'] for m in messages if m['role'] == 'system'), None)
-                        user_msg = next((m['content'] for m in messages if m['role'] == 'user'), None)
-                        golden_msg = next((m['content'] for m in messages if m['role'] == 'assistant'), None)
-
-                        if user_msg and golden_msg:
-                            # Run inference on this exact example
-                            self.model_ref.eval()
-                            with torch.no_grad():
-                                # Format prompt
-                                prompt_messages = [{"role": "user", "content": user_msg}]
-                                text = self.tokenizer.apply_chat_template(
-                                    prompt_messages,
-                                    tokenize=False,
-                                    add_generation_prompt=True
-                                )
-
-                                # Generate
-                                inputs = self.tokenizer(text, return_tensors="pt").to(self.model_ref.device)
-                                reset_processor_states(self.logits_processor)
-                                outputs = self.model_ref.generate(
-                                    **inputs,
-                                    max_new_tokens=2048,  # Full output for reasoning tasks
-                                    temperature=0.1,
-                                    do_sample=False,
-                                    pad_token_id=self.tokenizer.eos_token_id,
-                                    eos_token_id=self.tokenizer.eos_token_id,
-                                    logits_processor=self.logits_processor,
-                                    min_new_tokens=1
-                                )
-
-                                # Decode model output
-                                model_output = self.tokenizer.decode(
-                                    outputs[0][inputs['input_ids'].shape[1]:],
-                                    skip_special_tokens=True
-                                ).strip()
-
-                            # Calculate loss on this specific example
-                            example_loss = None
-                            try:
-                                # Tokenize the full conversation (user + golden assistant)
-                                full_messages = [
-                                    {"role": "user", "content": user_msg},
-                                    {"role": "assistant", "content": golden_msg}
-                                ]
-                                full_text = self.tokenizer.apply_chat_template(
-                                    full_messages,
-                                    tokenize=False,
-                                    add_generation_prompt=False
-                                )
-
-                                # Tokenize
-                                full_inputs = self.tokenizer(full_text, return_tensors="pt").to(self.model_ref.device)
-
-                                # Get model logits
-                                with torch.no_grad():
-                                    outputs = self.model_ref(**full_inputs, labels=full_inputs['input_ids'])
-                                    example_loss = outputs.loss.item()
-                            except Exception as e:
-                                print(f"Warning: Could not calculate loss for this example: {e}")
-
-                            self.model_ref.train()
-
-                            # Clear GPU cache after inference to prevent OOM
-                            if torch.cuda.is_available():
-                                torch.cuda.empty_cache()
-
-                            # Estimate token lengths for metadata/analysis
-                            golden_token_len = None
-                            model_token_len = None
-                            try:
-                                golden_token_len = len(self.tokenizer.encode(golden_msg, add_special_tokens=False))
-                            except Exception:
-                                pass
-                            try:
-                                model_token_len = len(self.tokenizer.encode(model_output, add_special_tokens=False))
-                            except Exception:
-                                pass
-
-                            # Check if match
-                            matches = golden_msg.strip() == model_output.strip()
-
-                            # Update pattern tracker for heatmap coverage
-                            pattern_matrix = None
-                            pattern_id = None
-                            bin_name = None
-                            if self.pattern_tracker:
-                                try:
-                                    response_tokens = model_token_len if model_token_len is not None else 0
-                                    pattern_id, bin_name = self.pattern_tracker.classify(
-                                        user_msg or "",
-                                        response_tokens
-                                    )
-                                    self.pattern_tracker.record(pattern_id, bin_name, matches)
-                                    pattern_matrix = self.pattern_tracker.get_matrix()
-                                except Exception as e:
-                                    print(f"Warning: Pattern tracker update failed: {e}")
-
-                            pattern_metadata = None
-                            if pattern_id:
-                                pattern_metadata = {
-                                    "pattern_id": pattern_id,
-                                    "length_bin": bin_name,
-                                    "timestamp": datetime.now().isoformat(),
-                                    "loss": example_loss,
-                                }
-
-                            layer_summary = None
-                            if self.layer_monitor:
-                                try:
-                                    layer_summary = self.layer_monitor.snapshot()
-                                except Exception as e:
-                                    print(f"Warning: Layer monitor snapshot failed: {e}")
-
-                            # Display in terminal
-                            print("\n" + "=" * 80)
-                            print(f"🔍 CURRENT TRAINING EXAMPLE - Step {state.global_step:,}")
-                            print("=" * 80)
-                            print(f"📝 PROMPT:\n{user_msg[:500]}...")
-                            print(f"\n✅ GOLDEN:\n{golden_msg[:200]}...")
-                            print(f"\n🤖 MODEL:\n{model_output[:200]}...")
-                            status = "✅ MATCH" if matches else "❌ NO MATCH"
-                            print(f"\n{status}")
-                            if example_loss is not None:
-                                print(f"📉 LOSS ON THIS EXAMPLE: {example_loss:.4f}")
-                            print("=" * 80 + "\n")
-
-                            # Calculate batch-relative step
-                            batch_step = state.global_step - self.current_global_step
-
-                            # Update status JSON (use example-specific loss if available)
-                            display_loss = example_loss if example_loss is not None else current_loss
-                            self.status_writer.update_inference(
-                                step=state.global_step,
-                                total_steps=self.total_steps,
-                                epoch=int(current_epoch),
-                                loss=display_loss,
-                                lr=current_lr,
-                                prompt=user_msg,
-                                golden=golden_msg,
-                                model_output=model_output,
-                                matches=matches,
-                                system_prompt=system_msg,
-                                batch_step=batch_step,
-                                batch_total_steps=self.batch_total_steps,
-                                batch_number=self.batch_number,
-                                batch_queue_size=self.batch_queue_size,
-                                current_file=self.current_file,
-                                golden_output_length=golden_token_len,
-                                model_output_length=model_token_len,
-                                pattern_heatmap=pattern_matrix,
-                                layer_activity_summary=layer_summary,
-                                pattern_metadata=pattern_metadata
-                            )
-                            self.last_update_time = current_time
-                            self.last_inference_step = state.global_step
-            except Exception as e:
-                print(f"Warning: Could not display current training example at step {state.global_step}: {e}")
-                import traceback
-                traceback.print_exc()
+        # NOTE: Inference preview removed - use 3090 for inference, not 4090 during training
 
         # Evolution tracking (at special steps only)
         # DISABLED: Takes 60-300s per snapshot (too slow)
@@ -598,6 +431,201 @@ class LiveMonitorCallback(TrainerCallback):
                     print(f"   Val-Train Gap: {gap:+.4f}")
                     if gap > 0.5:
                         print(f"   ⚠️  Large gap detected - possible overfitting!")
+
+    def on_save(self, args, state, control, **kwargs):
+        """Handle checkpoint save - record to ledger, rename, sync to remote."""
+        # =========================================================
+        # CHECKPOINT LEDGER - Record stats at exact moment of save
+        # =========================================================
+        try:
+            from core.checkpoint_ledger import record_checkpoint
+
+            # Find the checkpoint that was just saved
+            checkpoint_dir = Path(args.output_dir) / f"checkpoint-{state.global_step}"
+
+            if checkpoint_dir.exists():
+                # Extract stats from training state
+                train_loss = None
+                val_loss = None
+                learning_rate = None
+                for entry in reversed(state.log_history or []):
+                    if train_loss is None and "loss" in entry:
+                        train_loss = entry["loss"]
+                    if val_loss is None and "eval_loss" in entry:
+                        val_loss = entry["eval_loss"]
+                    if learning_rate is None and "learning_rate" in entry:
+                        learning_rate = entry["learning_rate"]
+                    if train_loss and learning_rate:
+                        break
+
+                # Record to ledger (also renames to canonical name)
+                record = record_checkpoint(
+                    step=state.global_step,
+                    path=str(checkpoint_dir),
+                    train_loss=train_loss,
+                    val_loss=val_loss,
+                    learning_rate=learning_rate,
+                    epoch=state.epoch,
+                    training_file=getattr(self, 'current_file', None),
+                    rename=True,  # Rename to canonical: checkpoint-{step}-{date}-{time}
+                )
+                print(f"📖 Ledger: {record.canonical_name} (loss={train_loss:.4f})" if train_loss else f"📖 Ledger: {record.canonical_name}")
+
+                # =========================================================
+                # QUEUE EVALUATIONS - Quick eval + LITE passives
+                # Also queue FULL eval every 5000 steps
+                # =========================================================
+                try:
+                    from core.evaluation_ledger import queue_evaluation, queue_full_evaluation
+                    from core.passives import queue_passive_lite
+
+                    # Get current curriculum level from state
+                    curriculum_state_file = Path(args.output_dir).parent.parent / "data_manager" / "curriculum_state.json"
+                    if curriculum_state_file.exists():
+                        import json
+                        with open(curriculum_state_file) as f:
+                            curriculum = json.load(f)
+
+                        # Queue QUICK eval for each active skill at current level
+                        for skill_id, skill_state in curriculum.get("skills", {}).items():
+                            current_level = skill_state.get("current_level", 1)
+                            queue_evaluation(
+                                checkpoint_step=state.global_step,
+                                skill=skill_id,
+                                level=current_level,
+                                eval_type="quick",
+                                priority=10,
+                            )
+                            print(f"📋 Queued quick eval: {skill_id} L{current_level}")
+
+                        # Queue FULL eval every 5000 steps (all levels)
+                        if state.global_step % 5000 == 0:
+                            for skill_id in curriculum.get("skills", {}).keys():
+                                queue_full_evaluation(
+                                    checkpoint_step=state.global_step,
+                                    skill=skill_id,
+                                    priority=6,  # Medium priority
+                                )
+                                print(f"📋 Queued FULL eval: {skill_id} (all levels)")
+
+                    # Queue LITE passives
+                    queue_passive_lite(state.global_step)
+                    print(f"📋 Queued LITE passives")
+
+                except Exception as e:
+                    print(f"⚠️  Eval queue failed: {e}")
+
+        except Exception as e:
+            print(f"⚠️  Ledger recording failed: {e}")
+
+        # =========================================================
+        # REMOTE EVAL - Sync and evaluate on 3090
+        # =========================================================
+        if not self.remote_evaluator or not self.remote_eval_config.get("enabled", False):
+            return
+
+        eval_interval = self.remote_eval_config.get("eval_interval_steps", 5000)
+
+        # Check if it's time for remote eval
+        if state.global_step - self.last_remote_eval_step < eval_interval:
+            return
+
+        print(f"\n🌐 Remote Eval: Checkpoint at step {state.global_step}")
+
+        try:
+            # Find the checkpoint directory (may have been renamed)
+            checkpoint_dir = None
+            for candidate in Path(args.output_dir).glob(f"checkpoint-{state.global_step}*"):
+                if candidate.is_dir():
+                    checkpoint_dir = candidate
+                    break
+
+            if not checkpoint_dir:
+                checkpoint_dir = Path(args.output_dir) / f"checkpoint-{state.global_step}"
+
+            if not checkpoint_dir.exists():
+                print(f"⚠️  Checkpoint not found: {checkpoint_dir}")
+                return
+
+            # Get remote config from hosts.json
+            from core.hosts import get_host
+            inference = get_host("3090")
+            remote_user = self.remote_eval_config.get("remote_user", inference.ssh_user if inference else "")
+            remote_host = self.remote_eval_config.get("host", inference.host if inference else "localhost")
+            # Use paths.py constant for remote models dir fallback
+            try:
+                from paths import REMOTE_MODELS_DIR
+                remote_dir = self.remote_eval_config.get("remote_models_dir", str(REMOTE_MODELS_DIR))
+            except ImportError:
+                remote_dir = self.remote_eval_config.get("remote_models_dir", "~/llm/models")
+            model_id = f"qwen3-step-{state.global_step}"
+            remote_path = f"{remote_dir}/{model_id}"
+
+            # Async copy function
+            def async_sync_and_eval():
+                try:
+                    if self.remote_eval_config.get("sync_checkpoints", True):
+                        print(f"   📦 Syncing to {remote_host}:{remote_path}...")
+
+                        # Use rsync for efficient transfer
+                        rsync_cmd = [
+                            "rsync", "-az", "--delete",
+                            str(checkpoint_dir) + "/",
+                            f"{remote_user}@{remote_host}:{remote_path}/"
+                        ]
+
+                        result = subprocess.run(
+                            rsync_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=300
+                        )
+
+                        if result.returncode != 0:
+                            print(f"   ⚠️  Sync failed: {result.stderr}")
+                            return
+
+                        print(f"   ✅ Sync complete")
+
+                    # Register checkpoint with remote server
+                    print(f"   📝 Registering model: {model_id}")
+                    success = self.remote_evaluator.register_checkpoint(
+                        checkpoint_path=remote_path,
+                        model_id=model_id,
+                        tags=f"step{state.global_step},training"
+                    )
+
+                    if not success:
+                        print(f"   ⚠️  Registration failed")
+                        return
+
+                    # Submit eval job
+                    dataset_ref = self.remote_eval_config.get("eval_dataset", "eval_dataset.jsonl")
+                    metrics = self.remote_eval_config.get("metrics", ["accuracy", "loss"])
+
+                    print(f"   🎯 Submitting eval job...")
+                    job_id = self.remote_evaluator.submit_eval_job(
+                        model_id=model_id,
+                        dataset_ref=dataset_ref,
+                        metrics=metrics
+                    )
+
+                    print(f"   ✅ Eval job submitted: {job_id}")
+                    print(f"      Check status: python3 data_manager/remote_evaluator.py status {job_id}")
+
+                except subprocess.TimeoutExpired:
+                    print(f"   ⚠️  Sync timed out")
+                except Exception as e:
+                    print(f"   ⚠️  Remote eval error: {e}")
+
+            # Start async sync and eval (don't wait)
+            thread = threading.Thread(target=async_sync_and_eval, daemon=True)
+            thread.start()
+
+            self.last_remote_eval_step = state.global_step
+
+        except Exception as e:
+            print(f"⚠️  Remote eval setup failed: {e}")
 
 
 __all__ = ["LiveMonitorCallback"]

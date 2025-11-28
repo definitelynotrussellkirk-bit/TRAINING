@@ -74,6 +74,17 @@ from logit_penalty import (
     collect_penalty_stats,
 )
 from layer_monitor import LayerMonitor
+
+# Optimizer factory (Muon support)
+try:
+    from trainer.optimizers import create_optimizer as create_custom_optimizer
+    from trainer.optimizers import get_param_group_summary
+    MUON_AVAILABLE = True
+except ImportError:
+    MUON_AVAILABLE = False
+    create_custom_optimizer = None
+    get_param_group_summary = None
+
 # Optional: auto self-correction (may not be available)
 try:
     from auto_self_correction import create_self_correction_monitor
@@ -1961,6 +1972,43 @@ class UltimateTrainer:
                     print(f"⚠️ Layer monitor disabled: {exc}")
                     self.layer_monitor = None
 
+            # Create optimizer (Muon or AdamW based on config)
+            custom_optimizer = None
+            custom_scheduler = None
+            optimizer_type = "adamw"  # default
+
+            if MUON_AVAILABLE and self.config:
+                opt_config = getattr(self.config, "optimizer", {}) if hasattr(self.config, "optimizer") else {}
+                if isinstance(self.config, dict):
+                    opt_config = self.config.get("optimizer", {})
+
+                optimizer_type = opt_config.get("type", "adamw") if isinstance(opt_config, dict) else "adamw"
+
+                if optimizer_type == "muon":
+                    print("\n" + "=" * 60)
+                    print("MUON OPTIMIZER - Orthogonalized Momentum")
+                    print("=" * 60)
+
+                    # Show parameter grouping summary
+                    summary = get_param_group_summary(self.model)
+                    total = summary.muon_params + summary.adam_params
+                    print(f"  Hidden weights (Muon): {summary.muon_params:,} params ({100*summary.muon_params/total:.1f}%)")
+                    print(f"  Other (AdamW):         {summary.adam_params:,} params ({100*summary.adam_params/total:.1f}%)")
+
+                    # Create optimizer with config
+                    config_dict = self.config if isinstance(self.config, dict) else vars(self.config)
+                    custom_optimizer, custom_scheduler, opt_info = create_custom_optimizer(
+                        self.model,
+                        config_dict,
+                        optimizer_type="muon",
+                        num_training_steps=max_steps,
+                        num_warmup_steps=self.args.warmup_steps,
+                    )
+
+                    print(f"  Hidden LR: {opt_info.hidden_lr}")
+                    print(f"  Aux LR:    {opt_info.aux_lr}")
+                    print("=" * 60 + "\n")
+
             # Trainer
             trainer = Trainer(
                 model=self.model,
@@ -1991,7 +2039,8 @@ class UltimateTrainer:
                     micro_eval_interval=max(500, self.args.eval_steps),
                     logits_processor=self.logits_processor,
                     layer_monitor=self.layer_monitor,
-                )]
+                )],
+                optimizers=(custom_optimizer, custom_scheduler) if custom_optimizer else (None, None),
             )
 
             # Enable detailed monitoring if available

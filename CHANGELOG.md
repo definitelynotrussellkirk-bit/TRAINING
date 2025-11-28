@@ -4,6 +4,46 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-11-27 - Muon Optimizer Integration
+
+### What
+Added Muon optimizer as an alternative to AdamW. Muon uses orthogonalized momentum (Newton-Schulz iteration) for faster convergence on transformer hidden layers.
+
+### Why
+- Muon holds NanoGPT and CIFAR-10 speedrun records
+- Used in KIMI Moonshot 1T+ parameter training
+- ~25% less optimizer memory than AdamW
+- Built-in muP scaling for better hyperparameter transfer
+
+### Implementation
+- `trainer/optimizers/muon.py` - Vendored SingleDeviceMuonWithAuxAdam
+- `trainer/optimizers/param_groups.py` - Automatic parameter splitting
+- `trainer/optimizers/factory.py` - Config-driven optimizer creation
+- Integration with HF Trainer via `optimizers=` parameter
+
+### Parameter Grouping
+Muon applies to 73.9% of parameters (hidden weights):
+- Attention: q_proj, k_proj, v_proj, o_proj
+- MLP: gate_proj, up_proj, down_proj
+
+AdamW applies to 26.1% (other):
+- embed_tokens, lm_head, layernorms, biases
+
+### Usage
+```json
+{
+  "optimizer": {
+    "type": "muon",
+    "muon": {"hidden_lr": 0.02, "aux_lr": 0.0003, "momentum": 0.95}
+  }
+}
+```
+
+### Attribution
+Muon by Keller Jordan: https://github.com/KellerJordan/Muon
+
+---
+
 ## 2025-11-27 - Critical Bug Fix: Packing + Masking
 
 ### The Bug

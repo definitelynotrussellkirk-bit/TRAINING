@@ -192,6 +192,7 @@ The Tavern displays data. To feel like a **complete game**, we need:
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
 Latest updates (2025-11-27):
+- **Muon Optimizer** - Alternative to AdamW with orthogonalized momentum (faster convergence)
 - **Packing + Masking Bug Fix** - Critical fix for training on instruction text
 - **Sparring with Trainers** - Self-correction training system
 - **Task Master** - GPU-aware background task scheduler
@@ -201,7 +202,7 @@ Latest updates (2025-11-27):
 - **Checkpoint Ledger** - Single source of truth for checkpoint stats
 - **Host Registry** - Service discovery for distributed operation
 - **Task Master UI** - Visible in Guild Hall with action hints
-- **VRAM Estimator** - Now accounts for max_length and gradient checkpointing
+- **VRAM Estimator** - Now accounts for max_length, gradient checkpointing, and Flash Attention 2
 
 ---
 
@@ -1072,6 +1073,79 @@ guild/skills/
 └── state_manager.py # Runtime state tracking
 ```
 
+---
+
+## ⚡ MUON OPTIMIZER (New 2025-11-27)
+
+**Muon** (MomentUm Orthogonalized by Newton-schulz) is an alternative optimizer that can be faster than AdamW for transformer training.
+
+### How It Works
+
+1. Runs standard SGD-momentum internally
+2. Orthogonalizes each 2D parameter's update using Newton-Schulz iteration
+3. Only applies to hidden weight matrices (attention, MLP projections)
+4. Embeddings, output heads, and biases still use AdamW
+
+### Enable Muon
+
+Edit `config.json`:
+
+```json
+{
+  "optimizer": {
+    "type": "muon",
+    "muon": {
+      "hidden_lr": 0.02,
+      "aux_lr": 0.0003,
+      "momentum": 0.95
+    }
+  }
+}
+```
+
+### Parameter Grouping
+
+| Parameters | Optimizer | Default LR |
+|------------|-----------|------------|
+| q_proj, k_proj, v_proj, o_proj | Muon | 0.02 |
+| gate_proj, up_proj, down_proj | Muon | 0.02 |
+| embed_tokens, lm_head | AdamW | 0.0003 |
+| layernorms, biases | AdamW | 0.0003 |
+
+### Memory
+
+Muon uses ~25% less optimizer memory than AdamW:
+- AdamW: 8 bytes/param (m + v states)
+- Muon: 4 bytes/param (single momentum buffer)
+
+For 0.6B model: ~1.2 GB savings
+
+### Files
+
+```
+trainer/optimizers/
+├── __init__.py      # Module exports
+├── factory.py       # create_optimizer() entry point
+├── param_groups.py  # split_transformer_params()
+└── muon.py          # SingleDeviceMuonWithAuxAdam
+```
+
+### Usage
+
+```python
+from trainer.optimizers import create_optimizer, split_transformer_params
+
+# Via config
+optimizer, scheduler, info = create_optimizer(model, config, num_training_steps=10000)
+
+# Manual
+param_groups = split_transformer_params(model, hidden_lr=0.02, aux_lr=3e-4)
+optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
+```
+
+### Attribution
+
+Muon optimizer by Keller Jordan: https://github.com/KellerJordan/Muon
 
 ---
 

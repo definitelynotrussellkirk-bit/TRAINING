@@ -202,6 +202,30 @@ from vault.zones import (
     pull_from_zone,
 )
 
+# Storage Resolver (NEW - handle to path resolution)
+from vault.storage_resolver import (
+    # Core
+    StorageResolver,
+    get_resolver,
+    # Convenience functions
+    ask_storage,
+    ask_storage_handle,
+    locate_storage,
+    storage_exists,
+    # Common paths
+    get_checkpoint_path,
+    get_snapshot_path,
+    get_dataset_path,
+    get_queue_path,
+    get_current_model_path,
+    get_status_path,
+    get_log_path,
+    # Errors
+    StorageResolverError,
+    ZoneNotAvailable,
+    KindNotConfigured,
+)
+
 
 __all__ = [
     # VaultKeeper - Central Registry
@@ -284,6 +308,23 @@ __all__ = [
     "check_zones",
     "push_to_zone",
     "pull_from_zone",
+    # Storage Resolver
+    "StorageResolver",
+    "get_resolver",
+    "ask_storage",
+    "ask_storage_handle",
+    "locate_storage",
+    "storage_exists",
+    "get_checkpoint_path",
+    "get_snapshot_path",
+    "get_dataset_path",
+    "get_queue_path",
+    "get_current_model_path",
+    "get_status_path",
+    "get_log_path",
+    "StorageResolverError",
+    "ZoneNotAvailable",
+    "KindNotConfigured",
 ]
 
 

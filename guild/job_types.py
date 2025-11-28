@@ -1,0 +1,384 @@
+"""
+Job Types - Types of jobs that can be dispatched to workers.
+
+This module defines the job type system for distributed task execution.
+Jobs can be routed to appropriate workers based on their type and requirements.
+
+Usage:
+    from guild.job_types import JobType, JobSpec, JobResult
+
+    # Create a job spec
+    spec = JobSpec(
+        job_type=JobType.EVAL,
+        payload={"skill_id": "bin", "level": 5, "batch_size": 100},
+    )
+
+    # Submit via dispatcher
+    result = dispatcher.submit(spec)
+"""
+
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+
+class JobType(str, Enum):
+    """
+    Types of jobs that can be dispatched.
+
+    Each job type maps to worker roles that can handle it:
+    - EVAL → EVAL_WORKER role
+    - DATA_GEN → DATA_FORGE role
+    - SPARRING → EVAL_WORKER + INFERENCE (needs both)
+    - ARCHIVE → VAULT_WORKER role
+    - ANALYTICS → ANALYTICS role
+    """
+    # Inference-requiring jobs
+    EVAL = "eval"                  # Skill evaluation (needs inference)
+    SPARRING = "sparring"          # Self-correction sparring (needs inference)
+    INFERENCE = "inference"        # Direct inference request
+
+    # Data generation jobs (CPU-bound)
+    DATA_GEN = "data_gen"          # Generate training data
+    DATA_FILTER = "data_filter"    # Filter/validate data
+    DATA_CONVERT = "data_convert"  # Convert data formats
+
+    # Storage/archival jobs
+    ARCHIVE = "archive"            # Archive checkpoints
+    RETENTION = "retention"        # Apply retention policies
+    SYNC = "sync"                  # Sync between zones
+
+    # Reporting/analytics jobs
+    ANALYTICS = "analytics"        # Run analytics/metrics
+    REPORT = "report"              # Generate reports
+    HEALTH_CHECK = "health_check"  # System health check
+
+    @property
+    def requires_gpu(self) -> bool:
+        """Whether this job type requires GPU."""
+        return self in {
+            JobType.EVAL,
+            JobType.SPARRING,
+            JobType.INFERENCE,
+        }
+
+    @property
+    def requires_inference(self) -> bool:
+        """Whether this job type requires inference server access."""
+        return self in {
+            JobType.EVAL,
+            JobType.SPARRING,
+            JobType.INFERENCE,
+        }
+
+    @property
+    def default_timeout(self) -> int:
+        """Default timeout in seconds."""
+        timeouts = {
+            JobType.EVAL: 600,           # 10 min
+            JobType.SPARRING: 1800,      # 30 min
+            JobType.INFERENCE: 60,       # 1 min
+            JobType.DATA_GEN: 300,       # 5 min
+            JobType.DATA_FILTER: 300,
+            JobType.DATA_CONVERT: 300,
+            JobType.ARCHIVE: 1800,       # 30 min
+            JobType.RETENTION: 600,
+            JobType.SYNC: 3600,          # 1 hour
+            JobType.ANALYTICS: 300,
+            JobType.REPORT: 120,
+            JobType.HEALTH_CHECK: 60,
+        }
+        return timeouts.get(self, 300)
+
+
+class JobStatus(str, Enum):
+    """Status of a job."""
+    PENDING = "pending"        # Waiting to be picked up
+    QUEUED = "queued"          # In worker queue
+    RUNNING = "running"        # Currently executing
+    COMPLETED = "completed"    # Finished successfully
+    FAILED = "failed"          # Failed with error
+    CANCELLED = "cancelled"    # Cancelled by user
+    TIMEOUT = "timeout"        # Timed out
+
+
+class JobPriority(str, Enum):
+    """Priority levels for jobs."""
+    CRITICAL = "critical"      # Process immediately
+    HIGH = "high"              # High priority
+    NORMAL = "normal"          # Normal priority
+    LOW = "low"                # Low priority (background)
+    IDLE = "idle"              # Only when system is idle
+
+
+@dataclass
+class JobSpec:
+    """
+    Specification for a job to be submitted.
+
+    Contains all information needed to route and execute a job.
+    """
+    job_type: JobType
+    payload: Dict[str, Any] = field(default_factory=dict)
+    priority: JobPriority = JobPriority.NORMAL
+    timeout: Optional[int] = None  # Override default timeout
+    tags: List[str] = field(default_factory=list)
+    require_gpu: Optional[bool] = None  # Override auto-detection
+    target_device: Optional[str] = None  # Specific device to run on
+
+    def __post_init__(self):
+        if self.timeout is None:
+            self.timeout = self.job_type.default_timeout
+
+    @property
+    def needs_gpu(self) -> bool:
+        """Whether this job needs GPU."""
+        if self.require_gpu is not None:
+            return self.require_gpu
+        return self.job_type.requires_gpu
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "job_type": self.job_type.value,
+            "payload": self.payload,
+            "priority": self.priority.value,
+            "timeout": self.timeout,
+            "tags": self.tags,
+            "require_gpu": self.require_gpu,
+            "target_device": self.target_device,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "JobSpec":
+        return cls(
+            job_type=JobType(data["job_type"]),
+            payload=data.get("payload", {}),
+            priority=JobPriority(data.get("priority", "normal")),
+            timeout=data.get("timeout"),
+            tags=data.get("tags", []),
+            require_gpu=data.get("require_gpu"),
+            target_device=data.get("target_device"),
+        )
+
+
+@dataclass
+class JobResult:
+    """
+    Result from executing a job.
+
+    Returned by workers after job completion.
+    """
+    job_id: str
+    status: JobStatus
+    job_type: JobType
+    worker_id: str
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: float = 0
+    output: Dict[str, Any] = field(default_factory=dict)
+    error: Optional[str] = None
+    metrics: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def success(self) -> bool:
+        return self.status == JobStatus.COMPLETED
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "job_id": self.job_id,
+            "status": self.status.value,
+            "job_type": self.job_type.value,
+            "worker_id": self.worker_id,
+            "started_at": self.started_at.isoformat(),
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "duration_seconds": self.duration_seconds,
+            "output": self.output,
+            "error": self.error,
+            "metrics": self.metrics,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "JobResult":
+        return cls(
+            job_id=data["job_id"],
+            status=JobStatus(data["status"]),
+            job_type=JobType(data["job_type"]),
+            worker_id=data["worker_id"],
+            started_at=datetime.fromisoformat(data["started_at"]),
+            completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None,
+            duration_seconds=data.get("duration_seconds", 0),
+            output=data.get("output", {}),
+            error=data.get("error"),
+            metrics=data.get("metrics", {}),
+        )
+
+
+@dataclass
+class Job:
+    """
+    A job instance with full tracking information.
+
+    Combines spec with runtime tracking data.
+    """
+    job_id: str
+    spec: JobSpec
+    status: JobStatus = JobStatus.PENDING
+    created_at: datetime = field(default_factory=datetime.now)
+    queued_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    worker_id: Optional[str] = None
+    attempts: int = 0
+    max_attempts: int = 3
+    result: Optional[JobResult] = None
+
+    @classmethod
+    def create(cls, spec: JobSpec) -> "Job":
+        """Create a new job from a spec."""
+        return cls(
+            job_id=str(uuid.uuid4())[:8],
+            spec=spec,
+        )
+
+    @property
+    def is_terminal(self) -> bool:
+        """Whether the job is in a terminal state."""
+        return self.status in {
+            JobStatus.COMPLETED,
+            JobStatus.FAILED,
+            JobStatus.CANCELLED,
+            JobStatus.TIMEOUT,
+        }
+
+    @property
+    def can_retry(self) -> bool:
+        """Whether the job can be retried."""
+        return (
+            self.status == JobStatus.FAILED
+            and self.attempts < self.max_attempts
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "job_id": self.job_id,
+            "spec": self.spec.to_dict(),
+            "status": self.status.value,
+            "created_at": self.created_at.isoformat(),
+            "queued_at": self.queued_at.isoformat() if self.queued_at else None,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "worker_id": self.worker_id,
+            "attempts": self.attempts,
+            "max_attempts": self.max_attempts,
+            "result": self.result.to_dict() if self.result else None,
+        }
+
+
+# =============================================================================
+# CONVENIENCE CONSTRUCTORS
+# =============================================================================
+
+def eval_job(
+    skill_id: str,
+    level: int = 1,
+    batch_size: int = 100,
+    priority: JobPriority = JobPriority.HIGH,
+) -> JobSpec:
+    """Create an eval job spec."""
+    return JobSpec(
+        job_type=JobType.EVAL,
+        payload={
+            "skill_id": skill_id,
+            "level": level,
+            "batch_size": batch_size,
+        },
+        priority=priority,
+        tags=["eval", skill_id],
+    )
+
+
+def sparring_job(
+    skill_id: str,
+    count: int = 100,
+    checkpoint: Optional[str] = None,
+    priority: JobPriority = JobPriority.HIGH,
+) -> JobSpec:
+    """Create a sparring job spec."""
+    return JobSpec(
+        job_type=JobType.SPARRING,
+        payload={
+            "skill_id": skill_id,
+            "count": count,
+            "checkpoint": checkpoint,
+        },
+        priority=priority,
+        tags=["sparring", skill_id],
+    )
+
+
+def data_gen_job(
+    generator: str,
+    count: int = 1000,
+    priority: JobPriority = JobPriority.NORMAL,
+) -> JobSpec:
+    """Create a data generation job spec."""
+    return JobSpec(
+        job_type=JobType.DATA_GEN,
+        payload={
+            "generator": generator,
+            "count": count,
+        },
+        priority=priority,
+        tags=["data_gen", generator],
+    )
+
+
+def archive_job(
+    source_zone: str = "hot",
+    target_zone: str = "warm",
+    max_count: int = 10,
+) -> JobSpec:
+    """Create an archive job spec."""
+    return JobSpec(
+        job_type=JobType.ARCHIVE,
+        payload={
+            "source_zone": source_zone,
+            "target_zone": target_zone,
+            "max_count": max_count,
+        },
+        priority=JobPriority.LOW,
+        tags=["archive", f"{source_zone}_to_{target_zone}"],
+    )
+
+
+# =============================================================================
+# CLI
+# =============================================================================
+
+if __name__ == "__main__":
+    print("Job Types")
+    print("=" * 50)
+
+    for jt in JobType:
+        print(f"\n{jt.value}:")
+        print(f"  requires_gpu: {jt.requires_gpu}")
+        print(f"  requires_inference: {jt.requires_inference}")
+        print(f"  default_timeout: {jt.default_timeout}s")
+
+    print("\n\nExample Job Specs:")
+    print("-" * 50)
+
+    specs = [
+        eval_job("bin", level=5),
+        sparring_job("binary", count=100),
+        data_gen_job("binary_arithmetic", count=500),
+        archive_job("hot", "warm"),
+    ]
+
+    for spec in specs:
+        print(f"\n{spec.job_type.value}:")
+        print(f"  payload: {spec.payload}")
+        print(f"  priority: {spec.priority.value}")
+        print(f"  needs_gpu: {spec.needs_gpu}")

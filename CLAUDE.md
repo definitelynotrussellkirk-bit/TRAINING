@@ -201,6 +201,13 @@ The Tavern displays data. To feel like a **complete game**, we need:
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
 Latest updates (2025-11-28):
+- **Storage + Device Registry** - Complete infrastructure for distributed operations
+  - Device Registry (`core/devices.py`) - Device roles + capabilities
+  - Storage Resolver (`vault/storage_resolver.py`) - Zone-aware path resolution
+  - Lab Interface (`core/lab.py`) - Unified entry point
+  - Retention Engine (`management/retention_engine.py`) - Zone-aware cleanup
+  - Job Dispatcher (`guild/job_*.py`) - Route jobs to workers
+  - Workers (`workers/`) - Distributed job execution agents
 - **Skill Engine** - Unified interface for skill training, eval, and per-primitive accuracy
   - 11 passives (7 new), 39 primitives in catalog
   - Per-primitive accuracy tracking identifies specific weaknesses
@@ -837,6 +844,113 @@ result = pull_from_zone(
 
 ---
 
+## 🗑️ RETENTION ENGINE - ZONE-AWARE CLEANUP
+
+**NEW (2025-11-28)** - Intelligent checkpoint retention across zones
+
+The Retention Engine manages checkpoint retention with zone-aware policies.
+
+### Usage
+
+```python
+from management.retention_engine import get_retention_engine
+
+engine = get_retention_engine()
+
+# Apply hot zone policy
+result = engine.apply_hot_policy()
+print(f"Deleted {result.deleted_count} checkpoints, freed {result.freed_gb:.1f} GB")
+
+# Get retention report
+report = engine.get_report()
+
+# Archive old checkpoints to warm zone
+engine.archive_to_warm(max_count=10, min_age_hours=168)
+```
+
+### Retention Policies
+
+| Zone | Keep Recent | Max Size | Max Age | Notes |
+|------|------------|----------|---------|-------|
+| HOT | 50 | 150GB | 7 days | Fast local NVMe |
+| WARM | 100 | 500GB | 90 days | Primary NAS |
+| COLD | All | None | None | Archive, compressed |
+
+### CLI
+
+```bash
+# Get retention report
+python3 management/retention_engine.py report
+
+# Apply hot zone policy (dry run)
+python3 management/retention_engine.py apply --zone hot --dry-run
+
+# Archive to warm
+python3 management/retention_engine.py archive --zone hot
+```
+
+---
+
+## 🚀 JOB DISPATCHER - DISTRIBUTED JOBS
+
+**NEW (2025-11-28)** - Route and execute jobs on remote workers
+
+The Job Dispatcher routes jobs to appropriate workers based on device roles.
+
+### Job Types
+
+| Type | Requires | Description |
+|------|----------|-------------|
+| `EVAL` | GPU/Inference | Skill evaluations |
+| `SPARRING` | GPU/Inference | Self-correction training |
+| `DATA_GEN` | CPU | Generate training data |
+| `ARCHIVE` | CPU | Archive checkpoints |
+
+### Usage
+
+```python
+from guild.job_dispatcher import get_dispatcher
+from guild.job_types import eval_job, sparring_job
+
+dispatcher = get_dispatcher()
+
+# Submit and wait for eval job
+result = dispatcher.run(eval_job("bin", level=5))
+print(f"Accuracy: {result.output.get('accuracy')}")
+
+# Submit async
+job_id = dispatcher.submit(sparring_job("binary", count=100))
+result = dispatcher.wait(job_id, timeout=300)
+```
+
+### Start Workers
+
+```bash
+# On remote machine with inference access
+python3 -m workers.eval_worker --port 8900
+
+# On CPU-only machine for data generation
+python3 -m workers.data_forge_worker --port 8900
+```
+
+### Deploy Worker to Remote Host
+
+```bash
+./scripts/setup_worker.sh macmini-eval-1.local eval 8900
+```
+
+### Worker API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `POST /jobs` | Submit | Submit a job |
+| `GET /jobs/{id}` | Status | Get job status |
+| `POST /jobs/{id}/cancel` | Cancel | Cancel running job |
+| `GET /health` | Health | Worker health check |
+| `GET /status` | Status | Worker status |
+
+---
+
 ## 📁 DIRECTORY STRUCTURE
 
 **Reorganized 2025-11-22** - All files organized + RPG wrappers added 2025-11-26
@@ -952,10 +1066,17 @@ $TRAINING_BASE_DIR/
 │   ├── backup_manager.py        # Backup system
 │   ├── model_versioner.py       # Version control
 │   ├── consolidate_model.py     # Model consolidation
-│   ├── checkpoint_retention.py  # Checkpoint cleanup
+│   ├── checkpoint_retention.py  # Checkpoint cleanup (legacy)
+│   ├── retention_engine.py      # 🆕 Zone-aware retention
 │   ├── safe_checkpoint_cleanup.py
 │   ├── daily_snapshot.py        # Daily snapshots
 │   └── auto_disk_manager.py     # Auto disk cleanup
+│
+├── workers/                     # 🆕 Distributed job workers
+│   ├── __init__.py              # Module exports
+│   ├── base_worker.py           # BaseWorker ABC with HTTP server
+│   ├── eval_worker.py           # EvalWorker (eval, sparring, inference)
+│   └── data_forge_worker.py     # DataForgeWorker (data gen, filter)
 │
 ├── safety/                      # Watchdogs + health checks
 │   ├── daemon_watchdog.py       # Auto-restart daemon

@@ -4,6 +4,77 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-11-28 - Storage + Device Registry System
+
+### What
+Complete implementation of the Storage and Device Registry system (Phases 1-7). Provides unified infrastructure for device capabilities, storage zones, job routing, and distributed workers.
+
+### Phase 1-4: Core Infrastructure (Previously Completed)
+- `core/devices.py` - DeviceRegistry with roles + capabilities
+- `core/storage_types.py` - StorageZone, StorageKind, StorageHandle
+- `vault/storage_resolver.py` - Handle → path resolution
+- `core/lab.py` - Unified Lab interface (single entry point)
+- `config/devices.json` - 5 devices defined
+- `config/storage_zones.json` - hot/warm/cold zone roots
+
+### Phase 5: Retention Engine
+**`management/retention_engine.py`** (~800 lines)
+- Zone-aware checkpoint retention (hot/warm/cold)
+- Retention policies per zone (keep recent, max size, age limits)
+- Archive operations (hot → warm → cold)
+- Protection for promoted, latest, best checkpoints
+
+```python
+from management.retention_engine import get_retention_engine
+engine = get_retention_engine()
+result = engine.apply_hot_policy()  # Clean up hot zone
+```
+
+### Phase 6: Job Dispatcher System
+**`guild/job_types.py`** - Job type definitions
+- JobType enum (EVAL, SPARRING, DATA_GEN, ARCHIVE, etc.)
+- JobSpec, JobResult, Job dataclasses
+- Convenience constructors (eval_job, sparring_job, data_gen_job)
+
+**`guild/job_router.py`** - Find workers for jobs
+- Routes jobs to devices using DeviceRegistry roles
+- GPU requirement checking
+- Worker availability tracking
+
+**`guild/job_dispatcher.py`** - Submit jobs to workers
+- HTTP-based job submission to remote workers
+- Job status polling and wait functionality
+- Job persistence and retry logic
+
+### Phase 6d: Worker System
+**`workers/`** - Distributed job execution agents
+- `base_worker.py` - BaseWorker ABC with HTTP server
+- `eval_worker.py` - Handles EVAL, SPARRING, INFERENCE jobs
+- `data_forge_worker.py` - Handles DATA_GEN, DATA_FILTER jobs
+
+```bash
+# Start eval worker on remote machine
+python3 -m workers.eval_worker --port 8900
+```
+
+### Phase 7: Deployment
+**`config/workers.json`** - Worker deployment configuration
+**`scripts/setup_worker.sh`** - Remote worker setup script
+
+```bash
+./scripts/setup_worker.sh macmini-eval-1.local eval 8900
+```
+
+### Config Updates
+- `config/storage_zones.json` - Added `retention_policies` section
+
+### Stats
+- New files: 10
+- Total new lines: ~3,800
+- 58 unit tests passing
+
+---
+
 ## 2025-11-28 - Skill Engine Implementation
 
 ### What

@@ -93,6 +93,7 @@ class HostConfig:
     models_dir: str = ""
     checkpoints_dir: str = ""
     capabilities: List[str] = field(default_factory=list)
+    device_id: str = ""  # Link to devices.json (e.g., "trainer4090")
 
     def get_service_url(self, service: str) -> Optional[str]:
         """Get URL for a service on this host."""
@@ -111,6 +112,7 @@ class HostConfig:
             "name": self.name,
             "host": self.host,
             "role": self.role.value,
+            "device_id": self.device_id,
             "services": {
                 k: {"port": v.port, "path": v.path, "protocol": v.protocol}
                 for k, v in self.services.items()
@@ -229,6 +231,7 @@ class HostRegistry:
             models_dir=data.get("models_dir", ""),
             checkpoints_dir=data.get("checkpoints_dir", ""),
             capabilities=data.get("capabilities", []),
+            device_id=data.get("device_id", ""),
         )
 
     def _detect_local_host(self):
@@ -514,3 +517,64 @@ def get_host_base_dir(host_id: str) -> str:
     if not host.base_dir:
         raise ValueError(f"No base_dir configured for host: {host_id}")
     return host.base_dir
+
+
+# =============================================================================
+# CROSS-REFERENCE WITH DEVICE REGISTRY
+# =============================================================================
+
+def get_device_for_host(host_id: str) -> Optional[Any]:
+    """
+    Get DeviceInfo for a host.
+
+    Uses the device_id field in hosts.json to look up in devices.json.
+
+    Args:
+        host_id: Host ID (e.g., "4090")
+
+    Returns:
+        DeviceInfo or None if not linked or device not found
+    """
+    host = get_host(host_id)
+    if not host or not host.device_id:
+        return None
+
+    try:
+        from core.devices import get_device_registry
+        return get_device_registry().get(host.device_id)
+    except ImportError:
+        return None
+
+
+def get_host_for_device(device_id: str) -> Optional[HostConfig]:
+    """
+    Get HostConfig for a device.
+
+    Searches hosts.json for a host with matching device_id.
+
+    Args:
+        device_id: Device ID (e.g., "trainer4090")
+
+    Returns:
+        HostConfig or None if not found
+    """
+    for host in get_registry().list_all():
+        if host.device_id == device_id:
+            return host
+    return None
+
+
+def get_host_by_hostname(hostname: str) -> Optional[HostConfig]:
+    """
+    Get HostConfig by hostname/IP.
+
+    Args:
+        hostname: IP address or hostname
+
+    Returns:
+        HostConfig or None if not found
+    """
+    for host in get_registry().list_all():
+        if host.host == hostname:
+            return host
+    return None

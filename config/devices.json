@@ -1,0 +1,150 @@
+{
+  "_comment": "Device Registry - Defines compute capabilities and roles for each machine in the lab",
+  "schema_version": 1,
+
+  "devices": {
+    "trainer4090": {
+      "hostname": "192.168.x.x",
+      "description": "Primary training server with RTX 4090",
+      "roles": [
+        "trainer",
+        "eval_worker",
+        "storage_hot",
+        "control_plane"
+      ],
+      "gpus": [
+        {
+          "name": "RTX 4090",
+          "count": 1,
+          "vram_gb": 24
+        }
+      ],
+      "cpu": {
+        "cores": 16,
+        "threads": 32
+      },
+      "memory_gb": 64,
+      "storage_zones": ["hot"],
+      "network": {
+        "speed_gbps": 10,
+        "tags": ["lan_core", "trainer"]
+      },
+      "enabled": true
+    },
+
+    "inference3090": {
+      "hostname": "192.168.x.x",
+      "description": "Inference server with RTX 3090",
+      "roles": [
+        "inference",
+        "eval_worker",
+        "storage_hot"
+      ],
+      "gpus": [
+        {
+          "name": "RTX 3090",
+          "count": 1,
+          "vram_gb": 24
+        }
+      ],
+      "cpu": {
+        "cores": 8,
+        "threads": 16
+      },
+      "memory_gb": 32,
+      "storage_zones": ["hot"],
+      "network": {
+        "speed_gbps": 10,
+        "tags": ["lan_core", "inference"]
+      },
+      "enabled": true
+    },
+
+    "synology_data": {
+      "hostname": "192.168.x.x",
+      "description": "Primary Synology NAS for datasets and snapshots",
+      "roles": [
+        "storage_warm"
+      ],
+      "gpus": [],
+      "cpu": {
+        "cores": 4,
+        "threads": 8
+      },
+      "memory_gb": 8,
+      "storage_zones": ["warm"],
+      "network": {
+        "speed_gbps": 10,
+        "tags": ["nas", "data"]
+      },
+      "enabled": true
+    },
+
+    "synology_backup": {
+      "hostname": "192.168.x.x",
+      "description": "Backup Synology for redundancy",
+      "roles": [
+        "storage_warm"
+      ],
+      "gpus": [],
+      "cpu": {
+        "cores": 4,
+        "threads": 8
+      },
+      "memory_gb": 8,
+      "storage_zones": ["warm"],
+      "network": {
+        "speed_gbps": 10,
+        "tags": ["nas", "backup"]
+      },
+      "enabled": true
+    },
+
+    "synology_archive": {
+      "hostname": "192.168.x.x",
+      "description": "Archive Synology for long-term cold storage",
+      "roles": [
+        "storage_cold"
+      ],
+      "gpus": [],
+      "cpu": {
+        "cores": 4,
+        "threads": 8
+      },
+      "memory_gb": 8,
+      "storage_zones": ["cold"],
+      "network": {
+        "speed_gbps": 1,
+        "tags": ["nas", "archive"]
+      },
+      "enabled": true
+    }
+  },
+
+  "_notes": [
+    "To add a Mac mini as eval worker:",
+    "{",
+    "  \"macmini_eval_1\": {",
+    "    \"hostname\": \"macmini-eval-1.local\",",
+    "    \"roles\": [\"eval_worker\", \"data_forge\", \"vault_worker\", \"analytics\"],",
+    "    \"gpus\": [],",
+    "    \"cpu\": {\"cores\": 8, \"threads\": 8},",
+    "    \"memory_gb\": 16,",
+    "    \"storage_zones\": [],",
+    "    \"network\": {\"speed_gbps\": 1, \"tags\": [\"lan_edge\"]}",
+    "  }",
+    "}",
+    "",
+    "Roles:",
+    "  trainer        - Can run GPU training jobs",
+    "  inference      - Can serve model inference",
+    "  eval_worker    - Can run skill evaluations",
+    "  data_forge     - Can generate/filter training data",
+    "  vault_worker   - Can run archive/retention jobs",
+    "  analytics      - Can run dashboards/metrics",
+    "  storage_hot    - Hosts HOT zone storage",
+    "  storage_warm   - Hosts WARM zone storage",
+    "  storage_cold   - Hosts COLD zone storage",
+    "  control_plane  - Runs orchestration services"
+  ]
+}

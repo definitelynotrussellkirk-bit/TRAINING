@@ -1,0 +1,162 @@
+{
+  "_comment": "Storage Zones - Defines path resolution for storage handles",
+  "schema_version": 1,
+
+  "zones": {
+    "hot": {
+      "description": "Fast local NVMe storage",
+      "devices": ["trainer4090", "inference3090"],
+      "roots": {
+        "trainer4090": "/path/to/training",
+        "inference3090": "/home/user/llm"
+      }
+    },
+    "warm": {
+      "description": "Primary NAS storage",
+      "devices": ["synology_data", "synology_backup"],
+      "roots": {
+        "synology_data": "/volume1/data/llm_training",
+        "synology_backup": "/volume1/backup/llm_training"
+      }
+    },
+    "cold": {
+      "description": "Archive NAS storage",
+      "devices": ["synology_archive"],
+      "roots": {
+        "synology_archive": "/volume1/archive/llm_training"
+      }
+    }
+  },
+
+  "kind_patterns": {
+    "base_model": {
+      "default_zone": "warm",
+      "subdir": "models/base/{key}",
+      "description": "Pretrained base models"
+    },
+    "current_model": {
+      "default_zone": "hot",
+      "subdir": "models/current_model",
+      "description": "Active training model directory"
+    },
+    "checkpoint": {
+      "default_zone": "hot",
+      "subdir": "models/current_model/{key}",
+      "description": "Training checkpoints"
+    },
+    "snapshot": {
+      "default_zone": "warm",
+      "subdir": "snapshots/{key}",
+      "description": "Promoted/blessed checkpoints"
+    },
+    "dataset": {
+      "default_zone": "warm",
+      "subdir": "data/{key}",
+      "description": "Training datasets"
+    },
+    "benchmark": {
+      "default_zone": "warm",
+      "subdir": "data/validation/{key}",
+      "description": "Evaluation benchmarks"
+    },
+    "validation": {
+      "default_zone": "warm",
+      "subdir": "data/validation/{key}",
+      "description": "Validation datasets"
+    },
+    "queue": {
+      "default_zone": "hot",
+      "subdir": "queue/{key}",
+      "description": "Training queue directories"
+    },
+    "inbox": {
+      "default_zone": "hot",
+      "subdir": "inbox",
+      "description": "Inbox for new training files"
+    },
+    "log": {
+      "default_zone": "hot",
+      "subdir": "logs/{key}",
+      "description": "Log files"
+    },
+    "status": {
+      "default_zone": "hot",
+      "subdir": "status/{key}",
+      "description": "Status JSON files"
+    },
+    "meta": {
+      "default_zone": "warm",
+      "subdir": "meta/{key}",
+      "description": "Guild states, metadata"
+    },
+    "ledger": {
+      "default_zone": "hot",
+      "subdir": "status/{key}",
+      "description": "Checkpoint ledger"
+    },
+    "backup": {
+      "default_zone": "cold",
+      "subdir": "backups/{key}",
+      "description": "Backup archives"
+    },
+    "archive": {
+      "default_zone": "cold",
+      "subdir": "archives/{key}",
+      "description": "Compressed archives"
+    }
+  },
+
+  "retention_policies": {
+    "hot": {
+      "description": "HOT zone: Fast local storage, limited capacity",
+      "keep_recent_checkpoints": 50,
+      "keep_promoted_snapshots": true,
+      "keep_best": true,
+      "keep_latest": true,
+      "max_total_gb": 150,
+      "max_age_hours": 168,
+      "min_age_hours": 36,
+      "one_per_day_after_count": 30
+    },
+    "warm": {
+      "description": "WARM zone: NAS storage, moderate retention",
+      "keep_recent_checkpoints": 100,
+      "keep_promoted_snapshots": true,
+      "keep_best": true,
+      "max_total_gb": 500,
+      "max_age_hours": 2160,
+      "min_age_hours": 168,
+      "one_per_day_after_count": 50
+    },
+    "cold": {
+      "description": "COLD zone: Archive storage, keep everything",
+      "keep_recent_checkpoints": null,
+      "keep_promoted_snapshots": true,
+      "max_total_gb": null,
+      "max_age_hours": null,
+      "min_age_hours": 2160,
+      "compress": true
+    }
+  },
+
+  "_notes": [
+    "Zone selection priority:",
+    "  1. Explicit zone in StorageHandle",
+    "  2. default_zone for the StorageKind",
+    "",
+    "Path resolution:",
+    "  path = zones[zone].roots[device_id] + kind_patterns[kind].subdir",
+    "",
+    "The {key} placeholder is replaced with the handle's key.",
+    "For kinds without {key} (like inbox), the key is ignored.",
+    "",
+    "Example:",
+    "  StorageHandle(CHECKPOINT, 'checkpoint-182000', HOT) on trainer4090",
+    "  = /path/to/training/models/current_model/checkpoint-182000",
+    "",
+    "Retention policies:",
+    "  - HOT: Keep 50 recent + 1/day after 30, max 150GB, 7 day age limit",
+    "  - WARM: Keep 100 recent + 1/day after 50, max 500GB, 90 day limit",
+    "  - COLD: Keep everything, compress archives"
+  ]
+}

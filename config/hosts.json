@@ -1,6 +1,6 @@
 {
   "_comment": "Host registry - Single source of truth for all service locations",
-  "version": "3.0",
+  "version": "3.1",
 
   "warden_port": 8760,
 
@@ -9,6 +9,7 @@
       "name": "Training Server",
       "host": "192.168.x.x",
       "role": "trainer",
+      "device_id": "trainer4090",
       "ssh_user": "user",
       "base_dir": "/path/to/training",
       "services": {
@@ -45,6 +46,7 @@
       "name": "Inference Server",
       "host": "192.168.x.x",
       "role": "inference",
+      "device_id": "inference3090",
       "ssh_user": "user",
       "services": {
         "inference": {
@@ -68,6 +70,7 @@
       "name": "Synology NAS",
       "host": "192.168.x.x",
       "role": "storage",
+      "device_id": "synology_data",
       "ssh_user": "admin",
       "services": {},
       "models_dir": "/volume1/data/llm_training/models",

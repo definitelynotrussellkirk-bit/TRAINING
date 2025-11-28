@@ -1384,28 +1384,64 @@ class UltimateTrainer:
             print("   ✅ Using response-only collator (instruction portion will be masked)")
             print("   ℹ️  Model will ONLY learn to generate the assistant's answer")
 
-            # VERIFY masking is working with a test sample
+            # VERIFY masking is working with comprehensive validation
+            # CRITICAL: Prevents training on instructions (bug discovered 2025-11-27)
             if len(tokenized_dataset) > 0:
-                test_batch = data_collator([tokenized_dataset[0]])
-                masked_count = (test_batch['labels'][0] == -100).sum().item()
-                total_count = test_batch['labels'][0].shape[0]
-                trained_count = total_count - masked_count
+                # Test on multiple samples for packed sequences
+                sample_count = min(5, len(tokenized_dataset))
+                test_samples = [tokenized_dataset[i] for i in range(sample_count)]
+                test_batch = data_collator(test_samples)
 
-                print(f"   🔍 Masking verification:")
+                # Basic stats
+                masked_count = (test_batch['labels'] == -100).sum().item()
+                total_count = test_batch['labels'].numel()
+                trained_count = total_count - masked_count
+                masked_pct = 100 * masked_count / total_count
+
+                print(f"   🔍 Masking verification ({sample_count} samples):")
                 print(f"      Total tokens: {total_count}")
-                print(f"      Masked (instruction): {masked_count} ({100*masked_count/total_count:.1f}%)")
+                print(f"      Masked (instruction): {masked_count} ({masked_pct:.1f}%)")
                 print(f"      Trained (response): {trained_count} ({100*trained_count/total_count:.1f}%)")
 
-                if masked_count == 0:
-                    print(f"   ❌ ERROR: NO MASKING DETECTED!")
-                    print(f"      Training would learn full conversation format")
-                    print(f"      ABORTING to prevent bad training")
-                    return False
-                elif masked_count < total_count * 0.3:
-                    print(f"   ⚠️  WARNING: Very little masking (< 30%)")
-                    print(f"      This might indicate a problem")
-                else:
-                    print(f"   ✅ Masking looks correct (instruction is masked)")
+                # Run full validation suite
+                try:
+                    from masking_validators import validate_masking, MaskingValidationError
+                    enable_packing = os.environ.get("ENABLE_PACKING", "1").lower() in ("1", "true", "yes", "on")
+
+                    report = validate_masking(
+                        batch=test_batch,
+                        tokenizer=self.tokenizer,
+                        response_template="<|im_start|>assistant\n",
+                        end_token="<|im_end|>",
+                        packing_enabled=enable_packing,
+                        strict=False,  # Don't raise, we'll check results
+                    )
+
+                    if report.passed:
+                        print(f"   ✅ All masking validations passed")
+                    else:
+                        print(f"   ❌ MASKING VALIDATION FAILED!")
+                        for r in report.results:
+                            if not r.passed:
+                                print(f"      - {r.validator_name}: {r.message}")
+                        print(f"   ⚠️  This could cause the model to learn instructions!")
+                        print(f"   ⚠️  Check custom_collator.py and packing settings")
+                        # Fail hard to prevent bad training
+                        if masked_pct < 25:
+                            print(f"   ❌ ABORTING: Masking too low ({masked_pct:.1f}% < 25%)")
+                            return False
+                except ImportError:
+                    # Fallback to basic check if validators not available
+                    if masked_count == 0:
+                        print(f"   ❌ ERROR: NO MASKING DETECTED!")
+                        print(f"      Training would learn full conversation format")
+                        print(f"      ABORTING to prevent bad training")
+                        return False
+                    elif masked_pct < 30:
+                        print(f"   ⚠️  WARNING: Very little masking ({masked_pct:.1f}% < 30%)")
+                        print(f"      This might indicate training on instructions!")
+                    else:
+                        print(f"   ✅ Masking looks correct (instruction is masked)")
 
             # Custom callback for live monitoring
             from transformers import TrainerCallback

@@ -2,6 +2,69 @@
 
 Common problems and solutions for the training system.
 
+---
+
+## CRITICAL: Model Outputs Garbage
+
+### Symptom: Model outputs random text instead of answers
+
+**Example outputs:**
+- "You are happy. You enjoy helping others."
+- "| | | | | | | | | | | | | | |"
+- "Output contract: Return your answer..."
+- Random Greek letters, dates, instruction fragments
+
+**Root Cause:** Model was trained on instructions, not just responses.
+
+**Diagnosis:**
+```bash
+# Check masking ratio in training logs
+grep "Masking verification" logs/training_daemon.log | tail -5
+
+# Should show 30-70% masked. If < 20%, training is broken!
+```
+
+**The Bug (discovered 2025-11-27):**
+When packing is enabled (default), multiple examples are combined:
+```
+[user1 instruction][assistant response1][user2 instruction][assistant response2]...
+```
+The old collator only masked the FIRST instruction, so the model learned:
+- User instructions ("What is 2+2?")
+- System prompts ("You are a helpful assistant")
+- Response templates ("Output contract: ...")
+
+**Fix Applied:**
+1. `core/custom_collator.py` now masks ALL instruction segments
+2. `core/masking_validators.py` validates masking before training
+3. `core/train.py` aborts if masking < 25%
+
+**If you see this issue:**
+```bash
+# 1. Stop training
+python3 core/training_controller.py stop
+
+# 2. Clear Python cache
+find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null
+
+# 3. Restart daemon (picks up fixed collator)
+pkill -f training_daemon
+nohup python3 core/training_daemon.py >> logs/training_daemon.log 2>&1 &
+
+# 4. Verify masking is correct (should be 30-70% masked)
+sleep 30
+grep "Masking verification" logs/training_daemon.log | tail -3
+```
+
+**Prevention:**
+The masking validators now check:
+1. Masking ratio (30-85% expected)
+2. Response template count matches masked regions
+3. Trained tokens don't contain instruction markers
+4. Packed sequences have proper mask/train alternation
+
+---
+
 ## Training Daemon Issues
 
 ### Daemon Not Running

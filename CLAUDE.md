@@ -189,6 +189,20 @@ The Tavern displays data. To feel like a **complete game**, we need:
 
 ## 📦 RECENT UPDATES
 
+**CRITICAL BUG FIX: Packing + Masking (2025-11-27)**
+- ❌ **Bug**: Model outputting garbage like "You are happy. You enjoy helping others."
+- ❌ **Cause**: Packing combines multiple examples, but collator only masked FIRST instruction
+- ❌ **Result**: Model trained on ALL subsequent instructions, system prompts, user messages
+- ✅ **Fix**: `custom_collator.py` now finds ALL `<|im_start|>assistant` → `<|im_end|>` segments
+- ✅ **Validation**: New `masking_validators.py` with 5 validators to prevent recurrence:
+  1. `MaskingRatioValidator` - Ensures 30-85% masked
+  2. `ResponseTemplateCountValidator` - Verifies template count matches regions
+  3. `TrainedTokenContentValidator` - Checks for instruction markers in trained tokens
+  4. `PackedSequenceValidator` - Validates mask/train alternation pattern
+  5. `LabelDistributionValidator` - Detects anomalous label patterns
+- ✅ **Integration**: `train.py` now runs full validation suite before training
+- ✅ **Fail-safe**: Training aborts if masking < 25%
+
 **Sparring with the Trainers + Task Master (2025-11-27)**
 - ✅ **Self-correction system** - DIO spars with skill trainers, learns from mistakes
 - ✅ **3 training examples per wrong answer**:

@@ -970,17 +970,6 @@
           "step": 181865,
           "accuracy": 0.0,
           "level": 1,
-          "timestamp": "2025-11-27T01:35:55.586058",
-          "metadata": {
-            "level": 1,
-            "problems": 20,
-            "correct": 0
-          }
-        },
-        {
-          "step": 181865,
-          "accuracy": 0.0,
-          "level": 1,
           "timestamp": "2025-11-27T01:45:55.657023",
           "metadata": {
             "level": 1,
@@ -2152,6 +2141,19 @@
             "correct": 0,
             "model": "checkpoint-181865"
           }
+        },
+        {
+          "step": 183250,
+          "accuracy": 0.0,
+          "training_level": 1,
+          "mastered_level": 0,
+          "timestamp": "2025-11-27T19:21:22.267341",
+          "metadata": {
+            "level": 1,
+            "problems": 20,
+            "correct": 0,
+            "model": "checkpoint-181865"
+          }
         }
       ],
       "progression_history": []
@@ -2160,5 +2162,5 @@
   "active_skill": "binary",
   "started_at": "2025-11-26T04:00:00.000000",
   "migrated_at": "2025-11-25T05:58:43.214548",
-  "last_updated": "2025-11-27T19:09:46.628419"
+  "last_updated": "2025-11-27T19:21:22.268670"
 }

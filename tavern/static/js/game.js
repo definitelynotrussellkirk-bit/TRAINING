@@ -858,10 +858,14 @@ function updateAll() {
 
 async function fetchCampaignData() {
     try {
-        // Fetch active hero info (single endpoint has all we need)
-        const heroResp = await fetch('/api/hero');
-        if (!heroResp.ok) return;
-        const hero = await heroResp.json();
+        // Fetch active hero info and titles in parallel
+        const [heroResp, titlesResp] = await Promise.all([
+            fetch('/api/hero'),
+            fetch('/api/titles')
+        ]);
+
+        const hero = heroResp.ok ? await heroResp.json() : null;
+        const titles = titlesResp.ok ? await titlesResp.json() : null;
 
         if (!hero || !hero.name) return;
 
@@ -872,7 +876,17 @@ async function fetchCampaignData() {
         const iconEl = document.querySelector('.dio-icon');
 
         if (nameEl) nameEl.textContent = hero.name;
-        if (titleEl) titleEl.textContent = hero.rpg_name;
+
+        // Use dynamic title from titles API, fallback to rpg_name
+        if (titleEl) {
+            if (titles && titles.primary && titles.primary.name) {
+                titleEl.textContent = titles.primary.name;
+                titleEl.title = titles.primary.description || '';
+            } else {
+                titleEl.textContent = hero.rpg_name;
+            }
+        }
+
         if (classEl) classEl.textContent = hero.model_name || hero.hero_id;
         if (iconEl) iconEl.textContent = hero.icon || '🦸';
 
@@ -880,8 +894,16 @@ async function fetchCampaignData() {
         GameState.heroName = hero.name;
         GameState.heroIcon = hero.icon;
         GameState.modelName = hero.model_name;
+        GameState.titles = titles;
 
-        console.log(`Hero loaded: ${hero.name} (${hero.rpg_name})`);
+        // Log warnings if any
+        if (titles && titles.warnings && titles.warnings.length > 0) {
+            titles.warnings.forEach(w => {
+                console.warn(`Title warning: ${w.icon || '⚠️'} ${w.name} - ${w.description}`);
+            });
+        }
+
+        console.log(`Hero loaded: ${hero.name} (${titles?.primary?.name || hero.rpg_name})`);
     } catch (err) {
         console.error('Error fetching hero:', err);
     }

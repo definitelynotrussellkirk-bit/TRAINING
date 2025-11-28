@@ -465,6 +465,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._serve_hero_info()
         elif path == "/api/skills":
             self._serve_skills()
+        elif path == "/api/titles":
+            self._serve_titles()
         elif path == "/api/curriculum":
             self._serve_curriculum()
         elif path == "/api/passives/definitions":
@@ -551,6 +553,17 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/events/stats":
             self._serve_events_stats()
 
+        # Jobs API - Distributed job execution
+        elif path == "/jobs" or path == "/jobs.html":
+            self._serve_template("jobs.html")
+        elif path == "/api/jobs":
+            self._serve_jobs_list(query)
+        elif path == "/api/jobs/stats":
+            self._serve_jobs_stats()
+        elif path.startswith("/api/jobs/"):
+            job_id = path.replace("/api/jobs/", "")
+            self._serve_job(job_id)
+
         # Campaign - Hero/Campaign management
         elif path == "/campaign" or path == "/campaign.html":
             self._serve_template("campaign.html")
@@ -619,6 +632,14 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Vault - Delete checkpoints
         elif path == "/api/vault/delete":
             self._delete_checkpoints()
+        # Jobs - Submit jobs
+        elif path == "/api/jobs":
+            self._submit_job()
+        elif path == "/api/jobs/eval":
+            self._submit_eval_job()
+        elif path.endswith("/cancel"):
+            job_id = path.replace("/api/jobs/", "").replace("/cancel", "")
+            self._cancel_job(job_id)
         else:
             self._send_error(404, "Endpoint not found")
 
@@ -1140,6 +1161,74 @@ class TavernHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Skills error: {e}")
             self._send_json({"skills": [], "error": str(e)})
+
+    def _serve_titles(self):
+        """Serve hero titles based on current training state."""
+        try:
+            from guild.titles import get_titles
+
+            # Get training status for total steps
+            status_file = BASE_DIR / "status" / "training_status.json"
+            total_steps = 0
+            if status_file.exists():
+                with open(status_file) as f:
+                    status = json.load(f)
+                    total_steps = status.get("global_step", 0)
+
+            # Get skill states from curriculum
+            skill_states = {}
+            skills_data = get_skills_data()
+            total_level = 0
+            for skill in skills_data.get("skills", []):
+                skill_id = skill.get("id")
+                if skill_id:
+                    mastered = skill.get("mastered_level", 0)
+                    total_level += mastered
+                    skill_states[skill_id] = {
+                        "level": skill.get("training_level", 1),
+                        "accuracy": skill.get("recent_accuracy", 0) / 100.0,  # Convert from percent
+                        "primitive_accuracy": {},  # Could load from skill state
+                    }
+
+            # Get titles
+            result = get_titles(total_steps, total_level, skill_states)
+
+            # Format response
+            response = {
+                "primary": {
+                    "id": result.primary.id,
+                    "name": result.primary.name,
+                    "description": result.primary.description,
+                    "category": result.primary.category,
+                } if result.primary else None,
+                "skill_titles": {
+                    k: {"id": v.id, "name": v.name, "description": v.description}
+                    for k, v in result.skill_titles.items()
+                },
+                "warnings": [
+                    {"id": w.id, "name": w.name, "description": w.description, "icon": w.icon}
+                    for w in result.warnings
+                ],
+                "achievements": [
+                    {"id": a.id, "name": a.name, "icon": a.icon}
+                    for a in result.achievements
+                ],
+                "total_count": len(result.all_titles),
+                "total_steps": total_steps,
+                "total_level": total_level,
+            }
+            self._send_json(response)
+        except Exception as e:
+            logger.error(f"Titles error: {e}")
+            import traceback
+            traceback.print_exc()
+            self._send_json({
+                "primary": {"id": "unknown", "name": "Unknown", "description": ""},
+                "skill_titles": {},
+                "warnings": [],
+                "achievements": [],
+                "error": str(e)
+            })
 
     def _serve_skill_page(self, skill_id: str):
         """Serve the skill detail page."""
@@ -2547,6 +2636,149 @@ class TavernHandler(SimpleHTTPRequestHandler):
             logger.error(f"Delete checkpoints error: {e}")
             self._send_json({"success": False, "error": str(e)}, 500)
 
+    # =========================================================================
+    # JOBS API - Distributed job execution
+    # =========================================================================
+
+    def _get_job_client(self):
+        """Get job store client, caching for performance."""
+        if not hasattr(self, '_job_client'):
+            try:
+                from jobs.client import JobStoreClient
+                self._job_client = JobStoreClient()
+            except ImportError:
+                self._job_client = None
+        return self._job_client
+
+    def _serve_jobs_list(self, query):
+        """List jobs with optional filters."""
+        client = self._get_job_client()
+        if not client:
+            self._send_json({"error": "Jobs module not available"}, 500)
+            return
+
+        try:
+            status = query.get("status", [None])[0]
+            job_type = query.get("type", [None])[0]
+            limit = int(query.get("limit", [100])[0])
+
+            jobs = client.list(status=status, job_type=job_type, limit=limit)
+
+            self._send_json({
+                "count": len(jobs),
+                "jobs": jobs,
+            })
+
+        except Exception as e:
+            logger.error(f"Jobs list error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_jobs_stats(self):
+        """Get job statistics."""
+        client = self._get_job_client()
+        if not client:
+            self._send_json({"error": "Jobs module not available"}, 500)
+            return
+
+        try:
+            stats = client.stats()
+            self._send_json(stats)
+
+        except Exception as e:
+            logger.error(f"Jobs stats error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_job(self, job_id: str):
+        """Get a specific job."""
+        client = self._get_job_client()
+        if not client:
+            self._send_json({"error": "Jobs module not available"}, 500)
+            return
+
+        try:
+            job = client.get(job_id)
+            if job:
+                self._send_json(job)
+            else:
+                self._send_json({"error": f"Job not found: {job_id}"}, 404)
+
+        except Exception as e:
+            logger.error(f"Jobs get error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _submit_job(self):
+        """Submit a generic job."""
+        client = self._get_job_client()
+        if not client:
+            self._send_json({"error": "Jobs module not available"}, 500)
+            return
+
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length).decode())
+
+            from guild.job_types import JobSpec
+            spec = JobSpec.from_dict(body)
+            job_id = client.submit(spec)
+
+            self._send_json({
+                "success": True,
+                "job_id": job_id,
+            }, 201)
+
+        except Exception as e:
+            logger.error(f"Submit job error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
+    def _submit_eval_job(self):
+        """Submit an eval job (convenience endpoint)."""
+        client = self._get_job_client()
+        if not client:
+            self._send_json({"error": "Jobs module not available"}, 500)
+            return
+
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length).decode())
+
+            skill_id = body.get("skill_id", "bin")
+            level = int(body.get("level", 1))
+            batch_size = int(body.get("batch_size", 100))
+
+            from jobs import eval_job
+            spec = eval_job(skill_id, level, batch_size)
+            job_id = client.submit(spec)
+
+            self._send_json({
+                "success": True,
+                "job_id": job_id,
+                "skill_id": skill_id,
+                "level": level,
+            }, 201)
+
+        except Exception as e:
+            logger.error(f"Submit eval job error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
+    def _cancel_job(self, job_id: str):
+        """Cancel a job."""
+        client = self._get_job_client()
+        if not client:
+            self._send_json({"error": "Jobs module not available"}, 500)
+            return
+
+        try:
+            success = client.cancel(job_id)
+
+            if success:
+                self._send_json({"success": True, "status": "cancelled"})
+            else:
+                self._send_json({"success": False, "error": "Cannot cancel job"}, 400)
+
+        except Exception as e:
+            logger.error(f"Cancel job error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
     def _serve_vault_zones(self, refresh: bool = False):
         """Serve zone status by querying Zone Wardens."""
         try:
@@ -3836,9 +4068,9 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
         host = host_config["host"]
         models_dir = host_config.get("models_dir")
-            if not models_dir:
-                self._send_json({"success": False, "error": f"Host {host_id} missing models_dir in hosts.json"}, 500)
-                return
+        if not models_dir:
+            self._send_json({"success": False, "error": f"Host {host_id} missing models_dir in hosts.json"}, 500)
+            return
         remote_target = f"{host}:{models_dir}/{checkpoint_name}/"
 
         cmd = [

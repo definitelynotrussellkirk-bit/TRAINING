@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-11-28 (TrainerEngine Refactor Complete)
+**Last Updated:** 2025-11-28 (Distributed Job System Complete)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 ---
@@ -35,12 +35,14 @@ DROP QUEST → DIO BATTLES → GAIN XP → LEVEL UP → UNLOCK SKILLS → REPEAT
 |----------|-----|---------|
 | **Tavern** | http://localhost:8888 | Main game UI - DIO, battles, stats |
 | **Quests** | http://localhost:8888/quests | Quest board - manage training queue |
+| **Jobs** | http://localhost:8888/jobs | Distributed job queue (eval, sparring) |
 | **Oracle** | http://localhost:8888/oracle | Talk to DIO - chat with any checkpoint |
 | **Vault** | http://localhost:8888/vault | Browse checkpoints, zones, assets |
 | **Settings** | http://localhost:8888/settings | Config, VRAM calc, scheduler |
 | **Scheduler** | http://localhost:8888/scheduler | Curriculum scheduling |
 | Guild Hall | http://localhost:8888/guild | Skill progression dashboard |
 | VaultKeeper API | http://localhost:8767/api/stats | Asset & Ledger API |
+| Jobs API | http://localhost:8767/api/jobs | Job queue API |
 
 ### Start Playing
 
@@ -201,6 +203,21 @@ The Tavern displays data. To feel like a **complete game**, we need:
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
 Latest updates (2025-11-28):
+- **Hero Titles System** - Threshold-based labels for capability milestones
+  - `configs/titles.yaml` - Title definitions with conditions
+  - `guild/titles.py` - TitleEngine evaluates state against conditions
+  - Tavern API `/api/titles` - Returns primary title, skill titles, warnings
+  - UI shows dynamic title based on training progress
+- **Lore Dictionary** - Centralized tooltips and UI copy
+  - `tavern/lore.py` - RPG-flavored explanations for training concepts
+  - Use for consistent tooltips across Tavern UI
+- **Distributed Job System** - Central job store with pull model for workers
+  - SQLite job store (`jobs/store.py`) - Persistent job queue
+  - Lease-based claiming for crash recovery
+  - VaultKeeper API (`/api/jobs/*`) - Submit, claim, status updates
+  - ClaimingWorker (`workers/claiming_worker.py`) - Pull-based job execution
+  - Tavern Jobs UI (`/jobs`) - View and submit jobs from browser
+  - Mac mini support in devices.json
 - **Storage + Device Registry** - Complete infrastructure for distributed operations
   - Device Registry (`core/devices.py`) - Device roles + capabilities
   - Storage Resolver (`vault/storage_resolver.py`) - Zone-aware path resolution

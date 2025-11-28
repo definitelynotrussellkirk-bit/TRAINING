@@ -1,0 +1,213 @@
+# Hero Titles - Threshold-based labels for capability milestones
+#
+# Titles are evaluated in order (first match wins).
+# Conditions can check:
+#   - skill.<id>.level: Skill level (1-N)
+#   - skill.<id>.accuracy: Rolling accuracy (0.0-1.0)
+#   - skill.<id>.primitive.<name>: Primitive accuracy (0.0-1.0)
+#   - total_level: Sum of all skill levels
+#   - total_steps: Training steps completed
+#
+# Real value: Quick visual feedback on capability thresholds.
+# These aren't cosmetic - they represent meaningful training milestones.
+
+# ==============================================================================
+# GLOBAL TITLES (based on overall progress)
+# ==============================================================================
+global_titles:
+  # Early game
+  - id: "untrained"
+    name: "Untrained"
+    description: "Fresh from initialization"
+    conditions:
+      total_steps: {lt: 1000}
+    priority: 0
+
+  - id: "apprentice"
+    name: "Apprentice"
+    description: "Beginning the journey"
+    conditions:
+      total_steps: {gte: 1000, lt: 10000}
+    priority: 10
+
+  - id: "journeyman"
+    name: "Journeyman"
+    description: "Finding footing in the basics"
+    conditions:
+      total_steps: {gte: 10000, lt: 50000}
+    priority: 20
+
+  - id: "adept"
+    name: "Adept"
+    description: "Competent across fundamentals"
+    conditions:
+      total_steps: {gte: 50000, lt: 100000}
+    priority: 30
+
+  - id: "expert"
+    name: "Expert"
+    description: "Deep mastery developing"
+    conditions:
+      total_steps: {gte: 100000, lt: 200000}
+    priority: 40
+
+  - id: "master"
+    name: "Master"
+    description: "Extensive training complete"
+    conditions:
+      total_steps: {gte: 200000}
+    priority: 50
+
+# ==============================================================================
+# SKILL-SPECIFIC TITLES (awarded based on skill mastery)
+# ==============================================================================
+skill_titles:
+  # Binary Arithmetic titles
+  bin:
+    - id: "binary_novice"
+      name: "Binary Novice"
+      description: "Learning the language of bits"
+      conditions:
+        level: {gte: 1, lt: 3}
+      priority: 10
+
+    - id: "bit_counter"
+      name: "Bit Counter"
+      description: "Comfortable with basic binary"
+      conditions:
+        level: {gte: 3, lt: 5}
+        accuracy: {gte: 0.7}
+      priority: 20
+
+    - id: "binary_arithmetician"
+      name: "Binary Arithmetician"
+      description: "Solid binary operations"
+      conditions:
+        level: {gte: 5, lt: 10}
+        accuracy: {gte: 0.8}
+      priority: 30
+
+    - id: "bit_master"
+      name: "Bit Master"
+      description: "High-level binary mastery"
+      conditions:
+        level: {gte: 10, lt: 20}
+        accuracy: {gte: 0.85}
+      priority: 40
+
+    - id: "keeper_of_bits"
+      name: "Keeper of Bits"
+      description: "Near-perfect binary reasoning"
+      conditions:
+        level: {gte: 20}
+        accuracy: {gte: 0.9}
+      priority: 50
+
+  # Syllacrostic (SY) titles
+  sy:
+    - id: "word_student"
+      name: "Word Student"
+      description: "Beginning word puzzles"
+      conditions:
+        level: {gte: 1, lt: 5}
+      priority: 10
+
+    - id: "word_weaver"
+      name: "Word Weaver"
+      description: "Crafting syllabic patterns"
+      conditions:
+        level: {gte: 5, lt: 15}
+        accuracy: {gte: 0.7}
+      priority: 20
+
+    - id: "syllable_sage"
+      name: "Syllable Sage"
+      description: "Master of word structure"
+      conditions:
+        level: {gte: 15, lt: 30}
+        accuracy: {gte: 0.8}
+      priority: 30
+
+    - id: "lexicon_lord"
+      name: "Lexicon Lord"
+      description: "Supreme word mastery"
+      conditions:
+        level: {gte: 30}
+        accuracy: {gte: 0.85}
+      priority: 40
+
+# ==============================================================================
+# PRIMITIVE MASTERY TITLES (awarded for specific primitive excellence)
+# ==============================================================================
+primitive_titles:
+  # Binary primitives
+  - id: "carry_master"
+    name: "Carry Master"
+    description: "Mastered binary carry operations"
+    skill: "bin"
+    primitive: "binary_add_with_carry"
+    conditions:
+      accuracy: {gte: 0.95}
+    priority: 60
+
+  - id: "overflow_handler"
+    name: "Overflow Handler"
+    description: "Expert at overflow detection"
+    skill: "bin"
+    primitive: "overflow_detection"
+    conditions:
+      accuracy: {gte: 0.95}
+    priority: 60
+
+  - id: "twos_complement_sage"
+    name: "Two's Complement Sage"
+    description: "Mastered signed binary"
+    skill: "bin"
+    primitive: "twos_complement"
+    conditions:
+      accuracy: {gte: 0.9}
+    priority: 60
+
+# ==============================================================================
+# REGRESSION WARNINGS (negative titles - indicate problems)
+# ==============================================================================
+warnings:
+  - id: "skill_regression"
+    name: "Skill Regression"
+    description: "Recent accuracy drop detected"
+    icon: "⚠️"
+    conditions:
+      accuracy_drop: {gte: 0.1}  # 10%+ drop from peak
+    severity: "warning"
+
+  - id: "primitive_weakness"
+    name: "Primitive Weakness"
+    description: "One or more primitives below threshold"
+    icon: "🔻"
+    conditions:
+      any_primitive_below: 0.6
+    severity: "info"
+
+# ==============================================================================
+# SPECIAL ACHIEVEMENT TITLES
+# ==============================================================================
+achievements:
+  - id: "perfect_trial"
+    name: "Perfect Trial"
+    description: "Achieved 100% on a skill trial"
+    icon: "⭐"
+    trigger: "trial_perfect"
+
+  - id: "marathon_trainer"
+    name: "Marathon Trainer"
+    description: "Completed 500k+ training steps"
+    conditions:
+      total_steps: {gte: 500000}
+    priority: 100
+
+  - id: "dual_specialist"
+    name: "Dual Specialist"
+    description: "Level 10+ in two or more skills"
+    conditions:
+      skills_at_level_10: {gte: 2}
+    priority: 90

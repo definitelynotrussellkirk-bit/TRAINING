@@ -1173,23 +1173,10 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
                 }, 400)
                 return
 
-            # Check backpressure
+            # Check backpressure - use efficient count_jobs() helper
             store = self._get_job_store()
-            stats = store.get_stats()
-
-            # Count pending/running for this type
-            type_stats = stats.get("by_type", {})
-            pending = 0
-            running = 0
-            for status, count in stats.get("by_status", {}).items():
-                if status == "pending":
-                    # This is total pending, we need per-type
-                    pass
-            # Get per-type counts from store
-            pending_jobs = store.list_jobs(status=JobStatus.PENDING, job_type=JobType(job_type))
-            running_jobs = store.list_jobs(status=JobStatus.RUNNING, job_type=JobType(job_type))
-            pending = len(pending_jobs)
-            running = len(running_jobs)
+            pending = store.count_jobs(JobStatus.PENDING, job_type)
+            running = store.count_jobs(JobStatus.RUNNING, job_type)
 
             can_accept, reason, limit_warning = check_queue_limits(job_type, pending, running)
 
@@ -1235,25 +1222,50 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             self._send_error(str(e), 500)
 
     def _handle_jobs_claim(self, body: Optional[Dict[str, Any]]):
-        """Claim the next available job (worker pull)."""
+        """
+        Claim the next available job (worker pull).
+
+        Supports two modes:
+        1. worker_id mode (preferred): Server looks up roles from workers table
+        2. Legacy mode: Client provides device_id + roles directly
+
+        Using worker_id mode ensures roles are validated from registration.
+        """
         if not body:
             self._send_error("Missing request body", 400)
             return
 
+        worker_id = body.get("worker_id")
         device_id = body.get("device_id")
         roles = body.get("roles", [])
         lease_duration = body.get("lease_duration", 300)
 
-        if not device_id:
-            self._send_error("Missing 'device_id' in request body", 400)
+        store = self._get_job_store()
+
+        # Prefer worker_id mode - look up roles from registered worker
+        if worker_id:
+            worker = store.get_worker(worker_id)
+            if not worker:
+                self._send_json({
+                    "claimed": False,
+                    "error": f"Worker not registered: {worker_id}",
+                    "should_register": True,
+                }, 404)
+                return
+
+            # Use roles from registered worker (validated during registration)
+            roles = worker.get("roles", [])
+            device_id = worker.get("device_id")
+
+        elif not device_id:
+            self._send_error("Missing 'device_id' or 'worker_id' in request body", 400)
             return
 
-        if not roles:
-            self._send_error("Missing 'roles' in request body", 400)
+        elif not roles:
+            self._send_error("Missing 'roles' in request body (or use 'worker_id')", 400)
             return
 
         try:
-            store = self._get_job_store()
             job = store.claim_next(device_id, roles, lease_duration)
 
             if job:
@@ -1377,7 +1389,7 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
     # =========================================================================
 
     def _handle_worker_register(self, body: Optional[Dict[str, Any]]):
-        """Register a worker."""
+        """Register a worker with role validation against devices.json."""
         if not body:
             self._send_error("Missing request body", 400)
             return
@@ -1401,6 +1413,50 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
                 "error": "Missing roles",
             }, 400)
             return
+
+        # Validate device_id and roles against devices.json
+        try:
+            from core.paths import get_base_dir
+            devices_path = get_base_dir() / "config" / "devices.json"
+            if devices_path.exists():
+                with open(devices_path) as f:
+                    devices_config = json.load(f)
+
+                devices = devices_config.get("devices", {})
+                if device_id not in devices:
+                    self._send_json({
+                        "registered": False,
+                        "error": f"Unknown device: {device_id}",
+                        "hint": "Device must be registered in config/devices.json",
+                    }, 403)
+                    return
+
+                device_cfg = devices[device_id]
+                if not device_cfg.get("enabled", True):
+                    self._send_json({
+                        "registered": False,
+                        "error": f"Device {device_id} is disabled",
+                    }, 403)
+                    return
+
+                # Validate roles are subset of device's allowed roles
+                allowed_roles = set(device_cfg.get("roles", []))
+                requested_roles = set(roles)
+                invalid_roles = requested_roles - allowed_roles
+
+                if invalid_roles:
+                    self._send_json({
+                        "registered": False,
+                        "error": f"Roles not allowed for device {device_id}: {sorted(invalid_roles)}",
+                        "allowed_roles": sorted(allowed_roles),
+                    }, 403)
+                    return
+
+                # Use the validated roles (intersection with allowed)
+                roles = list(requested_roles & allowed_roles)
+        except Exception as e:
+            # Log but don't block registration if devices.json can't be read
+            logger.warning(f"Could not validate device roles: {e}")
 
         try:
             # Get client IP from request

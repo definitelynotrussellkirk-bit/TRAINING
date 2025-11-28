@@ -437,8 +437,9 @@ class SQLiteJobStore(JobStore):
 
     def _get_roles_for_job(self, job: Job) -> List[str]:
         """Get required roles for a job type."""
-        from guild.job_router import JobRouter
-        return JobRouter.JOB_TYPE_ROLES.get(job.spec.job_type, [])
+        # Use registry as single source of truth for roles
+        from jobs.registry import get_roles_for_job_type
+        return get_roles_for_job_type(job.spec.job_type.value)
 
     # =========================================================================
     # CORE OPERATIONS
@@ -1070,6 +1071,32 @@ class SQLiteJobStore(JobStore):
         )
         return cursor.fetchone()["count"]
 
+    def count_jobs(self, status: JobStatus, job_type: Optional[str] = None) -> int:
+        """
+        Count jobs by status and optionally type.
+
+        Much more efficient than list_jobs() for backpressure checks.
+
+        Args:
+            status: Job status to count
+            job_type: Optional job type string to filter by
+
+        Returns:
+            Number of matching jobs
+        """
+        conn = self._get_conn()
+        if job_type:
+            cursor = conn.execute(
+                "SELECT COUNT(*) as count FROM jobs WHERE status = ? AND type = ?",
+                (status.value, job_type),
+            )
+        else:
+            cursor = conn.execute(
+                "SELECT COUNT(*) as count FROM jobs WHERE status = ?",
+                (status.value,),
+            )
+        return cursor.fetchone()["count"] or 0
+
     def get_active_jobs(self, device_id: Optional[str] = None) -> List[Job]:
         """Get currently running/claimed jobs."""
         conn = self._get_conn()
@@ -1364,6 +1391,68 @@ class SQLiteJobStore(JobStore):
             "metadata": json.loads(row["metadata_json"]) if row["metadata_json"] else None,
         }
 
+    def cleanup_old_workers(self, max_offline_days: int = 30) -> int:
+        """
+        Remove workers that have been offline for too long.
+
+        Args:
+            max_offline_days: Remove workers offline longer than this
+
+        Returns:
+            Number of workers removed
+        """
+        cutoff = (datetime.utcnow() - timedelta(days=max_offline_days)).isoformat()
+
+        with self._transaction() as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM workers
+                WHERE status = 'offline'
+                AND last_heartbeat_at < ?
+                """,
+                (cutoff,),
+            )
+            count = cursor.rowcount
+
+        if count > 0:
+            logger.info(f"Removed {count} workers offline for >{max_offline_days} days")
+        return count
+
+    def cleanup_old_events(self, max_age_days: int = 14) -> int:
+        """
+        Remove old job events for jobs that are already cleaned up.
+
+        Args:
+            max_age_days: Remove events older than this for completed jobs
+
+        Returns:
+            Number of events removed
+        """
+        cutoff = (datetime.utcnow() - timedelta(days=max_age_days)).isoformat()
+
+        with self._transaction() as conn:
+            # Delete events for jobs that no longer exist or are old completed/failed
+            cursor = conn.execute(
+                """
+                DELETE FROM job_events
+                WHERE timestamp < ?
+                AND (
+                    job_id NOT IN (SELECT id FROM jobs)
+                    OR job_id IN (
+                        SELECT id FROM jobs
+                        WHERE status IN ('completed', 'failed', 'cancelled')
+                        AND completed_at < ?
+                    )
+                )
+                """,
+                (cutoff, cutoff),
+            )
+            count = cursor.rowcount
+
+        if count > 0:
+            logger.info(f"Cleaned up {count} old job events")
+        return count
+
     # =========================================================================
     # JOB EVENTS (AUDIT TRAIL)
     # =========================================================================
@@ -1569,7 +1658,8 @@ class StoreMaintenanceWorker:
 
     Runs periodic tasks:
     - Expire stale leases (every 30 seconds)
-    - Clean up old jobs (every hour)
+    - Mark stale workers offline (every 60 seconds)
+    - Clean up old jobs, events, workers (every hour)
     """
 
     def __init__(self, store: JobStore, lease_interval: int = 30, cleanup_interval: int = 3600):
@@ -1578,6 +1668,7 @@ class StoreMaintenanceWorker:
         self.cleanup_interval = cleanup_interval
         self._running = False
         self._thread: Optional[threading.Thread] = None
+        self._last_worker_check = 0
 
     def start(self):
         """Start the maintenance worker."""
@@ -1601,12 +1692,19 @@ class StoreMaintenanceWorker:
 
         while self._running:
             try:
-                # Expire stale leases
+                # Expire stale job leases (every cycle)
                 self.store.expire_stale_leases()
 
-                # Periodic cleanup
+                # Mark stale workers offline (every 60 seconds)
+                if time.time() - self._last_worker_check > 60:
+                    self.store.mark_stale_workers_offline(max_age_sec=120)
+                    self._last_worker_check = time.time()
+
+                # Periodic deep cleanup (every hour)
                 if time.time() - last_cleanup > self.cleanup_interval:
-                    self.store.cleanup_old()
+                    self.store.cleanup_old()           # Old jobs
+                    self.store.cleanup_old_events()    # Old job events
+                    self.store.cleanup_old_workers()   # Long-offline workers
                     last_cleanup = time.time()
 
             except Exception as e:

@@ -444,6 +444,7 @@
                         <th>ID</th>
                         <th>Type</th>
                         <th>Status</th>
+                        <th>Error</th>
                         <th>Priority</th>
                         <th>Worker</th>
                         <th>Created</th>
@@ -452,7 +453,7 @@
                 </thead>
                 <tbody id="jobs-body">
                     <tr>
-                        <td colspan="7" class="empty-state">
+                        <td colspan="8" class="empty-state">
                             <h3>Loading...</h3>
                         </td>
                     </tr>
@@ -593,7 +594,7 @@
                 if (!data.jobs || data.jobs.length === 0) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="7" class="empty-state">
+                            <td colspan="8" class="empty-state">
                                 <h3>No jobs found</h3>
                                 <p>Submit an eval job to get started</p>
                             </td>
@@ -610,11 +611,20 @@
                     const created = job.created_at ?
                         new Date(job.created_at).toLocaleTimeString() : '-';
 
+                    // Error code display for failed jobs
+                    let errorDisplay = '-';
+                    if (status === 'failed' && job.error_code) {
+                        const shortCode = ERROR_CODES[job.error_code] || job.error_code;
+                        const errorMsg = job.error || 'Unknown error';
+                        errorDisplay = `<span class="error-code" title="${errorMsg}">${shortCode}</span>`;
+                    }
+
                     return `
                         <tr>
                             <td><code>${job.job_id}</code></td>
                             <td><span class="job-type job-type-${type}">${type}</span></td>
                             <td><span class="status status-${status}">${status}</span></td>
+                            <td>${errorDisplay}</td>
                             <td><span class="priority priority-${priority}">${priority}</span></td>
                             <td>${job.worker_id || '-'}</td>
                             <td>${created}</td>

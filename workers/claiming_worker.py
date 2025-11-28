@@ -117,16 +117,36 @@ class JobStoreClient:
         device_id: str,
         roles: List[str],
         lease_duration: int = 300,
+        worker_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Claim the next available job."""
+        """
+        Claim the next available job.
+
+        Args:
+            device_id: Device ID (used in legacy mode)
+            roles: Roles (used in legacy mode)
+            lease_duration: Lease duration in seconds
+            worker_id: Worker ID for preferred mode (server looks up roles)
+
+        If worker_id is provided, server uses roles from registration.
+        """
         try:
-            response = self.session.post(
-                f"{self.server_url}/api/jobs/claim",
-                json={
+            # Prefer worker_id mode for role trust
+            if worker_id:
+                payload = {
+                    "worker_id": worker_id,
+                    "lease_duration": lease_duration,
+                }
+            else:
+                payload = {
                     "device_id": device_id,
                     "roles": roles,
                     "lease_duration": lease_duration,
-                },
+                }
+
+            response = self.session.post(
+                f"{self.server_url}/api/jobs/claim",
+                json=payload,
                 timeout=10,
             )
 
@@ -134,6 +154,9 @@ class JobStoreClient:
                 data = response.json()
                 if data.get("claimed"):
                     return data["job"]
+                # Check if we need to re-register
+                if data.get("should_register"):
+                    logger.warning("Server says we need to re-register")
             return None
 
         except requests.RequestException as e:
@@ -295,11 +318,12 @@ class ClaimingWorker:
                 if time.time() - self._last_heartbeat > 30:
                     self._send_heartbeat()
 
-                # Try to claim a job
+                # Try to claim a job using worker_id mode (server looks up roles)
                 job = self.client.claim_next(
                     self.config.device_id,
                     self.config.roles,
                     self.config.lease_duration,
+                    worker_id=self.worker_id,  # Preferred: server-side role lookup
                 )
 
                 if job:
@@ -358,6 +382,22 @@ class ClaimingWorker:
         payload = spec.get("payload", {})
 
         self._stats["jobs_claimed"] += 1
+
+        # Guard: check if job type is allowed for this worker
+        if self.allowed_job_types and job_type not in self.allowed_job_types:
+            logger.error(
+                f"Job {job_id} has type '{job_type}' not allowed for this worker. "
+                f"Allowed: {self.allowed_job_types}"
+            )
+            self.client.mark_failed(
+                job_id,
+                f"Job type '{job_type}' not allowed for worker {self.worker_id}",
+                JobErrorCode.WORKER_SETUP,
+            )
+            self._stats["jobs_failed"] += 1
+            self._current_job = None
+            return
+
         logger.info(f"Executing job {job_id}: {job_type}")
 
         # Mark as running

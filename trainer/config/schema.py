@@ -171,6 +171,10 @@ class DataConfig:
     # Data augmentation (future)
     augmentation: bool = False
 
+    # Packing (combines short sequences into full-length blocks)
+    enable_packing: bool = True              # Pack sequences for efficiency
+    packing_strategy: str = "bfd"            # "bfd" (Best Fit Decreasing)
+
 
 @dataclass
 class ModelConfig:
@@ -189,6 +193,13 @@ class ModelConfig:
     # Model modifications
     use_cache: bool = False                  # Disable for training
     gradient_checkpointing: bool = False
+
+    # Attention implementation
+    prefer_flash_attention: bool = True      # Use flash_attention_2 if available
+
+    # Vision model handling (Qwen3VL)
+    freeze_vision_towers: bool = True        # Freeze vision/video for text-only training
+    try_vision_model_first: bool = True      # Try loading as Qwen3VL first
 
 
 @dataclass

@@ -19,17 +19,29 @@ Architecture:
     - Delegates to profiles for data transformation
     - Uses ConfigLoader for all config
     - Returns TrainingResult with metrics
+
+Features:
+    - Qwen3VL model fallback with vision tower freezing
+    - Flash Attention 2 detection and selection
+    - Response-only masking (DataCollatorForCompletionOnly)
+    - Packing support (trl.pack_dataset)
+    - Muon optimizer support
+    - Checkpoint resumption
+    - Masking validation
+    - Callback injection for monitoring
 """
 
-from dataclasses import dataclass
-from typing import Optional, Dict, Any, Tuple, List
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any, Tuple, List, Callable
 from pathlib import Path
 from datetime import datetime
 import json
 import random
 import time
 import sys
+import os
 import logging
+import gc
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -41,9 +53,11 @@ import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    AutoProcessor,
     TrainingArguments,
     Trainer,
     BitsAndBytesConfig,
+    TrainerCallback,
 )
 from datasets import Dataset
 
@@ -51,6 +65,38 @@ from trainer.config.schema import TrainerConfig
 from trainer.config.loader import ConfigLoader
 from trainer.monitoring.status_writer import TrainingStatusWriter
 from trainer.profiles import get_profile
+
+# Optional: Qwen3VL support
+try:
+    from transformers import Qwen3VLForConditionalGeneration
+    QWEN3VL_AVAILABLE = True
+except ImportError:
+    QWEN3VL_AVAILABLE = False
+    Qwen3VLForConditionalGeneration = None
+
+# Optional: Flash Attention 2
+try:
+    import flash_attn
+    FLASH_ATTN_AVAILABLE = True
+except ImportError:
+    FLASH_ATTN_AVAILABLE = False
+
+# Optional: Packing from TRL
+try:
+    from trl import ConstantLengthDataset
+    TRL_PACKING_AVAILABLE = True
+except ImportError:
+    TRL_PACKING_AVAILABLE = False
+
+# Optional: Muon optimizer
+try:
+    from trainer.optimizers import create_optimizer as create_custom_optimizer
+    from trainer.optimizers import get_param_group_summary
+    MUON_AVAILABLE = True
+except ImportError:
+    MUON_AVAILABLE = False
+    create_custom_optimizer = None
+    get_param_group_summary = None
 
 
 @dataclass
@@ -95,6 +141,26 @@ class TrainingResult:
         )
 
 
+@dataclass
+class MonitorContext:
+    """
+    Context for training monitors passed from UltimateTrainer.
+
+    Contains all monitoring components that can be injected into
+    the training loop via callbacks.
+    """
+    live_monitor: Any = None  # LiveInferenceMonitor
+    evolution_tracker: Any = None  # EvolutionTracker
+    layer_monitor: Any = None  # LayerMonitor
+    controller: Any = None  # TrainingController (pause/stop)
+    raw_train_examples: List[Dict] = field(default_factory=list)
+    logits_processor: Any = None  # LogitsProcessorList
+    remote_eval_config: Dict[str, Any] = field(default_factory=dict)
+    current_file: Optional[str] = None
+    batch_number: Optional[int] = None
+    batch_queue_size: Optional[int] = None
+
+
 class TrainerEngine:
     """
     Core training engine with stable public API.
@@ -106,49 +172,23 @@ class TrainerEngine:
     - Structured result object with metrics and errors
     - Exception-safe (returns errors in TrainingResult)
 
-    Responsibilities:
-        - Validate configuration before training starts
-        - Load and initialize model/tokenizer with correct precision
-        - Apply data profile transformations to examples
-        - Create train/validation splits with proper shuffling
-        - Execute HuggingFace Trainer with monitoring
-        - Save checkpoints and return comprehensive results
-
-    Data Flow:
-        1. Validate config → check locked parameters, paths exist
-        2. Load profile → get transformation functions for data
-        3. Load model & tokenizer → setup precision (bf16/fp16/fp32)
-        4. Prepare datasets → load JSONL, apply profile, tokenize
-        5. Create HF Trainer → setup args, collator, callbacks
-        6. Execute training → run training loop with monitoring
-        7. Save checkpoint → write final model to disk
-        8. Return result → structured TrainingResult with metrics
+    Enhanced Features:
+        - Qwen3VL model loading with vision tower freezing
+        - Flash Attention 2 detection and auto-selection
+        - Response-only masking via DataCollatorForCompletionOnly
+        - Dataset packing via trl.pack_dataset
+        - Muon optimizer support (orthogonalized momentum)
+        - Checkpoint resumption with scheduler management
+        - Masking validation to catch misconfigured collators
+        - Callback injection for external monitoring
 
     Attributes:
         status_writer: TrainingStatusWriter for writing status JSON
         model: HuggingFace model instance (None until loaded)
         tokenizer: HuggingFace tokenizer instance (None until loaded)
         profile: DataProfile instance for transformations (None until loaded)
-
-    Example:
-        >>> from trainer.config import create_default_config
-        >>> from trainer.monitoring import TrainingStatusWriter
-        >>>
-        >>> config = create_default_config(
-        ...     dataset_path="data.jsonl",
-        ...     model_path="models/Qwen3-0.6B",
-        ...     output_dir="outputs/run1"
-        ... )
-        >>> status_writer = TrainingStatusWriter("status/training_status.json")
-        >>> engine = TrainerEngine(status_writer)
-        >>> result = engine.run_job(config)
-        >>>
-        >>> if result.success:
-        ...     print(f"Trained {result.global_step} steps in {result.runtime_sec:.1f}s")
-        ...     print(f"Final loss: {result.final_loss:.4f}")
-        ...     print(f"Checkpoint: {result.last_checkpoint_path}")
-        ... else:
-        ...     print(f"Training failed: {result.error_message}")
+        is_vision_model: True if model is Qwen3VL (needs special handling)
+        avg_seq_len: Average sequence length (for throughput estimation)
     """
 
     def __init__(self, status_writer: TrainingStatusWriter):
@@ -160,15 +200,23 @@ class TrainerEngine:
                 Writes training_status.json with current step, loss, etc.
 
         Side Effects:
-            - Initializes instance attributes (model, tokenizer, profile) to None
+            - Initializes instance attributes to None
             - No file I/O or GPU operations occur until run_job() called
         """
         self.status_writer = status_writer
         self.model = None
         self.tokenizer = None
         self.profile = None
+        self.is_vision_model = False
+        self.avg_seq_len = 0.0
 
-    def run_job(self, config: TrainerConfig) -> TrainingResult:
+    def run_job(
+        self,
+        config: TrainerConfig,
+        config_dict: Optional[Dict[str, Any]] = None,
+        monitors: Optional[MonitorContext] = None,
+        callbacks: Optional[List[TrainerCallback]] = None
+    ) -> TrainingResult:
         """
         Execute a complete training job with the given configuration.
 
@@ -177,58 +225,20 @@ class TrainerEngine:
         TrainingResult object rather than being raised.
 
         Args:
-            config: TrainerConfig containing all training parameters:
-                - data: DataConfig (dataset_path, validation_split, shuffle, seed)
-                - hyperparams: Hyperparams (batch_size, learning_rate, epochs, etc.)
-                - profile: ProfileConfig (name="emoji_think" or "regime3", etc.)
-                - output: OutputConfig (output_dir, save_steps, overwrite, etc.)
-                - monitoring: MonitoringConfig (status_file, system_prompt, etc.)
-                - model: ModelConfig (model_path, tokenizer_path, quantization)
-                - environment: EnvironmentConfig (logging_steps, report_to, etc.)
+            config: TrainerConfig containing all training parameters
+            config_dict: Optional raw config dict (for optimizer settings, etc.)
+            monitors: Optional MonitorContext with external monitors
+            callbacks: Optional list of additional TrainerCallback instances
 
         Returns:
-            TrainingResult containing:
-                - success: bool (True if training completed without errors)
-                - global_step: int (total training steps executed)
-                - runtime_sec: float (wall-clock time in seconds)
-                - last_checkpoint_path: Optional[str] (path to final checkpoint)
-                - final_loss: float (last recorded training loss value)
-                - summary: Dict[str, Any] (config, metrics, profile name, etc.)
-                - error_message: Optional[str] (error description if failed)
+            TrainingResult containing success status, metrics, and error info
 
         Raises:
             No exceptions are raised. All errors are caught and returned
             in the TrainingResult.error_message field.
-
-        Side Effects:
-            - Loads model and tokenizer into GPU memory
-            - Reads dataset from config.data.dataset_path
-            - Creates checkpoint directories (config.output.output_dir)
-            - Writes checkpoint files every config.hyperparams.save_steps
-            - Writes final model to {output_dir}/final_model/
-            - Updates status_writer (writes training_status.json)
-            - Logs training progress to stdout
-            - May create profile-specific files (stop signals, etc.)
-
-        Example:
-            >>> config = TrainerConfig(
-            ...     data=DataConfig(dataset_path="data.jsonl"),
-            ...     hyperparams=Hyperparams(batch_size=16, learning_rate=2e-4),
-            ...     profile=ProfileConfig(name="regime3"),
-            ...     output=OutputConfig(output_dir="outputs/run1")
-            ... )
-            >>> engine = TrainerEngine(status_writer)
-            >>> result = engine.run_job(config)
-            >>>
-            >>> if result.success:
-            ...     print(f"Success! Trained {result.global_step} steps")
-            ...     print(f"Final loss: {result.final_loss:.4f}")
-            ...     print(f"Model saved to: {result.last_checkpoint_path}")
-            ... else:
-            ...     print(f"Training failed: {result.error_message}")
         """
         print("\n" + "=" * 80)
-        print("🚀 TRAINER ENGINE - FULL IMPLEMENTATION")
+        print("TRAINER ENGINE - ENHANCED IMPLEMENTATION")
         print("=" * 80)
         print(f"Profile: {config.profile.name}")
         print(f"Model: {config.model.model_path}")
@@ -239,47 +249,76 @@ class TrainerEngine:
         print("=" * 80 + "\n")
 
         start_time = time.time()
+        config_dict = config_dict or {}
 
         try:
             # 1. Validate config
-            print("📋 Step 1: Validating configuration")
+            print("Step 1: Validating configuration")
             ConfigLoader.validate_locked_config(config)
-            print("   ✓ Config validated\n")
+            print("   Config validated\n")
 
             # 2. Load profile
-            print(f"📋 Step 2: Loading profile '{config.profile.name}'")
+            print(f"Step 2: Loading profile '{config.profile.name}'")
             self.profile = get_profile(config.profile.name)
-            print(f"   ✓ Profile loaded: {self.profile.__class__.__name__}\n")
+            print(f"   Profile loaded: {self.profile.__class__.__name__}\n")
 
-            # 3. Load model & tokenizer
-            print("📋 Step 3: Loading model and tokenizer")
+            # 3. Load model & tokenizer (enhanced)
+            print("Step 3: Loading model and tokenizer")
             self.model, self.tokenizer = self._load_model_and_tokenizer(config)
-            print("   ✓ Model and tokenizer loaded\n")
+            print("   Model and tokenizer loaded\n")
 
-            # 4. Prepare datasets
-            print("📋 Step 4: Preparing datasets")
+            # 4. Prepare datasets (with packing)
+            print("Step 4: Preparing datasets")
             train_dataset, val_dataset = self._prepare_dataset(config)
-            print("   ✓ Datasets prepared\n")
+            print("   Datasets prepared\n")
 
-            # 5. Create trainer
-            print("📋 Step 5: Creating HuggingFace Trainer")
-            trainer = self._create_trainer(config, train_dataset, val_dataset)
-            print("   ✓ Trainer created\n")
+            # 5. Find checkpoint for resumption
+            print("Step 5: Checking for checkpoint resumption")
+            resume_checkpoint, current_global_step = self._find_resume_checkpoint(
+                config.output.output_dir
+            )
+            if resume_checkpoint:
+                print(f"   Will resume from: {resume_checkpoint}")
+                print(f"   Current global step: {current_global_step}")
+            else:
+                print("   Starting fresh (no checkpoint found)")
+            print()
 
-            # 6. Execute training
-            print("📋 Step 6: Executing training")
+            # 6. Create trainer (with callbacks, optimizer, collator)
+            print("Step 6: Creating HuggingFace Trainer")
+            trainer, data_collator = self._create_trainer(
+                config=config,
+                config_dict=config_dict,
+                train_dataset=train_dataset,
+                val_dataset=val_dataset,
+                monitors=monitors,
+                callbacks=callbacks,
+                current_global_step=current_global_step,
+            )
+            print("   Trainer created\n")
+
+            # 7. Validate masking
+            print("Step 7: Validating response masking")
+            masking_stats = self._validate_masking(train_dataset, data_collator)
+            print(f"   Masked (instruction): {masking_stats['masked_pct']:.1f}%")
+            print(f"   Trained (response): {masking_stats['trained_pct']:.1f}%")
+            print("   Masking validation passed\n")
+
+            # 8. Execute training
+            print("Step 8: Executing training")
             print("=" * 80)
-            train_result = trainer.train()
+            train_result = trainer.train(resume_from_checkpoint=resume_checkpoint)
             print("=" * 80)
-            print("   ✓ Training complete\n")
+            print("   Training complete\n")
 
-            # 7. Save checkpoint
-            print("📋 Step 7: Saving final checkpoint")
+            # 9. Save final checkpoint
+            print("Step 9: Saving final checkpoint")
             final_checkpoint = Path(config.output.output_dir) / "final_model"
             trainer.save_model(str(final_checkpoint))
-            print(f"   ✓ Saved to {final_checkpoint}\n")
+            self.tokenizer.save_pretrained(str(final_checkpoint))
+            print(f"   Saved to {final_checkpoint}\n")
 
-            # 8. Return result
+            # 10. Return result
             runtime_sec = time.time() - start_time
 
             return TrainingResult(
@@ -293,18 +332,19 @@ class TrainerEngine:
                     'config': config.to_dict(),
                     'profile': config.profile.name,
                     'precision': config.hyperparams.fp_precision,
+                    'masking_stats': masking_stats,
                 }
             )
 
         except Exception as e:
-            print(f"\n❌ Training failed: {e}")
+            print(f"\n Training failed: {e}")
             import traceback
             traceback.print_exc()
 
             return TrainingResult.from_error(str(e))
 
     # ========================================================================
-    # Private Helper Methods
+    # Model Loading (Enhanced)
     # ========================================================================
 
     def _load_model_and_tokenizer(
@@ -312,42 +352,35 @@ class TrainerEngine:
         config: TrainerConfig
     ) -> Tuple[torch.nn.Module, Any]:
         """
-        Load model and tokenizer from disk with proper precision settings.
+        Load model and tokenizer with enhanced features.
 
-        Loads HuggingFace model and tokenizer from paths specified in config.
-        Applies quantization if requested. Sets precision (bf16/fp16/fp32).
-        Disables KV cache for training. Sets pad_token if not present.
+        Enhancements over basic loading:
+        - Flash Attention 2 detection and auto-selection
+        - Qwen3VL fallback with vision tower freezing
+        - Chat template override for emoji_think/regime3 profiles
+        - Gradient checkpointing support
 
         Args:
-            config: TrainerConfig with model settings:
-                - model.model_path: Path to model directory
-                - model.tokenizer_path: Path to tokenizer (or None to use model_path)
-                - model.load_in_4bit: Whether to use 4-bit quantization
-                - hyperparams.fp_precision: Precision ("bf16", "fp16", or "fp32")
+            config: TrainerConfig with model settings
 
         Returns:
-            Tuple of (model, tokenizer):
-                - model: torch.nn.Module (AutoModelForCausalLM instance)
-                - tokenizer: HuggingFace tokenizer with pad_token set
-
-        Raises:
-            OSError: If model_path or tokenizer_path doesn't exist
-            ValueError: If model format is invalid or incompatible
-            RuntimeError: If GPU memory insufficient for model
-
-        Side Effects:
-            - Loads model into GPU memory (~1-2GB for 0.6B model)
-            - Prints loading progress to stdout
-            - Modifies model.config.use_cache (sets to False)
-            - May modify tokenizer.pad_token (sets to eos_token if None)
+            Tuple of (model, tokenizer)
         """
         model_path = config.model.model_path
         print(f"   Loading from: {model_path}")
 
+        # Detect attention implementation
+        attn_impl = "sdpa"
+        if FLASH_ATTN_AVAILABLE:
+            attn_impl = "flash_attention_2"
+            print("   Flash Attention 2 detected")
+        else:
+            print("   Using SDPA attention (flash_attention_2 not installed)")
+
         # Setup quantization (if requested)
         quantization_config = None
         if config.model.load_in_4bit:
-            print("   🔧 Enabling 4-bit quantization")
+            print("   Enabling 4-bit quantization")
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_quant_type="nf4",
@@ -362,7 +395,7 @@ class TrainerEngine:
         # Model kwargs
         model_kwargs = {
             "trust_remote_code": True,
-            "attn_implementation": "sdpa",
+            "attn_implementation": attn_impl,
         }
 
         if quantization_config:
@@ -370,71 +403,90 @@ class TrainerEngine:
         else:
             model_kwargs["torch_dtype"] = torch_dtype
 
-        # Load model
-        model = AutoModelForCausalLM.from_pretrained(model_path, **model_kwargs)
+        # Try Qwen3VL first (for VL models)
+        self.is_vision_model = False
+        model = None
+        tokenizer = None
 
-        # Load tokenizer
-        tokenizer_path = config.model.tokenizer_path or model_path
-        tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_path,
-            trust_remote_code=True
-        )
+        if QWEN3VL_AVAILABLE:
+            try:
+                model = Qwen3VLForConditionalGeneration.from_pretrained(
+                    model_path, **model_kwargs
+                )
+                print("   Loaded as Qwen3VLForConditionalGeneration")
+                self.is_vision_model = True
+
+                # Freeze vision and video towers for text-only training
+                print("   Freezing vision/video towers for text-only training...")
+                frozen_params = 0
+                for n, p in model.named_parameters():
+                    if any(k in n for k in ["vision_model", "video_model", "visual"]):
+                        p.requires_grad = False
+                        frozen_params += 1
+                print(f"   Froze {frozen_params} vision/video parameters")
+
+                # Use AutoProcessor for Qwen3VL
+                processor = AutoProcessor.from_pretrained(
+                    model_path, trust_remote_code=True
+                )
+                tokenizer = processor.tokenizer
+                print("   Loaded AutoProcessor")
+
+            except Exception as e:
+                print(f"   Qwen3VL failed ({str(e)[:50]}...), trying AutoModelForCausalLM...")
+                model = None
+
+        # Fallback to standard CausalLM
+        if model is None:
+            model = AutoModelForCausalLM.from_pretrained(model_path, **model_kwargs)
+            print("   Loaded as AutoModelForCausalLM")
+
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_path, trust_remote_code=True
+            )
 
         # Set pad token if not set
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
-            print("   ✓ Set pad_token = eos_token")
+            print("   Set pad_token = eos_token")
 
-        # Disable cache for training
+        # Apply chat template override (fixes Qwen3 <think> injection)
+        try:
+            from core.chat_templates import apply_chat_template_override
+            profile_name = config.profile.name if config.profile else None
+            apply_chat_template_override(tokenizer, profile_name=profile_name, verbose=True)
+        except ImportError:
+            print("   Chat template override not available")
+
+        # Disable KV cache for training
         model.config.use_cache = False
-        print("   ✓ Disabled KV cache (use_cache=False)")
+        print("   Disabled KV cache (use_cache=False)")
+
+        # Enable gradient checkpointing if configured
+        use_grad_ckpt = getattr(config.hyperparams, 'use_gradient_checkpointing', True)
+        if use_grad_ckpt and hasattr(model, 'gradient_checkpointing_enable'):
+            model.gradient_checkpointing_enable()
+            print("   Enabled gradient checkpointing")
+        else:
+            print("   Gradient checkpointing disabled")
 
         return model, tokenizer
+
+    # ========================================================================
+    # Dataset Preparation (Enhanced with Packing)
+    # ========================================================================
 
     def _prepare_dataset(
         self,
         config: TrainerConfig
     ) -> Tuple[Dataset, Dataset]:
         """
-        Load, transform, and tokenize datasets for training.
+        Load, transform, tokenize, and optionally pack datasets.
 
-        Loads JSONL data, applies profile transformations (emoji_think, regime3),
-        creates train/val splits, builds system prompts, and tokenizes examples.
-
-        Data Flow:
-            1. Load JSONL file → list of raw examples
-            2. Shuffle if config.data.shuffle=True
-            3. Split into train/val based on validation_split
-            4. Build system prompt with current date
-            5. Apply profile.transform_example() to each example
-            6. Tokenize using chat template
-            7. Create HuggingFace Dataset objects
-
-        Args:
-            config: TrainerConfig with data settings:
-                - data.dataset_path: Path to JSONL file
-                - data.shuffle: Whether to shuffle examples
-                - data.seed: Random seed for shuffling
-                - monitoring.validation_split: Fraction for validation (e.g., 0.1)
-                - monitoring.validation_max_samples: Max validation examples
-                - monitoring.system_prompt_base: Template for system prompt
-                - hyperparams.max_length: Max sequence length for truncation
-
-        Returns:
-            Tuple of (train_dataset, val_dataset):
-                - train_dataset: HuggingFace Dataset with tokenized examples
-                - val_dataset: HuggingFace Dataset with tokenized examples
-                Both datasets have columns: input_ids, attention_mask, labels
-
-        Raises:
-            FileNotFoundError: If dataset_path doesn't exist
-            json.JSONDecodeError: If JSONL format is invalid
-            ValueError: If examples don't have required fields after transform
-
-        Side Effects:
-            - Reads entire dataset file into memory
-            - Prints dataset statistics to stdout
-            - May create temporary files if profile requires (stop signals)
+        Enhancements:
+        - Dataset packing via trl.pack_dataset for efficiency
+        - Proper handling of packed sequence metadata
+        - Memory-efficient processing with garbage collection
         """
         # Load raw data
         dataset_path = Path(config.data.dataset_path)
@@ -479,85 +531,238 @@ class TrainerEngine:
             self.profile.transform_example(ex, idx, system_prompt)
             for idx, ex in enumerate(val_examples)
         ]
-        print("   ✓ Profile transformations applied")
+        print("   Profile transformations applied")
 
-        # Tokenize
-        def tokenize_function(example):
-            """Tokenize a single example"""
-            messages = example['messages']
+        # Format for tokenization
+        def format_messages(ex):
+            """Format messages for chat template."""
+            messages = ex['messages']
+            formatted_messages = []
 
-            # Apply chat template
+            for msg in messages:
+                content = msg.get('content', '')
+                if not isinstance(content, str):
+                    content = json.dumps(content, ensure_ascii=False)
+
+                # Wrap as list for vision models
+                if self.is_vision_model:
+                    content = [{"type": "text", "text": content}]
+
+                formatted_messages.append({
+                    "role": msg['role'],
+                    "content": content
+                })
+
             text = self.tokenizer.apply_chat_template(
-                messages,
+                formatted_messages,
                 tokenize=False,
                 add_generation_prompt=False
             )
+            return {"text": text}
 
-            # Tokenize
-            result = self.tokenizer(
-                text,
+        # Format all examples
+        train_data = [format_messages(ex) for ex in train_examples]
+        val_data = [format_messages(ex) for ex in val_examples]
+
+        # Create HF datasets
+        train_dataset = Dataset.from_list(train_data)
+        val_dataset = Dataset.from_list(val_data)
+
+        # Tokenize
+        max_length = config.hyperparams.max_length
+
+        def tokenize_function(examples):
+            return self.tokenizer(
+                examples["text"],
                 truncation=True,
-                max_length=config.hyperparams.max_length,
-                padding=False,  # Dynamic padding in collator
+                max_length=max_length,
+                padding=False
             )
 
-            # Add labels (same as input_ids for causal LM)
-            result['labels'] = result['input_ids'].copy()
-
-            return result
-
         print("   Tokenizing...")
-        train_dataset = Dataset.from_list(train_examples).map(
+        train_dataset = train_dataset.map(
             tokenize_function,
-            remove_columns=['messages']
+            batched=True,
+            batch_size=10,
+            remove_columns=["text"],
+            num_proc=None,  # Disable multiprocessing (CUDA fork issues)
+            load_from_cache_file=False,
         )
-        val_dataset = Dataset.from_list(val_examples).map(
+        val_dataset = val_dataset.map(
             tokenize_function,
-            remove_columns=['messages']
+            batched=True,
+            batch_size=10,
+            remove_columns=["text"],
+            num_proc=None,
+            load_from_cache_file=False,
         )
-        print("   ✓ Tokenization complete")
+        print("   Tokenization complete")
+
+        # Calculate average sequence length
+        sample_count = min(100, len(train_dataset))
+        if sample_count > 0:
+            total_tokens = sum(
+                len(train_dataset[i]["input_ids"])
+                for i in range(sample_count)
+            )
+            self.avg_seq_len = total_tokens / sample_count
+            print(f"   Avg seq length: {self.avg_seq_len:.1f} tokens")
+
+        # Pack dataset for efficiency (if enabled)
+        enable_packing = os.environ.get("ENABLE_PACKING", "1").lower() in ("1", "true", "yes")
+        if enable_packing:
+            train_dataset = self._pack_dataset(train_dataset, max_length)
+
+        # Memory cleanup
+        del train_data, val_data, examples
+        gc.collect()
 
         return train_dataset, val_dataset
+
+    def _pack_dataset(self, dataset: Dataset, max_length: int) -> Dataset:
+        """
+        Pack dataset for more efficient training.
+
+        Uses trl.pack_dataset to combine multiple short sequences
+        into full-length blocks, reducing padding waste.
+        """
+        try:
+            from trl import pack_dataset
+            print(f"   Packing dataset (max_length={max_length})...")
+            print(f"      Before packing: {len(dataset)} examples")
+
+            packed = pack_dataset(
+                dataset,
+                seq_length=max_length,
+                strategy="bfd"  # Best Fit Decreasing
+            )
+
+            print(f"      After packing: {len(packed)} packed sequences")
+
+            # Remove seq_lengths metadata (collator can't handle it)
+            if 'seq_lengths' in packed.column_names:
+                packed = packed.remove_columns(['seq_lengths'])
+                print("      Removed seq_lengths metadata")
+
+            print("      Packing enabled")
+            return packed
+
+        except ImportError:
+            print("      trl not available, skipping packing")
+            return dataset
+        except Exception as e:
+            print(f"      Packing failed ({e}), continuing without packing")
+            return dataset
+
+    # ========================================================================
+    # Checkpoint Resumption
+    # ========================================================================
+
+    def _find_resume_checkpoint(
+        self,
+        output_dir: str
+    ) -> Tuple[Optional[str], int]:
+        """
+        Find latest checkpoint for resumption.
+
+        Also deletes old scheduler.pt to force fresh constant LR scheduler.
+
+        Args:
+            output_dir: Directory containing checkpoints
+
+        Returns:
+            Tuple of (checkpoint_path, global_step) or (None, 0)
+        """
+        checkpoint_dir = Path(output_dir)
+        if not checkpoint_dir.exists():
+            return None, 0
+
+        candidates = []
+        for cp in checkpoint_dir.glob("checkpoint-*"):
+            parts = cp.name.split("-", 1)
+            if len(parts) != 2:
+                continue
+            try:
+                step = int(parts[1].split("-")[0])  # Handle checkpoint-123-date-time format
+            except ValueError:
+                continue
+
+            trainer_state = cp / "trainer_state.json"
+            if trainer_state.exists():
+                candidates.append((step, cp))
+
+        if not candidates:
+            return None, 0
+
+        # Get latest checkpoint
+        latest_step, latest_checkpoint = max(candidates, key=lambda x: x[0])
+
+        # Read actual global_step from trainer_state
+        trainer_state_file = latest_checkpoint / "trainer_state.json"
+        with open(trainer_state_file) as f:
+            state = json.load(f)
+            current_global_step = state.get('global_step', latest_step)
+
+        # Delete old scheduler to force fresh constant LR
+        old_scheduler = latest_checkpoint / "scheduler.pt"
+        if old_scheduler.exists():
+            old_scheduler.unlink()
+            print(f"   Deleted old scheduler.pt to force fresh constant LR")
+
+        return str(latest_checkpoint), current_global_step
+
+    # ========================================================================
+    # Trainer Creation (Enhanced)
+    # ========================================================================
 
     def _create_trainer(
         self,
         config: TrainerConfig,
+        config_dict: Dict[str, Any],
         train_dataset: Dataset,
-        val_dataset: Dataset
-    ) -> Trainer:
+        val_dataset: Dataset,
+        monitors: Optional[MonitorContext],
+        callbacks: Optional[List[TrainerCallback]],
+        current_global_step: int,
+    ) -> Tuple[Trainer, Any]:
         """
-        Create HuggingFace Trainer with all configuration.
+        Create HuggingFace Trainer with enhanced features.
 
-        Builds TrainingArguments from config, creates data collator,
-        and instantiates HuggingFace Trainer ready for training.
-
-        Args:
-            config: TrainerConfig with all training parameters
-            train_dataset: Tokenized training dataset with columns:
-                - input_ids: List[int]
-                - attention_mask: List[int]
-                - labels: List[int]
-            val_dataset: Tokenized validation dataset (same structure)
-
-        Returns:
-            Trainer: Configured HuggingFace Trainer instance ready to call .train()
-
-        Side Effects:
-            - Prints trainer configuration to stdout
-            - Creates output directory if it doesn't exist
+        Enhancements:
+        - Response-only masking via DataCollatorForCompletionOnly
+        - Muon optimizer support
+        - Callback injection from monitors
+        - Custom optimizer/scheduler handling
         """
+        # Calculate max_steps
+        effective_batch = (
+            config.hyperparams.batch_size *
+            config.hyperparams.gradient_accumulation
+        )
+        steps_for_this_file = len(train_dataset) // effective_batch
+        if len(train_dataset) % effective_batch != 0:
+            steps_for_this_file += 1
+
+        max_steps = current_global_step + steps_for_this_file
+        print(f"   Steps for this dataset: {steps_for_this_file}")
+        print(f"   Max steps (cumulative): {max_steps}")
+
         # Training arguments
-        training_args = self._build_training_arguments(config)
+        training_args = self._build_training_arguments(config, max_steps)
         print(f"   Batch size: {training_args.per_device_train_batch_size}")
         print(f"   Learning rate: {training_args.learning_rate}")
-        print(f"   Epochs: {training_args.num_train_epochs}")
 
-        # Data collator (simple padding)
-        from transformers import DataCollatorForLanguageModeling
-        data_collator = DataCollatorForLanguageModeling(
-            tokenizer=self.tokenizer,
-            mlm=False
+        # Data collator - response-only masking
+        data_collator = self._create_data_collator()
+        print("   Using response-only collator (instruction masked)")
+
+        # Create optimizer (Muon or default AdamW)
+        custom_optimizer, custom_scheduler = self._create_optimizer(
+            config_dict, max_steps, config.hyperparams.warmup_steps
         )
+
+        # Build callbacks list
+        all_callbacks = list(callbacks or [])
 
         # Create trainer
         trainer = Trainer(
@@ -566,28 +771,146 @@ class TrainerEngine:
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
             data_collator=data_collator,
+            callbacks=all_callbacks if all_callbacks else None,
+            optimizers=(custom_optimizer, custom_scheduler) if custom_optimizer else (None, None),
         )
 
-        return trainer
+        return trainer, data_collator
+
+    def _create_data_collator(self):
+        """
+        Create data collator for response-only training.
+
+        Uses DataCollatorForCompletionOnly which masks instruction tokens,
+        training only on assistant responses.
+        """
+        try:
+            from core.custom_collator import DataCollatorForCompletionOnly
+            return DataCollatorForCompletionOnly(
+                tokenizer=self.tokenizer,
+                response_template="<|im_start|>assistant\n"
+            )
+        except ImportError:
+            # Fallback to standard collator
+            print("   Warning: DataCollatorForCompletionOnly not available")
+            from transformers import DataCollatorForLanguageModeling
+            return DataCollatorForLanguageModeling(
+                tokenizer=self.tokenizer,
+                mlm=False
+            )
+
+    def _create_optimizer(
+        self,
+        config_dict: Dict[str, Any],
+        num_training_steps: int,
+        num_warmup_steps: int
+    ) -> Tuple[Optional[Any], Optional[Any]]:
+        """
+        Create optimizer (Muon or AdamW) based on config.
+
+        Args:
+            config_dict: Raw config dict with optimizer settings
+            num_training_steps: Total training steps
+            num_warmup_steps: Warmup steps
+
+        Returns:
+            Tuple of (optimizer, scheduler) or (None, None) to use defaults
+        """
+        if not MUON_AVAILABLE:
+            return None, None
+
+        opt_config = config_dict.get("optimizer", {})
+        optimizer_type = opt_config.get("type", "adamw") if isinstance(opt_config, dict) else "adamw"
+
+        if optimizer_type != "muon":
+            return None, None
+
+        print("\n" + "=" * 60)
+        print("MUON OPTIMIZER - Orthogonalized Momentum")
+        print("=" * 60)
+
+        # Show parameter grouping summary
+        summary = get_param_group_summary(self.model)
+        total = summary.muon_params + summary.adam_params
+        print(f"  Hidden weights (Muon): {summary.muon_params:,} params ({100*summary.muon_params/total:.1f}%)")
+        print(f"  Other (AdamW):         {summary.adam_params:,} params ({100*summary.adam_params/total:.1f}%)")
+
+        # Create optimizer
+        optimizer, scheduler, opt_info = create_custom_optimizer(
+            self.model,
+            config_dict,
+            optimizer_type="muon",
+            num_training_steps=num_training_steps,
+            num_warmup_steps=num_warmup_steps,
+        )
+
+        print(f"  Hidden LR: {opt_info.hidden_lr}")
+        print(f"  Aux LR:    {opt_info.aux_lr}")
+        print("=" * 60 + "\n")
+
+        return optimizer, scheduler
+
+    # ========================================================================
+    # Masking Validation
+    # ========================================================================
+
+    def _validate_masking(
+        self,
+        dataset: Dataset,
+        collator,
+        sample_count: int = 5
+    ) -> Dict[str, float]:
+        """
+        Validate that masking is working correctly.
+
+        Checks that a reasonable percentage of tokens are masked (instruction)
+        vs trained (response). Raises error if masking looks wrong.
+
+        Args:
+            dataset: Tokenized dataset
+            collator: Data collator with masking
+            sample_count: Number of samples to check
+
+        Returns:
+            Dict with masked_pct and trained_pct
+
+        Raises:
+            ValueError: If masking percentage is suspiciously low (<25%)
+        """
+        if len(dataset) == 0:
+            return {"masked_pct": 0.0, "trained_pct": 0.0}
+
+        samples = [dataset[i] for i in range(min(sample_count, len(dataset)))]
+        batch = collator(samples)
+
+        masked_count = (batch['labels'] == -100).sum().item()
+        total_count = batch['labels'].numel()
+        trained_count = total_count - masked_count
+
+        masked_pct = 100 * masked_count / total_count
+        trained_pct = 100 * trained_count / total_count
+
+        # Validate masking looks reasonable
+        if masked_pct < 25:
+            raise ValueError(
+                f"Masking too low ({masked_pct:.1f}% < 25%). "
+                "This may indicate training on instructions. "
+                "Check collator configuration."
+            )
+
+        return {
+            "masked_pct": masked_pct,
+            "trained_pct": trained_pct,
+            "masked_count": masked_count,
+            "total_count": total_count,
+        }
 
     # ========================================================================
     # Utility Methods
     # ========================================================================
 
     def _get_torch_dtype(self, precision: str) -> torch.dtype:
-        """
-        Convert precision string to PyTorch dtype.
-
-        Args:
-            precision: One of "bf16", "fp16", or "fp32"
-
-        Returns:
-            torch.dtype: Corresponding PyTorch dtype
-                - "bf16" → torch.bfloat16
-                - "fp16" → torch.float16
-                - "fp32" → torch.float32
-                - unknown → torch.bfloat16 (with warning)
-        """
+        """Convert precision string to PyTorch dtype."""
         if precision == "bf16":
             return torch.bfloat16
         elif precision == "fp16":
@@ -595,49 +918,24 @@ class TrainerEngine:
         elif precision == "fp32":
             return torch.float32
         else:
-            print(f"   ⚠️  Unknown precision '{precision}', defaulting to bf16")
+            print(f"   Unknown precision '{precision}', defaulting to bf16")
             return torch.bfloat16
 
     def _build_system_prompt(self, config: TrainerConfig) -> str:
-        """
-        Build system prompt by filling template with current date.
-
-        Args:
-            config: TrainerConfig with monitoring.system_prompt_base template.
-                Template should contain {date} placeholder.
-
-        Returns:
-            str: System prompt with {date} replaced by YYYY-MM-DD format
-
-        Example:
-            >>> config.monitoring.system_prompt_base = "Today is {date}. You are helpful."
-            >>> engine._build_system_prompt(config)
-            "Today is 2025-11-24. You are helpful."
-        """
+        """Build system prompt by filling template with current date."""
         template = config.monitoring.system_prompt_base
         date_str = datetime.now().strftime('%Y-%m-%d')
         return template.format(date=date_str)
 
-    def _build_training_arguments(self, config: TrainerConfig) -> TrainingArguments:
+    def _build_training_arguments(
+        self,
+        config: TrainerConfig,
+        max_steps: int
+    ) -> TrainingArguments:
         """
         Build HuggingFace TrainingArguments from TrainerConfig.
 
-        Converts our TrainerConfig structure to HuggingFace's TrainingArguments
-        format. Handles precision flags (fp16 vs bf16), batch size, learning rate,
-        eval strategy, checkpointing, and logging.
-
-        Args:
-            config: TrainerConfig with all training parameters
-
-        Returns:
-            TrainingArguments: HuggingFace TrainingArguments instance with:
-                - output_dir, batch_size, learning_rate, warmup_steps
-                - num_train_epochs or max_steps
-                - save_steps, save_total_limit
-                - eval_steps, eval_strategy
-                - fp16/bf16 flags based on config.hyperparams.fp_precision
-                - logging_steps, report_to
-                - other training configuration
+        Uses max_steps for continuous training instead of epochs.
         """
         # Determine precision flags
         use_fp16 = config.hyperparams.fp_precision == "fp16"
@@ -645,18 +943,24 @@ class TrainerEngine:
 
         return TrainingArguments(
             output_dir=config.output.output_dir,
+            max_steps=max_steps,
             per_device_train_batch_size=config.hyperparams.batch_size,
+            per_device_eval_batch_size=1,
             gradient_accumulation_steps=config.hyperparams.gradient_accumulation,
             learning_rate=config.hyperparams.learning_rate,
             warmup_steps=config.hyperparams.warmup_steps,
-            num_train_epochs=config.hyperparams.num_epochs,
-            max_steps=config.hyperparams.max_steps if config.hyperparams.max_steps else -1,
+            lr_scheduler_type="constant",  # Don't decay LR for continuous training
             save_steps=config.hyperparams.save_steps,
             save_total_limit=config.hyperparams.save_total_limit,
             eval_steps=config.hyperparams.eval_steps,
             eval_strategy=config.hyperparams.eval_strategy,
             fp16=use_fp16,
             bf16=use_bf16,
+            tf32=True,  # Enable TF32 for speedup
+            gradient_checkpointing=True,
+            optim="adamw_torch_fused",  # Faster than default
+            dataloader_num_workers=16,
+            dataloader_pin_memory=True,
             logging_steps=config.environment.logging_steps,
             report_to=config.environment.report_to,
             remove_unused_columns=False,
@@ -666,4 +970,4 @@ class TrainerEngine:
         )
 
 
-__all__ = ["TrainerEngine", "TrainingResult"]
+__all__ = ["TrainerEngine", "TrainingResult", "MonitorContext"]

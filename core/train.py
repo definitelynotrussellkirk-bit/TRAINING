@@ -98,6 +98,16 @@ from trainer.config import ConfigLoader, TrainerConfig, create_default_config
 from trainer.profiles import get_profile
 # NOTE: trainer.monitoring.TrainingStatusWriter exists but we use core/training_status.py for now (backward compat)
 
+# Import TrainerEngine for delegation (Phase 3 refactor)
+try:
+    from trainer.core.engine import TrainerEngine, TrainingResult, MonitorContext
+    ENGINE_AVAILABLE = True
+except ImportError:
+    ENGINE_AVAILABLE = False
+    TrainerEngine = None
+    TrainingResult = None
+    MonitorContext = None
+
 # Import chat template override (fixes Qwen3 <think> injection conflict)
 from core.chat_templates import apply_chat_template_override
 
@@ -393,6 +403,14 @@ class UltimateTrainer:
         self.training_summary: Dict[str, Any] | None = None
         self.layer_monitor: LayerMonitor | None = None
 
+        # TrainerEngine for delegation (Phase 3 refactor)
+        # Enable with USE_ENGINE=1 environment variable
+        self.engine = None
+        self.use_engine = os.environ.get("USE_ENGINE", "0").lower() in ("1", "true", "yes")
+        if self.use_engine and ENGINE_AVAILABLE:
+            self.engine = TrainerEngine(self.status_writer)
+            print("TrainerEngine delegation enabled (USE_ENGINE=1)")
+
     def _get_hyperparam(self, name: str, default=None):
         """Get hyperparam from config (preferred) or args (fallback)."""
         if self.config and hasattr(self.config, 'hyperparams'):
@@ -566,11 +584,117 @@ class UltimateTrainer:
         except Exception as e:
             print(f"⚠️  Locked-config check failed: {e} (continuing, but investigate)")
 
+    def _run_with_engine(self) -> bool:
+        """
+        Execute training using TrainerEngine delegation.
+
+        This is the new simplified path enabled by USE_ENGINE=1.
+        Keeps CLI orchestration (validation, time estimate, notifications)
+        but delegates core HF training to TrainerEngine.
+
+        Returns:
+            bool: True if training succeeded, False otherwise
+        """
+        print("Using TrainerEngine delegation (Phase 3 refactor)")
+        print("-" * 80)
+
+        # Step 0: Enforce locked config
+        self.enforce_locked_config()
+
+        # Reset CUDA peak memory stats
+        try:
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
+        except Exception:
+            pass
+
+        # Step 1: Validate dataset
+        if not self.args.skip_validation:
+            print("\nSTEP 1: Validating Dataset")
+            print("-" * 80)
+            if not self.validate_dataset():
+                print("\nValidation failed! Aborting.")
+                return False
+            print("Dataset validation passed!")
+        else:
+            print("\nSkipping validation (not recommended!)")
+
+        # Step 2: Time estimation
+        print("\nSTEP 2: Time Estimation")
+        print("-" * 80)
+        estimate = self.estimate_time()
+        TimeEstimator.display_estimate(estimate)
+
+        # Ask for confirmation
+        if not self.args.yes:
+            response = input("\nContinue with training? [yes/no]: ").strip().lower()
+            if response != 'yes':
+                print("Training cancelled by user")
+                return False
+
+        # Step 3: Delegate to TrainerEngine
+        print("\nSTEP 3: Training (via TrainerEngine)")
+        print("-" * 80)
+
+        self.training_start_time = time.time()
+
+        # Run the engine
+        result = self.engine.run_job(
+            config=self.config,
+            config_dict=self.config_dict,
+            monitors=None,  # TODO: Pass MonitorContext when Phase 4 is complete
+            callbacks=None,  # TODO: Pass LiveMonitorCallback when extracted
+        )
+
+        # Handle result
+        if result.success:
+            elapsed = time.time() - self.training_start_time
+            duration_str = f"{elapsed/60:.1f} minutes"
+
+            print("\n" + "=" * 80)
+            print("TRAINING COMPLETE!")
+            print("=" * 80)
+            print(f"\nModel saved to: {result.last_checkpoint_path}")
+            print(f"Final loss: {result.final_loss:.4f}")
+            print(f"Global step: {result.global_step}")
+            print(f"Runtime: {duration_str}")
+
+            # Store training summary
+            self.training_summary = result.summary
+
+            # Mark completed
+            self.status_writer.mark_completed(result.global_step, result.global_step)
+
+            # Send notification
+            self.notifier.training_complete(duration_str)
+
+            return True
+        else:
+            print("\n" + "=" * 80)
+            print("TRAINING FAILED!")
+            print("=" * 80)
+            print(f"\nError: {result.error_message}")
+
+            # Mark crashed
+            self.status_writer.mark_crashed(result.error_message, "TrainerEngine")
+
+            # Send notification
+            if result.error_message and "out of memory" in result.error_message.lower():
+                self.notifier.oom_error()
+            else:
+                self.notifier.training_crashed(result.error_message or "Unknown error")
+
+            return False
+
     def run(self):
         """Execute full training pipeline."""
         print("\n" + "=" * 80)
-        print("🚀 ULTIMATE TRAINER")
+        print("ULTIMATE TRAINER")
         print("=" * 80)
+
+        # Check if using engine delegation (USE_ENGINE=1)
+        if self.use_engine and self.engine and self.config:
+            return self._run_with_engine()
 
         # Step 0: Enforce locked config values to prevent bad runs
         self.enforce_locked_config()

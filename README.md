@@ -24,6 +24,8 @@
 | Vault | Checkpoint storage |
 | Oracle | Inference server (chat with the model) |
 
+*The author notes with some amusement that these mappings emerged with surprising ease—the conceptual distance between "training a model" and "raising a hero" proved remarkably small. Contributions of additional isomorphisms are welcomed; perhaps your mental model prefers different metaphors. PRs accepted.*
+
 ---
 
 ## Quick Start

@@ -225,23 +225,37 @@ class DataCollatorForCompletionOnly:
         labels = batch['labels'].clone()
 
         for idx, input_ids in enumerate(batch['input_ids']):
-            # Find where the response template appears in the token sequence
+            # Find ALL occurrences of response template (handles packed sequences)
             input_ids_list = input_ids.tolist()
 
-            # Search for the response template token sequence
-            response_start_idx = None
+            # Find all positions where response template appears
+            response_positions = []
             for i in range(len(input_ids_list) - response_template_length + 1):
                 if input_ids_list[i:i + response_template_length] == response_token_ids:
-                    # Found it! Response starts AFTER the template
-                    response_start_idx = i + response_template_length
-                    break
+                    # Response starts AFTER the template
+                    response_positions.append(i + response_template_length)
 
-            if response_start_idx is not None:
-                # Mask everything before the response (including the template itself)
-                labels[idx, :response_start_idx] = self.ignore_index
+            if response_positions:
+                # Start with all masked
+                labels[idx, :] = self.ignore_index
+
+                # Unmask only the response portions (between template and next instruction)
+                # For packed sequences: mask instruction, train response, mask instruction, train response...
+                for pos_idx, response_start in enumerate(response_positions):
+                    # Find end of this response (next template start, or end of sequence)
+                    if pos_idx + 1 < len(response_positions):
+                        # There's another response after this one
+                        # Response ends at the start of next template (not response_start)
+                        next_template_start = response_positions[pos_idx + 1] - response_template_length
+                        response_end = next_template_start
+                    else:
+                        # Last response - goes to end of sequence
+                        response_end = len(input_ids_list)
+
+                    # Unmask the response portion (set labels to actual token IDs)
+                    labels[idx, response_start:response_end] = batch['input_ids'][idx, response_start:response_end]
             else:
-                # Couldn't find template - this shouldn't happen with proper data
-                # but if it does, mask the entire sequence to be safe
+                # Couldn't find template - mask entire sequence to be safe
                 print(f"Warning: Could not find response template in example {idx}")
                 labels[idx, :] = self.ignore_index
 

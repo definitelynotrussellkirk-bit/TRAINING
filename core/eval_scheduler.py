@@ -395,6 +395,15 @@ class EvalScheduler:
 
         Returns (should_run, reason).
         """
+        # Check RealmMode first
+        try:
+            from core.realm_state import can_run_evals
+            priority_class = suite.priority_class.value  # "P0", "P1", "P2"
+            if not can_run_evals(priority_class):
+                return False, f"realm mode doesn't allow {priority_class} evals"
+        except ImportError:
+            pass  # If realm_state not available, allow all
+
         # Check trigger type matches suite config
         if trigger == "checkpoint":
             if not suite.on_new_checkpoint:

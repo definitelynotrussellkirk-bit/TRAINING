@@ -482,6 +482,21 @@ class TavernHandler(SimpleHTTPRequestHandler):
             skill_id = path.replace("/api/engine/skill/", "").replace("/state", "")
             skills_api.serve_skill_state(self, skill_id)
 
+        # Evals - Evaluation ledger queries
+        elif path == "/api/evals":
+            self._serve_evals_list(query)
+        elif path == "/api/evals/summary":
+            self._serve_evals_summary()
+        elif path.startswith("/api/evals/checkpoint/"):
+            checkpoint_step = path.replace("/api/evals/checkpoint/", "")
+            self._serve_evals_by_checkpoint(checkpoint_step, query)
+        elif path.startswith("/api/evals/skill/"):
+            skill_id = path.replace("/api/evals/skill/", "")
+            self._serve_evals_by_skill(skill_id, query)
+        elif path.startswith("/api/evals/job/"):
+            job_id = path.replace("/api/evals/job/", "")
+            self._serve_eval_by_job(job_id)
+
         # Mantra - System prompt that's injected into all training
         elif path == "/mantra":
             self._serve_mantra()
@@ -612,6 +627,14 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/run-context":
             run_context_api.serve_run_context(self)
 
+        # World State API - Single authoritative snapshot of the Realm
+        elif path == "/api/world-state":
+            self._serve_world_state()
+        elif path == "/api/realm-mode":
+            self._serve_realm_mode()
+        elif path == "/api/battle-log":
+            self._serve_battle_log(query)
+
         # Analysis - Model Archaeology (uses analysis_api module)
         elif path == "/analysis" or path == "/analysis.html":
             self._serve_template("analysis.html")
@@ -714,6 +737,9 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Reset API - Clear stale state
         elif path == "/api/reset":
             self._handle_reset()
+        # Realm Mode API - Set global mode (TRAINING/IDLE/etc)
+        elif path == "/api/realm-mode":
+            self._set_realm_mode()
         else:
             self._send_error(404, "Endpoint not found")
 
@@ -798,6 +824,113 @@ class TavernHandler(SimpleHTTPRequestHandler):
     def _send_error(self, status: int, message: str):
         """Send an error response."""
         self._send_json({"error": message, "status": status}, status)
+
+    # =========================================
+    # World State API - Single Authoritative Snapshot
+    # =========================================
+
+    def _serve_world_state(self):
+        """Serve complete world state snapshot."""
+        try:
+            from core.world_state import get_world_state
+            state = get_world_state()
+            self._send_json(state)
+        except ImportError:
+            self._send_json({
+                "error": "World state system not available",
+                "realm_mode": "unknown",
+                "health": "unknown",
+            }, 503)
+        except Exception as e:
+            logger.error(f"World state error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_realm_mode(self):
+        """Serve current realm mode."""
+        try:
+            from core.realm_state import get_realm_state, RealmMode
+            state = get_realm_state()
+            self._send_json({
+                "mode": state.mode.value,
+                "description": state.mode.description,
+                "changed_at": state.changed_at,
+                "changed_by": state.changed_by,
+                "reason": state.reason,
+                "allows_training": state.mode.allows_training,
+                "allows_evals": state.mode.allows_evals,
+                "available_modes": [m.value for m in RealmMode],
+            })
+        except ImportError:
+            self._send_json({
+                "mode": "training",
+                "description": "Realm state system not available",
+                "error": "System not installed",
+            }, 503)
+        except Exception as e:
+            logger.error(f"Realm mode error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _set_realm_mode(self):
+        """Set realm mode via POST."""
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body) if body else {}
+
+            mode_str = data.get("mode")
+            reason = data.get("reason", "set via tavern")
+
+            if not mode_str:
+                self._send_json({"error": "Missing 'mode' field"}, 400)
+                return
+
+            from core.realm_state import set_realm_mode, RealmMode
+
+            try:
+                mode = RealmMode(mode_str)
+            except ValueError:
+                self._send_json({
+                    "error": f"Invalid mode: {mode_str}",
+                    "valid_modes": [m.value for m in RealmMode],
+                }, 400)
+                return
+
+            new_state = set_realm_mode(mode, changed_by="tavern", reason=reason)
+            self._send_json({
+                "success": True,
+                "mode": new_state.mode.value,
+                "description": new_state.mode.description,
+                "changed_at": new_state.changed_at,
+            })
+
+        except ImportError:
+            self._send_json({"error": "Realm state system not available"}, 503)
+        except Exception as e:
+            logger.error(f"Set realm mode error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_battle_log(self, query: dict):
+        """Serve formatted battle log entries."""
+        try:
+            from core.events import get_battle_log
+            limit = int(query.get("limit", [50])[0])
+            since_minutes = query.get("since_minutes", [None])[0]
+            if since_minutes:
+                since_minutes = int(since_minutes)
+
+            log = get_battle_log(limit=limit, since_minutes=since_minutes)
+            self._send_json({
+                "entries": log,
+                "count": len(log),
+            })
+        except ImportError:
+            self._send_json({
+                "entries": [],
+                "error": "Battle log system not available",
+            }, 503)
+        except Exception as e:
+            logger.error(f"Battle log error: {e}")
+            self._send_json({"error": str(e)}, 500)
 
     # =========================================
     # Events API - Global Announcement Channel
@@ -3103,19 +3236,11 @@ class TavernHandler(SimpleHTTPRequestHandler):
         """
         Reset training environment - clear stale state while preserving models.
 
-        This is a destructive operation that:
-        - Stops running daemons
-        - Clears PID files
-        - Clears state files (control/state.json, status/training_status.json)
-        - Optionally cancels pending jobs
-
         POST /api/reset
         Body: {"keep_jobs": false}  # optional
         """
         try:
-            import os
-            import signal
-            from pathlib import Path
+            from core.reset import reset_environment
             from core.paths import get_base_dir
 
             content_length = int(self.headers.get("Content-Length", 0))
@@ -3124,71 +3249,16 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 body = json.loads(self.rfile.read(content_length).decode())
 
             keep_jobs = body.get("keep_jobs", False)
-            base_dir = get_base_dir()
 
-            results = {
-                "daemons_stopped": 0,
-                "pids_cleared": 0,
-                "state_files_cleared": 0,
-                "jobs_cancelled": 0,
-            }
-
-            # Step 1: Stop daemons
-            pids_dir = base_dir / ".pids"
-            if pids_dir.exists():
-                for pid_file in pids_dir.glob("*.pid"):
-                    try:
-                        pid = int(pid_file.read_text().strip())
-                        os.kill(pid, signal.SIGTERM)
-                        results["daemons_stopped"] += 1
-                    except (ValueError, ProcessLookupError, PermissionError):
-                        pass
-
-            # Step 2: Clear PID files
-            if pids_dir.exists():
-                for pid_file in pids_dir.glob("*.pid"):
-                    try:
-                        pid_file.unlink()
-                        results["pids_cleared"] += 1
-                    except Exception:
-                        pass
-
-            # Step 3: Clear state files
-            state_files = [
-                base_dir / "control" / "state.json",
-                base_dir / "status" / "training_status.json",
-                base_dir / "status" / "events.jsonl",
-            ]
-            for state_file in state_files:
-                if state_file.exists():
-                    try:
-                        state_file.unlink()
-                        results["state_files_cleared"] += 1
-                    except Exception:
-                        pass
-
-            # Step 4: Cancel pending jobs
-            if not keep_jobs:
-                try:
-                    from jobs.store import get_store
-                    from guild.job_types import JobStatus
-                    store = get_store()
-                    jobs = store.list_jobs(status=JobStatus.PENDING, limit=1000)
-                    jobs += store.list_jobs(status=JobStatus.CLAIMED, limit=1000)
-                    jobs += store.list_jobs(status=JobStatus.RUNNING, limit=1000)
-                    for job in jobs:
-                        try:
-                            store.cancel(job.job_id, actor="reset")
-                            results["jobs_cancelled"] += 1
-                        except Exception:
-                            pass
-                except Exception as e:
-                    logger.warning(f"Could not clear jobs: {e}")
+            result = reset_environment(
+                keep_jobs=keep_jobs,
+                base_dir=get_base_dir(),
+            )
 
             self._send_json({
                 "success": True,
                 "message": "Environment reset complete",
-                "results": results,
+                "results": result.as_counts(),
             })
 
         except Exception as e:
@@ -4305,6 +4375,162 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Passives summary error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    # =========================================================================
+    # Evaluation Ledger API - Query eval results
+    # =========================================================================
+
+    def _serve_evals_list(self, query: dict):
+        """List recent evals with optional filtering."""
+        try:
+            from core.evaluation_ledger import get_eval_ledger
+
+            ledger = get_eval_ledger()
+            limit = int(query.get("limit", [50])[0])
+
+            # Optional filters
+            skill = query.get("skill", [None])[0]
+            hero_id = query.get("hero_id", [None])[0]
+            campaign_id = query.get("campaign_id", [None])[0]
+
+            if skill:
+                level = query.get("level", [None])[0]
+                level = int(level) if level else None
+                records = ledger.get_by_skill(skill, level)
+            elif hero_id:
+                records = ledger.get_by_hero_campaign(hero_id, campaign_id)
+            else:
+                records = ledger.list_all(limit)
+
+            self._send_json({
+                "evals": [r.to_dict() for r in records[:limit]],
+                "count": len(records),
+            })
+
+        except ImportError:
+            self._send_json({
+                "evals": [],
+                "count": 0,
+                "message": "Evaluation ledger not available"
+            })
+        except Exception as e:
+            logger.error(f"Evals list error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_evals_summary(self):
+        """Get evaluation summary statistics."""
+        try:
+            from core.evaluation_ledger import get_eval_ledger
+
+            ledger = get_eval_ledger()
+            summary = ledger.summary()
+            self._send_json(summary)
+
+        except ImportError:
+            self._send_json({
+                "total_evaluations": 0,
+                "by_skill": {},
+                "message": "Evaluation ledger not available"
+            })
+        except Exception as e:
+            logger.error(f"Evals summary error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_evals_by_checkpoint(self, checkpoint_step: str, query: dict):
+        """Get all evals for a checkpoint."""
+        try:
+            from core.evaluation_ledger import get_eval_ledger
+
+            ledger = get_eval_ledger()
+            step = int(checkpoint_step)
+
+            # Optional hero/campaign filter
+            hero_id = query.get("hero_id", [None])[0]
+            campaign_id = query.get("campaign_id", [None])[0]
+
+            records = ledger.get_by_checkpoint(step)
+
+            # Filter by hero/campaign if specified
+            if hero_id:
+                records = [r for r in records if r.hero_id == hero_id]
+            if campaign_id:
+                records = [r for r in records if r.campaign_id == campaign_id]
+
+            # Also get skills grouped view
+            skills_map = ledger.get_checkpoint_skills(step, hero_id, campaign_id)
+
+            self._send_json({
+                "checkpoint_step": step,
+                "evals": [r.to_dict() for r in records],
+                "skills": {k: v.to_dict() for k, v in skills_map.items()},
+                "count": len(records),
+            })
+
+        except ValueError:
+            self._send_json({"error": "Invalid checkpoint step"}, 400)
+        except Exception as e:
+            logger.error(f"Evals by checkpoint error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_evals_by_skill(self, skill_id: str, query: dict):
+        """Get all evals for a skill with optional level filter."""
+        try:
+            from core.evaluation_ledger import get_eval_ledger
+
+            ledger = get_eval_ledger()
+
+            level = query.get("level", [None])[0]
+            level = int(level) if level else None
+            hero_id = query.get("hero_id", [None])[0]
+            campaign_id = query.get("campaign_id", [None])[0]
+            limit = int(query.get("limit", [100])[0])
+
+            records = ledger.get_by_skill(skill_id, level)
+
+            # Filter by hero/campaign
+            if hero_id:
+                records = [r for r in records if r.hero_id == hero_id]
+            if campaign_id:
+                records = [r for r in records if r.campaign_id == campaign_id]
+
+            # Get skill summary with trends
+            skill_summary = ledger.get_by_skill(skill_id)  # Unfiltered for summary
+
+            self._send_json({
+                "skill_id": skill_id,
+                "level": level,
+                "evals": [r.to_dict() for r in records[:limit]],
+                "count": len(records),
+                "best_accuracy": max((r.accuracy for r in records), default=None),
+            })
+
+        except Exception as e:
+            logger.error(f"Evals by skill error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_eval_by_job(self, job_id: str):
+        """Get eval result for a specific job."""
+        try:
+            from core.evaluation_ledger import get_eval_ledger
+
+            ledger = get_eval_ledger()
+            record = ledger.get_by_job(job_id)
+
+            if record:
+                self._send_json({
+                    "found": True,
+                    "eval": record.to_dict(),
+                })
+            else:
+                self._send_json({
+                    "found": False,
+                    "job_id": job_id,
+                    "message": "No eval found for this job"
+                })
+
+        except Exception as e:
+            logger.error(f"Eval by job error: {e}")
             self._send_json({"error": str(e)}, 500)
 
     # =========================================================================

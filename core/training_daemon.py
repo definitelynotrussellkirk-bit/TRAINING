@@ -134,6 +134,18 @@ except ImportError:
     def emit(*args, **kwargs): pass
     def announce(*args, **kwargs): pass
 
+# World State integration (heartbeats, events, realm mode)
+try:
+    from core.heartbeat import HeartbeatWriter
+    from core.realm_state import get_realm_mode, can_start_training, RealmMode
+    from core.events import emit_event, emit_training_started, emit_training_completed, emit_checkpoint_saved
+    WORLD_STATE_AVAILABLE = True
+except ImportError:
+    WORLD_STATE_AVAILABLE = False
+    HeartbeatWriter = None
+    def get_realm_mode(): return "training"
+    def can_start_training(manual=False): return True
+
 # Add format variety support
 import random
 REPO_ROOT = Path(__file__).parent.parent / "singleSKILL"
@@ -322,6 +334,15 @@ class TrainingDaemon:
         # Register signal handlers
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
+
+        # Initialize heartbeat writer for World State integration
+        self.heartbeat_writer = None
+        if WORLD_STATE_AVAILABLE and HeartbeatWriter:
+            self.heartbeat_writer = HeartbeatWriter(
+                worker_id="training_daemon",
+                role="training",
+                device="GPU0",  # TODO: auto-detect from nvidia-smi
+            )
 
     def setup_logging(self):
         """Setup logging to file and console"""
@@ -1227,6 +1248,36 @@ class TrainingDaemon:
                 self.shutdown_requested or
                 self.controller.should_stop_after_batch())
 
+    def _emit_heartbeat(
+        self,
+        status: str = "idle",
+        current_job_id: str = None,
+        step: int = None,
+        total_steps: int = None,
+        it_per_sec: float = None,
+        current_file: str = None,
+    ):
+        """Emit heartbeat for World State tracking."""
+        if not self.heartbeat_writer:
+            return
+
+        extra = {}
+        if step is not None:
+            extra["step"] = step
+        if total_steps is not None:
+            extra["total_steps"] = total_steps
+        if it_per_sec is not None:
+            extra["it_per_sec"] = it_per_sec
+        if current_file:
+            extra["current_file"] = current_file
+
+        self.heartbeat_writer.beat(
+            status=status,
+            current_job_id=current_job_id,
+            current_job_type="train" if current_job_id else None,
+            extra=extra,
+        )
+
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully"""
         sig_name = signal.Signals(signum).name
@@ -1607,6 +1658,9 @@ class TrainingDaemon:
             while True:
                 iteration += 1
 
+                # Emit idle heartbeat at start of each iteration
+                self._emit_heartbeat(status="idle")
+
                 # Check for stop signal
                 if self.should_stop():
                     self.logger.info("Stop signal detected!")
@@ -1614,6 +1668,17 @@ class TrainingDaemon:
                         self.stop_file.unlink()
                     self.logger.info("Daemon stopped cleanly")
                     break
+
+                # Check RealmMode - respect global mode
+                if WORLD_STATE_AVAILABLE:
+                    mode = get_realm_mode()
+                    if not can_start_training(manual=False):
+                        # Mode doesn't allow auto-training
+                        if iteration % 60 == 1:  # Log occasionally
+                            self.logger.info(f"Realm mode is {mode} - auto-training paused")
+                        self._emit_heartbeat(status="idle")
+                        time.sleep(self.config["poll_interval"])
+                        continue
 
                 # Enforce checkpoint retention periodically
                 self.run_checkpoint_retention()
@@ -1677,6 +1742,22 @@ class TrainingDaemon:
                         # Update controller state
                         self.controller.update_state("training", current_file=data_file.name)
 
+                        # Emit training heartbeat
+                        self._emit_heartbeat(
+                            status="running",
+                            current_job_id=data_file.name,
+                            current_file=data_file.name,
+                        )
+
+                        # Emit training_started event
+                        if WORLD_STATE_AVAILABLE:
+                            emit_event(
+                                "training_started",
+                                job_id=data_file.name,
+                                job_name=data_file.name,
+                                total_examples=num_examples,
+                            )
+
                         # Record start metrics for impact tracking
                         start_metrics = self.get_current_training_metrics()
                         self.impact_tracker.start_file(
@@ -1733,6 +1814,16 @@ class TrainingDaemon:
                                 best_checkpoint=self._get_current_checkpoint()
                             )
                             self.job_logger.log_job(job)  # Log completed state
+
+                            # Emit training_completed event
+                            if WORLD_STATE_AVAILABLE:
+                                emit_event(
+                                    "training_completed",
+                                    job_id=data_file.name,
+                                    job_name=data_file.name,
+                                    final_step=end_metrics['step'],
+                                    final_loss=end_metrics['loss'],
+                                )
                         elif self.controller.should_skip_current_file():
                             self.controller.clear_skip()
                             self.queue.mark_skipped(data_file, reason="Skipped by user")

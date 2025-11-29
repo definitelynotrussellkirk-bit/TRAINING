@@ -372,7 +372,38 @@ def record_evaluation(
         problems=problems or [],
     )
 
-    return ledger.record(record)
+    recorded = ledger.record(record)
+
+    # Update campaign peak metrics if recorded successfully
+    if recorded:
+        _update_campaign_peak_accuracy(accuracy)
+
+    return recorded
+
+
+def _update_campaign_peak_accuracy(accuracy: float):
+    """
+    Update campaign peak accuracy metric if this is a new personal best.
+
+    Safe to call - never throws, just logs warnings.
+    """
+    try:
+        from guild.campaigns.loader import load_active_campaign
+
+        campaign = load_active_campaign()
+        if campaign is None:
+            return
+
+        is_new_peak = campaign.update_peak_metric(
+            "highest_accuracy", accuracy, lower_is_better=False
+        )
+        if is_new_peak:
+            logger.info(
+                f"[Campaign {campaign.id}] New best accuracy: {accuracy:.3f}"
+            )
+    except Exception as e:
+        # Don't crash evaluation because peak tracking failed
+        logger.warning(f"Failed to update peak accuracy: {e}")
 
 
 # Eval Queue for checkpoint saves

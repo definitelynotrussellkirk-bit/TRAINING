@@ -2,6 +2,7 @@
 
 **Last Updated:** 2025-11-29
 **Update Frequency:** Every ~50k tokens or when significant changes occur
+**Philosophy:** This repo is the method, not the results (see META section)
 
 ---
 
@@ -85,6 +86,116 @@ python3 -m training stop-all
 |------|---------|-------------|
 | **DIO Training** | `./scripts/start_all.sh` | Full daemon system - Tavern, VaultKeeper, queue |
 | **4B Experiments** | `python3 scripts/train_4b_full.py` | Standalone script - no daemon needed |
+
+---
+
+## 🧠 META: THIS REPO IS THE METHOD
+
+> **The main point is to have fun learning.**
+> Everything below is just thought experiments about where that might lead.
+
+**This project is intentionally not "here's my finished research results."**
+
+Instead, it is: **the method I intend to do the research with.**
+
+If you clone this repo, you don't get a static paper — you get the lab:
+- The way campaigns are structured
+- The way skills and curricula are defined
+- The way evaluation, peaks, and "maxed out" behavior are tracked
+- The way the human is pulled into forward momentum loops
+
+**The idea:** If you copy the method faithfully and point it at similar data/models, you should be able to recreate the results I'd otherwise just write in a PDF.
+
+The real thing being "taught" here is the research method: how to think about model training as a game of campaigns, skills, and level caps — not just a single set of numbers from one run.
+
+### Humans as Neural Nets & HITL Pressure
+
+There's another layer: **humans are neural nets too.**
+
+We adapt, optimize, and "game" reward structures. If this system works, we should expect players to:
+- Find shortcuts
+- Discover emergent strategies
+- And, crucially, **try to build skills that produce new skills**
+
+That's not a bug; it's the point.
+
+If the system works, at some point a natural player move is:
+
+> "I want a skill that, given new information Y, can design a curriculum Z so the hero can handle more Y-like information in domain X efficiently in the future."
+
+In other words, a **meta-skill**:
+- **Input:** New data/domain Y
+- **Output:** A proposed skill definition + curriculum + evaluation loop for that domain
+
+So the hero can bootstrap competence in new areas without the human hand-crafting every step.
+
+**This is the human-in-the-loop AGI twist:**
+1. The human is naturally motivated to "game" the system (optimize XP, unlock skills, beat their friends' heroes)
+2. The system gives them a language for doing that in terms of: skills, quests, curricula, campaigns
+3. The obvious high-level play becomes: **"Invent a skill that generates more skills"** (i.e., tools for automatic curriculum design and pipeline extension)
+
+At that point, the project isn't just "train a model better" — it's a sandbox where humans and models co-evolve a pipeline that can extend itself.
+
+### Campaigns as HITL Proto-AGI Experiments
+
+Putting it together, each Campaign can be seen as:
+
+**A finite, human-guided attempt to push a fixed hero (model) to its practical capacity** — under a method where the operator is nudged to:
+1. Keep training
+2. Add and refine skills
+3. Eventually delegate more of that process to the hero itself
+
+Either:
+- The human+system loop bootstraps something AGI-like for the tasks/skills you care about, **or**
+- You hit a capacity ceiling for this hero: the model is "maxed out" for this architecture/scale/data regime
+
+### What "Maxed Out" Means
+
+**A hero is effectively maxed when the experience required to gain a new skill level causes too much regression in previously mastered skills.**
+
+The maintenance multiplier blows up:
+- You spend more and more training just to keep old skills from decaying
+- Adding a new level in one area always comes with unacceptable losses elsewhere
+
+At that point:
+- **In-universe:** The hero has discovered its level cap
+- **Meta-level:** The campaign has exhausted the model's useful capacity under this method
+
+Time to:
+1. Archive the journey
+2. Keep the method
+3. Start a new campaign with a different hero (bigger model / different architecture / different data)
+
+### The Meta-Skill: Skill Forge
+
+The ultimate expression of HITL pressure is a skill that creates skills:
+
+```yaml
+# configs/skills/curriculum_design.yaml (concept)
+id: curriculum_design
+name: Curriculum Design
+rpg_name: "Skill Forge"
+description: "Given novel information Y, propose a curriculum Z"
+category: meta
+
+levels:
+  - level: 1
+    name: "Template Matching"
+    description: "Match new domain to existing skill template"
+  - level: 2
+    name: "Difficulty Scaling"
+    description: "Propose appropriate level progression"
+  - level: 3
+    name: "Primitive Decomposition"
+    description: "Identify atomic concepts in new domain"
+```
+
+Evaluation options:
+1. **Human judge** - you rate the proposals (full HITL)
+2. **Downstream performance** - train on proposed curriculum, measure actual skill acquisition (slow but objective)
+3. **Self-consistency** - does the hero's curriculum proposal actually work when tested
+
+Option 2 is honest but expensive. Option 1 keeps humans in the loop, which fits the thesis.
 
 ---
 

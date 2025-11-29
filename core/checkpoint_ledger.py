@@ -384,7 +384,50 @@ class CheckpointLedger:
             self._index[step] = record
             self._save_index()
 
+        # Update campaign peak metrics (outside lock)
+        self._update_campaign_peak_loss(train_loss, val_loss)
+
         return record
+
+    def _update_campaign_peak_loss(
+        self,
+        train_loss: Optional[float],
+        val_loss: Optional[float]
+    ):
+        """
+        Update campaign peak loss metrics if these are new personal bests.
+
+        Safe to call - never throws, just logs warnings.
+        """
+        try:
+            from guild.campaigns.loader import load_active_campaign
+
+            campaign = load_active_campaign()
+            if campaign is None:
+                return
+
+            # Track both train and validation loss
+            if train_loss is not None:
+                is_new_peak = campaign.update_peak_metric(
+                    "lowest_loss", train_loss, lower_is_better=True
+                )
+                if is_new_peak:
+                    logger.info(
+                        f"[Campaign {campaign.id}] New lowest loss: {train_loss:.4f}"
+                    )
+
+            if val_loss is not None:
+                is_new_peak = campaign.update_peak_metric(
+                    "lowest_val_loss", val_loss, lower_is_better=True
+                )
+                if is_new_peak:
+                    logger.info(
+                        f"[Campaign {campaign.id}] New lowest val loss: {val_loss:.4f}"
+                    )
+
+        except Exception as e:
+            # Don't crash checkpoint saving because peak tracking failed
+            logger.warning(f"Failed to update peak loss: {e}")
 
     def get(self, step: int) -> Optional[CheckpointRecord]:
         """Get record for a specific step."""

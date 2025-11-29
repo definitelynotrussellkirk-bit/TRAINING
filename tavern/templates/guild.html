@@ -389,6 +389,26 @@
             </div>
         </div>
 
+        <!-- Hero's Journey - Personal Best -->
+        <div class="campaign-peaks-section" id="campaignPeaks" style="margin-bottom: 2rem; display: none;">
+            <h2 class="section-title">🏆 Hero's Journey - Personal Best</h2>
+            <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem;">
+                <p id="journeySummary" style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--accent);">Loading...</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                    <!-- Peak Skills -->
+                    <div>
+                        <h4 style="font-size: 0.875rem; color: var(--text-dim); margin-bottom: 0.75rem;">Peak Skill Levels</h4>
+                        <ul id="peakSkillList" style="list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem;"></ul>
+                    </div>
+                    <!-- Peak Metrics -->
+                    <div>
+                        <h4 style="font-size: 0.875rem; color: var(--text-dim); margin-bottom: 0.75rem;">Best Metrics</h4>
+                        <ul id="peakMetricList" style="list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem;"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Active Skills -->
         <h2 class="section-title">⚔️ Active Skills</h2>
         <div class="skills-grid" id="skillsGrid">
@@ -777,13 +797,79 @@
             }
         }
 
+        // Campaign Peaks - Personal Best tracking
+        async function loadCampaignPeaks() {
+            try {
+                const res = await fetch('/api/campaigns/active');
+                if (!res.ok) return;
+
+                const c = await res.json();
+                if (!c || !c.id) {
+                    // No active campaign - hide section
+                    document.getElementById('campaignPeaks').style.display = 'none';
+                    return;
+                }
+
+                // Show the section
+                document.getElementById('campaignPeaks').style.display = 'block';
+
+                // Journey summary
+                document.getElementById('journeySummary').textContent =
+                    c.journey_summary || `${c.name} - Step ${(c.current_step || 0).toLocaleString()}`;
+
+                // Peak skills
+                const skillsUl = document.getElementById('peakSkillList');
+                const peaks = c.peak_skill_levels || {};
+                const skillKeys = Object.keys(peaks);
+
+                if (skillKeys.length === 0) {
+                    skillsUl.innerHTML = '<li style="color: var(--text-dim);">No skills peaked yet</li>';
+                } else {
+                    skillsUl.innerHTML = skillKeys.map(skillId => `
+                        <li style="background: var(--bg-hover); padding: 0.5rem 1rem; border-radius: 6px;">
+                            <span style="font-weight: 600; text-transform: uppercase;">${skillId}</span>:
+                            <span style="color: var(--accent);">L${peaks[skillId]}</span>
+                        </li>
+                    `).join('');
+                }
+
+                // Peak metrics
+                const metricsUl = document.getElementById('peakMetricList');
+                const metrics = c.peak_metrics || {};
+                const metricKeys = Object.keys(metrics);
+
+                if (metricKeys.length === 0) {
+                    metricsUl.innerHTML = '<li style="color: var(--text-dim);">No metrics tracked yet</li>';
+                } else {
+                    metricsUl.innerHTML = metricKeys.map(name => {
+                        const value = metrics[name];
+                        const displayValue = name.includes('accuracy')
+                            ? `${(value * 100).toFixed(1)}%`
+                            : value.toFixed(4);
+                        const icon = name.includes('loss') ? '📉' : name.includes('accuracy') ? '🎯' : '📊';
+                        const displayName = name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        return `
+                            <li style="background: var(--bg-hover); padding: 0.5rem 1rem; border-radius: 6px;">
+                                ${icon} ${displayName}:
+                                <span style="color: var(--success); font-weight: 600;">${displayValue}</span>
+                            </li>
+                        `;
+                    }).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load campaign peaks:', err);
+            }
+        }
+
         // Load on page load
         loadGuildData();
         loadTaskMaster();
+        loadCampaignPeaks();
 
         // Refresh every 30 seconds
         setInterval(loadGuildData, 30000);
         setInterval(loadTaskMaster, 30000);
+        setInterval(loadCampaignPeaks, 30000);
     </script>
 </body>
 </html>

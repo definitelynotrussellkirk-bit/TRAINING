@@ -285,6 +285,31 @@ class SkillStateManager:
         self._save_state()
         logger.info(f"[{skill_id}] PROGRESSION: Level {from_level} -> {to_level}")
 
+        # Update campaign peak skill tracking
+        self._update_campaign_peak_skill(skill_id, to_level)
+
+    def _update_campaign_peak_skill(self, skill_id: str, new_level: int):
+        """
+        Update campaign peak skill level if this is a new personal best.
+
+        Safe to call - never throws, just logs warnings.
+        """
+        try:
+            from guild.campaigns.loader import load_active_campaign
+
+            campaign = load_active_campaign()
+            if campaign is None:
+                return
+
+            is_new_peak = campaign.update_peak_skill(skill_id, new_level)
+            if is_new_peak:
+                logger.info(
+                    f"[Campaign {campaign.id}] New peak level for {skill_id}: {new_level}"
+                )
+        except Exception as e:
+            # Don't crash training because peak tracking failed
+            logger.warning(f"Failed to update peak skill {skill_id}: {e}")
+
     def set_level(self, skill_id: str, level: int, triggered_by: str = "manual"):
         """
         Set skill level directly.

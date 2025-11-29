@@ -37,6 +37,7 @@ def get_base_dir() -> Path:
 def run_command(command: str, args) -> int:
     """Dispatch to the appropriate command handler."""
     handlers = {
+        "play": cmd_play,
         "doctor": cmd_doctor,
         "start-all": cmd_start_all,
         "stop-all": cmd_stop_all,
@@ -47,6 +48,174 @@ def run_command(command: str, args) -> int:
         return handler(args)
     print(f"Unknown command: {command}")
     return 1
+
+
+# =============================================================================
+# PLAY COMMAND - The main game entry point
+# =============================================================================
+
+def cmd_play(args) -> int:
+    """
+    Enter the Realm of Training.
+
+    This starts everything needed to "play" - services, heroes, and opens the UI.
+    """
+    import webbrowser
+    import threading
+
+    base_dir = get_base_dir()
+    tavern_port = int(os.environ.get("TAVERN_PORT", 8888))
+
+    print()
+    print("=" * 60)
+    print("     THE REALM OF TRAINING")
+    print("=" * 60)
+    print()
+
+    processes: List[subprocess.Popen] = []
+    hero_processes: List[subprocess.Popen] = []
+
+    def cleanup():
+        """Clean up all processes on exit."""
+        print("\n\nLeaving the realm...")
+        for proc in hero_processes + processes:
+            try:
+                proc.terminate()
+                proc.wait(timeout=5)
+            except:
+                proc.kill()
+        print("Farewell, adventurer.")
+
+    def signal_handler(sig, frame):
+        cleanup()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    # Step 1: Start core services
+    print("Starting services...")
+
+    # VaultKeeper
+    vault_port = int(os.environ.get("VAULTKEEPER_PORT", 8767))
+    vault_server = base_dir / "vault" / "server.py"
+    if vault_server.exists():
+        proc = subprocess.Popen(
+            [sys.executable, str(vault_server), "--port", str(vault_port)],
+            cwd=str(base_dir),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        processes.append(proc)
+        print(f"  [+] VaultKeeper (port {vault_port})")
+
+    # Tavern
+    tavern_server = base_dir / "tavern" / "server.py"
+    if tavern_server.exists():
+        proc = subprocess.Popen(
+            [sys.executable, str(tavern_server), "--port", str(tavern_port)],
+            cwd=str(base_dir),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        processes.append(proc)
+        print(f"  [+] Tavern (port {tavern_port})")
+
+    # Wait for Tavern to be ready
+    time.sleep(2)
+
+    # Step 2: Find and awaken heroes (start hero loops)
+    print("\nAwakening heroes...")
+
+    campaigns_dir = base_dir / "campaigns"
+    campaigns_to_start = []
+
+    if hasattr(args, 'hero') and args.hero:
+        # Specific hero requested
+        campaign_path = campaigns_dir / args.hero
+        if campaign_path.exists():
+            campaigns_to_start.append(args.hero)
+        else:
+            print(f"  [!] Campaign not found: {args.hero}")
+    else:
+        # Find all active campaigns
+        for hero_dir in campaigns_dir.iterdir():
+            if not hero_dir.is_dir():
+                continue
+            for campaign_dir in hero_dir.iterdir():
+                if not campaign_dir.is_dir():
+                    continue
+                config_file = campaign_dir / "config.json"
+                if config_file.exists():
+                    rel_path = f"{hero_dir.name}/{campaign_dir.name}"
+                    campaigns_to_start.append(rel_path)
+
+    for campaign in campaigns_to_start:
+        campaign_path = campaigns_dir / campaign
+        try:
+            # Load hero name from config
+            config_file = campaign_path / "config.json"
+            hero_name = campaign
+            if config_file.exists():
+                with open(config_file) as f:
+                    config = json.load(f)
+                    hero_name = config.get("hero_name", campaign)
+
+            # Start hero loop
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "arena.hero_loop", campaign],
+                cwd=str(base_dir),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            hero_processes.append(proc)
+            print(f"  [+] {hero_name} awakened")
+        except Exception as e:
+            print(f"  [!] Failed to awaken {campaign}: {e}")
+
+    if not hero_processes:
+        print("  [!] No heroes to awaken. Create a campaign first.")
+
+    # Step 3: Open browser
+    if not (hasattr(args, 'no_browser') and args.no_browser):
+        print(f"\nOpening Tavern...")
+        time.sleep(1)
+        webbrowser.open(f"http://localhost:{tavern_port}")
+
+    # Step 4: Show status and wait
+    print()
+    print("=" * 60)
+    print(f"  Tavern: http://localhost:{tavern_port}")
+    print(f"  Heroes: {len(hero_processes)} active")
+    print()
+    print("  The heroes are training. Press Ctrl+C to leave.")
+    print("=" * 60)
+    print()
+
+    # Monitor processes
+    try:
+        while True:
+            time.sleep(5)
+
+            # Check if any service died
+            for proc in processes:
+                if proc.poll() is not None:
+                    print(f"[!] Service (PID {proc.pid}) exited unexpectedly")
+
+            # Check if any hero died
+            dead_heroes = []
+            for i, proc in enumerate(hero_processes):
+                if proc.poll() is not None:
+                    dead_heroes.append(i)
+
+            # Clean up dead heroes
+            for i in reversed(dead_heroes):
+                hero_processes.pop(i)
+
+    except KeyboardInterrupt:
+        cleanup()
+
+    return 0
 
 
 # =============================================================================

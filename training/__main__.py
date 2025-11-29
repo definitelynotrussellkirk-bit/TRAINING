@@ -3,6 +3,7 @@
 TRAINING CLI - Main entry point for Realm of Training.
 
 Usage:
+    python -m training play         # Enter the realm - start everything
     python -m training doctor       # Check environment and services
     python -m training start-all    # Start all services for dev
     python -m training stop-all     # Stop all services
@@ -19,6 +20,22 @@ def main():
         description="Realm of Training - CLI for managing training infrastructure"
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # play command - THE main entry point
+    p_play = subparsers.add_parser(
+        "play",
+        help="Enter the realm - start services and awaken heroes"
+    )
+    p_play.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Don't open browser automatically"
+    )
+    p_play.add_argument(
+        "--hero",
+        type=str,
+        help="Only awaken a specific hero (e.g., titan-qwen3-4b/campaign-001)"
+    )
 
     # doctor command
     p_doctor = subparsers.add_parser(

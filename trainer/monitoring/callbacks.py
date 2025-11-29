@@ -23,6 +23,15 @@ from core.logit_penalty import reset_processor_states, collect_penalty_stats
 from monitoring.servers.pattern_tracker import PatternTracker, get_default_patterns
 from monitoring.servers.layer_monitor import LayerMonitor
 
+# World State integration (heartbeats)
+try:
+    from core.heartbeat import HeartbeatWriter
+    from core.events import emit_event
+    WORLD_STATE_AVAILABLE = True
+except ImportError:
+    WORLD_STATE_AVAILABLE = False
+    HeartbeatWriter = None
+
 # Optional imports for remote evaluation
 try:
     from data_manager.remote_evaluator import RemoteEvaluator
@@ -202,6 +211,22 @@ class LiveMonitorCallback(TrainerCallback):
             "yes",
             "on",
         )
+
+        # World State heartbeat integration
+        self.heartbeat_writer = None
+        if WORLD_STATE_AVAILABLE and HeartbeatWriter:
+            try:
+                # Auto-detect GPU device
+                device_name = "GPU0"
+                if torch.cuda.is_available():
+                    device_name = f"GPU{torch.cuda.current_device()}"
+                self.heartbeat_writer = HeartbeatWriter(
+                    worker_id="training_daemon",
+                    role="training",
+                    device=device_name,
+                )
+            except Exception as e:
+                print(f"⚠️  Heartbeat setup failed: {e}")
 
     def on_step_end(self, args, state, control, **kwargs):
         """Called after each training step."""
@@ -409,6 +434,26 @@ class LiveMonitorCallback(TrainerCallback):
                 penalty_heatmap=penalty_heatmap_payload,
                 skill_context=self.skill_context,
             )
+
+            # World State heartbeat - emit during training with live stats
+            if self.heartbeat_writer:
+                try:
+                    self.heartbeat_writer.beat(
+                        status="running",
+                        current_job_id=self.current_file,
+                        current_job_type="train",
+                        extra={
+                            "step": state.global_step,
+                            "total_steps": self.total_steps,
+                            "loss": round(current_loss, 4) if current_loss else None,
+                            "it_per_sec": round(self.steps_per_sec_ema, 3) if self.steps_per_sec_ema else None,
+                            "current_file": self.current_file,
+                        },
+                        min_interval=5.0,  # Only write every 5 seconds max
+                    )
+                except Exception:
+                    pass  # Don't let heartbeat failures affect training
+
             self.last_update_time = current_time
 
         # NOTE: Inference preview removed - use 3090 for inference, not 4090 during training
@@ -504,6 +549,22 @@ class LiveMonitorCallback(TrainerCallback):
                     )
                 except Exception:
                     pass  # Don't let battle log errors affect training
+
+                # World State - emit checkpoint_saved event
+                if WORLD_STATE_AVAILABLE:
+                    try:
+                        from core.run_context import get_run_context
+                        ctx = get_run_context()
+                        emit_event(
+                            "checkpoint_saved",
+                            hero_id=ctx.hero_id or "unknown",
+                            campaign_id=ctx.campaign_id or "unknown",
+                            step=state.global_step,
+                            path=str(record.path) if record else str(checkpoint_dir),
+                            loss=train_loss,
+                        )
+                    except Exception:
+                        pass
 
                 # =========================================================
                 # QUEUE EVALUATIONS - Quick eval + LITE passives

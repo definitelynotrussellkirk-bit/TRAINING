@@ -31,9 +31,19 @@
             </div>
         </div>
         <div class="header-right">
+            <!-- REALM MODE TOGGLE -->
+            <div class="realm-mode-toggle" id="realmModeToggle">
+                <button class="mode-btn mode-training" id="btnTraining" title="Enable auto-training">TRAIN</button>
+                <button class="mode-btn mode-idle" id="btnIdle" title="Pause auto-training">IDLE</button>
+            </div>
+            <!-- HEALTH INDICATOR -->
+            <div class="health-indicator" id="healthIndicator" title="Realm health">
+                <span class="health-icon" id="healthIcon">⚪</span>
+            </div>
+            <!-- IDLE INDICATOR (now shows actual realm mode) -->
             <div class="idle-indicator" id="idleIndicator">
-                <span class="idle-icon">💤</span>
-                <span class="idle-text">IDLE</span>
+                <span class="idle-icon" id="modeIcon">💤</span>
+                <span class="idle-text" id="modeText">IDLE</span>
             </div>
             <div class="time-display" id="timeDisplay">--:--:--</div>
         </div>
@@ -272,5 +282,6 @@
     <script src="/static/js/training_controls.js?v=1"></script>
     <!-- Main game logic -->
     <script src="/static/js/game.js?v=16"></script>
+    <script src="/static/js/world-state.js?v=1"></script>
 </body>
 </html>

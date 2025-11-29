@@ -1339,3 +1339,121 @@ body {
     color: #000;
     border-color: var(--color-success);
 }
+
+/* ========================================
+   WORLD STATE - Mode Toggle & Health
+   ======================================== */
+
+.realm-mode-toggle {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.2rem;
+}
+
+.mode-btn {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: transparent;
+    color: var(--text-muted);
+}
+
+.mode-btn:hover:not(:disabled) {
+    background: var(--bg-highlight);
+    color: var(--text-primary);
+}
+
+.mode-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.mode-btn.active {
+    color: #000;
+    font-weight: 700;
+}
+
+.mode-btn.mode-training.active {
+    background: var(--color-success);
+}
+
+.mode-btn.mode-idle.active {
+    background: var(--color-warning);
+}
+
+/* Health Indicator */
+.health-indicator {
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0.5rem;
+    cursor: help;
+}
+
+.health-icon {
+    font-size: 1rem;
+    transition: transform 0.2s ease;
+}
+
+.health-indicator.has-warnings .health-icon {
+    animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
+/* Mode Indicator (replacing idle indicator) */
+.idle-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+
+.idle-indicator.mode-training {
+    border-color: var(--color-success);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.idle-indicator.mode-training .idle-text {
+    color: var(--color-success);
+}
+
+.idle-indicator.mode-idle {
+    border-color: var(--color-warning);
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.idle-indicator.mode-idle .idle-text {
+    color: var(--color-warning);
+}
+
+.idle-indicator.is-running {
+    animation: running-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes running-glow {
+    0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.3); }
+    50% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.6); }
+}
+
+.idle-icon {
+    font-size: 1rem;
+}
+
+.idle-text {
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}

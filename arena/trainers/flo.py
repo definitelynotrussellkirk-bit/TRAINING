@@ -34,28 +34,76 @@ try:
 except ImportError:
     LIGER_AVAILABLE = False
 
+# Events system for SSE streaming
+try:
+    from events import emit, Event, EventType, Severity
+    EVENTS_AVAILABLE = True
+except ImportError:
+    EVENTS_AVAILABLE = False
+
 
 class FLOProgressCallback(TrainerCallback):
     """Log training progress with loss and VRAM usage."""
-    
-    def __init__(self, status_file: Path = None):
+
+    def __init__(self, status_file: Path = None, hero_name: str = "FLO", data_file: str = ""):
         self.status_file = status_file
+        self.hero_name = hero_name
+        self.data_file = data_file
         self.last_loss = None
         self.start_time = time.time()
-    
+        self.training_started_emitted = False
+
+    def _emit_event(self, event_type: str, message: str, severity: str = "info", data: dict = None):
+        """Emit an event via the events system."""
+        if not EVENTS_AVAILABLE:
+            return
+        try:
+            event = Event(
+                type=EventType(event_type),
+                message=message,
+                severity=Severity(severity),
+                source="flo_trainer",
+                data=data or {},
+            )
+            emit(event)
+        except Exception:
+            pass  # Don't let event failures break training
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        """Emit training started event."""
+        if not self.training_started_emitted:
+            self._emit_event(
+                "training.started",
+                f"{self.hero_name} begins training on {self.data_file}",
+                "info",
+                {"hero": self.hero_name, "file": self.data_file, "step": state.global_step}
+            )
+            self.training_started_emitted = True
+
     def on_log(self, args, state, control, logs=None, **kwargs):
         if logs is None:
             return
-        
+
         loss = logs.get("loss")
         if loss is not None:
             self.last_loss = loss
             lr = logs.get("learning_rate", 0)
             grad_norm = logs.get("grad_norm", 0)
-            
+
             print(f"\n  [Step {state.global_step}/{state.max_steps}] "
                   f"Loss: {loss:.4f} | LR: {lr:.2e} | Grad: {grad_norm:.2f}", flush=True)
-            
+
+            # Get VRAM usage
+            vram_gb = 0
+            if torch.cuda.is_available():
+                vram_gb = torch.cuda.memory_allocated() / 1e9
+
+            # Calculate progress and ETA
+            progress_pct = (state.global_step / state.max_steps * 100) if state.max_steps > 0 else 0
+            elapsed = time.time() - self.start_time
+            steps_per_sec = state.global_step / elapsed if elapsed > 0 else 0
+            eta_seconds = (state.max_steps - state.global_step) / steps_per_sec if steps_per_sec > 0 else 0
+
             if self.status_file:
                 try:
                     now = datetime.now().isoformat()
@@ -69,30 +117,67 @@ class FLOProgressCallback(TrainerCallback):
                     }
                     with open(self.status_file, "w") as f:
                         json.dump(flo_status, f)
-                    
+
                     # Tavern-compatible status
                     tavern_status = {
                         "status": "training",
                         "current_step": state.global_step,
                         "global_step": state.global_step,
+                        "total_steps": state.max_steps,
                         "max_steps": state.max_steps,
                         "loss": loss,
                         "learning_rate": lr,
-                        "current_file": "FLO GaLore Training",
+                        "current_file": self.data_file or "FLO GaLore Training",
+                        "progress_percent": progress_pct,
+                        "steps_per_second": steps_per_sec,
+                        "eta_seconds": eta_seconds,
                         "timestamp": now,
-                        "hero": "FLO",
+                        "hero": self.hero_name,
                     }
                     tavern_file = self.status_file.parent / "training_status.json"
                     with open(tavern_file, "w") as f:
                         json.dump(tavern_status, f)
                 except Exception:
                     pass
-    
+
+            # Emit SSE event for real-time updates
+            self._emit_event(
+                "training.step",
+                f"Step {state.global_step}/{state.max_steps} | Loss: {loss:.4f}",
+                "info",
+                {
+                    "hero": self.hero_name,
+                    "step": state.global_step,
+                    "max_steps": state.max_steps,
+                    "loss": loss,
+                    "learning_rate": lr,
+                    "progress_percent": progress_pct,
+                    "steps_per_second": steps_per_sec,
+                    "eta_seconds": eta_seconds,
+                    "vram_gb": vram_gb,
+                }
+            )
+
     def on_step_end(self, args, state, control, **kwargs):
         if state.global_step % 20 == 0 and torch.cuda.is_available():
             allocated = torch.cuda.memory_allocated() / 1e9
             reserved = torch.cuda.memory_reserved() / 1e9
             print(f"\n  [VRAM] {allocated:.1f}GB / {reserved:.1f}GB reserved")
+
+    def on_train_end(self, args, state, control, **kwargs):
+        """Emit training completed event."""
+        duration = time.time() - self.start_time
+        self._emit_event(
+            "training.completed",
+            f"{self.hero_name} completed training: {state.global_step} steps in {duration:.0f}s",
+            "success",
+            {
+                "hero": self.hero_name,
+                "steps": state.global_step,
+                "duration_seconds": duration,
+                "final_loss": self.last_loss,
+            }
+        )
 
 
 class FLOTrainer(BaseTrainer):
@@ -258,13 +343,20 @@ class FLOTrainer(BaseTrainer):
         # Create trainer
         status_file = base_dir / "status" / "flo_training.json"
         status_file.parent.mkdir(exist_ok=True)
-        
+
+        # Get hero name from config
+        hero_name = self.hero_config.get("name", "FLO")
+
         trainer = Trainer(
             model=model,
             args=training_args,
             train_dataset=dataset,
             optimizers=(optimizer, None),
-            callbacks=[FLOProgressCallback(status_file)],
+            callbacks=[FLOProgressCallback(
+                status_file=status_file,
+                hero_name=hero_name,
+                data_file=data_path.name,
+            )],
             data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
         )
         

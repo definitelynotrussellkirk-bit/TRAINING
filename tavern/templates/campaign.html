@@ -404,16 +404,22 @@
     <!-- TITLE BAR -->
     <header class="game-header">
         <div class="header-left">
-            <a href="/" class="game-title">Realm of Training</a>
+            <h1 class="game-title">Campaign</h1>
         </div>
-        <nav class="header-nav">
-            <a href="/">Tavern</a>
-            <a href="/quests">Quests</a>
-            <a href="/guild">Guild</a>
-            <a href="/oracle">Oracle</a>
-            <a href="/campaign" class="active">Campaign</a>
-            <a href="/settings">Settings</a>
-        </nav>
+        <div class="header-center">
+            <div class="resource-bar">
+                <div class="resource">
+                    <span class="resource-icon">🏰</span>
+                    <span class="resource-label">CAMPAIGN</span>
+                    <span class="resource-value" id="campaignStatus">Active</span>
+                </div>
+                <div class="resource">
+                    <span class="resource-icon">⚡</span>
+                    <span class="resource-label">STEP</span>
+                    <span class="resource-value" id="headerStep">0</span>
+                </div>
+            </div>
+        </div>
         <div class="header-right">
             <div class="time-display" id="timeDisplay">--:--:--</div>
         </div>

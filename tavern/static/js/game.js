@@ -947,6 +947,76 @@ function init() {
 
     // Update time every second
     setInterval(updateTime, 1000);
+
+    // Register for real-time SSE training updates
+    registerTrainingEventHandlers();
+}
+
+/**
+ * Register handlers for SSE training events
+ * Provides instant UI updates without polling
+ */
+function registerTrainingEventHandlers() {
+    // Wait for eventStream to be initialized
+    const waitForEventStream = setInterval(() => {
+        if (window.eventStream) {
+            clearInterval(waitForEventStream);
+
+            // Handle training.step events - real-time progress updates
+            window.eventStream.on('training.step', (event) => {
+                const data = event.data || {};
+
+                // Update GameState with real-time data
+                GameState.isTraining = true;
+                GameState.currentStep = data.step || GameState.currentStep;
+                GameState.totalSteps = data.max_steps || GameState.totalSteps;
+                GameState.loss = data.loss || GameState.loss;
+                GameState.questProgress = data.progress_percent || GameState.questProgress;
+                GameState.stepsPerSecond = data.steps_per_second || GameState.stepsPerSecond;
+                GameState.etaSeconds = data.eta_seconds || GameState.etaSeconds;
+                GameState.learningRate = data.learning_rate || GameState.learningRate;
+
+                // Update VRAM if provided
+                if (data.vram_gb) {
+                    GameState.vramUsed = data.vram_gb;
+                }
+
+                // Add to loss history for graph
+                if (data.loss && data.step) {
+                    GameState.lossHistory.push({ step: data.step, loss: data.loss });
+                    // Keep last 200 entries
+                    if (GameState.lossHistory.length > 200) {
+                        GameState.lossHistory = GameState.lossHistory.slice(-200);
+                    }
+                    renderLossChart(GameState.lossHistory);
+                }
+
+                // Update UI immediately
+                updateBattleStatus();
+                updateForge();
+            });
+
+            // Handle training.started events
+            window.eventStream.on('training.started', (event) => {
+                const data = event.data || {};
+                GameState.isTraining = true;
+                GameState.currentQuest = data.file || 'Training';
+                GameState.lossHistory = [];  // Reset loss history for new training
+                updateBattleStatus();
+                console.log('[Game] Training started:', data.file);
+            });
+
+            // Handle training.completed events
+            window.eventStream.on('training.completed', (event) => {
+                const data = event.data || {};
+                GameState.isTraining = false;
+                updateBattleStatus();
+                console.log('[Game] Training completed:', data.steps, 'steps');
+            });
+
+            console.log('[Game] Registered SSE training event handlers');
+        }
+    }, 100);
 }
 
 // Start when DOM is ready

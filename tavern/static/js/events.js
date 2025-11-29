@@ -16,6 +16,9 @@ class EventStream {
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 3000;
 
+        // Callback handlers for game state updates
+        this.handlers = {};
+
         // Severity colors
         this.severityColors = {
             debug: '#6b7280',
@@ -36,12 +39,37 @@ class EventStream {
             'data.quality_pass': '✅',
             'data.quality_fail': '❌',
             'training.started': '⚔️',
+            'training.step': '⚡',
             'training.completed': '🎉',
             'training.checkpoint': '💾',
             'hero.level_up': '🆙',
             'daemon.heartbeat': '💓',
             'default': '📢'
         };
+
+        // Events that should NOT show notifications (high-frequency)
+        this.silentEvents = new Set(['training.step', 'daemon.heartbeat']);
+    }
+
+    /**
+     * Register a handler for a specific event type
+     * @param {string} eventType - The event type to handle
+     * @param {function} handler - Callback function(eventData)
+     */
+    on(eventType, handler) {
+        if (!this.handlers[eventType]) {
+            this.handlers[eventType] = [];
+        }
+        this.handlers[eventType].push(handler);
+    }
+
+    /**
+     * Remove a handler for an event type
+     */
+    off(eventType, handler) {
+        if (this.handlers[eventType]) {
+            this.handlers[eventType] = this.handlers[eventType].filter(h => h !== handler);
+        }
     }
 
     /**
@@ -216,6 +244,7 @@ class EventStream {
             this.eventSource.addEventListener('data.quality_pass', (e) => this.handleEvent(e));
             this.eventSource.addEventListener('data.quality_fail', (e) => this.handleEvent(e));
             this.eventSource.addEventListener('training.started', (e) => this.handleEvent(e));
+            this.eventSource.addEventListener('training.step', (e) => this.handleEvent(e));
             this.eventSource.addEventListener('training.completed', (e) => this.handleEvent(e));
             this.eventSource.addEventListener('training.checkpoint', (e) => this.handleEvent(e));
             this.eventSource.addEventListener('hero.level_up', (e) => this.handleEvent(e));
@@ -254,7 +283,23 @@ class EventStream {
     handleEvent(event) {
         try {
             const data = JSON.parse(event.data);
-            this.showNotification(data);
+
+            // Call registered handlers for this event type
+            const eventType = data.type;
+            if (this.handlers[eventType]) {
+                for (const handler of this.handlers[eventType]) {
+                    try {
+                        handler(data);
+                    } catch (err) {
+                        console.error(`[EventStream] Handler error for ${eventType}:`, err);
+                    }
+                }
+            }
+
+            // Show notification unless it's a silent event
+            if (!this.silentEvents.has(eventType)) {
+                this.showNotification(data);
+            }
         } catch (error) {
             console.error('[EventStream] Failed to parse event:', error);
         }

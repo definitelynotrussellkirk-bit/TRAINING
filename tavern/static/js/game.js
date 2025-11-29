@@ -413,6 +413,9 @@ function updateBattleStatus() {
         setText('#battleStrain', '--');
         setText('#battleETA', '--');
     }
+
+    // Update control buttons
+    updateControlButtons();
 }
 
 // ============================================
@@ -1017,6 +1020,75 @@ function registerTrainingEventHandlers() {
             console.log('[Game] Registered SSE training event handlers');
         }
     }, 100);
+}
+
+// ============================================
+// TRAINING CONTROL
+// ============================================
+
+/**
+ * Send control command to training daemon
+ * @param {string} action - 'pause', 'resume', or 'stop'
+ */
+async function controlTraining(action) {
+    const btnPause = document.getElementById('btnPause');
+    const btnResume = document.getElementById('btnResume');
+    const btnStop = document.getElementById('btnStop');
+
+    // Disable buttons during request
+    if (btnPause) btnPause.disabled = true;
+    if (btnResume) btnResume.disabled = true;
+    if (btnStop) btnStop.disabled = true;
+
+    try {
+        const response = await fetch('/api/daemon/control', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Update button states based on action
+            if (action === 'pause') {
+                if (btnPause) btnPause.style.display = 'none';
+                if (btnResume) btnResume.style.display = 'inline-flex';
+                addLocalLog(`Training paused - ${result.message}`, 'warning');
+            } else if (action === 'resume') {
+                if (btnPause) btnPause.style.display = 'inline-flex';
+                if (btnResume) btnResume.style.display = 'none';
+                addLocalLog(`Training resumed - ${result.message}`, 'success');
+            } else if (action === 'stop') {
+                addLocalLog(`Training stopped - ${result.message}`, 'warning');
+            }
+        } else {
+            addLocalLog(`Control failed: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        addLocalLog(`Control error: ${error.message}`, 'error');
+    } finally {
+        // Re-enable buttons
+        if (btnPause) btnPause.disabled = false;
+        if (btnResume) btnResume.disabled = false;
+        if (btnStop) btnStop.disabled = false;
+    }
+}
+
+/**
+ * Update control button states based on training status
+ */
+function updateControlButtons() {
+    const btnPause = document.getElementById('btnPause');
+    const btnResume = document.getElementById('btnResume');
+    const controls = document.getElementById('trainingControls');
+
+    // Show controls only when training
+    if (controls) {
+        controls.style.display = GameState.isTraining ? 'flex' : 'none';
+    }
+
+    // TODO: Check actual pause state from API and show correct button
 }
 
 // Start when DOM is ready

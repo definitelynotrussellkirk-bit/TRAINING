@@ -141,6 +141,19 @@
                         <span class="loss-max" id="lossMax">--</span>
                     </div>
                 </div>
+
+                <!-- TRAINING CONTROLS -->
+                <div class="training-controls" id="trainingControls">
+                    <button class="control-btn pause" id="btnPause" onclick="controlTraining('pause')" title="Pause training after current step">
+                        <span class="btn-icon">⏸</span> Pause
+                    </button>
+                    <button class="control-btn resume" id="btnResume" onclick="controlTraining('resume')" title="Resume training" style="display: none;">
+                        <span class="btn-icon">▶</span> Resume
+                    </button>
+                    <button class="control-btn stop" id="btnStop" onclick="controlTraining('stop')" title="Stop training completely">
+                        <span class="btn-icon">⏹</span> Stop
+                    </button>
+                </div>
             </div>
 
             <!-- RECENT ACTIVITY -->

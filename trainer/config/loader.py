@@ -310,6 +310,54 @@ class ConfigLoader:
         return config
 
     @staticmethod
+    def from_file_and_defaults_with_raw(
+        dataset_path: str,
+        base_config: str = "config.json",
+        validate_lock: bool = True,
+        **overrides
+    ) -> tuple:
+        """
+        Create config from file with specific dataset and overrides.
+
+        Returns both TrainerConfig and raw dict (for optimizer settings, etc.)
+
+        Used by daemon and arena trainers when processing files.
+
+        Args:
+            dataset_path: Path to training dataset
+            base_config: Path to base config.json
+            validate_lock: If True, validate against .config_lock.json
+            **overrides: Additional overrides (e.g., output_dir="outputs/run_001")
+
+        Returns:
+            Tuple of (TrainerConfig, raw_config_dict)
+        """
+        # Load base
+        base = {}
+        if Path(base_config).exists():
+            base = ConfigLoader.from_json_file(Path(base_config))
+
+        # Apply overrides
+        base.setdefault('data', {})['dataset_path'] = dataset_path
+
+        for key, value in overrides.items():
+            # Simple dot-notation support: "output.output_dir" -> nested
+            keys = key.split('.')
+            d = base
+            for k in keys[:-1]:
+                d = d.setdefault(k, {})
+            d[keys[-1]] = value
+
+        # Create config
+        config = TrainerConfig.from_dict(base)
+
+        # Validate locked config
+        if validate_lock:
+            ConfigLoader.validate_locked_config(config, strict=True)
+
+        return config, base
+
+    @staticmethod
     def validate_locked_config(
         config: TrainerConfig,
         strict: bool = True,

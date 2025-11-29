@@ -95,7 +95,21 @@ from lineage_tracker import LineageTracker
 # Checkpoint retention (new system)
 from retention_service import RetentionService
 
-from train import UltimateTrainer
+# Training Engine (Layer 1 - THE training executor)
+# See ARCHITECTURE.md "Training Flow Architecture" for the layer model
+from trainer.core.engine import TrainerEngine, TrainingResult, MonitorContext
+from trainer.config import ConfigLoader
+from trainer.monitoring.status_writer import TrainingStatusWriter
+
+# Legacy import kept for backward compatibility during migration
+# TODO: Remove once all callers use TrainerEngine directly
+try:
+    from train import UltimateTrainer
+    LEGACY_TRAINER_AVAILABLE = True
+except ImportError:
+    LEGACY_TRAINER_AVAILABLE = False
+    UltimateTrainer = None
+
 from training_queue import TrainingQueue
 from training_controller import TrainingController
 from atomic_ops import write_json_atomic, safe_file_operation
@@ -295,6 +309,15 @@ class TrainingDaemon:
         # Job logger - first-class job abstraction for tracking file lifecycles
         self.job_logger = JobLogger(self.base_dir / "status" / "job_history.jsonl")
         self.current_job_id: str | None = None  # Track current job being processed
+
+        # Status writer for TrainerEngine (Layer 1)
+        status_file = self.base_dir / "status" / "training_status.json"
+        self.status_writer = TrainingStatusWriter(
+            str(status_file),
+            max_output_tokens=self.config.get("max_output_tokens", 2048),
+            context_window=self.config.get("max_length", 2048),
+            model_name=self.config.get("model_display_name", self.config.get("model_name", "unknown"))
+        )
 
         # Register signal handlers
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -962,19 +985,11 @@ class TrainingDaemon:
             self.logger.error("   Fix config or data, then try again")
             return False
 
-        # Create minimal args for UltimateTrainer
-        # TrainerConfig will load hyperparams from config.json
-        class Args:
-            pass
-
-        args = Args()
-
-        # Routing info only (where to read/write)
-        args.dataset = str(data_file)
-        args.output_dir = str(self.current_model_dir)
-
-        # Point to config.json for TrainerConfig to load hyperparams
-        args.config = str(self.config_file)
+        # ====================================================================
+        # TRAINING VIA TrainerEngine (Layer 1)
+        # See ARCHITECTURE.md "Training Flow Architecture"
+        # Daemon is Layer 2 (orchestration) - we schedule, engine executes
+        # ====================================================================
 
         # Validate current_model directory
         def is_valid_model_dir(path):
@@ -985,14 +1000,14 @@ class TrainingDaemon:
             return all((path / f).exists() for f in required)
 
         # Determine which model to use
-        config_file = self.current_model_dir / "config.json"
-        if config_file.exists():
+        model_config_file = self.current_model_dir / "config.json"
+        if model_config_file.exists():
             # Continue training existing model
-            args.model = str(self.current_model_dir)
+            model_path = str(self.current_model_dir)
             self.logger.info(f"Continuing training on: {self.current_model_dir}")
         else:
             # Start fresh from base model
-            args.model = self.config.get("model_path") or self.config["model_name"]
+            base_model = self.config.get("model_path") or self.config["model_name"]
 
             # Initialize current_model_dir from base if invalid/empty
             if not is_valid_model_dir(self.current_model_dir):
@@ -1000,44 +1015,21 @@ class TrainingDaemon:
                     self.logger.warning("Current model dir incomplete/corrupt; will replace with fresh copy")
                     shutil.rmtree(self.current_model_dir)
 
-                self.logger.info(f"Copying base model from: {args.model}")
-                shutil.copytree(args.model, self.current_model_dir, dirs_exist_ok=True)
+                self.logger.info(f"Copying base model from: {base_model}")
+                shutil.copytree(base_model, self.current_model_dir, dirs_exist_ok=True)
                 self.logger.info(f"✅ Model copied to: {self.current_model_dir}")
             else:
                 self.logger.info(f"Using existing model: {self.current_model_dir}")
 
-            args.model = str(self.current_model_dir)
+            model_path = str(self.current_model_dir)
 
-        # These are daemon-specific overrides (not hyperparams)
-        args.epochs = 1  # ALWAYS 1 EPOCH (daemon trains 1 epoch per file)
-        args.skip_validation = True  # Assume data is pre-validated
-        args.yes = True  # No prompts
-        # Import base prompt from single source of truth
-        from core.prompts import BASE_PROMPT
-        args.system_prompt = BASE_PROMPT
-
-        # Control/routing params (not hyperparams, needed by trainer logic)
-        args.warmup_steps = self.config.get("warmup_steps", 100)
-        args.log_steps = self.config.get("log_steps", 10)
-        args.eval_steps = self.config.get("eval_steps", 500)
-        args.save_steps = self.config.get("save_steps", 10000)
-        args.num_eval_samples = self.config.get("num_eval_samples", 2)
-        args.load_in_4bit = self.config.get("load_in_4bit", False)
-
-        # Batch context for progress tracking
-        args.current_file = data_file.name
-        args.batch_number = batch_number
-        args.batch_queue_size = batch_queue_size
-
-        # Train
-        self.logger.info("Starting training...")
+        # Train via TrainerEngine
+        self.logger.info("Starting training via TrainerEngine...")
         self.logger.info(f"🧭 Model dir: {self.current_model_dir}")
         start_time = time.time()
 
         try:
-            self.logger.info("Initializing UltimateTrainer...")
-
-            # CRITICAL FIX #6: GPU crash detection
+            # GPU crash detection
             try:
                 import torch
                 if torch.cuda.is_available():
@@ -1050,35 +1042,84 @@ class TrainingDaemon:
                     return False
                 raise
 
-            trainer = UltimateTrainer(args, controller=self.controller)
+            # Create TrainerConfig from config.json + overrides
+            # This is the Layer 2 → Layer 1 handoff
+            self.logger.info("Building TrainerConfig...")
+            config, config_dict = ConfigLoader.from_file_and_defaults_with_raw(
+                dataset_path=str(data_file),
+                base_config=str(self.config_file),
+                validate_lock=True,
+                # Overrides for daemon-specific behavior
+                **{
+                    "model.model_path": model_path,
+                    "output.output_dir": str(self.current_model_dir),
+                }
+            )
+            self.logger.info(f"   Profile: {config.profile.name}")
+            self.logger.info(f"   Batch: {config.hyperparams.batch_size} x {config.hyperparams.gradient_accumulation}")
+            self.logger.info(f"   LR: {config.hyperparams.learning_rate}")
+
+            # Create MonitorContext with controller for pause/stop signals
+            monitors = MonitorContext(
+                live_monitor=None,  # Daemon doesn't need live inference preview
+                controller=self.controller,
+                current_file=data_file.name,
+                batch_number=batch_number,
+                batch_queue_size=batch_queue_size,
+                status_writer=self.status_writer,
+                remote_eval_config=config_dict.get("remote_eval", {}),
+            )
+
+            # Create engine and run training
+            self.logger.info("Initializing TrainerEngine...")
+            engine = TrainerEngine(self.status_writer, verbose=True)
 
             self.logger.info("Running training...")
-            success = trainer.run()
-            summary = getattr(trainer, 'training_summary', None)
-            if summary:
-                summary.setdefault('dataset', data_file.name)
-                self.log_run_summary(summary)
+            result = engine.run_job(
+                config=config,
+                config_dict=config_dict,
+                monitors=monitors,
+            )
 
             elapsed = time.time() - start_time
             self.logger.info(f"Training completed in {elapsed/60:.1f} minutes")
 
-            if success:
-                self.logger.info("✅ Training successful")
+            # Log summary
+            if result.success:
+                summary = {
+                    'dataset': data_file.name,
+                    'success': True,
+                    'runtime_sec': result.runtime_sec,
+                    'global_step': result.global_step,
+                    'final_loss': result.final_loss,
+                    'batch_size': config.hyperparams.batch_size,
+                    'gradient_accumulation': config.hyperparams.gradient_accumulation,
+                    **result.summary
+                }
+                self.log_run_summary(summary)
 
-                # GUARDRAIL: Clean up GPU memory after training
-                # Part of Phase 1 from CRITICAL_EDGE_CASES_AND_GUARDRAILS.md
+                self.logger.info("✅ Training successful")
+                self.logger.info(f"   Final loss: {result.final_loss:.4f}")
+                self.logger.info(f"   Global step: {result.global_step}")
+
+                # Clean up GPU memory after training
                 self.cleanup_gpu_memory()
 
                 return True
             else:
-                self.logger.error("❌ Training failed (trainer.run() returned False)")
-                self.logger.error("Check if there were validation errors or other issues")
+                self.logger.error(f"❌ Training failed: {result.error_message}")
+                summary = {
+                    'dataset': data_file.name,
+                    'success': False,
+                    'runtime_sec': elapsed,
+                    'error': result.error_message,
+                }
+                self.log_run_summary(summary)
                 return False
 
         except Exception as e:
             self.logger.error(f"❌ Training error: {e}")
             import traceback
-            # Log full traceback to file
             error_details = traceback.format_exc()
             self.logger.error(f"Full traceback:\n{error_details}")
             return False

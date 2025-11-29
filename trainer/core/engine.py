@@ -117,6 +117,28 @@ except ImportError:
 
 
 @dataclass
+class DryRunResult:
+    """
+    Result of a dry-run validation pass.
+
+    Contains validation status and resource estimates without actually
+    loading the model or starting training.
+    """
+    valid: bool  # True if config and data are valid
+    error_message: Optional[str] = None  # Error description if valid=False
+    dataset_path: Optional[str] = None  # Validated dataset path
+    dataset_examples: int = 0  # Number of examples in dataset
+    vram_estimate_gb: float = 0.0  # Estimated VRAM requirement
+    estimated_steps: int = 0  # Estimated training steps
+    config_summary: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_error(cls, error: str) -> 'DryRunResult':
+        """Create a DryRunResult for validation failure."""
+        return cls(valid=False, error_message=error)
+
+
+@dataclass
 class TrainingResult:
     """
     Result of a training job execution.
@@ -348,6 +370,135 @@ class TrainerEngine:
             traceback.print_exc()
 
             return TrainingResult.from_error(str(e))
+
+    def dry_run(self, config: TrainerConfig) -> DryRunResult:
+        """
+        Validate configuration and estimate resources without training.
+
+        This is a lightweight check that validates:
+        - Config structure and locked values
+        - Dataset existence and format
+        - VRAM estimate (based on model size and batch size)
+        - Estimated training steps
+
+        Does NOT load the model or tokenizer. Use this before run_job()
+        to catch configuration errors early.
+
+        Args:
+            config: TrainerConfig to validate
+
+        Returns:
+            DryRunResult with validation status and estimates
+        """
+        self._log("\n" + "=" * 60)
+        self._log("TRAINER ENGINE - DRY RUN")
+        self._log("=" * 60)
+
+        try:
+            # 1. Validate locked config
+            self._log("Checking config...")
+            ConfigLoader.validate_locked_config(config)
+            self._log("   Config validation passed")
+
+            # 2. Check dataset exists
+            dataset_path = Path(config.data.dataset_path)
+            if not dataset_path.exists():
+                return DryRunResult.from_error(f"Dataset not found: {dataset_path}")
+            self._log(f"   Dataset found: {dataset_path}")
+
+            # 3. Count examples
+            example_count = 0
+            with open(dataset_path) as f:
+                for line in f:
+                    if line.strip():
+                        example_count += 1
+            self._log(f"   Examples: {example_count:,}")
+
+            if example_count == 0:
+                return DryRunResult.from_error("Dataset is empty")
+
+            # 4. Estimate VRAM (rough heuristic based on model name)
+            model_path = config.model.model_path
+            vram_estimate = self._estimate_vram(model_path, config)
+            self._log(f"   Estimated VRAM: {vram_estimate:.1f} GB")
+
+            # 5. Estimate steps
+            effective_batch = (
+                config.hyperparams.batch_size *
+                config.hyperparams.gradient_accumulation
+            )
+            estimated_steps = example_count // effective_batch
+            if example_count % effective_batch != 0:
+                estimated_steps += 1
+            self._log(f"   Estimated steps: {estimated_steps:,}")
+
+            self._log("=" * 60)
+            self._log("DRY RUN PASSED")
+            self._log("=" * 60 + "\n")
+
+            return DryRunResult(
+                valid=True,
+                dataset_path=str(dataset_path),
+                dataset_examples=example_count,
+                vram_estimate_gb=vram_estimate,
+                estimated_steps=estimated_steps,
+                config_summary={
+                    'model_path': model_path,
+                    'profile': config.profile.name,
+                    'batch_size': config.hyperparams.batch_size,
+                    'gradient_accumulation': config.hyperparams.gradient_accumulation,
+                    'learning_rate': config.hyperparams.learning_rate,
+                    'max_length': config.hyperparams.max_length,
+                    'precision': config.hyperparams.fp_precision,
+                }
+            )
+
+        except Exception as e:
+            self._log(f"DRY RUN FAILED: {e}")
+            return DryRunResult.from_error(str(e))
+
+    def _estimate_vram(self, model_path: str, config: TrainerConfig) -> float:
+        """
+        Estimate VRAM usage based on model and config.
+
+        This is a rough heuristic. Actual usage may vary.
+        """
+        # Base VRAM by model size (from model name patterns)
+        model_lower = model_path.lower()
+
+        if "0.5b" in model_lower or "0.6b" in model_lower:
+            base_vram = 4.0
+        elif "1.5b" in model_lower or "1b" in model_lower:
+            base_vram = 6.0
+        elif "3b" in model_lower:
+            base_vram = 10.0
+        elif "4b" in model_lower:
+            base_vram = 12.0
+        elif "7b" in model_lower or "8b" in model_lower:
+            base_vram = 18.0
+        elif "13b" in model_lower or "14b" in model_lower:
+            base_vram = 28.0
+        else:
+            base_vram = 8.0  # Default assumption
+
+        # Adjust for batch size (roughly linear for small batches)
+        batch_multiplier = 1.0 + (config.hyperparams.batch_size - 1) * 0.3
+
+        # Adjust for sequence length
+        seq_multiplier = config.hyperparams.max_length / 2048
+
+        # Adjust for precision
+        if config.hyperparams.fp_precision == "fp32":
+            precision_multiplier = 2.0
+        elif config.hyperparams.fp_precision == "fp16":
+            precision_multiplier = 1.0
+        else:  # bf16
+            precision_multiplier = 1.0
+
+        # Gradient checkpointing reduces memory
+        grad_ckpt_multiplier = 0.6 if getattr(config.hyperparams, 'use_gradient_checkpointing', True) else 1.0
+
+        return base_vram * batch_multiplier * seq_multiplier * precision_multiplier * grad_ckpt_multiplier
 
     # ========================================================================
     # Model Loading (Enhanced)
@@ -1023,4 +1174,4 @@ class TrainerEngine:
         )
 
 
-__all__ = ["TrainerEngine", "TrainingResult", "MonitorContext"]
+__all__ = ["TrainerEngine", "TrainingResult", "DryRunResult", "MonitorContext"]

@@ -1,21 +1,32 @@
 #!/usr/bin/env python3
 """
-Ultimate Trainer - Main Orchestrator
+Ultimate Trainer - CLI Interface (Layer 3)
 
-Brings together all components:
-1. Validator - Check data BEFORE training
-2. Model DB - Select model & adapters
-3. Time Estimator - Know what you're getting into
-4. Live Monitor - See what's learning DURING training
-5. Training - Actually do it with all safety checks
+This is a Layer 3 interface that provides CLI access to TrainerEngine (Layer 1).
+See ARCHITECTURE.md "Training Flow Architecture" for the layer model.
+
+Layer Responsibilities:
+- Layer 3 (this file): Parse CLI args, create TrainerConfig, call engine
+- Layer 2 (daemon): Schedule training jobs, manage queue
+- Layer 1 (TrainerEngine): Execute training loop
+
+Default Behavior:
+- Uses TrainerEngine for all training (engine-first)
+- Legacy path available via USE_LEGACY_TRAINER=1 (deprecated)
 
 Usage:
-    python3 train.py \
-        --dataset path/to/data.jsonl \
-        --model qwen3_0.6b \
-        --output-dir ~/my_adapter \
-        --epochs 2 \
-        --batch-size 4
+    # Standard (uses TrainerEngine)
+    python3 train.py --dataset data.jsonl --model qwen3_0.6b --output-dir models/
+
+    # Force legacy path (deprecated)
+    USE_LEGACY_TRAINER=1 python3 train.py --dataset data.jsonl
+
+Architecture Note:
+    The legacy _run_legacy() method contains ~1000 lines of training code that
+    duplicates TrainerEngine functionality. It is kept only for backward
+    compatibility and will be removed in a future version.
+
+    NEW CODE SHOULD NOT USE THE LEGACY PATH.
 """
 
 import argparse
@@ -257,34 +268,34 @@ class DesktopNotifier:
 
 class UltimateTrainer:
     """
-    Main training orchestrator that combines all training system components.
+    CLI training interface (Layer 3) that delegates to TrainerEngine.
 
-    Responsibilities:
-        - Validate training data before execution
-        - Load and configure model + tokenizer (with optional quantization)
-        - Apply data profile transformations (emoji_think, regime3, etc.)
-        - Setup HuggingFace Trainer with all callbacks
-        - Execute training loop with monitoring and status updates
-        - Handle checkpointing, snapshots, and failure recovery
+    ARCHITECTURE (see ARCHITECTURE.md "Training Flow Architecture"):
+        - This class is a Layer 3 THIN WRAPPER
+        - All training logic lives in TrainerEngine (Layer 1)
+        - This class only: parses CLI args, creates config, calls engine
 
-    Data Flow:
-        1. Validate dataset format and quality (validator)
-        2. Load model from database (model_db) and tokenizer
-        3. Apply profile transformations to examples (if profile enabled)
-        4. Create train/validation splits (with optional fixed validation set)
-        5. Tokenize and pack sequences for training
-        6. Setup Trainer with callbacks:
-           - TrainingStatusWriter (writes training_status.json)
-           - LiveInferenceMonitor (periodic model inference)
-           - EvolutionTracker (tracks model evolution)
-           - LayerMonitor (tracks layer activations/norms)
-        7. Execute trainer.train() with HuggingFace Trainer
-        8. Save checkpoints and create final snapshot
+    Default Behavior:
+        - run() calls _run_with_engine() which delegates to TrainerEngine
+        - Legacy _run_legacy() path is DEPRECATED (USE_LEGACY_TRAINER=1 to force)
+
+    DEPRECATION WARNING:
+        The following methods are DEPRECATED and will be removed:
+        - _run_legacy()
+        - load_model()
+        - prepare_dataset()
+        - train()
+        - validate_dataset()
+        - estimate_time()
+        - setup_live_monitor()
+        - enforce_locked_config()
+
+        These methods duplicate TrainerEngine functionality and are kept only
+        for backward compatibility. New code should use TrainerEngine directly.
 
     Configuration:
-        Supports two modes:
-        1. New Config System: Uses trainer.config.TrainerConfig from config.json + CLI args
-        2. Legacy Mode: Falls back to CLI args only (backward compatible)
+        Uses trainer.config.TrainerConfig from config.json + CLI args.
+        TrainerConfig is passed to TrainerEngine.run_job().
 
     Key Components Integrated:
         - DatasetValidator: Pre-training validation

@@ -123,16 +123,184 @@ LineageTracker aggregates per-generator and per-validator:
 curl http://localhost:8081/api/lineage | jq .summary
 ```
 
+## Training Flow Architecture
+
+**Canonical Rule:** There is exactly ONE training executor. Everything else schedules or wraps.
+
+### Layer Model
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Layer 3: INTERFACES (thin wrappers, no training logic)         │
+│                                                                  │
+│   training/cli.py     tavern/api/*     arena/hero_loop.py       │
+│   (human CLI)         (HTTP API)       (campaign runner)         │
+│         │                  │                  │                  │
+│         └──────────────────┼──────────────────┘                  │
+│                            ▼                                     │
+├──────────────────────────────────────────────────────────────────┤
+│  Layer 2: ORCHESTRATION (decide what/when, never how)           │
+│                                                                  │
+│   core/training_daemon.py          core/training_queue.py       │
+│   (long-running scheduler)         (priority queue)              │
+│         │                                │                       │
+│         └────────────────┬───────────────┘                       │
+│                          ▼                                       │
+│                     RunConfig                                    │
+│                    (dataclass)                                   │
+│                          │                                       │
+├──────────────────────────┼───────────────────────────────────────┤
+│  Layer 1: ENGINE (the boss - owns the training loop)            │
+│                          │                                       │
+│                          ▼                                       │
+│               trainer/core/engine.py                             │
+│                   TrainerEngine                                  │
+│                          │                                       │
+│         ┌────────────────┼─────────────────┐                     │
+│         ▼                ▼                 ▼                     │
+│    Model Load      Dataset Prep      HF Trainer                  │
+│    (Flash Attn,    (Profile,         (callbacks,                 │
+│     Qwen3VL,       tokenize,         optimizer,                  │
+│     precision)     packing)          collator)                   │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 1: TrainerEngine (THE BOSS)
+
+**Location:** `trainer/core/engine.py`
+
+**Responsibilities:**
+- Load model + tokenizer (Flash Attention, Qwen3VL, precision)
+- Prepare datasets (profile transforms, tokenization, packing)
+- Create HF Trainer with callbacks, optimizer, collator
+- Execute training loop
+- Return structured `TrainingResult`
+
+**API:**
+```python
+from trainer.core.engine import TrainerEngine, TrainingResult
+
+@dataclass
+class TrainingResult:
+    success: bool
+    global_step: int
+    runtime_sec: float
+    last_checkpoint_path: Optional[str]
+    final_loss: float
+    summary: Dict[str, Any]
+    error_message: Optional[str] = None
+
+class TrainerEngine:
+    def __init__(self, status_writer: TrainingStatusWriter): ...
+
+    def run_job(
+        self,
+        config: TrainerConfig,
+        config_dict: Optional[Dict] = None,
+        monitors: Optional[MonitorContext] = None,
+        callbacks: Optional[List[TrainerCallback]] = None
+    ) -> TrainingResult:
+        """Execute complete training job. ONLY public method."""
+```
+
+**Rule:** All training logic lives here. If you're touching model APIs, you're in the engine.
+
+### Layer 2: Orchestration (Schedule Only)
+
+**Location:** `core/training_daemon.py`, `core/training_queue.py`
+
+**Responsibilities:**
+- Monitor inbox for new files
+- Manage priority queues (high/normal/low)
+- Handle pause/resume/stop signals
+- Auto-generate data when queue empty
+- Create daily snapshots
+- Enforce checkpoint retention
+
+**Rule:** Orchestration NEVER calls model APIs directly. It only:
+1. Creates `TrainerConfig` from job metadata
+2. Calls `TrainerEngine.run_job(config)`
+3. Records results
+
+**Pattern:**
+```python
+# In daemon - CORRECT
+job = queue.get_next_job()
+config = job_to_trainer_config(job)
+engine = TrainerEngine(status_writer)
+result = engine.run_job(config)
+record_result(job.id, result)
+
+# In daemon - WRONG (leaking training logic)
+model = AutoModelForCausalLM.from_pretrained(...)  # NO!
+trainer = Trainer(model=model, ...)  # NO!
+```
+
+### Layer 3: Interfaces (Thin Wrappers)
+
+**Locations:**
+- `training/cli.py` - Human CLI
+- `tavern/api/*` - HTTP API for UI
+- `arena/hero_loop.py` - Campaign-based runner
+- `arena/trainers/*.py` - Trainer wrappers
+
+**Responsibilities:**
+- Parse user input (CLI args, HTTP requests)
+- Translate to orchestration calls
+- Format output for humans/APIs
+
+**Rule:** Interfaces NEVER import training libraries. They only:
+1. Parse input → `RunConfig` or job submission
+2. Call Layer 2 (daemon/queue) or Layer 1 (engine)
+3. Format output
+
+**Pattern:**
+```python
+# In CLI - CORRECT
+def cmd_train(args):
+    config = config_from_args(args)
+    engine = TrainerEngine(status_writer)
+    result = engine.run_job(config)
+    print_summary(result)
+
+# In CLI - WRONG
+from transformers import Trainer  # NO! Don't import HF here
+```
+
+### Migration Status
+
+| Component | Current State | Target State |
+|-----------|---------------|--------------|
+| `trainer/core/engine.py` | ✅ Canonical engine | ✅ Done |
+| `core/train.py` | ✅ Delegates to engine (legacy deprecated) | ✅ Done |
+| `core/training_daemon.py` | ✅ Uses TrainerEngine directly | ✅ Done |
+| `training/cli.py` | ✅ Spawns hero loops (clean interface) | ✅ Done |
+| `arena/hero_loop.py` | ✅ Uses factory → engine trainers | ✅ Done |
+| `arena/trainers/*.py` | ✅ Delegates to TrainerEngine | ✅ Done |
+
+### Verification Checklist
+
+You've "done it right" when:
+
+1. ✅ Exactly one file implements the training loop: `trainer/core/engine.py`
+2. ✅ `training/cli.py` does not import model/dataset libs directly (spawns hero loops)
+3. ✅ `core/training_daemon.py` uses `TrainerEngine.run_job()` directly (no training inner loops)
+4. ✅ Arena trainers (`arena/trainers/*.py`) delegate to TrainerEngine
+5. ⬜ Swapping optimizers or models requires editing only `trainer/core/engine.py`
+
+**Updated:** 2025-11-29 - All training paths now route through TrainerEngine
+
 ## Key Modules
 
 ### Training Core
 | Module | Location | Responsibility |
 |--------|----------|----------------|
-| TrainerEngine | `trainer/core/engine.py` | High-level training API |
+| TrainerEngine | `trainer/core/engine.py` | **THE** training executor (Layer 1) |
 | ConfigLoader | `trainer/config/loader.py` | JSON + CLI config merging |
 | DataProfile | `trainer/profiles/base.py` | Data transformation interface |
-| UltimateTrainer | `core/train.py` | Main training script |
-| training_daemon | `core/training_daemon.py` | Queue processing orchestrator |
+| UltimateTrainer | `core/train.py` | Legacy wrapper → delegates to engine |
+| training_daemon | `core/training_daemon.py` | Queue processing orchestrator (Layer 2) |
 
 ### Daemon Services (Extracted)
 | Module | Location | Responsibility |

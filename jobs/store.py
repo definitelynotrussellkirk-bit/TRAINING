@@ -1323,6 +1323,144 @@ class SQLiteJobStore(JobStore):
 
         return [self._row_to_job(row) for row in cursor.fetchall()]
 
+    def get_warnings(
+        self,
+        pending_threshold_sec: int = 300,  # 5 minutes
+        running_threshold_sec: int = 1800,  # 30 minutes
+    ) -> Dict[str, Any]:
+        """
+        Get warnings about potentially stuck jobs and workers.
+
+        This is the key observability method for the orchestrator.
+        It detects:
+        - Jobs stuck in pending state too long (no worker claimed them)
+        - Jobs stuck in running/claimed state too long (worker may have died)
+        - Offline workers with supposedly active jobs
+
+        Args:
+            pending_threshold_sec: Seconds before pending job is considered stuck
+            running_threshold_sec: Seconds before running job is considered stuck
+
+        Returns:
+            Dict with warnings by category and severity:
+            {
+                "stuck_pending": [...],
+                "stuck_running": [...],
+                "orphaned_jobs": [...],
+                "summary": {"total": N, "critical": N, "warning": N}
+            }
+        """
+        conn = self._get_conn()
+        warnings = {
+            "stuck_pending": [],
+            "stuck_running": [],
+            "orphaned_jobs": [],
+            "summary": {"total": 0, "critical": 0, "warning": 0},
+        }
+
+        now = datetime.utcnow()
+
+        # 1. Jobs stuck in pending state
+        cursor = conn.execute(
+            """
+            SELECT * FROM jobs
+            WHERE status = 'pending'
+            AND created_at < datetime('now', ? || ' seconds')
+            ORDER BY created_at ASC
+            """,
+            (f"-{pending_threshold_sec}",),
+        )
+
+        for row in cursor.fetchall():
+            job = self._row_to_job(row)
+            age_sec = (now - job.created_at).total_seconds()
+            severity = "critical" if age_sec > pending_threshold_sec * 3 else "warning"
+            warnings["stuck_pending"].append({
+                "job_id": job.job_id,
+                "job_type": job.spec.job_type.value,
+                "created_at": job.created_at.isoformat(),
+                "age_seconds": int(age_sec),
+                "age_human": self._format_duration(age_sec),
+                "severity": severity,
+                "reason": "no_worker_claimed",
+                "payload_preview": str(job.spec.payload)[:100],
+            })
+            warnings["summary"]["total"] += 1
+            warnings["summary"][severity] += 1
+
+        # 2. Jobs stuck in running/claimed state
+        cursor = conn.execute(
+            """
+            SELECT * FROM jobs
+            WHERE status IN ('claimed', 'running')
+            AND (
+                started_at < datetime('now', ? || ' seconds')
+                OR (started_at IS NULL AND queued_at < datetime('now', ? || ' seconds'))
+            )
+            ORDER BY COALESCE(started_at, queued_at) ASC
+            """,
+            (f"-{running_threshold_sec}", f"-{running_threshold_sec}"),
+        )
+
+        for row in cursor.fetchall():
+            job = self._row_to_job(row)
+            ref_time = job.started_at or job.queued_at or job.created_at
+            age_sec = (now - ref_time).total_seconds()
+            # Critical if past lease expiration or very old
+            severity = "critical" if age_sec > running_threshold_sec * 2 else "warning"
+            warnings["stuck_running"].append({
+                "job_id": job.job_id,
+                "job_type": job.spec.job_type.value,
+                "status": job.status.value,
+                "worker_id": job.worker_id,
+                "started_at": job.started_at.isoformat() if job.started_at else None,
+                "age_seconds": int(age_sec),
+                "age_human": self._format_duration(age_sec),
+                "severity": severity,
+                "reason": "execution_timeout" if job.started_at else "stuck_claimed",
+            })
+            warnings["summary"]["total"] += 1
+            warnings["summary"][severity] += 1
+
+        # 3. Jobs claimed by offline workers (orphaned)
+        cursor = conn.execute(
+            """
+            SELECT j.*, w.status as worker_status, w.last_heartbeat_at
+            FROM jobs j
+            LEFT JOIN workers w ON j.claimed_by = w.id
+            WHERE j.status IN ('claimed', 'running')
+            AND (w.status = 'offline' OR w.id IS NULL)
+            """,
+        )
+
+        for row in cursor.fetchall():
+            job = self._row_to_job(row)
+            warnings["orphaned_jobs"].append({
+                "job_id": job.job_id,
+                "job_type": job.spec.job_type.value,
+                "status": job.status.value,
+                "worker_id": job.worker_id,
+                "worker_status": row["worker_status"] if "worker_status" in row.keys() else "unknown",
+                "severity": "critical",
+                "reason": "worker_offline",
+            })
+            warnings["summary"]["total"] += 1
+            warnings["summary"]["critical"] += 1
+
+        return warnings
+
+    @staticmethod
+    def _format_duration(seconds: float) -> str:
+        """Format duration in human-readable form."""
+        if seconds < 60:
+            return f"{int(seconds)}s"
+        elif seconds < 3600:
+            return f"{int(seconds / 60)}m {int(seconds % 60)}s"
+        else:
+            hours = int(seconds / 3600)
+            mins = int((seconds % 3600) / 60)
+            return f"{hours}h {mins}m"
+
     # =========================================================================
     # WORKER MANAGEMENT
     # =========================================================================

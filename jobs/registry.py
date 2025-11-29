@@ -98,8 +98,20 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         name="eval",
         description="Run skill evaluation suite on a model",
         required_fields=["skill_id"],
-        optional_fields=["level", "batch_size", "model_ref", "checkpoint_step"],
-        payload_version=1,
+        # Model identity fields: hero_id, campaign_id, checkpoint_id anchor eval to specific model version
+        # This allows evals to be independent of the current training run
+        optional_fields=[
+            "level",
+            "batch_size",
+            "model_ref",
+            "checkpoint_step",
+            # Model identity (for run-independent evals)
+            "hero_id",        # e.g., "dio-qwen3-0.6b" or "titan-qwen3-4b"
+            "campaign_id",    # e.g., "campaign-001"
+            "checkpoint_id",  # e.g., "checkpoint-175000-20251128-1430"
+            "checkpoint_path",  # Full path if checkpoint_id not sufficient
+        ],
+        payload_version=2,  # Bumped for model identity fields
         default_timeout=600,  # 10 min
         max_attempts=2,
         retryable_errors=[
@@ -122,8 +134,18 @@ JOB_TYPE_REGISTRY: Dict[str, JobTypeConfig] = {
         name="sparring",
         description="Self-correction sparring session",
         required_fields=["skill_id"],
-        optional_fields=["count", "checkpoint", "threshold", "output_path"],
-        payload_version=1,
+        optional_fields=[
+            "count",
+            "checkpoint",
+            "threshold",
+            "output_path",
+            # Model identity (for run-independent sparring)
+            "hero_id",
+            "campaign_id",
+            "checkpoint_id",
+            "checkpoint_path",
+        ],
+        payload_version=2,  # Bumped for model identity fields
         default_timeout=1800,  # 30 min
         max_attempts=1,  # Expensive, don't retry
         retryable_errors=[],

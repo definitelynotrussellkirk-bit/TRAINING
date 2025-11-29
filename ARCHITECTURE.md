@@ -615,3 +615,103 @@ INFERENCE_TIMEOUT_S=120
 INFERENCE_MAX_RETRIES=5
 INFERENCE_API_KEY=secret123
 ```
+
+## Cluster Roles: Head Node vs Workers
+
+The distributed job system uses a simple ownership model without election.
+
+### Head Node (Control Plane)
+
+The head node owns the job store and control state. Responsibilities:
+
+| Responsibility | Details |
+|---------------|---------|
+| **Job Store** | SQLite database at `vault/jobs.db` |
+| **RunContext** | Files in `control/` (state.json, active_campaign.json) |
+| **Tavern UI** | Port 8888 |
+| **VaultKeeper API** | Port 8767 (job endpoints) |
+| **Job Submission** | Only head node should submit jobs to the store |
+
+**The head node is whichever box runs Tavern and owns the job store.**
+There is no election - you designate the head by starting the services there.
+
+### Worker Nodes
+
+Workers consume jobs from the store. They never own control state.
+
+| Responsibility | Details |
+|---------------|---------|
+| **Claim Jobs** | Pull from job store via VaultKeeper API |
+| **Execute Jobs** | Run eval, sparring, data_gen, etc. |
+| **Report Results** | Mark jobs complete/failed |
+| **Heartbeat** | Send heartbeats to register liveness |
+
+Workers can run on any node that can reach the VaultKeeper API.
+
+### What Workers Must NOT Do
+
+- Modify RunContext (hero/campaign switches)
+- Submit jobs that affect other workers
+- Change job store schema or paths
+- Make assumptions about "current model" - use job payload
+
+### Failure Scenarios
+
+| Scenario | Behavior |
+|----------|----------|
+| **Head node process crash** | Workers continue from job store. Restart Tavern to restore UI. |
+| **Head node loses storage** | Workers fail job store operations. Restore storage, restart head. |
+| **Worker crash** | Lease expires, job returns to queue. Other workers pick it up. |
+| **Worker loses network** | Same as crash - lease expiration handles it. |
+| **All workers down** | Jobs accumulate in pending. `/api/jobs/warnings` shows stuck_pending. |
+
+### Migrating Head Node
+
+To move the head node to a different machine:
+
+1. Stop Tavern and VaultKeeper on old head
+2. Copy `vault/jobs.db` and `control/` to new head
+3. Start Tavern and VaultKeeper on new head
+4. Update `config/hosts.json` if needed
+5. Workers will automatically use new VaultKeeper endpoint
+
+### Monitoring Job Health
+
+Use the warnings endpoint to detect stuck jobs:
+
+```bash
+# Check for stuck jobs
+curl http://localhost:8888/api/jobs/warnings | jq .summary
+
+# Response:
+# {
+#   "stuck_pending": [...],    # Jobs waiting >5min for workers
+#   "stuck_running": [...],    # Jobs running >30min
+#   "orphaned_jobs": [...],    # Jobs on offline workers
+#   "summary": {"total": 0, "critical": 0, "warning": 0}
+# }
+```
+
+### Eval Jobs Are Model-Anchored
+
+Eval and sparring jobs carry explicit model identity in their payload:
+
+```json
+{
+  "job_type": "eval",
+  "payload": {
+    "skill_id": "bin",
+    "level": 5,
+    "hero_id": "dio-qwen3-0.6b",
+    "campaign_id": "campaign-001",
+    "checkpoint_id": "checkpoint-175000-20251128-1430"
+  }
+}
+```
+
+This makes evals **independent of the current training run**. You can:
+- Evaluate old checkpoints while training continues
+- Run evals on a different hero/campaign
+- Queue evals for models not currently active
+
+Workers resolve the model path from the payload, not from RunContext.

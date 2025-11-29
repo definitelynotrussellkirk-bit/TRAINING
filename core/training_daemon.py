@@ -1060,12 +1060,15 @@ class TrainingDaemon:
             self.logger.info(f"   LR: {config.hyperparams.learning_rate}")
 
             # Create MonitorContext with controller for pause/stop signals
+            from trainer.monitoring.context import ControlContext, ProgressContext
             monitors = MonitorContext(
                 live_monitor=None,  # Daemon doesn't need live inference preview
-                controller=self.controller,
-                current_file=data_file.name,
-                batch_number=batch_number,
-                batch_queue_size=batch_queue_size,
+                control=ControlContext(controller=self.controller),
+                progress=ProgressContext(
+                    current_file=data_file.name,
+                    batch_number=batch_number,
+                    batch_queue_size=batch_queue_size,
+                ),
                 status_writer=self.status_writer,
                 remote_eval_config=config_dict.get("remote_eval", {}),
             )

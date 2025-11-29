@@ -988,17 +988,10 @@ function updateNextActionUI(campaign, momentum) {
         section.classList.add('blocked');
         titleEl.textContent = 'Training Daemon Not Running';
         bodyEl.innerHTML = `
-            The training daemon needs to be started before you can train.<br><br>
-            <code style="background:#1a1e28;padding:0.5rem;border-radius:4px;display:block;margin-top:0.5rem;">
-            ./scripts/start_all.sh
-            </code>
+            The training daemon needs to be started before you can train.
         `;
-        btnEl.textContent = 'Copy Command';
-        btnEl.onclick = () => {
-            navigator.clipboard.writeText('./scripts/start_all.sh');
-            btnEl.textContent = 'Copied!';
-            setTimeout(() => { btnEl.textContent = 'Copy Command'; }, 2000);
-        };
+        btnEl.textContent = 'Start Daemon';
+        btnEl.onclick = () => startDaemon(btnEl);
         return;
     }
 
@@ -1027,13 +1020,35 @@ function updateNextActionUI(campaign, momentum) {
         return;
     }
 
-    // No campaign at all
+    // No campaign at all - check if first run
     if (!campaign || !campaign.id) {
         section.classList.add('no-campaign');
-        titleEl.textContent = 'No Active Campaign';
-        bodyEl.textContent = 'Create or select a campaign to begin your hero\'s journey.';
-        btnEl.textContent = 'Open Campaign';
-        btnEl.onclick = () => { window.location.href = '/campaign'; };
+
+        // Check setup status to determine if truly first run
+        checkSetupStatus().then(setup => {
+            if (setup && setup.is_first_run) {
+                // True first run - show welcome with Quick Start
+                titleEl.textContent = 'Welcome to the Realm!';
+                bodyEl.innerHTML = `
+                    Begin your hero's training journey with one click.<br>
+                    <small style="opacity:0.7">Creates a campaign and generates training data automatically.</small>
+                `;
+                btnEl.textContent = 'Quick Start';
+                btnEl.onclick = () => quickStart(btnEl);
+            } else {
+                // Has campaigns but none active
+                titleEl.textContent = 'No Active Campaign';
+                bodyEl.textContent = 'Select a campaign to continue your hero\'s journey.';
+                btnEl.textContent = 'Open Campaign';
+                btnEl.onclick = () => { window.location.href = '/campaign'; };
+            }
+        }).catch(() => {
+            // Fallback if setup check fails
+            titleEl.textContent = 'No Active Campaign';
+            bodyEl.textContent = 'Create or select a campaign to begin your hero\'s journey.';
+            btnEl.textContent = 'Open Campaign';
+            btnEl.onclick = () => { window.location.href = '/campaign'; };
+        });
         return;
     }
 
@@ -1043,13 +1058,21 @@ function updateNextActionUI(campaign, momentum) {
         section.classList.add('blocked');
         titleEl.textContent = 'No Training Data';
         bodyEl.innerHTML = `
-            The training queue is empty. Generate some data first:<br><br>
-            <code style="background:#1a1e28;padding:0.5rem;border-radius:4px;display:block;margin-top:0.5rem;">
-            python3 tools/generate_training_data.py --count 1000 --curriculum
-            </code>
+            <div style="margin-bottom: 0.75rem;">The training queue is empty.</div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                <button class="action-btn secondary" onclick="toggleAutoQueue(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                    Enable Auto-Queue
+                </button>
+                <button class="action-btn secondary" onclick="generateTrainingData(this, 5000)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                    Generate 5,000
+                </button>
+            </div>
         `;
-        btnEl.textContent = 'Open Quests';
-        btnEl.onclick = () => { window.location.href = '/quests'; };
+        btnEl.textContent = 'Generate 1,000 Examples';
+        btnEl.onclick = () => generateTrainingData(btnEl, 1000);
+
+        // Check auto-queue status and update button
+        checkAutoQueueStatus();
         return;
     }
 
@@ -1057,18 +1080,38 @@ function updateNextActionUI(campaign, momentum) {
     const rec = campaign.recommendation;
     if (!rec) {
         titleEl.textContent = 'Ready to Train';
-        bodyEl.textContent = 'Run a training session to push your hero further.';
+        bodyEl.innerHTML = `
+            <div style="margin-bottom: 0.75rem;">Run a training session to push your hero further.</div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                <button class="action-btn secondary" onclick="toggleAutoRun(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                    Enable Auto-Run
+                </button>
+            </div>
+        `;
         btnEl.textContent = 'Run 2,000 Steps';
         btnEl.onclick = () => startTraining(2000);
+
+        // Check auto-run status and update button
+        checkAutoRunStatus();
         return;
     }
 
     titleEl.textContent = rec.title;
-    bodyEl.textContent = rec.description + (rec.reason ? ` (${rec.reason})` : '');
+    bodyEl.innerHTML = `
+        <div style="margin-bottom: 0.75rem;">${rec.description}${rec.reason ? ` (${rec.reason})` : ''}</div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+            <button class="action-btn secondary" onclick="toggleAutoRun(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                Enable Auto-Run
+            </button>
+        </div>
+    `;
 
     const steps = rec.suggested_steps || 2000;
     btnEl.textContent = `Run ${steps.toLocaleString()} Steps`;
     btnEl.onclick = () => startTraining(steps);
+
+    // Check auto-run status and update button
+    checkAutoRunStatus();
 }
 
 /**
@@ -1115,6 +1158,351 @@ async function startTraining(steps) {
         console.error('Failed to start training:', err);
         btnEl.textContent = 'Error - Retry';
         btnEl.disabled = false;
+    }
+}
+
+/**
+ * Start the training daemon
+ */
+async function startDaemon(btnEl) {
+    if (!btnEl) btnEl = document.getElementById('nextActionButton');
+    if (!btnEl) return;
+
+    // Disable button while starting
+    btnEl.disabled = true;
+    btnEl.textContent = 'Starting...';
+
+    try {
+        const res = await fetch('/api/daemon/control', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start' }),
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            btnEl.textContent = 'Daemon Starting...';
+            if (typeof showNotification === 'function') {
+                showNotification('Training daemon is starting...', 'success');
+            }
+            // Poll for daemon to be ready
+            let attempts = 0;
+            const pollInterval = setInterval(async () => {
+                attempts++;
+                try {
+                    const mRes = await fetch('/api/momentum');
+                    const m = await mRes.json();
+                    if (m.daemon && m.daemon.running) {
+                        clearInterval(pollInterval);
+                        btnEl.textContent = 'Daemon Started!';
+                        if (typeof showNotification === 'function') {
+                            showNotification('Training daemon is ready!', 'success');
+                        }
+                        // Refresh UI
+                        setTimeout(() => {
+                            refreshNextAction();
+                            fetchMomentum();
+                        }, 1000);
+                    } else if (attempts >= 15) {
+                        // 15 seconds timeout
+                        clearInterval(pollInterval);
+                        btnEl.textContent = 'Start Daemon';
+                        btnEl.disabled = false;
+                        if (typeof showNotification === 'function') {
+                            showNotification('Daemon taking too long to start. Check logs.', 'warning');
+                        }
+                    }
+                } catch (e) {
+                    // Keep polling
+                }
+            }, 1000);
+        } else {
+            btnEl.textContent = 'Start Daemon';
+            btnEl.disabled = false;
+            if (typeof showNotification === 'function') {
+                showNotification(result.error || 'Failed to start daemon', 'error');
+            }
+        }
+    } catch (err) {
+        console.error('Failed to start daemon:', err);
+        btnEl.textContent = 'Start Daemon';
+        btnEl.disabled = false;
+        if (typeof showNotification === 'function') {
+            showNotification('Failed to start daemon', 'error');
+        }
+    }
+}
+
+/**
+ * Check setup/first-run status
+ */
+async function checkSetupStatus() {
+    try {
+        const res = await fetch('/api/setup/status');
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (err) {
+        console.error('Failed to check setup status:', err);
+        return null;
+    }
+}
+
+/**
+ * Quick Start - One-click setup for new users
+ */
+async function quickStart(btnEl) {
+    if (!btnEl) btnEl = document.getElementById('nextActionButton');
+    if (!btnEl) return;
+
+    // Disable button while running
+    btnEl.disabled = true;
+    btnEl.textContent = 'Setting up...';
+
+    try {
+        const res = await fetch('/api/setup/quick-start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ examples_count: 1000 }),
+        });
+
+        const result = await res.json();
+
+        if (result.ok) {
+            btnEl.textContent = 'Ready!';
+            if (typeof showNotification === 'function') {
+                let msg;
+                if (result.skipped) {
+                    msg = 'Campaign already exists!';
+                } else {
+                    const count = result.generated?.[0]?.count || 0;
+                    const daemon = result.daemon_started ? ' Daemon starting...' : '';
+                    msg = `Campaign created! Generated ${count} training examples.${daemon}`;
+                }
+                showNotification(msg, 'success');
+            }
+            // Refresh everything (give daemon time to start)
+            const delay = result.daemon_started ? 3000 : 1500;
+            setTimeout(() => {
+                fetchCampaignData();
+                refreshNextAction();
+                fetchMomentum();
+            }, delay);
+        } else {
+            btnEl.textContent = 'Quick Start';
+            btnEl.disabled = false;
+            if (typeof showNotification === 'function') {
+                showNotification(result.error || 'Quick start failed', 'error');
+            }
+        }
+    } catch (err) {
+        console.error('Quick start failed:', err);
+        btnEl.textContent = 'Quick Start';
+        btnEl.disabled = false;
+        if (typeof showNotification === 'function') {
+            showNotification('Quick start failed', 'error');
+        }
+    }
+}
+
+/**
+ * Check auto-queue status and update button text
+ */
+async function checkAutoQueueStatus() {
+    try {
+        const res = await fetch('/config');
+        if (!res.ok) return;
+        const config = await res.json();
+        const enabled = config.auto_generate?.enabled || false;
+
+        // Find and update the auto-queue button
+        const btn = document.querySelector('button[onclick*="toggleAutoQueue"]');
+        if (btn) {
+            btn.textContent = enabled ? 'Disable Auto-Queue' : 'Enable Auto-Queue';
+            btn.classList.toggle('active', enabled);
+        }
+    } catch (err) {
+        console.error('Failed to check auto-queue status:', err);
+    }
+}
+
+/**
+ * Toggle auto-queue (auto-generate) setting
+ */
+async function toggleAutoQueue(btnEl) {
+    if (!btnEl) return;
+
+    btnEl.disabled = true;
+    const wasEnabled = btnEl.textContent.includes('Disable');
+    btnEl.textContent = 'Updating...';
+
+    try {
+        // Get current config
+        const configRes = await fetch('/config');
+        if (!configRes.ok) throw new Error('Failed to load config');
+        const config = await configRes.json();
+
+        // Toggle auto_generate.enabled
+        if (!config.auto_generate) config.auto_generate = {};
+        config.auto_generate.enabled = !wasEnabled;
+
+        // Save config
+        const saveRes = await fetch('/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+        });
+
+        const result = await saveRes.json();
+
+        if (result.success || result.ok) {
+            const newState = config.auto_generate.enabled;
+            btnEl.textContent = newState ? 'Disable Auto-Queue' : 'Enable Auto-Queue';
+            btnEl.classList.toggle('active', newState);
+            if (typeof showNotification === 'function') {
+                showNotification(
+                    newState ? 'Auto-queue enabled! Data will generate automatically.' : 'Auto-queue disabled.',
+                    'success'
+                );
+            }
+        } else {
+            btnEl.textContent = wasEnabled ? 'Disable Auto-Queue' : 'Enable Auto-Queue';
+            if (typeof showNotification === 'function') {
+                showNotification(result.error || 'Failed to update setting', 'error');
+            }
+        }
+    } catch (err) {
+        console.error('Failed to toggle auto-queue:', err);
+        btnEl.textContent = wasEnabled ? 'Disable Auto-Queue' : 'Enable Auto-Queue';
+        if (typeof showNotification === 'function') {
+            showNotification('Failed to toggle auto-queue', 'error');
+        }
+    } finally {
+        btnEl.disabled = false;
+    }
+}
+
+/**
+ * Check auto-run status and update button text
+ */
+async function checkAutoRunStatus() {
+    try {
+        const res = await fetch('/config');
+        if (!res.ok) return;
+        const config = await res.json();
+        const enabled = config.auto_run?.enabled || false;
+
+        // Find and update the auto-run button
+        const btn = document.querySelector('button[onclick*="toggleAutoRun"]');
+        if (btn) {
+            btn.textContent = enabled ? 'Disable Auto-Run' : 'Enable Auto-Run';
+            btn.classList.toggle('active', enabled);
+        }
+    } catch (err) {
+        console.error('Failed to check auto-run status:', err);
+    }
+}
+
+/**
+ * Toggle auto-run (automatic training) setting
+ */
+async function toggleAutoRun(btnEl) {
+    if (!btnEl) return;
+
+    btnEl.disabled = true;
+    const wasEnabled = btnEl.textContent.includes('Disable');
+    btnEl.textContent = 'Updating...';
+
+    try {
+        // Get current config
+        const configRes = await fetch('/config');
+        if (!configRes.ok) throw new Error('Failed to load config');
+        const config = await configRes.json();
+
+        // Toggle auto_run.enabled
+        if (!config.auto_run) config.auto_run = {};
+        config.auto_run.enabled = !wasEnabled;
+
+        // Save config
+        const saveRes = await fetch('/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+        });
+
+        const result = await saveRes.json();
+
+        if (result.success || result.ok) {
+            const newState = config.auto_run.enabled;
+            btnEl.textContent = newState ? 'Disable Auto-Run' : 'Enable Auto-Run';
+            btnEl.classList.toggle('active', newState);
+            if (typeof showNotification === 'function') {
+                showNotification(
+                    newState ? 'Auto-run enabled! Training will start automatically.' : 'Auto-run disabled. Use Run button to start.',
+                    'success'
+                );
+            }
+        } else {
+            btnEl.textContent = wasEnabled ? 'Disable Auto-Run' : 'Enable Auto-Run';
+            if (typeof showNotification === 'function') {
+                showNotification(result.error || 'Failed to update setting', 'error');
+            }
+        }
+    } catch (err) {
+        console.error('Failed to toggle auto-run:', err);
+        btnEl.textContent = wasEnabled ? 'Disable Auto-Run' : 'Enable Auto-Run';
+        if (typeof showNotification === 'function') {
+            showNotification('Failed to toggle auto-run', 'error');
+        }
+    } finally {
+        btnEl.disabled = false;
+    }
+}
+
+/**
+ * Generate training data and add to queue
+ */
+async function generateTrainingData(btnEl, count = 1000) {
+    if (!btnEl) btnEl = document.getElementById('nextActionButton');
+    if (!btnEl) return;
+
+    // Disable button while generating
+    btnEl.disabled = true;
+    btnEl.textContent = 'Generating...';
+
+    try {
+        const res = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ count }),
+        });
+
+        const result = await res.json();
+
+        if (result.ok) {
+            btnEl.textContent = `Generated ${result.examples_generated}!`;
+            if (typeof showNotification === 'function') {
+                showNotification(`Generated ${result.examples_generated} training examples for ${result.skill} L${result.level}`, 'success');
+            }
+            // Refresh UI to show updated state
+            setTimeout(() => {
+                refreshNextAction();
+                fetchMomentum();
+            }, 1500);
+        } else {
+            btnEl.textContent = 'Generate 1,000 Examples';
+            btnEl.disabled = false;
+            if (typeof showNotification === 'function') {
+                showNotification(result.error || 'Failed to generate data', 'error');
+            }
+        }
+    } catch (err) {
+        console.error('Failed to generate training data:', err);
+        btnEl.textContent = 'Generate 1,000 Examples';
+        btnEl.disabled = false;
+        if (typeof showNotification === 'function') {
+            showNotification('Failed to generate training data', 'error');
+        }
     }
 }
 

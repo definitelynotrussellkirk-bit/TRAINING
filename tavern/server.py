@@ -57,6 +57,8 @@ from tavern.api import vault as vault_api
 from tavern.api import jobs as jobs_api
 from tavern.api import momentum as momentum_api
 from tavern.api import train as train_api
+from tavern.api import generate as generate_api
+from tavern.api import setup as setup_api
 
 # Import events system
 try:
@@ -592,6 +594,17 @@ class TavernHandler(SimpleHTTPRequestHandler):
             else:
                 train_api.serve_train_status(self)
 
+        # Generate API - Generate training data from UI
+        elif path == "/api/generate":
+            if self.command == "POST":
+                generate_api.serve_generate_post(self)
+            else:
+                generate_api.serve_generate_status(self)
+
+        # Setup API - First-run detection and onboarding
+        elif path == "/api/setup/status":
+            setup_api.serve_setup_status(self)
+
         # Analysis - Model Archaeology (uses analysis_api module)
         elif path == "/analysis" or path == "/analysis.html":
             self._serve_template("analysis.html")
@@ -682,6 +695,15 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path.endswith("/cancel"):
             job_id = path.replace("/api/jobs/", "").replace("/cancel", "")
             self._cancel_job(job_id)
+        # Training API - Start training from UI
+        elif path == "/api/train":
+            train_api.serve_train_post(self)
+        # Generate API - Generate training data from UI
+        elif path == "/api/generate":
+            generate_api.serve_generate_post(self)
+        # Setup API - Quick start for first-run
+        elif path == "/api/setup/quick-start":
+            setup_api.serve_quick_start(self)
         else:
             self._send_error(404, "Endpoint not found")
 
@@ -1722,12 +1744,19 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 # Start daemon in background
                 daemon_script = BASE_DIR / "core" / "training_daemon.py"
                 log_file = BASE_DIR / "logs" / "training_daemon.log"
+                log_file.parent.mkdir(parents=True, exist_ok=True)
+
+                # Set PYTHONPATH so daemon can import trainer, guild, etc.
+                env = os.environ.copy()
+                env["PYTHONPATH"] = str(BASE_DIR)
+
                 subprocess.Popen(
                     ["nohup", "python3", str(daemon_script)],
                     stdout=open(log_file, "a"),
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
-                    cwd=str(BASE_DIR)
+                    cwd=str(BASE_DIR),
+                    env=env
                 )
                 self._send_json({"success": True, "action": "start", "message": "Daemon starting..."})
 
@@ -1754,7 +1783,6 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 if pid_file.exists():
                     try:
                         pid = int(pid_file.read_text().strip())
-                        import os
                         os.kill(pid, 9)  # SIGKILL
                         pid_file.unlink()
                         self._send_json({"success": True, "action": "kill", "message": f"Killed daemon (PID {pid})"})

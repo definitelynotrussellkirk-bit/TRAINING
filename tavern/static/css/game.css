@@ -1310,3 +1310,32 @@ body {
     transform: none;
     box-shadow: none;
 }
+
+/* Secondary action buttons (smaller, less prominent) */
+.action-btn.secondary {
+    background: var(--bg-highlight);
+    color: var(--text-primary);
+    border: 1px solid var(--text-muted);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-btn.secondary:hover {
+    background: var(--bg-card);
+    border-color: var(--color-gold);
+    color: var(--color-gold);
+}
+
+.action-btn.secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.action-btn.secondary.active {
+    background: var(--color-success);
+    color: #000;
+    border-color: var(--color-success);
+}

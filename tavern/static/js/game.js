@@ -980,6 +980,27 @@ function updateNextActionUI(campaign, momentum) {
 
     // Reset classes
     section.className = 'next-action-card';
+    btnEl.disabled = false;
+
+    // Check if daemon is running - CRITICAL for honest state
+    const daemon = momentum.daemon || {};
+    if (!daemon.running) {
+        section.classList.add('blocked');
+        titleEl.textContent = 'Training Daemon Not Running';
+        bodyEl.innerHTML = `
+            The training daemon needs to be started before you can train.<br><br>
+            <code style="background:#1a1e28;padding:0.5rem;border-radius:4px;display:block;margin-top:0.5rem;">
+            ./scripts/start_all.sh
+            </code>
+        `;
+        btnEl.textContent = 'Copy Command';
+        btnEl.onclick = () => {
+            navigator.clipboard.writeText('./scripts/start_all.sh');
+            btnEl.textContent = 'Copied!';
+            setTimeout(() => { btnEl.textContent = 'Copy Command'; }, 2000);
+        };
+        return;
+    }
 
     // If blocked, show blocker info
     if (momentum.status === 'blocked' && momentum.primary_blocker) {
@@ -1013,6 +1034,22 @@ function updateNextActionUI(campaign, momentum) {
         bodyEl.textContent = 'Create or select a campaign to begin your hero\'s journey.';
         btnEl.textContent = 'Open Campaign';
         btnEl.onclick = () => { window.location.href = '/campaign'; };
+        return;
+    }
+
+    // Check if queue is empty (warning blocker)
+    const queueEmpty = momentum.blockers && momentum.blockers['QUEUE_EMPTY'];
+    if (queueEmpty) {
+        section.classList.add('blocked');
+        titleEl.textContent = 'No Training Data';
+        bodyEl.innerHTML = `
+            The training queue is empty. Generate some data first:<br><br>
+            <code style="background:#1a1e28;padding:0.5rem;border-radius:4px;display:block;margin-top:0.5rem;">
+            python3 tools/generate_training_data.py --count 1000 --curriculum
+            </code>
+        `;
+        btnEl.textContent = 'Open Quests';
+        btnEl.onclick = () => { window.location.href = '/quests'; };
         return;
     }
 

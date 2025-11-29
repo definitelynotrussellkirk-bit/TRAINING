@@ -11,7 +11,7 @@ import logging
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs
 
-from core.momentum import get_momentum_state, run_momentum_checks
+from core.momentum import get_momentum_state, run_momentum_checks, get_daemon_status
 
 if TYPE_CHECKING:
     from tavern.server import TavernHandler
@@ -31,7 +31,12 @@ def serve_momentum(handler: "TavernHandler", run_checks: bool = True):
             "status": "go" | "blocked" | "idle",
             "primary_blocker": {...} | null,
             "blockers": {...},
-            "blocker_count": int
+            "blocker_count": int,
+            "daemon": {
+                "running": bool,
+                "pid": int | null,
+                "stale": bool
+            }
         }
     """
     try:
@@ -48,7 +53,22 @@ def serve_momentum(handler: "TavernHandler", run_checks: bool = True):
         else:
             state = get_momentum_state()
 
-        handler._send_json(state.to_dict())
+        # Build response
+        response = state.to_dict()
+
+        # Add daemon status - critical for honest UI
+        daemon = get_daemon_status()
+        response["daemon"] = {
+            "running": daemon["running"],
+            "pid": daemon["pid"],
+            "stale": daemon["stale"],
+        }
+
+        # If daemon not running, override status display
+        if not daemon["running"]:
+            response["daemon_message"] = "Training daemon is not running"
+
+        handler._send_json(response)
     except Exception as e:
         logger.error(f"Momentum API error: {e}")
         handler._send_json({
@@ -56,5 +76,6 @@ def serve_momentum(handler: "TavernHandler", run_checks: bool = True):
             "primary_blocker": None,
             "blockers": {},
             "blocker_count": 0,
+            "daemon": {"running": False, "pid": None, "stale": False},
             "error": str(e)
         })

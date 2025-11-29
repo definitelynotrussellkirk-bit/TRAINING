@@ -415,3 +415,86 @@ def _check_checkpoints() -> None:
             clear_blocker(BLOCKER_NO_CHECKPOINTS)
     except Exception as e:
         logger.warning(f"Failed to check checkpoints: {e}")
+
+
+# =============================================================================
+# DAEMON STATUS - Is the training daemon actually running?
+# =============================================================================
+
+
+def get_daemon_status() -> Dict[str, Any]:
+    """
+    Check if the training daemon is actually running.
+
+    Returns:
+        {
+            "running": bool,
+            "pid": int | None,
+            "pid_file_exists": bool,
+            "process_alive": bool,
+            "training_status": dict | None,
+            "stale": bool  # True if status file is old but daemon not running
+        }
+    """
+    import os
+    import json
+    from datetime import datetime, timedelta
+
+    from core.paths import get_base_dir, get_status_dir
+
+    result = {
+        "running": False,
+        "pid": None,
+        "pid_file_exists": False,
+        "process_alive": False,
+        "training_status": None,
+        "stale": False,
+    }
+
+    # Check PID file
+    pid_file = get_base_dir() / ".daemon.pid"
+    if pid_file.exists():
+        result["pid_file_exists"] = True
+        try:
+            pid = int(pid_file.read_text().strip())
+            result["pid"] = pid
+
+            # Check if process is actually running
+            try:
+                os.kill(pid, 0)  # Signal 0 just checks if process exists
+                result["process_alive"] = True
+                result["running"] = True
+            except ProcessLookupError:
+                # PID file exists but process is dead - stale PID
+                result["process_alive"] = False
+            except PermissionError:
+                # Process exists but we can't signal it (shouldn't happen for own process)
+                result["process_alive"] = True
+                result["running"] = True
+        except (ValueError, IOError):
+            pass
+
+    # Check training status file
+    status_file = get_status_dir() / "training_status.json"
+    if status_file.exists():
+        try:
+            status = json.loads(status_file.read_text())
+            result["training_status"] = status
+
+            # Check if status is stale
+            timestamp_str = status.get("timestamp")
+            if timestamp_str:
+                try:
+                    # Handle ISO format
+                    timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                    age = datetime.now(timestamp.tzinfo or None) - timestamp
+                    # If status says "training" but is > 5 min old and daemon not running
+                    if status.get("status") == "training" and age > timedelta(minutes=5):
+                        if not result["running"]:
+                            result["stale"] = True
+                except (ValueError, TypeError):
+                    pass
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    return result

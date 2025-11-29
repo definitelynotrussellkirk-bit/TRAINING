@@ -1,0 +1,96 @@
+{
+  "_comment": "FLO - Qwen3-4B with DeepSpeed ZeRO-3 on SY+BIN skills",
+  "hero_name": "FLO",
+  "model_name": "qwen3_4b",
+  "model_display_name": "FLO - Qwen3-4B-Instruct (ZeRO-3)",
+  "model_path": "models/Qwen3-4B-Instruct-2507",
+  "current_model_dir": "campaigns/titan-qwen3-4b/campaign-001/checkpoints",
+
+  "batch_size": 1,
+  "gradient_accumulation": 32,
+  "learning_rate": 2e-5,
+  "warmup_steps": 100,
+  "epochs": 1,
+  "log_steps": 10,
+  "eval_steps": 500,
+  "num_eval_samples": 3,
+  "save_steps": 500,
+  "poll_interval": 60,
+  "max_length": 1024,
+
+  "base_model": "models/Qwen3-4B-Instruct-2507",
+  "eval_max_tokens": 2048,
+  "eval_timeout_seconds": 180,
+
+  "deepspeed": {
+    "enabled": true,
+    "config": "configs/deepspeed/zero3_offload.json",
+    "_comment": "ZeRO-3 with CPU offload - uses 64GB RAM for optimizer states + params"
+  },
+
+  "optimizer": {
+    "type": "galore",
+    "galore": {
+      "rank": 256,
+      "update_proj_gap": 200,
+      "scale": 0.25
+    },
+    "muon": {
+      "hidden_lr": 0.02,
+      "aux_lr": 3e-4,
+      "momentum": 0.95,
+      "weight_decay": 0.0
+    },
+    "adamw": {
+      "lr": 2e-5,
+      "weight_decay": 0.01
+    }
+  },
+
+  "hyperparams": {
+    "fp_precision": "bf16",
+    "max_length": 1024,
+    "batch_size": 1,
+    "gradient_accumulation": 32,
+    "learning_rate": 2e-5,
+    "use_gradient_checkpointing": true
+  },
+
+  "profile": {
+    "name": "none"
+  },
+
+  "curriculum": {
+    "enabled": true,
+    "target_accuracy": 0.80,
+    "current_skill": "bin",
+    "skills": ["bin", "sy"],
+    "progression_mode": "automatic"
+  },
+
+  "auto_generate": {
+    "enabled": true,
+    "count": 1000,
+    "priority": "normal",
+    "threshold": 0,
+    "cooldown_sec": 300,
+    "min_queue_depth": 3
+  },
+
+  "remote_eval": {
+    "enabled": true,
+    "host_id": "3090",
+    "eval_interval_steps": 1000,
+    "sync_checkpoints": true,
+    "metrics": ["accuracy", "loss"]
+  },
+
+  "retention": {
+    "enabled": true
+  },
+
+  "liger": {
+    "enabled": true,
+    "_comment": "Fused ops for memory efficiency on 4B"
+  }
+}

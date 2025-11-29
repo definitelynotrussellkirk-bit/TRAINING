@@ -21,12 +21,22 @@ Usage:
 
     param_groups = split_transformer_params(model, hidden_lr=0.02, aux_lr=3e-4)
     optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
+
+    # With 8-bit AdamW for aux params (saves ~2GB on 4B models):
+    optimizer = SingleDeviceMuonWithAuxAdam(param_groups, use_8bit_adam=True)
 """
 
 import torch
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Try to import bitsandbytes for 8-bit Adam
+try:
+    import bitsandbytes as bnb
+    BNB_AVAILABLE = True
+except ImportError:
+    BNB_AVAILABLE = False
 
 
 def zeropower_via_newtonschulz5(G: torch.Tensor, steps: int = 5) -> torch.Tensor:
@@ -212,12 +222,16 @@ class SingleDeviceMuonWithAuxAdam(torch.optim.Optimizer):
         param_groups: List of parameter group dicts, each must have 'use_muon' key.
             - use_muon=True: Uses Muon (lr, momentum, weight_decay)
             - use_muon=False: Uses AdamW (lr, betas, eps, weight_decay)
+        use_8bit_adam: Use 8-bit AdamW for aux params (saves ~2GB VRAM on 4B models)
 
     Example:
         from trainer.optimizers import split_transformer_params
 
         param_groups = split_transformer_params(model, hidden_lr=0.02, aux_lr=3e-4)
         optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
+
+        # With 8-bit AdamW for memory savings:
+        optimizer = SingleDeviceMuonWithAuxAdam(param_groups, use_8bit_adam=True)
 
     Hyperparameters:
         Muon groups (use_muon=True):
@@ -232,9 +246,13 @@ class SingleDeviceMuonWithAuxAdam(torch.optim.Optimizer):
             - weight_decay: Weight decay (default: 0)
     """
 
-    def __init__(self, param_groups: list):
+    def __init__(self, param_groups: list, use_8bit_adam: bool = False):
+        self.use_8bit_adam = use_8bit_adam and BNB_AVAILABLE
+        self._aux_optimizer = None
+
         muon_count = 0
         adam_count = 0
+        adam_params = []
 
         for group in param_groups:
             if "use_muon" not in group:
@@ -254,8 +272,25 @@ class SingleDeviceMuonWithAuxAdam(torch.optim.Optimizer):
                 group.setdefault("eps", 1e-10)
                 group.setdefault("weight_decay", 0)
                 adam_count += len(group["params"])
+                adam_params.extend(group["params"])
 
-        logger.info(f"Muon optimizer: {muon_count} params with Muon, {adam_count} params with AdamW")
+        # Create 8-bit optimizer for aux params if requested
+        if self.use_8bit_adam and adam_params:
+            # Find the adam group to get hyperparams
+            adam_group = next(g for g in param_groups if not g["use_muon"])
+            self._aux_optimizer = bnb.optim.AdamW8bit(
+                adam_params,
+                lr=adam_group["lr"],
+                betas=adam_group["betas"],
+                eps=adam_group["eps"],
+                weight_decay=adam_group["weight_decay"],
+            )
+            logger.info(f"Muon optimizer: {muon_count} tensors with Muon, {adam_count} tensors with 8-bit AdamW")
+        else:
+            if use_8bit_adam and not BNB_AVAILABLE:
+                logger.warning("8-bit AdamW requested but bitsandbytes not available. Using standard AdamW.")
+            logger.info(f"Muon optimizer: {muon_count} tensors with Muon, {adam_count} tensors with AdamW")
+
         super().__init__(param_groups, dict())
 
     @torch.no_grad()
@@ -285,8 +320,11 @@ class SingleDeviceMuonWithAuxAdam(torch.optim.Optimizer):
 
                     p.mul_(1 - group["lr"] * group["weight_decay"])
                     p.add_(update.reshape(p.shape), alpha=-group["lr"])
+            elif self._aux_optimizer is not None:
+                # Use 8-bit AdamW (already has the params)
+                pass  # Handled below
             else:
-                # AdamW update for embeddings, heads, biases
+                # Standard AdamW update for embeddings, heads, biases
                 for p in group["params"]:
                     if p.grad is None:
                         continue
@@ -309,6 +347,10 @@ class SingleDeviceMuonWithAuxAdam(torch.optim.Optimizer):
 
                     p.mul_(1 - group["lr"] * group["weight_decay"])
                     p.add_(update, alpha=-group["lr"])
+
+        # Step the 8-bit optimizer if we're using it
+        if self._aux_optimizer is not None:
+            self._aux_optimizer.step()
 
         return loss
 

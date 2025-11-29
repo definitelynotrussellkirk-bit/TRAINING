@@ -125,6 +125,12 @@ class Job:
     regression_flag: bool = False
     alert_count: int = 0
 
+    # Skill context (optional - only for skill-based jobs)
+    skill_id: Optional[str] = None
+    skill_level: Optional[int] = None
+    skill_target_accuracy: Optional[float] = None
+    skill_accuracy: Optional[float] = None  # Set after eval
+
     # Extensible metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -456,6 +462,10 @@ def job_to_record_dict(job: Job) -> Dict[str, Any]:
         'git_commit': job.git_commit,
         'regression_flag': job.regression_flag,
         'alert_count': job.alert_count,
+        'skill_id': job.skill_id,
+        'skill_level': job.skill_level,
+        'skill_target_accuracy': job.skill_target_accuracy,
+        'skill_accuracy': job.skill_accuracy,
         'metadata': job.metadata,
     }
 

@@ -117,6 +117,16 @@ Complete JSON schema for the status file:
     "current_job_hero_id": "titan-qwen3-4b",  // Hero ID (str or null)
     "current_job_campaign_id": "campaign-001",  // Campaign ID (str or null)
 
+    // Skill context (when training skill-based jobs)
+    "skill_context": {                         // (dict or null)
+        "skill_id": "bin",                     // Skill ID (str)
+        "skill_name": "Binary Arithmetic",     // Display name (str)
+        "skill_level": 5,                      // Current level (int)
+        "skill_icon": "🔢",                    // Skill icon (str)
+        "skill_target_accuracy": 0.85,         // Target accuracy for level (float)
+        "skill_last_accuracy": 0.78            // Last eval accuracy (float or null)
+    },
+
     // Latest inference results
     "current_system_prompt": "...",  // System prompt (str or null)
     "current_prompt": "What is 2+2?", // Input prompt (str or null)
@@ -604,6 +614,9 @@ class TrainingStatus:
     current_job_hero_id: Optional[str] = None     # Hero (e.g., "titan-qwen3-4b")
     current_job_campaign_id: Optional[str] = None # Campaign (e.g., "campaign-001")
 
+    # Skill context (when training skill-based jobs)
+    skill_context: Optional[Dict] = None     # {skill_id, skill_name, skill_level, skill_icon, skill_target_accuracy, skill_last_accuracy}
+
     # Latest inference results
     current_system_prompt: Optional[str] = None  # System prompt for current example
     current_prompt: Optional[str] = None
@@ -963,6 +976,8 @@ class TrainingStatusWriter:
         current_job_status: Optional[str] = None,
         current_job_hero_id: Optional[str] = None,
         current_job_campaign_id: Optional[str] = None,
+        # Skill context (for skill-based jobs)
+        skill_context: Optional[Dict] = None,
     ):
         """Update basic training progress (preserves last inference data)."""
         accuracy_pct = (self.total_correct / self.total_evals * 100) if self.total_evals > 0 else 0.0
@@ -1032,6 +1047,8 @@ class TrainingStatusWriter:
             current_job_status=current_job_status,
             current_job_hero_id=current_job_hero_id,
             current_job_campaign_id=current_job_campaign_id,
+            # Skill context
+            skill_context=skill_context,
             # Preserve last inference data
             current_system_prompt=self.last_inference_data.get('system_prompt'),
             current_prompt=self.last_inference_data.get('prompt'),
@@ -1424,6 +1441,50 @@ def __getattr__(name):
     if name == "DEFAULT_STATUS_FILE":
         return get_default_status_file()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def build_skill_context(skill_id: str, skill_level: Optional[int] = None) -> Optional[Dict]:
+    """
+    Build skill_context dict from a skill_id using SkillEngine.
+
+    Args:
+        skill_id: The skill ID (e.g., "bin", "sy")
+        skill_level: Optional override for level (uses state.level if not provided)
+
+    Returns:
+        Dict with skill context fields, or None if skill not found
+
+    Example:
+        skill_context = build_skill_context("bin", skill_level=5)
+        writer.update_progress(..., skill_context=skill_context)
+    """
+    if not skill_id:
+        return None
+
+    try:
+        from guild.skills import get_engine
+        from guild.skills.loader import load_skill_config
+
+        engine = get_engine()
+        config = load_skill_config(skill_id)
+        state = engine.get_state(skill_id)
+
+        level = skill_level if skill_level is not None else state.level
+        target_accuracy = config.get_threshold(level) if hasattr(config, 'get_threshold') else 0.80
+
+        return {
+            "skill_id": skill_id,
+            "skill_name": config.name,
+            "skill_level": level,
+            "skill_icon": config.display.icon if hasattr(config, 'display') else "",
+            "skill_target_accuracy": target_accuracy,
+            "skill_last_accuracy": state.last_eval_accuracy,
+        }
+    except Exception as e:
+        # Don't break training if skill lookup fails
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to build skill_context for {skill_id}: {e}")
+        return None
 
 
 def example_usage():

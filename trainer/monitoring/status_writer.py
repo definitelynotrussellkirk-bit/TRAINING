@@ -266,6 +266,9 @@ class TrainingStatus:
     current_golden_output_length: Optional[int] = None  # Current golden output length
     current_model_output_length: Optional[int] = None   # Current model output length
 
+    # Skill context (when training skill-based jobs)
+    skill_context: Optional[Dict] = None  # {skill_id, skill_name, skill_level, skill_icon, skill_target_accuracy, skill_last_accuracy}
+
     # Error info (if crashed)
     error_message: Optional[str] = None
     error_type: Optional[str] = None
@@ -470,6 +473,7 @@ class TrainingStatusWriter:
         queue_velocity: Optional[Dict] = None,
         logit_penalty_stats: Optional[List[Dict]] = None,
         penalty_heatmap: Optional[Dict] = None,
+        skill_context: Optional[Dict] = None,
     ):
         """Update basic training progress (preserves last inference data)."""
         accuracy_pct = (self.total_correct / self.total_evals * 100) if self.total_evals > 0 else 0.0
@@ -568,6 +572,7 @@ class TrainingStatusWriter:
             throughput_vram_samples=self.vram_samples or None,
             queue_velocity=self.queue_velocity_snapshot,
             logit_penalty_stats=self.penalty_stats_snapshot,
+            skill_context=skill_context,
         )
         self.write(status)
 

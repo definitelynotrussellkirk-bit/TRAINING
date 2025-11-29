@@ -70,7 +70,9 @@ class LiveMonitorCallback(TrainerCallback):
         micro_eval_interval: int = 500,
         logits_processor=None,
         layer_monitor: Optional[LayerMonitor] = None,
-        remote_eval_config: Optional[Dict] = None
+        remote_eval_config: Optional[Dict] = None,
+        skill_id: Optional[str] = None,
+        skill_level: Optional[int] = None,
     ):
         """
         Initialize LiveMonitorCallback.
@@ -109,6 +111,17 @@ class LiveMonitorCallback(TrainerCallback):
         self.evolution_tracker = evolution_tracker
         self.controller = controller  # Training control system
         self.fixed_val_dataset = fixed_val_dataset  # Fixed validation set
+
+        # Skill context (for skill-based training)
+        self.skill_id = skill_id
+        self.skill_level = skill_level
+        self.skill_context = None
+        if skill_id:
+            try:
+                from core.training_status import build_skill_context
+                self.skill_context = build_skill_context(skill_id, skill_level)
+            except Exception as e:
+                print(f"⚠️  Failed to build skill context: {e}")
 
         # Remote evaluation setup
         self.remote_eval_config = remote_eval_config or {}
@@ -394,6 +407,7 @@ class LiveMonitorCallback(TrainerCallback):
                 queue_velocity=self.queue_velocity,
                 logit_penalty_stats=penalty_stats_payload,
                 penalty_heatmap=penalty_heatmap_payload,
+                skill_context=self.skill_context,
             )
             self.last_update_time = current_time
 

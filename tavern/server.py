@@ -71,104 +71,63 @@ def get_saga_reader():
     return _saga_reader
 
 
-# Skill loader (lazy)
-_skill_cache = None
-
+# Skill loader - uses SkillEngine
 def get_skills_data():
-    """Load skill data from YAML configs + campaign-specific curriculum state."""
-    global _skill_cache
-
+    """Load skill data from SkillEngine (single source of truth)."""
     try:
-        import yaml
+        from guild.skills import get_engine
+        from guild.skills.loader import load_skill_config
 
-        skills_dir = BASE_DIR / "configs" / "skills"
-
-        # Try to get campaign-specific curriculum state first
-        curriculum_file = None
-        try:
-            from core.hero import get_active_campaign
-            campaign = get_active_campaign()
-            if campaign.get("campaign_path"):
-                campaign_curriculum = BASE_DIR / campaign["campaign_path"] / "status" / "curriculum_state.json"
-                if campaign_curriculum.exists():
-                    curriculum_file = campaign_curriculum
-        except Exception:
-            pass
-
-        # Fallback to global curriculum state
-        if curriculum_file is None:
-            curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
-
-        # Load curriculum state for levels/accuracy
-        curriculum = {}
-        if curriculum_file.exists():
-            with open(curriculum_file) as f:
-                curriculum = json.load(f)
-
+        engine = get_engine()
         skills = []
-        for yaml_file in skills_dir.glob("*.yaml"):
-            if yaml_file.name.startswith("_"):
-                continue  # Skip templates
 
-            with open(yaml_file) as f:
-                config = yaml.safe_load(f)
+        for skill_id in engine.list_skills():
+            try:
+                config = load_skill_config(skill_id)
+                state = engine.get_state(skill_id)
 
-            skill_id = config.get("id", yaml_file.stem)
+                # current_level = level being TRAINED on (not mastered)
+                # mastered = training - 1 (minimum 0)
+                training = state.level
+                training = min(training, config.max_level)
+                mastered = max(0, training - 1)
 
-            # Handle ID mapping (YAML uses short IDs, curriculum uses full names)
-            id_mapping = {
-                "sy": "syllo",
-                "bin": "binary",
-            }
-            curriculum_id = id_mapping.get(skill_id, skill_id)
-            skill_state = curriculum.get("skills", {}).get(curriculum_id, {})
+                # Get accuracy from state
+                recent_acc = 0
+                if state.last_eval_accuracy is not None:
+                    recent_acc = state.last_eval_accuracy * 100
 
-            # current_level = level being TRAINED on (not mastered)
-            # mastered = training - 1 (minimum 0)
-            max_level = config.get("max_level", 30)
-            training = skill_state.get("current_level", 1)
-            training = min(training, max_level)
-            mastered = max(0, training - 1)
-
-            # Get recent accuracy from history
-            history = skill_state.get("accuracy_history", [])
-            recent_acc = 0
-            if history:
-                # Average of last 3 evals
-                recent = history[-3:]
-                recent_acc = sum(r.get("accuracy", 0) for r in recent) / len(recent) * 100
-
-            # Count evals at current training level
-            at_level = [r for r in history if r.get("training_level", r.get("level")) == training]
-
-            skills.append({
-                "id": skill_id,
-                "name": config.get("name", skill_id),
-                "rpg_name": config.get("rpg_name", config.get("name", skill_id)),
-                "rpg_description": config.get("rpg_description", config.get("description", "")),
-                "icon": config.get("display", {}).get("icon", "⚔️"),
-                "color": config.get("display", {}).get("color", "#888"),
-                "short_name": config.get("display", {}).get("short_name", skill_id.upper()),
-                "max_level": max_level,
-                "mastered_level": mastered,
-                "training_level": training,
-                "accuracy": round(recent_acc, 1),
-                "eval_count": len(at_level),
-                "category": config.get("category", "general"),
-                "description": config.get("description", ""),
-            })
+                skills.append({
+                    "id": config.id,
+                    "name": config.name,
+                    "rpg_name": config.rpg_name or config.name,
+                    "rpg_description": config.rpg_description or config.description or "",
+                    "icon": config.display.icon if config.display else "⚔️",
+                    "color": config.display.color if config.display else "#888",
+                    "short_name": config.display.short_name if config.display else config.id.upper(),
+                    "max_level": config.max_level,
+                    "mastered_level": mastered,
+                    "training_level": training,
+                    "accuracy": round(recent_acc, 1),
+                    "eval_count": state.total_evals,
+                    "category": config.category.value if hasattr(config.category, 'value') else str(config.category),
+                    "description": config.description or "",
+                })
+            except Exception as e:
+                logger.warning(f"Failed to load skill {skill_id}: {e}")
+                continue
 
         # Sort by name
         skills.sort(key=lambda s: s["name"])
 
         return {
             "skills": skills,
-            "active_skill": curriculum.get("active_skill", ""),
+            "active_skill": "",  # TODO: Get from training status
             "total_mastered": sum(s["mastered_level"] for s in skills),
         }
 
     except Exception as e:
-        logger.error(f"Failed to load skills: {e}")
+        logger.error(f"Failed to load skills from engine: {e}")
         return {"skills": [], "error": str(e)}
 
 

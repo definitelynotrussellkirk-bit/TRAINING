@@ -360,11 +360,25 @@ function updateHeroStats() {
     setText('#totalLevel', GameState.totalLevel);
 
     // Current skill being trained - show training level (what they're working on)
-    setText('#currentSkillName', GameState.currentSkill);
+    // Include skill icon if available from skill_context
+    const skillDisplay = GameState.skillIcon
+        ? `${GameState.skillIcon} ${GameState.currentSkill}`
+        : GameState.currentSkill;
+    setText('#currentSkillName', skillDisplay);
     setText('#currentSkillLevel', GameState.currentSkillTraining);
 
-    // Stats are for current skill
-    setText('#statAcc', GameState.currentSkillAcc ? `${GameState.currentSkillAcc.toFixed(1)}%` : '0%');
+    // Stats are for current skill - show target if available
+    const accDisplay = GameState.currentSkillAcc
+        ? `${GameState.currentSkillAcc.toFixed(1)}%`
+        : '0%';
+    setText('#statAcc', accDisplay);
+
+    // Add tooltip showing target accuracy if available
+    const statAccEl = document.querySelector('#statAcc')?.parentElement;
+    if (statAccEl && GameState.skillTargetAcc) {
+        statAccEl.title = `Target: ${GameState.skillTargetAcc.toFixed(0)}% for level-up`;
+    }
+
     setText('#statClarity', formatClarity(GameState.perplexity));
     setText('#statStrain', formatStrain(GameState.loss));
 }
@@ -784,18 +798,36 @@ function processGameData(data) {
         // Total evals = SYLLO + BINARY evaluations
         GameState.totalEvals = GameState.sylloEvals + GameState.binaryEvals;
 
-        // Determine current skill from training file name or default to BINARY
-        const questName = (GameState.currentQuest || '').toLowerCase();
-        if (questName.includes('syllo') || questName.includes('sy_')) {
-            GameState.currentSkill = 'SYLLO';
-            GameState.currentSkillMastered = GameState.sylloMastered;
-            GameState.currentSkillTraining = GameState.sylloTraining;
-            GameState.currentSkillAcc = GameState.sylloAcc;
+        // Determine current skill - prefer skill_context from training status
+        if (training?.skill_context) {
+            // Use authoritative skill context from training daemon
+            const ctx = training.skill_context;
+            GameState.currentSkill = ctx.skill_name || ctx.skill_id?.toUpperCase() || 'UNKNOWN';
+            GameState.currentSkillTraining = ctx.skill_level || 1;
+            GameState.currentSkillMastered = Math.max(0, GameState.currentSkillTraining - 1);
+            GameState.currentSkillAcc = ctx.skill_last_accuracy != null
+                ? ctx.skill_last_accuracy * 100
+                : 0;
+            GameState.skillIcon = ctx.skill_icon || '⚔️';
+            GameState.skillTargetAcc = ctx.skill_target_accuracy
+                ? ctx.skill_target_accuracy * 100
+                : 80;
         } else {
-            GameState.currentSkill = 'BINARY';
-            GameState.currentSkillMastered = GameState.binaryMastered;
-            GameState.currentSkillTraining = GameState.binaryTraining;
-            GameState.currentSkillAcc = GameState.binaryAcc;
+            // Fallback: infer from training file name
+            const questName = (GameState.currentQuest || '').toLowerCase();
+            if (questName.includes('syllo') || questName.includes('sy_')) {
+                GameState.currentSkill = 'SYLLO';
+                GameState.currentSkillMastered = GameState.sylloMastered;
+                GameState.currentSkillTraining = GameState.sylloTraining;
+                GameState.currentSkillAcc = GameState.sylloAcc;
+            } else {
+                GameState.currentSkill = 'BINARY';
+                GameState.currentSkillMastered = GameState.binaryMastered;
+                GameState.currentSkillTraining = GameState.binaryTraining;
+                GameState.currentSkillAcc = GameState.binaryAcc;
+            }
+            GameState.skillIcon = null;
+            GameState.skillTargetAcc = 80;
         }
     }
 

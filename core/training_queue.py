@@ -66,10 +66,18 @@ import json
 import shutil
 import fcntl
 from pathlib import Path
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Union
 from datetime import datetime
 import logging
 from contextlib import contextmanager
+
+# Import Job for first-class job support
+try:
+    from core.job import Job
+    JOB_AVAILABLE = True
+except ImportError:
+    JOB_AVAILABLE = False
+    Job = None
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -465,6 +473,103 @@ class TrainingQueue:
             "failed": len(metadata.get("failed", [])),
             "skipped": len(metadata.get("skipped", []))
         }
+
+    def is_healthy(self, min_depth: int = 5) -> bool:
+        """
+        Check if queue has sufficient depth for continuous training.
+
+        Args:
+            min_depth: Minimum queue depth to be considered healthy
+
+        Returns:
+            True if queue has at least min_depth items (queued + processing)
+        """
+        status = self.get_queue_status()
+        return status['total_queued'] + status['processing'] >= min_depth
+
+    def get_next_job(
+        self,
+        hero_id: Optional[str] = None,
+        campaign_id: Optional[str] = None,
+    ) -> Optional['Job']:
+        """
+        Get next file as a Job object (first-class job support).
+
+        Same priority logic as get_next_file(), but returns a Job object
+        instead of just a Path. The Job tracks full lifecycle state.
+
+        Args:
+            hero_id: Optional hero ID to attach to job
+            campaign_id: Optional campaign ID to attach to job
+
+        Returns:
+            Job object if queue not empty, None otherwise.
+            Job status is set to 'processing' with started_at timestamp.
+
+        Example:
+            job = queue.get_next_job(hero_id="titan-qwen3-4b")
+            if job:
+                # Train on job.dataset_path
+                job.complete(final_step=85000, final_loss=0.44)
+        """
+        if not JOB_AVAILABLE:
+            raise RuntimeError("Job class not available. Check core/job.py import.")
+
+        # Get file using existing logic
+        file_path = self.get_next_file()
+        if file_path is None:
+            return None
+
+        # Create Job from file
+        job = Job.from_file(
+            path=str(file_path),
+            priority=self._get_file_priority(file_path),
+            hero_id=hero_id,
+            campaign_id=campaign_id,
+        )
+
+        # Mark as processing
+        job.status = 'processing'
+        job.started_at = datetime.now().isoformat()
+
+        return job
+
+    def _get_file_priority(self, file_path: Path) -> str:
+        """Determine priority from file location (for Job creation)."""
+        path_str = str(file_path)
+        if '/high/' in path_str:
+            return 'high'
+        elif '/low/' in path_str:
+            return 'low'
+        else:
+            return 'normal'
+
+    def complete_job(self, job: 'Job', delete_file: bool = True):
+        """
+        Mark a Job as completed.
+
+        Wrapper around mark_completed that accepts a Job object.
+
+        Args:
+            job: Job object to complete
+            delete_file: Whether to delete/backup the training file
+        """
+        file_path = Path(job.dataset_path)
+        self.mark_completed(file_path, delete_file=delete_file)
+
+    def fail_job(self, job: 'Job', keep_file: bool = True):
+        """
+        Mark a Job as failed.
+
+        Wrapper around mark_failed that accepts a Job object.
+
+        Args:
+            job: Job object that failed
+            keep_file: Whether to keep file for retry
+        """
+        file_path = Path(job.dataset_path)
+        error = job.last_error or "Training failed"
+        self.mark_failed(file_path, error=error, keep_file=keep_file)
 
     def list_queue(self, priority: Optional[str] = None) -> List[Dict]:
         """

@@ -64,6 +64,7 @@ from datasets import Dataset
 from trainer.config.schema import TrainerConfig
 from trainer.config.loader import ConfigLoader
 from trainer.monitoring.status_writer import TrainingStatusWriter
+from trainer.monitoring.context import MonitorContext, ProgressContext, EvalContext, ControlContext
 from trainer.profiles import get_profile
 
 # Optional: Qwen3VL support
@@ -157,53 +158,6 @@ class TrainingResult:
         )
 
 
-@dataclass
-class MonitorContext:
-    """
-    Context for training monitors passed from UltimateTrainer.
-
-    Contains all monitoring components that can be injected into
-    the training loop via callbacks. This context provides everything
-    LiveMonitorCallback needs to enable full monitoring features:
-    - Progress tracking (steps, loss, learning rate)
-    - Validation loss tracking (micro-eval)
-    - Throughput monitoring (tokens/sec, VRAM usage)
-    - Pattern tracking (heatmaps)
-    - Layer monitoring
-    - Control signal handling (pause/stop)
-    - Smart alerts
-    - Checkpoint ledger recording
-    - Remote evaluation sync
-    """
-    # Core monitors
-    live_monitor: Any = None  # LiveInferenceMonitor
-    evolution_tracker: Any = None  # EvolutionTracker
-    layer_monitor: Any = None  # LayerMonitor (can be created by engine if None)
-    controller: Any = None  # TrainingController (pause/stop)
-
-    # Training data context
-    raw_train_examples: List[Dict] = field(default_factory=list)
-    logits_processor: Any = None  # LogitsProcessorList for generation
-
-    # Remote evaluation
-    remote_eval_config: Dict[str, Any] = field(default_factory=dict)
-
-    # Batch/file context (for progress display)
-    current_file: Optional[str] = None
-    batch_number: Optional[int] = None
-    batch_queue_size: Optional[int] = None
-
-    # Validation datasets
-    fixed_val_dataset: Any = None  # Fixed validation set for generalization metrics
-    micro_eval_inputs: Any = None  # Tokenized micro eval inputs
-
-    # Monitoring intervals
-    micro_eval_interval: int = 500  # How often to run micro-eval
-
-    # Status writer (optional - engine has its own, but can be overridden)
-    status_writer: Any = None
-
-
 class TrainerEngine:
     """
     Core training engine with stable public API.
@@ -232,26 +186,35 @@ class TrainerEngine:
         profile: DataProfile instance for transformations (None until loaded)
         is_vision_model: True if model is Qwen3VL (needs special handling)
         avg_seq_len: Average sequence length (for throughput estimation)
+        verbose: If True, log progress to stdout (default True)
     """
 
-    def __init__(self, status_writer: TrainingStatusWriter):
+    def __init__(self, status_writer: TrainingStatusWriter, verbose: bool = True):
         """
         Initialize TrainerEngine with monitoring.
 
         Args:
             status_writer: Status writer for live UI updates.
                 Writes training_status.json with current step, loss, etc.
+            verbose: If True, print progress to stdout. Set False for tests
+                or library usage where output should be suppressed.
 
         Side Effects:
             - Initializes instance attributes to None
             - No file I/O or GPU operations occur until run_job() called
         """
         self.status_writer = status_writer
+        self.verbose = verbose
         self.model = None
         self.tokenizer = None
         self.profile = None
         self.is_vision_model = False
         self.avg_seq_len = 0.0
+
+    def _log(self, message: str):
+        """Log a message if verbose mode is enabled."""
+        if self.verbose:
+            print(message)
 
     def run_job(
         self,
@@ -280,55 +243,55 @@ class TrainerEngine:
             No exceptions are raised. All errors are caught and returned
             in the TrainingResult.error_message field.
         """
-        print("\n" + "=" * 80)
-        print("TRAINER ENGINE - ENHANCED IMPLEMENTATION")
-        print("=" * 80)
-        print(f"Profile: {config.profile.name}")
-        print(f"Model: {config.model.model_path}")
-        print(f"Dataset: {config.data.dataset_path}")
-        print(f"Output: {config.output.output_dir}")
-        print(f"Precision: {config.hyperparams.fp_precision}")
-        print(f"Batch size: {config.hyperparams.batch_size}")
-        print("=" * 80 + "\n")
+        self._log("\n" + "=" * 80)
+        self._log("TRAINER ENGINE - ENHANCED IMPLEMENTATION")
+        self._log("=" * 80)
+        self._log(f"Profile: {config.profile.name}")
+        self._log(f"Model: {config.model.model_path}")
+        self._log(f"Dataset: {config.data.dataset_path}")
+        self._log(f"Output: {config.output.output_dir}")
+        self._log(f"Precision: {config.hyperparams.fp_precision}")
+        self._log(f"Batch size: {config.hyperparams.batch_size}")
+        self._log("=" * 80 + "\n")
 
         start_time = time.time()
         config_dict = config_dict or {}
 
         try:
             # 1. Validate config
-            print("Step 1: Validating configuration")
+            self._log("Step 1: Validating configuration")
             ConfigLoader.validate_locked_config(config)
-            print("   Config validated\n")
+            self._log("   Config validated\n")
 
             # 2. Load profile
-            print(f"Step 2: Loading profile '{config.profile.name}'")
+            self._log(f"Step 2: Loading profile '{config.profile.name}'")
             self.profile = get_profile(config.profile.name)
-            print(f"   Profile loaded: {self.profile.__class__.__name__}\n")
+            self._log(f"   Profile loaded: {self.profile.__class__.__name__}\n")
 
             # 3. Load model & tokenizer (enhanced)
-            print("Step 3: Loading model and tokenizer")
+            self._log("Step 3: Loading model and tokenizer")
             self.model, self.tokenizer = self._load_model_and_tokenizer(config)
-            print("   Model and tokenizer loaded\n")
+            self._log("   Model and tokenizer loaded\n")
 
             # 4. Prepare datasets (with packing)
-            print("Step 4: Preparing datasets")
+            self._log("Step 4: Preparing datasets")
             train_dataset, val_dataset = self._prepare_dataset(config)
-            print("   Datasets prepared\n")
+            self._log("   Datasets prepared\n")
 
             # 5. Find checkpoint for resumption
-            print("Step 5: Checking for checkpoint resumption")
+            self._log("Step 5: Checking for checkpoint resumption")
             resume_checkpoint, current_global_step = self._find_resume_checkpoint(
                 config.output.output_dir
             )
             if resume_checkpoint:
-                print(f"   Will resume from: {resume_checkpoint}")
-                print(f"   Current global step: {current_global_step}")
+                self._log(f"   Will resume from: {resume_checkpoint}")
+                self._log(f"   Current global step: {current_global_step}")
             else:
-                print("   Starting fresh (no checkpoint found)")
-            print()
+                self._log("   Starting fresh (no checkpoint found)")
+            self._log("")
 
             # 6. Create trainer (with callbacks, optimizer, collator)
-            print("Step 6: Creating HuggingFace Trainer")
+            self._log("Step 6: Creating HuggingFace Trainer")
             trainer, data_collator = self._create_trainer(
                 config=config,
                 config_dict=config_dict,
@@ -338,28 +301,28 @@ class TrainerEngine:
                 callbacks=callbacks,
                 current_global_step=current_global_step,
             )
-            print("   Trainer created\n")
+            self._log("   Trainer created\n")
 
             # 7. Validate masking
-            print("Step 7: Validating response masking")
+            self._log("Step 7: Validating response masking")
             masking_stats = self._validate_masking(train_dataset, data_collator)
-            print(f"   Masked (instruction): {masking_stats['masked_pct']:.1f}%")
-            print(f"   Trained (response): {masking_stats['trained_pct']:.1f}%")
-            print("   Masking validation passed\n")
+            self._log(f"   Masked (instruction): {masking_stats['masked_pct']:.1f}%")
+            self._log(f"   Trained (response): {masking_stats['trained_pct']:.1f}%")
+            self._log("   Masking validation passed\n")
 
             # 8. Execute training
-            print("Step 8: Executing training")
-            print("=" * 80)
+            self._log("Step 8: Executing training")
+            self._log("=" * 80)
             train_result = trainer.train(resume_from_checkpoint=resume_checkpoint)
-            print("=" * 80)
-            print("   Training complete\n")
+            self._log("=" * 80)
+            self._log("   Training complete\n")
 
             # 9. Save final checkpoint
-            print("Step 9: Saving final checkpoint")
+            self._log("Step 9: Saving final checkpoint")
             final_checkpoint = Path(config.output.output_dir) / "final_model"
             trainer.save_model(str(final_checkpoint))
             self.tokenizer.save_pretrained(str(final_checkpoint))
-            print(f"   Saved to {final_checkpoint}\n")
+            self._log(f"   Saved to {final_checkpoint}\n")
 
             # 10. Return result
             runtime_sec = time.time() - start_time
@@ -380,7 +343,7 @@ class TrainerEngine:
             )
 
         except Exception as e:
-            print(f"\n Training failed: {e}")
+            self._log(f"\n Training failed: {e}")
             import traceback
             traceback.print_exc()
 
@@ -410,20 +373,20 @@ class TrainerEngine:
             Tuple of (model, tokenizer)
         """
         model_path = config.model.model_path
-        print(f"   Loading from: {model_path}")
+        self._log(f"   Loading from: {model_path}")
 
         # Detect attention implementation
         attn_impl = "sdpa"
         if FLASH_ATTN_AVAILABLE:
             attn_impl = "flash_attention_2"
-            print("   Flash Attention 2 detected")
+            self._log("   Flash Attention 2 detected")
         else:
-            print("   Using SDPA attention (flash_attention_2 not installed)")
+            self._log("   Using SDPA attention (flash_attention_2 not installed)")
 
         # Setup quantization (if requested)
         quantization_config = None
         if config.model.load_in_4bit:
-            print("   Enabling 4-bit quantization")
+            self._log("   Enabling 4-bit quantization")
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_quant_type="nf4",
@@ -433,7 +396,7 @@ class TrainerEngine:
 
         # Get precision
         torch_dtype = self._get_torch_dtype(config.hyperparams.fp_precision)
-        print(f"   Precision: {config.hyperparams.fp_precision} ({torch_dtype})")
+        self._log(f"   Precision: {config.hyperparams.fp_precision} ({torch_dtype})")
 
         # Model kwargs
         model_kwargs = {
@@ -456,33 +419,33 @@ class TrainerEngine:
                 model = Qwen3VLForConditionalGeneration.from_pretrained(
                     model_path, **model_kwargs
                 )
-                print("   Loaded as Qwen3VLForConditionalGeneration")
+                self._log("   Loaded as Qwen3VLForConditionalGeneration")
                 self.is_vision_model = True
 
                 # Freeze vision and video towers for text-only training
-                print("   Freezing vision/video towers for text-only training...")
+                self._log("   Freezing vision/video towers for text-only training...")
                 frozen_params = 0
                 for n, p in model.named_parameters():
                     if any(k in n for k in ["vision_model", "video_model", "visual"]):
                         p.requires_grad = False
                         frozen_params += 1
-                print(f"   Froze {frozen_params} vision/video parameters")
+                self._log(f"   Froze {frozen_params} vision/video parameters")
 
                 # Use AutoProcessor for Qwen3VL
                 processor = AutoProcessor.from_pretrained(
                     model_path, trust_remote_code=True
                 )
                 tokenizer = processor.tokenizer
-                print("   Loaded AutoProcessor")
+                self._log("   Loaded AutoProcessor")
 
             except Exception as e:
-                print(f"   Qwen3VL failed ({str(e)[:50]}...), trying AutoModelForCausalLM...")
+                self._log(f"   Qwen3VL failed ({str(e)[:50]}...), trying AutoModelForCausalLM...")
                 model = None
 
         # Fallback to standard CausalLM
         if model is None:
             model = AutoModelForCausalLM.from_pretrained(model_path, **model_kwargs)
-            print("   Loaded as AutoModelForCausalLM")
+            self._log("   Loaded as AutoModelForCausalLM")
 
             tokenizer = AutoTokenizer.from_pretrained(
                 model_path, trust_remote_code=True
@@ -491,27 +454,27 @@ class TrainerEngine:
         # Set pad token if not set
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
-            print("   Set pad_token = eos_token")
+            self._log("   Set pad_token = eos_token")
 
         # Apply chat template override (fixes Qwen3 <think> injection)
         try:
             from core.chat_templates import apply_chat_template_override
             profile_name = config.profile.name if config.profile else None
-            apply_chat_template_override(tokenizer, profile_name=profile_name, verbose=True)
+            apply_chat_template_override(tokenizer, profile_name=profile_name, verbose=self.verbose)
         except ImportError:
-            print("   Chat template override not available")
+            self._log("   Chat template override not available")
 
         # Disable KV cache for training
         model.config.use_cache = False
-        print("   Disabled KV cache (use_cache=False)")
+        self._log("   Disabled KV cache (use_cache=False)")
 
         # Enable gradient checkpointing if configured
         use_grad_ckpt = getattr(config.hyperparams, 'use_gradient_checkpointing', True)
         if use_grad_ckpt and hasattr(model, 'gradient_checkpointing_enable'):
             model.gradient_checkpointing_enable()
-            print("   Enabled gradient checkpointing")
+            self._log("   Enabled gradient checkpointing")
         else:
-            print("   Gradient checkpointing disabled")
+            self._log("   Gradient checkpointing disabled")
 
         return model, tokenizer
 
@@ -533,7 +496,7 @@ class TrainerEngine:
         """
         # Load raw data
         dataset_path = Path(config.data.dataset_path)
-        print(f"   Loading from: {dataset_path}")
+        self._log(f"   Loading from: {dataset_path}")
 
         examples = []
         with open(dataset_path) as f:
@@ -541,13 +504,13 @@ class TrainerEngine:
                 if line.strip():
                     examples.append(json.loads(line))
 
-        print(f"   Total examples: {len(examples):,}")
+        self._log(f"   Total examples: {len(examples):,}")
 
         # Shuffle
         if config.data.shuffle:
             random.seed(config.data.seed)
             random.shuffle(examples)
-            print(f"   Shuffled (seed={config.data.seed})")
+            self._log(f"   Shuffled (seed={config.data.seed})")
 
         # Split train/val
         val_size = min(
@@ -557,15 +520,15 @@ class TrainerEngine:
         val_examples = examples[:val_size]
         train_examples = examples[val_size:]
 
-        print(f"   Train: {len(train_examples):,}")
-        print(f"   Val: {len(val_examples):,}")
+        self._log(f"   Train: {len(train_examples):,}")
+        self._log(f"   Val: {len(val_examples):,}")
 
         # Build system prompt
         system_prompt = self._build_system_prompt(config)
-        print(f"   System prompt: \"{system_prompt[:50]}...\"")
+        self._log(f"   System prompt: \"{system_prompt[:50]}...\"")
 
         # Transform using profile
-        print(f"   Applying profile transformations...")
+        self._log("   Applying profile transformations...")
         train_examples = [
             self.profile.transform_example(ex, idx, system_prompt)
             for idx, ex in enumerate(train_examples)
@@ -574,7 +537,7 @@ class TrainerEngine:
             self.profile.transform_example(ex, idx, system_prompt)
             for idx, ex in enumerate(val_examples)
         ]
-        print("   Profile transformations applied")
+        self._log("   Profile transformations applied")
 
         # Format for tokenization
         def format_messages(ex):
@@ -622,7 +585,7 @@ class TrainerEngine:
                 padding=False
             )
 
-        print("   Tokenizing...")
+        self._log("   Tokenizing...")
         train_dataset = train_dataset.map(
             tokenize_function,
             batched=True,
@@ -639,7 +602,7 @@ class TrainerEngine:
             num_proc=None,
             load_from_cache_file=False,
         )
-        print("   Tokenization complete")
+        self._log("   Tokenization complete")
 
         # Calculate average sequence length
         sample_count = min(100, len(train_dataset))
@@ -649,10 +612,12 @@ class TrainerEngine:
                 for i in range(sample_count)
             )
             self.avg_seq_len = total_tokens / sample_count
-            print(f"   Avg seq length: {self.avg_seq_len:.1f} tokens")
+            self._log(f"   Avg seq length: {self.avg_seq_len:.1f} tokens")
 
-        # Pack dataset for efficiency (if enabled)
-        enable_packing = os.environ.get("ENABLE_PACKING", "1").lower() in ("1", "true", "yes")
+        # Pack dataset for efficiency (config is primary, env is override for debugging)
+        enable_packing = config.data.enable_packing
+        if os.environ.get("ENABLE_PACKING") == "0":
+            enable_packing = False
         if enable_packing:
             train_dataset = self._pack_dataset(train_dataset, max_length)
 
@@ -671,8 +636,8 @@ class TrainerEngine:
         """
         try:
             from trl import pack_dataset
-            print(f"   Packing dataset (max_length={max_length})...")
-            print(f"      Before packing: {len(dataset)} examples")
+            self._log(f"   Packing dataset (max_length={max_length})...")
+            self._log(f"      Before packing: {len(dataset)} examples")
 
             packed = pack_dataset(
                 dataset,
@@ -680,21 +645,21 @@ class TrainerEngine:
                 strategy="bfd"  # Best Fit Decreasing
             )
 
-            print(f"      After packing: {len(packed)} packed sequences")
+            self._log(f"      After packing: {len(packed)} packed sequences")
 
             # Remove seq_lengths metadata (collator can't handle it)
             if 'seq_lengths' in packed.column_names:
                 packed = packed.remove_columns(['seq_lengths'])
-                print("      Removed seq_lengths metadata")
+                self._log("      Removed seq_lengths metadata")
 
-            print("      Packing enabled")
+            self._log("      Packing enabled")
             return packed
 
         except ImportError:
-            print("      trl not available, skipping packing")
+            self._log("      trl not available, skipping packing")
             return dataset
         except Exception as e:
-            print(f"      Packing failed ({e}), continuing without packing")
+            self._log(f"      Packing failed ({e}), continuing without packing")
             return dataset
 
     # ========================================================================
@@ -750,7 +715,7 @@ class TrainerEngine:
         old_scheduler = latest_checkpoint / "scheduler.pt"
         if old_scheduler.exists():
             old_scheduler.unlink()
-            print(f"   Deleted old scheduler.pt to force fresh constant LR")
+            self._log("   Deleted old scheduler.pt to force fresh constant LR")
 
         return str(latest_checkpoint), current_global_step
 
@@ -787,17 +752,17 @@ class TrainerEngine:
             steps_for_this_file += 1
 
         max_steps = current_global_step + steps_for_this_file
-        print(f"   Steps for this dataset: {steps_for_this_file}")
-        print(f"   Max steps (cumulative): {max_steps}")
+        self._log(f"   Steps for this dataset: {steps_for_this_file}")
+        self._log(f"   Max steps (cumulative): {max_steps}")
 
         # Training arguments
         training_args = self._build_training_arguments(config, max_steps)
-        print(f"   Batch size: {training_args.per_device_train_batch_size}")
-        print(f"   Learning rate: {training_args.learning_rate}")
+        self._log(f"   Batch size: {training_args.per_device_train_batch_size}")
+        self._log(f"   Learning rate: {training_args.learning_rate}")
 
         # Data collator - response-only masking
         data_collator = self._create_data_collator()
-        print("   Using response-only collator (instruction masked)")
+        self._log("   Using response-only collator (instruction masked)")
 
         # Create optimizer (Muon or default AdamW)
         custom_optimizer, custom_scheduler = self._create_optimizer(
@@ -817,9 +782,9 @@ class TrainerEngine:
             if layer_monitor is None and LAYER_MONITOR_AVAILABLE:
                 try:
                     layer_monitor = LayerMonitor(self.model)
-                    print("   Created LayerMonitor for layer statistics")
+                    self._log("   Created LayerMonitor for layer statistics")
                 except Exception as e:
-                    print(f"   LayerMonitor disabled: {e}")
+                    self._log(f"   LayerMonitor disabled: {e}")
                     layer_monitor = None
 
             # Create LiveMonitorCallback with all monitoring features
@@ -848,9 +813,9 @@ class TrainerEngine:
                 remote_eval_config=monitors.remote_eval_config,
             )
             all_callbacks.append(monitor_cb)
-            print("   LiveMonitorCallback enabled (full monitoring)")
+            self._log("   LiveMonitorCallback enabled (full monitoring)")
         elif monitors and monitors.live_monitor:
-            print("   Warning: LiveMonitorCallback not available, monitoring disabled")
+            self._log("   Warning: LiveMonitorCallback not available, monitoring disabled")
 
         # Create trainer
         trainer = Trainer(
@@ -880,7 +845,7 @@ class TrainerEngine:
             )
         except ImportError:
             # Fallback to standard collator
-            print("   Warning: DataCollatorForCompletionOnly not available")
+            self._log("   Warning: DataCollatorForCompletionOnly not available")
             from transformers import DataCollatorForLanguageModeling
             return DataCollatorForLanguageModeling(
                 tokenizer=self.tokenizer,
@@ -913,15 +878,15 @@ class TrainerEngine:
         if optimizer_type != "muon":
             return None, None
 
-        print("\n" + "=" * 60)
-        print("MUON OPTIMIZER - Orthogonalized Momentum")
-        print("=" * 60)
+        self._log("\n" + "=" * 60)
+        self._log("MUON OPTIMIZER - Orthogonalized Momentum")
+        self._log("=" * 60)
 
         # Show parameter grouping summary
         summary = get_param_group_summary(self.model)
         total = summary.muon_params + summary.adam_params
-        print(f"  Hidden weights (Muon): {summary.muon_params:,} params ({100*summary.muon_params/total:.1f}%)")
-        print(f"  Other (AdamW):         {summary.adam_params:,} params ({100*summary.adam_params/total:.1f}%)")
+        self._log(f"  Hidden weights (Muon): {summary.muon_params:,} params ({100*summary.muon_params/total:.1f}%)")
+        self._log(f"  Other (AdamW):         {summary.adam_params:,} params ({100*summary.adam_params/total:.1f}%)")
 
         # Create optimizer
         optimizer, scheduler, opt_info = create_custom_optimizer(
@@ -932,9 +897,9 @@ class TrainerEngine:
             num_warmup_steps=num_warmup_steps,
         )
 
-        print(f"  Hidden LR: {opt_info.hidden_lr}")
-        print(f"  Aux LR:    {opt_info.aux_lr}")
-        print("=" * 60 + "\n")
+        self._log(f"  Hidden LR: {opt_info.hidden_lr}")
+        self._log(f"  Aux LR:    {opt_info.aux_lr}")
+        self._log("=" * 60 + "\n")
 
         return optimizer, scheduler
 
@@ -1006,7 +971,7 @@ class TrainerEngine:
         elif precision == "fp32":
             return torch.float32
         else:
-            print(f"   Unknown precision '{precision}', defaulting to bf16")
+            self._log(f"   Unknown precision '{precision}', defaulting to bf16")
             return torch.bfloat16
 
     def _build_system_prompt(self, config: TrainerConfig) -> str:

@@ -23,7 +23,9 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +35,30 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from guild.heroes import get_hero, list_heroes, HeroNotFoundError
+
+
+def get_git_commit() -> Optional[str]:
+    """Get current git commit hash for reproducibility tracking."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def hash_config(config: dict) -> str:
+    """Hash a config dict for reproducibility tracking."""
+    if not config:
+        return "sha256:empty"
+    content = json.dumps(config, sort_keys=True)
+    return f"sha256:{hashlib.sha256(content.encode()).hexdigest()[:16]}"
 
 
 class CampaignCLI:
@@ -231,6 +257,9 @@ class CampaignCLI:
             "archived_at": None,
             # Lineage tracking
             "parent_campaign": parent_campaign,
+            # Version tracking for reproducibility
+            "code_version": get_git_commit(),
+            "config_hash": hash_config(config_overrides or {}),
         }
 
         with open(campaign_dir / "campaign.json", "w") as f:

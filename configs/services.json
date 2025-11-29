@@ -1,0 +1,87 @@
+{
+  "$schema": "service_registry_v1",
+  "$comment": "Service registry for Weaver orchestrator. Defines all services with their startup commands, ports, and health checks.",
+
+  "training": {
+    "name": "Training Daemon",
+    "description": "Core training daemon that processes queue and trains models",
+    "command": ["python3", "core/training_daemon.py"],
+    "pid_file": ".daemon.pid",
+    "required": true,
+    "health_check": {
+      "type": "pid",
+      "interval_seconds": 30
+    },
+    "depends_on": []
+  },
+
+  "tavern": {
+    "name": "Tavern Server",
+    "description": "Game UI web server",
+    "command": ["python3", "tavern/server.py", "--port", "8888"],
+    "port": 8888,
+    "required": true,
+    "health_check": {
+      "type": "http",
+      "path": "/health",
+      "interval_seconds": 60
+    },
+    "depends_on": []
+  },
+
+  "vault": {
+    "name": "VaultKeeper",
+    "description": "Asset registry and job queue API",
+    "command": ["python3", "vault/server.py", "--port", "8767"],
+    "port": 8767,
+    "required": true,
+    "health_check": {
+      "type": "http",
+      "path": "/api/health",
+      "interval_seconds": 60
+    },
+    "depends_on": []
+  },
+
+  "watchtower": {
+    "name": "Watchtower",
+    "description": "Monitoring dashboard",
+    "command": ["python3", "watchtower/server.py", "--port", "8081"],
+    "port": 8081,
+    "required": false,
+    "health_check": {
+      "type": "http",
+      "path": "/health",
+      "interval_seconds": 60
+    },
+    "depends_on": ["training"]
+  },
+
+  "skill_sy": {
+    "name": "Syllacrostic API",
+    "description": "SY skill API for generation and evaluation",
+    "command": ["python3", "guild/skills/servers/sy_server.py", "--port", "8080"],
+    "port": 8080,
+    "required": false,
+    "health_check": {
+      "type": "http",
+      "path": "/health",
+      "interval_seconds": 120
+    },
+    "depends_on": []
+  },
+
+  "skill_bin": {
+    "name": "Binary API",
+    "description": "BIN skill API for generation and evaluation",
+    "command": ["python3", "guild/skills/servers/bin_server.py", "--port", "8090"],
+    "port": 8090,
+    "required": false,
+    "health_check": {
+      "type": "http",
+      "path": "/health",
+      "interval_seconds": 120
+    },
+    "depends_on": []
+  }
+}

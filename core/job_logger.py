@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Job Logger - First-class job abstraction for training files
+Job Logger - Persistent job history for training files
 
 Provides a persistent job history that tracks training file lifecycles:
 - Job creation (file queued)
@@ -14,24 +14,31 @@ This enables:
 - Dashboard job tables
 - Alerting on job failures
 
-Usage:
-    from core.job_logger import JobLogger, JobRecord
+Usage (New API with Job):
+    from core.job_logger import JobLogger
+    from core.job import Job
 
     logger = JobLogger(base_dir / "status" / "job_history.jsonl")
 
-    # When file is queued
-    record = logger.create_job("data.jsonl", priority="high")
+    # Create job from file
+    job = Job.from_file("data.jsonl", priority="high")
+    logger.log_job(job)
 
     # When training starts
-    logger.start_job(record.job_id, checkpoint="checkpoint-84000")
+    job.start(step=84000, checkpoint="checkpoint-84000")
+    logger.log_job(job)
 
     # When training completes
-    logger.complete_job(
-        job_id=record.job_id,
-        final_step=85000,
-        final_loss=0.44,
-        final_val_loss=0.52
-    )
+    job.complete(final_step=85000, final_loss=0.44)
+    logger.log_job(job)
+
+Legacy Usage (deprecated, for backwards compatibility):
+    from core.job_logger import JobLogger, JobRecord
+
+    logger = JobLogger(base_dir / "status" / "job_history.jsonl")
+    record = logger.create_job("data.jsonl", priority="high")
+    logger.start_job(record.job_id, checkpoint="checkpoint-84000")
+    logger.complete_job(job_id=record.job_id, final_step=85000, final_loss=0.44)
 """
 
 import json
@@ -40,7 +47,16 @@ import subprocess
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
+
+# Import Job for first-class support
+try:
+    from core.job import Job, job_to_record_dict
+    JOB_AVAILABLE = True
+except ImportError:
+    JOB_AVAILABLE = False
+    Job = None
+    job_to_record_dict = None
 
 
 @dataclass
@@ -185,6 +201,39 @@ class JobLogger:
 
         # Update cache
         self._job_cache[record.job_id] = record
+
+    def log_job(self, job: 'Job') -> None:
+        """
+        Log a Job object to the history file (preferred API).
+
+        This is the recommended method for logging jobs. It accepts the
+        unified Job dataclass and converts it to the storage format.
+
+        Args:
+            job: Job object to log
+
+        Example:
+            job = Job.from_file("data.jsonl", priority="high")
+            logger.log_job(job)  # Log queued state
+
+            job.start(step=84000)
+            logger.log_job(job)  # Log started state
+
+            job.complete(final_step=85000, final_loss=0.44)
+            logger.log_job(job)  # Log completed state
+        """
+        if not JOB_AVAILABLE:
+            raise RuntimeError("Job class not available. Check core/job.py import.")
+
+        # Convert Job to record-compatible dict and write
+        record_dict = job_to_record_dict(job)
+        line = json.dumps(record_dict, ensure_ascii=False)
+        with open(self.history_file, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+            f.flush()
+
+        # Update cache with job_id key
+        self._job_cache[job.id] = job
 
     def create_job(
         self,

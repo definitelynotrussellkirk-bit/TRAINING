@@ -10,6 +10,7 @@ Components:
 - PreviewBackend: Abstract interface for preview generation
 - LocalPreviewBackend: Run preview on training GPU
 - Remote3090Backend: Send preview to 3090 API
+- MonitorContext: Context for training monitors
 """
 
 from trainer.monitoring.callbacks import LiveMonitorCallback
@@ -26,6 +27,12 @@ from trainer.monitoring.preview_backend import (
     Remote3090Backend,
     create_preview_backend
 )
+from trainer.monitoring.context import (
+    MonitorContext,
+    ProgressContext,
+    EvalContext,
+    ControlContext,
+)
 
 __all__ = [
     "LiveMonitorCallback",
@@ -37,5 +44,9 @@ __all__ = [
     "PreviewResult",
     "LocalPreviewBackend",
     "Remote3090Backend",
-    "create_preview_backend"
+    "create_preview_backend",
+    "MonitorContext",
+    "ProgressContext",
+    "EvalContext",
+    "ControlContext",
 ]

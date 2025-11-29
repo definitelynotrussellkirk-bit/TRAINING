@@ -39,6 +39,7 @@ from typing import Any, Dict, List, Optional
 
 from guild.heroes import get_hero, HeroProfile
 from guild.heroes.types import LigerKernelConfig
+from trainer.config.locked import build_locked_config
 
 logger = logging.getLogger("config_builder")
 
@@ -59,6 +60,8 @@ class TrainingConfig:
     model_path: str
     model_family: str
     model_size_b: float
+    model_architecture: str = "AutoModelForCausalLM"
+    vocab_size: int = 151936
 
     # Precision & Quantization
     precision: str = "bf16"
@@ -176,11 +179,12 @@ class TrainingConfig:
             # Monitoring (use defaults)
             'monitoring': {},
             # Locked config (critical architecture parameters)
+            # Uses model_architecture and vocab_size from hero YAML (single source of truth)
             'locked': {
                 'base_model': self.model_path,
-                'model_architecture': 'Qwen3ForCausalLM',  # TODO: Make configurable
+                'model_architecture': self.model_architecture,
                 'max_context_length': self.max_length,
-                'vocab_size': 151936,  # Qwen3 vocab size
+                'vocab_size': self.vocab_size,
                 'model_version': f'campaign-{self.campaign_id}',
             },
             # Data (filled in by training daemon with actual file)
@@ -322,10 +326,12 @@ class ConfigBuilder:
         """Extract training settings from hero profile."""
         td = hero.training_defaults
         return {
-            # Model
+            # Model (including architecture from hero YAML - single source of truth)
             "model_path": hero.model.hf_name,
             "model_family": hero.model.family,
             "model_size_b": hero.model.size_b,
+            "model_architecture": hero.model.architecture,
+            "vocab_size": hero.model.vocab_size,
             # Precision
             "precision": td.precision,
             "load_in_4bit": td.load_in_4bit,
@@ -373,6 +379,8 @@ class ConfigBuilder:
             model_path=config_dict["model_path"],
             model_family=config_dict["model_family"],
             model_size_b=config_dict["model_size_b"],
+            model_architecture=config_dict.get("model_architecture", hero.model.architecture),
+            vocab_size=config_dict.get("vocab_size", hero.model.vocab_size),
             precision=config_dict.get("precision", "bf16"),
             load_in_4bit=config_dict.get("load_in_4bit", False),
             batch_size=config_dict.get("batch_size", 1),

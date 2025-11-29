@@ -248,16 +248,18 @@ class ConfigLoader:
 
         # Ensure locked config exists (required)
         if 'locked' not in merged:
-            # Try to infer from base config or model
+            # Use build_locked_config for consistent locked config generation
+            # In config.json path (no hero), we use fallback values
+            from .locked import build_locked_config
             model_path = merged.get('model', {}).get('model_path', '')
-            merged['locked'] = {
-                'base_model': base.get('base_model', model_path),
-                'model_architecture': base.get('model_architecture', 'AutoModelForCausalLM'),
-                'max_context_length': base.get('max_length', 4096),
-                'vocab_size': base.get('vocab_size', 151936),
-                'model_version': 'v1',
-                'created_at': datetime.now().isoformat()
-            }
+            max_length = merged.get('hyperparams', {}).get('max_length', 4096)
+            merged['locked'] = build_locked_config(
+                hero=None,  # No hero in config.json-only path
+                model_path=base.get('base_model', model_path),
+                max_length=max_length,
+                model_version='v1',
+            )
+            merged['locked']['created_at'] = datetime.now().isoformat()
 
         return merged
 
@@ -468,23 +470,3 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
-
-if __name__ == "__main__":
-    # Test config loading
-    print("Testing config loader...\n")
-
-    # Example: Load from config.json
-    try:
-        config_path = Path("config.json")
-        if config_path.exists():
-            config_dict = ConfigLoader.from_json_file(config_path)
-            print(f"✓ Loaded config from {config_path}")
-            print(f"  Model: {config_dict.get('model_path', 'not set')}")
-            print(f"  Batch size: {config_dict.get('batch_size', 'not set')}")
-        else:
-            print(f"✗ Config file not found: {config_path}")
-    except Exception as e:
-        print(f"✗ Error loading config: {e}")
-
-    print("\nConfig loader ready!")

@@ -942,6 +942,146 @@ async function fetchCampaignData() {
 const pollers = createPollerGroup();
 
 // ============================================
+// NEXT ACTION - Main Call to Action
+// ============================================
+
+/**
+ * Refresh the Next Action widget
+ * Shows either:
+ * - A blocker message (if momentum is blocked)
+ * - A recommendation (what to do next)
+ */
+async function refreshNextAction() {
+    try {
+        const [campaignRes, momentumRes] = await Promise.all([
+            fetch('/api/campaigns/active'),
+            fetch('/api/momentum?check=false'), // Don't re-run checks, just get state
+        ]);
+
+        const campaign = campaignRes.ok ? await campaignRes.json() : null;
+        const momentum = momentumRes.ok ? await momentumRes.json() : { status: 'go' };
+
+        updateNextActionUI(campaign, momentum);
+    } catch (err) {
+        console.error('Failed to refresh next action:', err);
+    }
+}
+
+/**
+ * Update the Next Action UI based on campaign and momentum state
+ */
+function updateNextActionUI(campaign, momentum) {
+    const section = document.getElementById('nextActionSection');
+    const titleEl = document.getElementById('nextActionTitle');
+    const bodyEl = document.getElementById('nextActionBody');
+    const btnEl = document.getElementById('nextActionButton');
+
+    if (!section) return;
+
+    // Reset classes
+    section.className = 'next-action-card';
+
+    // If blocked, show blocker info
+    if (momentum.status === 'blocked' && momentum.primary_blocker) {
+        const b = momentum.primary_blocker;
+        section.classList.add('blocked');
+        titleEl.textContent = "Can't move forward yet";
+        bodyEl.textContent = `${b.why_i_failed} ${b.how_to_fix}`;
+
+        // Set button based on suggested action
+        const action = b.suggested_action;
+        if (action === 'open_campaign') {
+            btnEl.textContent = 'Open Campaign';
+            btnEl.onclick = () => { window.location.href = '/campaign'; };
+        } else if (action === 'open_guild') {
+            btnEl.textContent = 'Open Guild';
+            btnEl.onclick = () => { window.location.href = '/guild'; };
+        } else if (action === 'open_quests') {
+            btnEl.textContent = 'Open Quests';
+            btnEl.onclick = () => { window.location.href = '/quests'; };
+        } else {
+            btnEl.textContent = 'Fix This';
+            btnEl.onclick = () => { window.location.href = '/settings'; };
+        }
+        return;
+    }
+
+    // No campaign at all
+    if (!campaign || !campaign.id) {
+        section.classList.add('no-campaign');
+        titleEl.textContent = 'No Active Campaign';
+        bodyEl.textContent = 'Create or select a campaign to begin your hero\'s journey.';
+        btnEl.textContent = 'Open Campaign';
+        btnEl.onclick = () => { window.location.href = '/campaign'; };
+        return;
+    }
+
+    // Show recommendation
+    const rec = campaign.recommendation;
+    if (!rec) {
+        titleEl.textContent = 'Ready to Train';
+        bodyEl.textContent = 'Run a training session to push your hero further.';
+        btnEl.textContent = 'Run 2,000 Steps';
+        btnEl.onclick = () => startTraining(2000);
+        return;
+    }
+
+    titleEl.textContent = rec.title;
+    bodyEl.textContent = rec.description + (rec.reason ? ` (${rec.reason})` : '');
+
+    const steps = rec.suggested_steps || 2000;
+    btnEl.textContent = `Run ${steps.toLocaleString()} Steps`;
+    btnEl.onclick = () => startTraining(steps);
+}
+
+/**
+ * Start a training session
+ */
+async function startTraining(steps) {
+    const btnEl = document.getElementById('nextActionButton');
+    if (!btnEl) return;
+
+    // Disable button while submitting
+    btnEl.disabled = true;
+    btnEl.textContent = 'Starting...';
+
+    try {
+        const res = await fetch('/api/train', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ steps }),
+        });
+
+        const result = await res.json();
+
+        if (result.ok) {
+            btnEl.textContent = 'Request Submitted!';
+            // Show notification
+            if (typeof showNotification === 'function') {
+                showNotification(`Training request: ${steps.toLocaleString()} steps`, 'success');
+            }
+            // Refresh after a moment
+            setTimeout(() => {
+                refreshNextAction();
+                fetchMomentum();
+            }, 2000);
+        } else {
+            btnEl.textContent = 'Error - Retry';
+            btnEl.disabled = false;
+            if (typeof showNotification === 'function') {
+                showNotification(result.message || result.error, 'error');
+            }
+            // Refresh momentum to show any blockers
+            fetchMomentum();
+        }
+    } catch (err) {
+        console.error('Failed to start training:', err);
+        btnEl.textContent = 'Error - Retry';
+        btnEl.disabled = false;
+    }
+}
+
+// ============================================
 // MOMENTUM ENGINE - Forward Progress Tracking
 // ============================================
 
@@ -955,6 +1095,8 @@ async function fetchMomentum() {
 
         const m = await res.json();
         updateMomentumUI(m);
+        // Also update next action since momentum affects it
+        refreshNextAction();
     } catch (err) {
         console.error('Failed to fetch momentum:', err);
     }
@@ -1051,6 +1193,9 @@ function init() {
 
     // Fetch momentum state (blockers, forward progress)
     fetchMomentum();
+
+    // Fetch next action recommendation (main CTA)
+    refreshNextAction();
 
     // Set up polling using createPollerGroup for centralized management
     pollers.add('gameData', fetchGameData, CONFIG.UPDATE_INTERVAL, { immediate: false });

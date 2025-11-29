@@ -56,6 +56,7 @@ from tavern.api import skills as skills_api
 from tavern.api import vault as vault_api
 from tavern.api import jobs as jobs_api
 from tavern.api import momentum as momentum_api
+from tavern.api import train as train_api
 
 # Import events system
 try:
@@ -583,6 +584,13 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Momentum Engine - Forward progress + blockers
         elif path == "/api/momentum":
             momentum_api.serve_momentum(self)
+
+        # Training API - Start training from UI
+        elif path == "/api/train":
+            if self.command == "POST":
+                train_api.serve_train_post(self)
+            else:
+                train_api.serve_train_status(self)
 
         # Analysis - Model Archaeology (uses analysis_api module)
         elif path == "/analysis" or path == "/analysis.html":

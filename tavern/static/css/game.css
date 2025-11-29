@@ -1242,3 +1242,71 @@ body {
     background: #fbbf24;
     transform: translateY(-1px);
 }
+
+/* ========================================
+   NEXT ACTION - Main Call to Action
+   ======================================== */
+
+.next-action-card {
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-highlight) 100%);
+    border: 2px solid var(--color-gold);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    box-shadow: var(--glow-gold);
+}
+
+.next-action-card.blocked {
+    border-color: var(--color-warning);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+}
+
+.next-action-card.no-campaign {
+    border-color: var(--color-danger);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+}
+
+.next-action-title {
+    font-family: var(--font-title);
+    font-size: 1.1rem;
+    color: var(--text-gold);
+    margin-bottom: 0.5rem;
+}
+
+.next-action-body {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.4;
+}
+
+.next-action-btn {
+    background: linear-gradient(135deg, var(--color-gold) 0%, #d4a520 100%);
+    color: #000;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.next-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(251, 191, 36, 0.4);
+}
+
+.next-action-btn:active {
+    transform: translateY(0);
+}
+
+.next-action-btn:disabled {
+    background: var(--text-muted);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}

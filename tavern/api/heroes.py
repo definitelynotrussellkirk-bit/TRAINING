@@ -154,9 +154,11 @@ def serve_active_campaign(handler: "TavernHandler"):
     - peak_metrics: Best metrics (lowest_loss, highest_accuracy)
     - skill_effort: Cumulative effort per skill
     - journey_summary: One-line summary
+    - recommendation: What to do next
     """
     try:
         from guild.campaigns import get_active_campaign
+        from guild.campaigns.recommendations import compute_recommendation
 
         base_dir = paths.get_base_dir()
         active = get_active_campaign(base_dir)
@@ -174,6 +176,12 @@ def serve_active_campaign(handler: "TavernHandler"):
                 data["effort_summary"] = active.get_effort_summary()
             except Exception:
                 data["effort_summary"] = None
+            # Add recommendation: "What should I do next?"
+            try:
+                data["recommendation"] = compute_recommendation(active)
+            except Exception as e:
+                logger.warning(f"Failed to compute recommendation: {e}")
+                data["recommendation"] = None
             handler._send_json(data)
         else:
             handler._send_json(None)

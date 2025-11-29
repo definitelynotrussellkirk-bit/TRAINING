@@ -49,6 +49,10 @@ sys.path.insert(0, str(BASE_DIR))
 
 from watchtower.chronicle import get_chronicle
 
+# Import API modules (extracted from this file)
+from tavern.api import heroes as heroes_api
+from tavern.api import analysis as analysis_api
+
 # Import events system
 try:
     from events import get_broadcaster, get_recent, subscribe, Event
@@ -439,10 +443,12 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/guild" or path == "/guild.html" or path == "/guildhall.html":
             self._serve_template("guild.html")
         elif path == "/api/hero":
-            self._serve_hero_info()
+            heroes_api.serve_hero_info(self)
         elif path.startswith("/api/hero-config/"):
             hero_id = path.replace("/api/hero-config/", "")
-            self._serve_hero_config(hero_id)
+            heroes_api.serve_hero_config(self, hero_id)
+        elif path == "/api/hero-model-info":
+            heroes_api.serve_hero_model_info(self)
         elif path == "/api/skills":
             self._serve_skills()
         elif path == "/api/titles":
@@ -564,13 +570,13 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/campaign" or path == "/campaign.html":
             self._serve_template("campaign.html")
         elif path == "/api/campaigns":
-            self._serve_campaigns_data()
+            heroes_api.serve_campaigns_data(self)
         elif path == "/api/campaigns/active":
-            self._serve_active_campaign()
+            heroes_api.serve_active_campaign(self)
         elif path == "/api/heroes":
-            self._serve_heroes_data()
+            heroes_api.serve_heroes_data(self)
 
-        # Analysis - Model Archaeology
+        # Analysis - Model Archaeology (uses analysis_api module)
         elif path == "/analysis" or path == "/analysis.html":
             self._serve_template("analysis.html")
         elif path.startswith("/api/analysis/") and "/layer_stats/" in path:
@@ -578,21 +584,21 @@ class TavernHandler(SimpleHTTPRequestHandler):
             parts = path.replace("/api/analysis/", "").split("/layer_stats/")
             if len(parts) == 2:
                 campaign_id, checkpoint_name = parts
-                self._serve_analysis_layer_stats_detail(campaign_id, checkpoint_name, query)
+                analysis_api.serve_layer_stats_detail(self, campaign_id, checkpoint_name, query)
             else:
                 self._send_error(400, "Invalid path")
         elif path.startswith("/api/analysis/") and path.endswith("/layer_stats"):
             # /api/analysis/{campaign_id}/layer_stats
             campaign_id = path.replace("/api/analysis/", "").replace("/layer_stats", "")
-            self._serve_analysis_layer_stats_list(campaign_id, query)
+            analysis_api.serve_layer_stats_list(self, campaign_id, query)
         elif path.startswith("/api/analysis/") and path.endswith("/drift_timeline"):
             # /api/analysis/{campaign_id}/drift_timeline
             campaign_id = path.replace("/api/analysis/", "").replace("/drift_timeline", "")
-            self._serve_analysis_drift_timeline(campaign_id, query)
+            analysis_api.serve_drift_timeline(self, campaign_id, query)
         elif path.startswith("/api/analysis/") and path.endswith("/top_movers"):
             # /api/analysis/{campaign_id}/top_movers
             campaign_id = path.replace("/api/analysis/", "").replace("/top_movers", "")
-            self._serve_analysis_top_movers(campaign_id, query)
+            analysis_api.serve_top_movers(self, campaign_id, query)
 
         elif path.startswith("/api/"):
             self._proxy_api(path)

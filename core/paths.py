@@ -247,6 +247,31 @@ def get_test_results_dir() -> Path:
     return get_base_dir() / "test_results"
 
 
+def get_campaigns_dir() -> Path:
+    """Get the campaigns directory (base/campaigns)."""
+    return get_base_dir() / "campaigns"
+
+
+def get_heroes_config_dir() -> Path:
+    """Get the hero configs directory (base/configs/heroes)."""
+    return get_base_dir() / "configs" / "heroes"
+
+
+def get_campaign_dir(hero_id: str, campaign_id: str) -> Path:
+    """Get a specific campaign directory."""
+    return get_campaigns_dir() / hero_id / campaign_id
+
+
+def get_campaign_analysis_dir(hero_id: str, campaign_id: str) -> Path:
+    """Get the analysis directory for a campaign."""
+    return get_campaign_dir(hero_id, campaign_id) / "analysis"
+
+
+def get_campaign_checkpoints_dir(hero_id: str, campaign_id: str) -> Path:
+    """Get the checkpoints directory for a campaign."""
+    return get_campaign_dir(hero_id, campaign_id) / "checkpoints"
+
+
 # Remote server configuration - use core.hosts for service discovery
 # These are deprecated - use get_service_url("inference") from core.hosts instead
 def _get_inference_host() -> str:

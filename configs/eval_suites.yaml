@@ -1,0 +1,209 @@
+# Eval Suites - Grouped evaluations with different priorities
+#
+# Priority Classes:
+#   P0 (Gatekeeping) - Small, high-signal. Run on EVERY checkpoint.
+#                      Used for promote/rollback/alarm decisions.
+#   P1 (Coverage)    - Broader tests. Run periodically or on interesting checkpoints.
+#   P2 (Exploratory) - Huge, noisy. Only run when spare compute exists.
+#                      Can be cancelled/throttled without hurting training.
+#
+# Usage:
+#   from core.eval_scheduler import get_scheduler
+#   scheduler = get_scheduler()
+#   scheduler.on_checkpoint_saved(run_ctx)  # Triggers P0/P1 suites
+#   scheduler.on_idle_gpu()                 # Triggers P2 suites
+
+version: 1
+
+# Default settings for all suites
+defaults:
+  max_tokens_per_eval: 500000   # Token budget per suite run
+  cooldown_minutes: 5           # Minimum time between suite runs
+
+suites:
+  # ==========================================================================
+  # P0 - GATEKEEPING SUITES
+  # Critical evals that run on every checkpoint. Small but high-signal.
+  # ==========================================================================
+
+  core_gate:
+    name: "Core Gatekeeping"
+    description: "Essential checks for every checkpoint"
+    priority_class: P0
+
+    skills:
+      - skill_id: bin
+        level: 1
+        batch_size: 50      # Small but statistically meaningful
+      - skill_id: sy
+        level: 1
+        batch_size: 50
+
+    triggers:
+      on_new_checkpoint: true
+      min_steps_between_runs: 500    # Don't spam on rapid saves
+
+    limits:
+      max_examples: 100              # Total examples across all skills
+      max_duration_minutes: 5        # Hard timeout
+
+    # What to do with results
+    actions:
+      on_regression:                 # If accuracy drops >10% from peak
+        alert: true
+        suggest_rollback: true
+      on_improvement:                # If new personal best
+        log: true
+        update_peak: true
+
+  # ==========================================================================
+  # P1 - COVERAGE SUITES
+  # Broader tests. Run periodically, not on every checkpoint.
+  # ==========================================================================
+
+  skill_coverage:
+    name: "Skill Coverage"
+    description: "Full skill evaluation at multiple levels"
+    priority_class: P1
+
+    skills:
+      - skill_id: bin
+        level: 1
+        batch_size: 100
+      - skill_id: bin
+        level: 2
+        batch_size: 100
+      - skill_id: bin
+        level: 3
+        batch_size: 100
+      - skill_id: sy
+        level: 1
+        batch_size: 100
+      - skill_id: sy
+        level: 2
+        batch_size: 100
+
+    triggers:
+      on_new_checkpoint: true
+      min_steps_between_runs: 2000   # Every ~2k steps
+      min_minutes_between_runs: 30   # Or at least 30 min gap
+
+    limits:
+      max_examples: 500
+      max_duration_minutes: 15
+
+  level_progression:
+    name: "Level Progression"
+    description: "Test curriculum progression readiness"
+    priority_class: P1
+
+    skills:
+      # Test the NEXT level for each skill to see if ready to advance
+      - skill_id: bin
+        level: 4
+        batch_size: 50
+      - skill_id: bin
+        level: 5
+        batch_size: 50
+      - skill_id: sy
+        level: 3
+        batch_size: 50
+
+    triggers:
+      on_new_checkpoint: false       # Not automatic
+      manual: true                   # Triggered by user/scheduler
+      min_steps_between_runs: 5000
+
+    limits:
+      max_examples: 150
+      max_duration_minutes: 10
+
+    actions:
+      on_threshold_reached:          # If accuracy >= 80%
+        threshold: 0.8
+        suggest_level_up: true
+
+  # ==========================================================================
+  # P2 - EXPLORATORY SUITES
+  # Huge, potentially infinite. Only run when GPU is idle.
+  # ==========================================================================
+
+  stress_test:
+    name: "Stress Test"
+    description: "High-volume evaluation for statistical confidence"
+    priority_class: P2
+
+    skills:
+      - skill_id: bin
+        level: 1
+        batch_size: 500
+      - skill_id: bin
+        level: 2
+        batch_size: 500
+      - skill_id: sy
+        level: 1
+        batch_size: 500
+
+    triggers:
+      on_new_checkpoint: false
+      background_only: true          # Only run when system is idle
+      on_idle_gpu: true
+
+    limits:
+      max_examples: 1500
+      max_duration_minutes: 60
+
+    interruptible: true              # Can be paused/cancelled
+    resumable: true                  # Can pick up where left off
+
+  edge_cases:
+    name: "Edge Cases"
+    description: "Adversarial and edge case testing"
+    priority_class: P2
+
+    skills:
+      # Higher difficulty levels
+      - skill_id: bin
+        level: 8
+        batch_size: 200
+      - skill_id: bin
+        level: 10
+        batch_size: 200
+
+    triggers:
+      background_only: true
+      on_idle_gpu: true
+      min_steps_between_runs: 10000  # Rarely run
+
+    limits:
+      max_examples: 400
+      max_duration_minutes: 30
+
+    interruptible: true
+
+# ==========================================================================
+# PRIORITY CLASS DEFINITIONS
+# Maps priority class to job system priority
+# ==========================================================================
+
+priority_mapping:
+  P0: critical    # JobPriority.CRITICAL - Process immediately
+  P1: high        # JobPriority.HIGH - High priority
+  P2: low         # JobPriority.LOW - Background/idle only
+
+# ==========================================================================
+# SCHEDULER SETTINGS
+# ==========================================================================
+
+scheduler:
+  # How often to check if suites should run
+  check_interval_seconds: 60
+
+  # Maximum concurrent eval jobs
+  max_concurrent_evals: 3
+
+  # P2 suites only run if these conditions are met
+  idle_conditions:
+    no_training_for_minutes: 5
+    no_p0_p1_pending: true
+    gpu_utilization_below: 50        # percent

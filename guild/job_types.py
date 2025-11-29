@@ -510,6 +510,9 @@ def eval_job(
     checkpoint_id: Optional[str] = None,
     checkpoint_path: Optional[str] = None,
     context_hash: Optional[str] = None,
+    # Suite fields (for grouped evals)
+    suite_id: Optional[str] = None,
+    suite_run_id: Optional[str] = None,
 ) -> JobSpec:
     """
     Create an eval job spec.
@@ -517,6 +520,9 @@ def eval_job(
     If model identity fields are provided, the eval is anchored to
     that specific model version. Otherwise, workers may use the
     current active model (not recommended for reproducibility).
+
+    If suite_id is provided, this eval is part of an eval suite.
+    The suite_run_id groups related evals for tracking.
     """
     payload = {
         "skill_id": skill_id,
@@ -535,11 +541,22 @@ def eval_job(
     if context_hash:
         payload["context_hash"] = context_hash
 
+    # Add suite info if provided
+    if suite_id:
+        payload["suite_id"] = suite_id
+    if suite_run_id:
+        payload["suite_run_id"] = suite_run_id
+
+    # Build tags
+    tags = ["eval", skill_id]
+    if suite_id:
+        tags.append(f"suite:{suite_id}")
+
     return JobSpec(
         job_type=JobType.EVAL,
         payload=payload,
         priority=priority,
-        tags=["eval", skill_id],
+        tags=tags,
     )
 
 

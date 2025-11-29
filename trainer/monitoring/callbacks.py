@@ -550,6 +550,31 @@ class LiveMonitorCallback(TrainerCallback):
                     print(f"⚠️  Eval queue failed: {e}")
 
                 # =========================================================
+                # EVAL SUITES - Policy-driven suite scheduling (P0/P1/P2)
+                # =========================================================
+                try:
+                    from core.eval_scheduler import get_scheduler
+                    from core.run_context import get_run_context
+
+                    run_ctx = get_run_context()
+                    scheduler = get_scheduler()
+
+                    # Trigger P0 (gatekeeping) and eligible P1 (coverage) suites
+                    suite_runs = scheduler.on_checkpoint_saved(
+                        run_ctx=run_ctx,
+                        checkpoint_step=state.global_step,
+                        checkpoint_path=str(record.path) if record else str(checkpoint_dir),
+                    )
+
+                    if suite_runs:
+                        suite_names = ", ".join(r.suite_id for r in suite_runs)
+                        total_jobs = sum(r.jobs_submitted for r in suite_runs)
+                        print(f"📊 Eval suites triggered: {suite_names} ({total_jobs} jobs)")
+
+                except Exception as e:
+                    print(f"⚠️  Eval scheduler failed: {e}")
+
+                # =========================================================
                 # LAYER STATS JOB - Model Archaeology analysis
                 # Submit every N steps (configurable, default: every 5000 steps)
                 # =========================================================

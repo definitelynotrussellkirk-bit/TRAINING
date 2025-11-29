@@ -114,6 +114,29 @@ skills_affinity:
   - sy                         # Word Weaving
 
 # =============================================================================
+# AUTONOMOUS HERO LOOP
+# =============================================================================
+# When idle, hero generates training data based on skill priorities
+idle_behavior:
+  enabled: true
+  skill_priorities:
+    bin: 0.5                   # 50% binary problems
+    sy: 0.5                    # 50% syllacrostic puzzles
+  generation:
+    batch_size: 1000           # Samples per generation run
+    levels: [1, 2, 3]          # Skill levels to include
+    min_queue_depth: 1         # Generate when queue has fewer files
+
+# =============================================================================
+# TRAINER TYPE
+# =============================================================================
+trainer:
+  type: "flo"                  # flo | ultimate | deepspeed
+  optimizer: "galore"          # galore | muon | adamw
+  galore:
+    rank: 256                  # GaLore rank for memory efficiency
+
+# =============================================================================
 # NOTES
 # =============================================================================
 notes: |

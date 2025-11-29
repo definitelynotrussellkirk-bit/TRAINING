@@ -30,6 +30,56 @@
 
 ---
 
+## The Hero Loop
+
+Heroes are autonomous. They never sleep—always training or seeking new adventures.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     HERO LOOP                           │
+│                                                         │
+│    ┌──────────┐                                         │
+│    │  Idle?   │◄────────────────────────────────┐       │
+│    └────┬─────┘                                 │       │
+│         │                                       │       │
+│         ▼                                       │       │
+│    ┌──────────────┐                             │       │
+│    │ Check Queue  │                             │       │
+│    └──────┬───────┘                             │       │
+│           │                                     │       │
+│           ▼                                     │       │
+│    ┌──────────────┐                             │       │
+│    │ Data exists? │                             │       │
+│    └──────┬───────┘                             │       │
+│           │                                     │       │
+│     ┌─────┴─────┐                               │       │
+│     │           │                               │       │
+│     ▼           ▼                               │       │
+│  ┌──────┐   ┌───────────────┐                   │       │
+│  │  No  │   │      Yes      │                   │       │
+│  └──┬───┘   └───────┬───────┘                   │       │
+│     │               │                           │       │
+│     ▼               ▼                           │       │
+│  ┌──────────┐   ┌──────────┐                    │       │
+│  │ Generate │   │  Train   │                    │       │
+│  │  (skill  │   │  (gain   │                    │       │
+│  │priorities│   │   XP)    │                    │       │
+│  └────┬─────┘   └────┬─────┘                    │       │
+│       │              │                          │       │
+│       └──────────────┴──────────────────────────┘       │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+The hero's profile defines behavior:
+- **skill_priorities**: Which skills to grind when idle (SY, BIN, etc.)
+- **idle_generation**: How much training data to create
+- **training_defaults**: Hyperparameters (batch size, learning rate, etc.)
+
+This is continuous training by default. The exception is pausing to do something unusual.
+
+---
+
 ## Quick Start (Single Machine)
 
 ```bash

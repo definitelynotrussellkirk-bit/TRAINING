@@ -153,6 +153,16 @@ class Campaign:
     # e.g., {"lowest_loss": 0.82, "highest_accuracy": 0.94}
     peak_metrics: Dict[str, float] = field(default_factory=dict)
 
+    # Effort tracking - materials science metaphor
+    # Strain = instantaneous difficulty (loss - floor)
+    # Effort = cumulative strain (area under curve)
+    # This tracks "how much work did it take to get here?"
+    skill_effort: Dict[str, float] = field(default_factory=dict)  # cumulative effort per skill
+
+    # Level transition records - effort spent on each level-up
+    # List of dicts with: skill_id, from_level, to_level, effort_spent, efficiency
+    level_transitions: List[Dict[str, Any]] = field(default_factory=list)
+
     # Archive info
     archived_at: Optional[str] = None
 
@@ -200,6 +210,9 @@ class Campaign:
             # Peak achievements - how far did we push?
             "peak_skill_levels": self.peak_skill_levels,
             "peak_metrics": self.peak_metrics,
+            # Effort tracking - how much work did it take?
+            "skill_effort": self.skill_effort,
+            "level_transitions": self.level_transitions,
             "archived_at": self.archived_at,
         }
 
@@ -227,6 +240,9 @@ class Campaign:
             # Peak achievements - how far did we push in this journey?
             peak_skill_levels=data.get("peak_skill_levels", {}),
             peak_metrics=data.get("peak_metrics", {}),
+            # Effort tracking - how much work did it take?
+            skill_effort=data.get("skill_effort", {}),
+            level_transitions=data.get("level_transitions", []),
             archived_at=data.get("archived_at"),
         )
 
@@ -302,6 +318,116 @@ class Campaign:
             f"{s}:L{l}" for s, l in self.peak_skill_levels.items()
         ) or "No skills yet"
         return f"{self.name} - Step {self.current_step:,} - {skills_str}"
+
+    # =========================================================================
+    # Effort Tracking - Materials Science Metaphor
+    # =========================================================================
+
+    def add_effort(self, skill_id: str, effort: float) -> None:
+        """
+        Add effort spent on a skill.
+
+        Effort = cumulative strain = area under (loss - floor) curve.
+        This tracks "how much work went into this skill?"
+        """
+        current = self.skill_effort.get(skill_id, 0.0)
+        self.skill_effort[skill_id] = current + effort
+        self.save()
+
+    def record_level_transition(
+        self,
+        skill_id: str,
+        from_level: int,
+        to_level: int,
+        effort_spent: float,
+        plastic_gain: float,
+        steps_taken: int = 0,
+    ) -> None:
+        """
+        Record effort spent on a level transition.
+
+        This lets us analyze: "Which level-ups were expensive vs cheap?"
+
+        Args:
+            skill_id: The skill that leveled up
+            from_level: Previous level
+            to_level: New level
+            effort_spent: Cumulative strain during this transition
+            plastic_gain: Loss improvement (start_loss - end_loss)
+            steps_taken: Training steps during this transition
+        """
+        efficiency = plastic_gain / effort_spent if effort_spent > 0 else 0.0
+
+        record = {
+            "skill_id": skill_id,
+            "from_level": from_level,
+            "to_level": to_level,
+            "effort_spent": effort_spent,
+            "plastic_gain": plastic_gain,
+            "efficiency": efficiency,
+            "steps_taken": steps_taken,
+            "timestamp": datetime.now().isoformat(),
+        }
+        self.level_transitions.append(record)
+        self.save()
+
+    def get_effort_summary(self) -> Dict[str, Any]:
+        """
+        Get effort summary for this campaign.
+
+        Returns stats like:
+        - Total effort across all skills
+        - Effort per skill
+        - Average efficiency (plastic_gain / effort)
+        - Most/least expensive skills
+        """
+        total_effort = sum(self.skill_effort.values())
+
+        # Aggregate from level transitions
+        transitions_by_skill: Dict[str, List[Dict]] = {}
+        for t in self.level_transitions:
+            skill = t["skill_id"]
+            transitions_by_skill.setdefault(skill, []).append(t)
+
+        skill_stats = {}
+        for skill_id, effort in self.skill_effort.items():
+            transitions = transitions_by_skill.get(skill_id, [])
+            total_plastic = sum(t.get("plastic_gain", 0) for t in transitions)
+            avg_efficiency = total_plastic / effort if effort > 0 else 0.0
+
+            skill_stats[skill_id] = {
+                "total_effort": effort,
+                "levels_gained": len(transitions),
+                "total_plastic_gain": total_plastic,
+                "avg_efficiency": avg_efficiency,
+                "effort_per_level": effort / len(transitions) if transitions else effort,
+            }
+
+        # Rank skills
+        ranked = sorted(
+            skill_stats.items(),
+            key=lambda x: x[1]["avg_efficiency"],
+            reverse=True
+        )
+
+        return {
+            "total_effort": total_effort,
+            "skill_stats": skill_stats,
+            "efficiency_ranking": [s for s, _ in ranked],
+            "most_expensive_skill": (
+                max(skill_stats.items(), key=lambda x: x[1]["effort_per_level"])[0]
+                if skill_stats else None
+            ),
+            "most_efficient_skill": (
+                ranked[0][0] if ranked else None
+            ),
+            "total_level_transitions": len(self.level_transitions),
+        }
+
+    @property
+    def total_effort(self) -> float:
+        """Total effort spent across all skills."""
+        return sum(self.skill_effort.values())
 
 
 @dataclass

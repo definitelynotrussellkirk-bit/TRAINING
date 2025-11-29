@@ -143,6 +143,47 @@ Skills are defined in `configs/skills/*.yaml` - YAML is the single source of tru
 | Stronghold | Storage location |
 | VaultKeeper | Asset registry |
 | Tavern | Game UI |
+| **Strain** | Loss - floor (instantaneous difficulty) |
+| **Effort** | Cumulative strain (XP spent on skill) |
+| **Zone** | Training intensity (Recovery/Productive/Stretch/Overload) |
+
+### Strain/Effort Metaphor (Materials Science)
+
+Training viewed through a materials science lens:
+
+| Concept | Formula | Meaning |
+|---------|---------|---------|
+| **Strain** | `loss - floor` | How "stretched" the model is right now |
+| **Effort** | `Σ strain` | Total work done (area under strain curve) |
+| **Strain Rate** | `Δstrain/Δt` | Learning velocity (negative = learning) |
+| **Plastic Gain** | `L_before - L_after` | Permanent improvement |
+| **Efficiency** | `plastic_gain / effort` | Learning ROI |
+
+**Strain Zones** (like heart rate zones):
+
+| Zone | Strain Range | Meaning | Curriculum Action |
+|------|-------------|---------|-------------------|
+| **Recovery** | < 0.1 | Under-challenged | Level up |
+| **Productive** | 0.1 - 0.3 | Optimal learning | Continue |
+| **Stretch** | 0.3 - 0.5 | Challenging | Continue if improving |
+| **Overload** | > 0.5 | Too hard | Back off |
+
+**Curriculum guidance** from strain:
+- High strain + not improving → Back off difficulty
+- Low strain + stable → Level up (too easy)
+- Moderate strain + improving → Sweet spot (continue)
+
+**Usage:**
+```python
+from guild.metrics import StrainTracker, StrainZone
+
+tracker = StrainTracker(floor=0.5)  # comfort zone
+metrics = tracker.update(loss=0.8, step=100)
+hint = tracker.get_curriculum_hint()
+
+print(f"Zone: {metrics.zone.name}")  # PRODUCTIVE
+print(f"Action: {hint.action.value}")  # continue
+```
 
 ---
 
@@ -170,13 +211,26 @@ Skills are defined in `configs/skills/*.yaml` - YAML is the single source of tru
 - [ ] **Vault Browser** - Browse/delete/export checkpoints
 - [x] **Guild Management** - Adjust curriculum, skill priorities ✅ `/settings` scheduler
 
+### Phase 5: Strain/Effort Visualization
+- [ ] **Strain Graph** - Show `loss - floor` instead of raw loss (normalized view)
+- [ ] **Zone Indicator** - Color-coded badge: Recovery/Productive/Stretch/Overload
+- [ ] **Effort Meter** - Cumulative effort per skill (like XP bar)
+- [ ] **Curriculum Hint** - Show suggested action based on strain analysis
+- [ ] **Efficiency Dashboard** - Compare skills by plastic_gain / effort
+- [ ] **Level Transition Log** - Effort spent per level-up
+
 ---
 
 ## 📦 RECENT UPDATES
 
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
-Latest (2025-11-28):
+Latest (2025-11-29):
+- **Strain/Effort Metrics** - Materials science metaphor for training (`guild/metrics/strain.py`)
+- **Campaign Peak Tracking** - `peak_skill_levels`, `peak_metrics`, effort tracking per skill
+- **Curriculum Hints** - Strain zones (Recovery/Productive/Stretch/Overload) for difficulty guidance
+
+Previous (2025-11-28):
 - **Shareable Project** - Bootstrap script, `python -m training doctor`, pre-commit hooks
 - **Hero Titles System** - `configs/titles.yaml`, `guild/titles.py`
 - **Distributed Job System V2** - SQLite job store, worker registration, backpressure
@@ -301,6 +355,32 @@ batch = engine.generate_eval_batch("bin", level=1, count=10)
 ```
 
 Skills defined in `configs/skills/*.yaml`
+
+### Strain/Effort Metrics
+
+Materials-science inspired training analytics.
+
+```python
+from guild.metrics import StrainTracker, StrainZone, SkillStrainTracker
+
+# Single skill tracking
+tracker = StrainTracker(floor=0.5)  # comfort zone loss
+metrics = tracker.update(loss=0.8, step=100)
+print(f"Zone: {metrics.zone.name}")  # STRETCH
+print(f"Effort: {tracker.cumulative_effort}")
+
+# Get curriculum hint
+hint = tracker.get_curriculum_hint()
+if hint.action.value == "back_off":
+    decrease_difficulty()
+
+# Multi-skill tracking
+multi = SkillStrainTracker()
+multi.set_floor("sy", 0.8)
+multi.set_floor("bin", 0.5)
+```
+
+Key files: `guild/metrics/strain.py`, `guild/campaigns/types.py`
 
 ### TrainerEngine
 

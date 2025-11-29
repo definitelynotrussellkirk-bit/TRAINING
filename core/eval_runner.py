@@ -618,13 +618,13 @@ class EvalRunner:
         got_norm = got.strip().lower()
 
         # Skill-specific checking
-        if skill == "bin":
+        if skill in ("bin", "binary"):
             # For binary, check if expected result appears in response
             # The expected format is like "decrement(①⓪) = ①"
             # Model might include verification steps
             return expected_norm in got_norm or self._extract_binary_result(expected) in got
 
-        elif skill == "sy":
+        elif skill in ("sy", "syllo"):
             # For syllacrostic, check word list
             expected_words = set(w.strip().lower() for w in expected.split(",") if w.strip())
             # Extract words from response (look for comma-separated or newline-separated)

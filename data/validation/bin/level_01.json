@@ -1,65 +1,58 @@
 {
   "level": 1,
-  "level_name": "Tiny",
+  "level_name": "Tiny (2-bit)",
   "bits": 2,
-  "eval_version": "1.0",
+  "eval_version": "2.0-training-format",
   "pass_threshold": 0.8,
-  "passing_score": "4/5",
-  "scoring_rule": "Each problem: answer must match exactly. Level: 80% of problems must pass.",
-  "response_schema": {
-    "type": "object",
-    "required": [
-      "answer"
-    ],
-    "properties": {
-      "answer": {
-        "type": "string",
-        "description": "Result in circled binary notation (\u24ea\u2460)"
-      }
-    },
-    "example": "{\"answer\": \"\u2460\u24ea\u2460\u24ea\"}"
-  },
-  "num_problems": 5,
+  "scoring_rule": "Response must contain the expected result pattern",
   "problems": [
     {
-      "problem_id": "eval_L1_P1",
-      "problem_index": 0,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute add(\u2460\u24ea, \u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (easy): 2 + 1 = 3"
+      "prompt": "Compute: add(①⓪, ①)",
+      "expected": "add(①⓪, ①) = ①①",
+      "metadata": {
+        "operation": "add",
+        "a": "①⓪",
+        "b": "①",
+        "result": "①①"
+      }
     },
     {
-      "problem_id": "eval_L1_P2",
-      "problem_index": 1,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute subtract(\u2460\u2460, \u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (easy): 3 - 1 = 2"
+      "prompt": "Compute: increment(①)",
+      "expected": "increment(①) = ①⓪",
+      "metadata": {
+        "operation": "increment",
+        "a": "①",
+        "result": "①⓪"
+      }
     },
     {
-      "problem_id": "eval_L1_P3",
-      "problem_index": 2,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute multiply(\u2460\u24ea, \u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (medium): 2 * 1 = 2"
+      "prompt": "Compute: decrement(①⓪)",
+      "expected": "decrement(①⓪) = ①",
+      "metadata": {
+        "operation": "decrement",
+        "a": "①⓪",
+        "result": "①"
+      }
     },
     {
-      "problem_id": "eval_L1_P4",
-      "problem_index": 3,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute add(\u2460\u24ea, \u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (medium): 2 + 1 = 3"
+      "prompt": "Compute: add(①, ①)",
+      "expected": "add(①, ①) = ①⓪",
+      "metadata": {
+        "operation": "add",
+        "a": "①",
+        "b": "①",
+        "result": "①⓪"
+      }
     },
     {
-      "problem_id": "eval_L1_P5",
-      "problem_index": 4,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute multiply(\u2460\u24ea, \u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (hard): 2 * 1 = 2"
+      "prompt": "Compute: subtract(①①, ①)",
+      "expected": "subtract(①①, ①) = ①⓪",
+      "metadata": {
+        "operation": "subtract",
+        "a": "①①",
+        "b": "①",
+        "result": "①⓪"
+      }
     }
   ]
 }

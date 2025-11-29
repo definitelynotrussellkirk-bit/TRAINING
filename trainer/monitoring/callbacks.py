@@ -637,9 +637,11 @@ class LiveMonitorCallback(TrainerCallback):
                 try:
                     from core.evaluation_ledger import queue_evaluation, queue_full_evaluation
                     from core.passives import queue_passive_lite
+                    from core.paths import get_base_dir
 
-                    # Get current curriculum level from state
-                    curriculum_state_file = Path(args.output_dir).parent.parent / "data_manager" / "curriculum_state.json"
+                    # Get current curriculum level from canonical state (status/ symlink)
+                    base_dir = get_base_dir()
+                    curriculum_state_file = base_dir / "status" / "curriculum_state.json"
                     if curriculum_state_file.exists():
                         import json
                         with open(curriculum_state_file) as f:

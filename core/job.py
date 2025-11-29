@@ -36,7 +36,8 @@ import hashlib
 import subprocess
 
 # Type alias for job status
-JobStatus = Literal['queued', 'processing', 'completed', 'failed', 'skipped']
+# State machine: queued → processing → (paused ↔ processing) → (stopped | completed | failed | skipped)
+JobStatus = Literal['queued', 'processing', 'paused', 'stopped', 'completed', 'failed', 'skipped']
 
 
 @dataclass
@@ -285,6 +286,59 @@ class Job:
         self.last_error = reason
         return self
 
+    def pause(self, reason: Optional[str] = None) -> 'Job':
+        """
+        Mark job as paused.
+
+        Only valid when status is 'processing'.
+
+        Args:
+            reason: Optional reason for pausing
+
+        Returns:
+            self (for chaining)
+        """
+        if self.status != 'processing':
+            raise ValueError(f"Cannot pause job in state '{self.status}', must be 'processing'")
+        self.status = 'paused'
+        if reason:
+            self.metadata['pause_reason'] = reason
+        self.metadata['paused_at'] = datetime.now().isoformat()
+        return self
+
+    def resume(self) -> 'Job':
+        """
+        Resume a paused job.
+
+        Only valid when status is 'paused'.
+
+        Returns:
+            self (for chaining)
+        """
+        if self.status != 'paused':
+            raise ValueError(f"Cannot resume job in state '{self.status}', must be 'paused'")
+        self.status = 'processing'
+        self.metadata['resumed_at'] = datetime.now().isoformat()
+        return self
+
+    def stop(self, reason: str = "User requested stop") -> 'Job':
+        """
+        Stop job gracefully (user-initiated).
+
+        Different from fail() - stopped is a clean exit, not an error.
+
+        Args:
+            reason: Reason for stopping
+
+        Returns:
+            self (for chaining)
+        """
+        self.status = 'stopped'
+        self.finished_at = datetime.now().isoformat()
+        self.last_error = reason
+        self._calculate_actual_hours()
+        return self
+
     def _calculate_actual_hours(self):
         """Calculate actual duration from timestamps."""
         if self.started_at and self.finished_at:
@@ -341,7 +395,12 @@ class Job:
     @property
     def is_finished(self) -> bool:
         """Check if job is in a terminal state."""
-        return self.status in ('completed', 'failed', 'skipped')
+        return self.status in ('completed', 'failed', 'skipped', 'stopped')
+
+    @property
+    def is_paused(self) -> bool:
+        """Check if job is currently paused."""
+        return self.status == 'paused'
 
     @property
     def is_running(self) -> bool:

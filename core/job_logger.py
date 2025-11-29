@@ -69,12 +69,15 @@ class JobRecord:
 
     Lifecycle States:
         - queued: File in queue, waiting for training
-        - validating: Running pre-training validation
-        - estimating: Computing time/resource estimates
-        - running: Training in progress
+        - processing: Training in progress (alias: running)
+        - paused: Training paused by user
+        - stopped: Training stopped by user (clean exit)
         - completed: Training finished successfully
         - failed: Training failed (see reason field)
         - skipped: Skipped by user or system
+
+    State machine:
+        queued → processing → (paused ↔ processing) → (stopped | completed | failed | skipped)
     """
     # Identity
     job_id: str                         # Unique ID: "{timestamp}_{filename}"
@@ -500,6 +503,150 @@ class JobLogger:
             finished_at=self.now(),
             reason=reason,
             num_examples=record.num_examples,
+            config_hash=record.config_hash,
+            git_commit=record.git_commit,
+            metadata=record.metadata
+        )
+
+        self.append(updated)
+        return updated
+
+    def pause_job(
+        self,
+        job_id: str,
+        reason: Optional[str] = None
+    ) -> Optional[JobRecord]:
+        """
+        Record job pause.
+
+        Args:
+            job_id: The job ID to update
+            reason: Optional reason for pausing
+
+        Returns:
+            Updated JobRecord or None if job not found
+        """
+        record = self._job_cache.get(job_id)
+        if record is None:
+            return None
+
+        metadata = dict(record.metadata) if record.metadata else {}
+        metadata['paused_at'] = self.now()
+        if reason:
+            metadata['pause_reason'] = reason
+
+        updated = JobRecord(
+            job_id=record.job_id,
+            file_name=record.file_name,
+            file_path=record.file_path,
+            priority=record.priority,
+            status="paused",
+            created_at=record.created_at,
+            started_at=record.started_at,
+            num_examples=record.num_examples,
+            start_step=record.start_step,
+            gpu_type=record.gpu_type,
+            checkpoint_used=record.checkpoint_used,
+            config_hash=record.config_hash,
+            git_commit=record.git_commit,
+            metadata=metadata
+        )
+
+        self.append(updated)
+        return updated
+
+    def resume_job(
+        self,
+        job_id: str
+    ) -> Optional[JobRecord]:
+        """
+        Record job resume.
+
+        Args:
+            job_id: The job ID to update
+
+        Returns:
+            Updated JobRecord or None if job not found
+        """
+        record = self._job_cache.get(job_id)
+        if record is None:
+            return None
+
+        metadata = dict(record.metadata) if record.metadata else {}
+        metadata['resumed_at'] = self.now()
+
+        updated = JobRecord(
+            job_id=record.job_id,
+            file_name=record.file_name,
+            file_path=record.file_path,
+            priority=record.priority,
+            status="running",  # Back to running
+            created_at=record.created_at,
+            started_at=record.started_at,
+            num_examples=record.num_examples,
+            start_step=record.start_step,
+            gpu_type=record.gpu_type,
+            checkpoint_used=record.checkpoint_used,
+            config_hash=record.config_hash,
+            git_commit=record.git_commit,
+            metadata=metadata
+        )
+
+        self.append(updated)
+        return updated
+
+    def stop_job(
+        self,
+        job_id: str,
+        reason: str = "User requested stop",
+        final_step: Optional[int] = None,
+        final_loss: Optional[float] = None
+    ) -> Optional[JobRecord]:
+        """
+        Record job stop (user-initiated clean exit).
+
+        Different from fail_job - stopped is not an error.
+
+        Args:
+            job_id: The job ID to update
+            reason: Stop reason
+            final_step: Step when stopped
+            final_loss: Last known loss
+
+        Returns:
+            Updated JobRecord or None if job not found
+        """
+        record = self._job_cache.get(job_id)
+        if record is None:
+            return None
+
+        finished_at = self.now()
+        actual_hours = None
+        if record.started_at:
+            try:
+                start = datetime.fromisoformat(record.started_at)
+                end = datetime.fromisoformat(finished_at)
+                actual_hours = (end - start).total_seconds() / 3600
+            except Exception:
+                pass
+
+        updated = JobRecord(
+            job_id=record.job_id,
+            file_name=record.file_name,
+            file_path=record.file_path,
+            priority=record.priority,
+            status="stopped",
+            created_at=record.created_at,
+            started_at=record.started_at,
+            finished_at=finished_at,
+            reason=reason,
+            num_examples=record.num_examples,
+            actual_hours=actual_hours,
+            start_step=record.start_step,
+            final_step=final_step,
+            final_loss=final_loss,
+            gpu_type=record.gpu_type,
+            checkpoint_used=record.checkpoint_used,
             config_hash=record.config_hash,
             git_commit=record.git_commit,
             metadata=record.metadata

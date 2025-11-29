@@ -111,6 +111,12 @@ Complete JSON schema for the status file:
     "batch_queue_size": 22,      // Total batches queued (int or null)
     "current_file": "data.jsonl", // Filename being trained (str or null)
 
+    // Job tracking (first-class job abstraction - see core/job.py)
+    "current_job_id": "2025-11-29T12:00:00_data.jsonl",  // Job ID (str or null)
+    "current_job_status": "processing",  // Job status (str or null)
+    "current_job_hero_id": "titan-qwen3-4b",  // Hero ID (str or null)
+    "current_job_campaign_id": "campaign-001",  // Campaign ID (str or null)
+
     // Latest inference results
     "current_system_prompt": "...",  // System prompt (str or null)
     "current_prompt": "What is 2+2?", // Input prompt (str or null)
@@ -592,6 +598,12 @@ class TrainingStatus:
     batch_queue_size: Optional[int] = None   # Total batches in queue (e.g., 22)
     current_file: Optional[str] = None       # Filename being trained on
 
+    # Job tracking (first-class job abstraction - see core/job.py)
+    current_job_id: Optional[str] = None     # Job ID (e.g., "2025-11-29T12:00:00_data.jsonl")
+    current_job_status: Optional[str] = None # Job status (queued, processing, paused, etc.)
+    current_job_hero_id: Optional[str] = None     # Hero (e.g., "titan-qwen3-4b")
+    current_job_campaign_id: Optional[str] = None # Campaign (e.g., "campaign-001")
+
     # Latest inference results
     current_system_prompt: Optional[str] = None  # System prompt for current example
     current_prompt: Optional[str] = None
@@ -946,6 +958,11 @@ class TrainingStatusWriter:
         logit_penalty_stats: Optional[List[Dict]] = None,
         penalty_heatmap: Optional[Dict] = None,
         protocol_stats: Optional[Dict] = None,
+        # Job tracking (first-class job abstraction)
+        current_job_id: Optional[str] = None,
+        current_job_status: Optional[str] = None,
+        current_job_hero_id: Optional[str] = None,
+        current_job_campaign_id: Optional[str] = None,
     ):
         """Update basic training progress (preserves last inference data)."""
         accuracy_pct = (self.total_correct / self.total_evals * 100) if self.total_evals > 0 else 0.0
@@ -1010,6 +1027,11 @@ class TrainingStatusWriter:
             batch_number=batch_number,
             batch_queue_size=batch_queue_size,
             current_file=current_file,
+            # Job tracking
+            current_job_id=current_job_id,
+            current_job_status=current_job_status,
+            current_job_hero_id=current_job_hero_id,
+            current_job_campaign_id=current_job_campaign_id,
             # Preserve last inference data
             current_system_prompt=self.last_inference_data.get('system_prompt'),
             current_prompt=self.last_inference_data.get('prompt'),

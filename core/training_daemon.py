@@ -1684,23 +1684,24 @@ class TrainingDaemon:
                             val_loss=start_metrics['val_loss']
                         )
 
-                        # Create job record and start tracking
+                        # Create Job object (first-class job abstraction)
+                        from core.job import Job
                         num_examples = sum(1 for _ in open(data_file, 'r', encoding='utf-8'))
-                        job = self.job_logger.create_job(
-                            file_name=data_file.name,
-                            file_path=str(data_file),
+                        job = Job.from_file(
+                            path=str(data_file),
                             priority=self._get_file_priority(data_file),
-                            num_examples=num_examples
                         )
-                        self.current_job_id = job.job_id
+                        job.num_examples = num_examples
+                        self.job_logger.log_job(job)  # Log queued state
+                        self.current_job_id = job.id
 
-                        # Record job start with checkpoint info
-                        self.job_logger.start_job(
-                            job_id=self.current_job_id,
-                            checkpoint_used=self._get_current_checkpoint(),
-                            start_step=start_metrics['step'],
+                        # Mark job as started
+                        job.start(
+                            step=start_metrics['step'],
+                            checkpoint=self._get_current_checkpoint(),
                             gpu_type=self._detect_gpu_type()
                         )
+                        self.job_logger.log_job(job)  # Log processing state
 
                         # Train on file
                         success = self.train_on_file(
@@ -1719,38 +1720,34 @@ class TrainingDaemon:
                             val_loss=end_metrics['val_loss']
                         )
 
-                        # Handle result and log job completion
+                        # Handle result and update Job state
                         if success:
                             self.queue.mark_completed(data_file, delete_file=True)
-                            # Log job completion with final metrics
-                            if self.current_job_id:
-                                self.job_logger.complete_job(
-                                    job_id=self.current_job_id,
-                                    final_step=end_metrics['step'],
-                                    final_loss=end_metrics['loss'],
-                                    final_val_loss=end_metrics['val_loss'],
-                                    best_checkpoint_after=self._get_current_checkpoint()
-                                )
+                            job.complete(
+                                final_step=end_metrics['step'] or 0,
+                                final_loss=end_metrics['loss'] or 0.0,
+                                final_val_loss=end_metrics['val_loss'],
+                                best_checkpoint=self._get_current_checkpoint()
+                            )
+                            self.job_logger.log_job(job)  # Log completed state
                         elif self.controller.should_skip_current_file():
                             self.controller.clear_skip()
                             self.queue.mark_skipped(data_file, reason="Skipped by user")
                             self.logger.info("⏭️  Skipped by user")
-                            # Log job skip
-                            if self.current_job_id:
-                                self.job_logger.skip_job(
-                                    job_id=self.current_job_id,
-                                    reason="Skipped by user"
-                                )
+                            job.skip("Skipped by user")
+                            self.job_logger.log_job(job)  # Log skipped state
+                        elif self.controller.should_stop_after_batch():
+                            self.queue.mark_failed(data_file, error="Stopped by user", keep_file=True)
+                            job.stop("Stopped by user")
+                            self.job_logger.log_job(job)  # Log stopped state
                         else:
                             self.queue.mark_failed(data_file, error="Training failed", keep_file=True)
-                            # Log job failure
-                            if self.current_job_id:
-                                self.job_logger.fail_job(
-                                    job_id=self.current_job_id,
-                                    reason="Training failed",
-                                    final_step=end_metrics['step'],
-                                    final_loss=end_metrics['loss']
-                                )
+                            job.fail(
+                                error="Training failed",
+                                final_step=end_metrics['step'],
+                                final_loss=end_metrics['loss']
+                            )
+                            self.job_logger.log_job(job)  # Log failed state
 
                         # Clear current job ID
                         self.current_job_id = None

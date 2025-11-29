@@ -302,6 +302,70 @@ You've "done it right" when:
 | UltimateTrainer | `core/train.py` | Legacy wrapper → delegates to engine |
 | training_daemon | `core/training_daemon.py` | Queue processing orchestrator (Layer 2) |
 
+### Job System (First-Class Job Abstraction)
+
+There are **two separate job systems** for different purposes:
+
+#### 1. Training Jobs (`core/job.py`)
+For tracking training file lifecycles in daemon and campaigns.
+
+```python
+from core.job import Job
+from core.job_logger import JobLogger
+
+# Create job from training file
+job = Job.from_file("data.jsonl", hero_id="titan-qwen3-4b")
+logger.log_job(job)  # Log queued
+
+# Training starts
+job.start(step=84000, checkpoint="checkpoint-84000")
+logger.log_job(job)  # Log processing
+
+# Training completes
+job.complete(final_step=85000, final_loss=0.44)
+logger.log_job(job)  # Log completed
+```
+
+**State Machine:**
+```
+queued → processing → (paused ↔ processing) → (stopped | completed | failed | skipped)
+```
+
+**Persisted to:** `status/job_history.jsonl` (append-only)
+
+| Module | Location | Purpose |
+|--------|----------|---------|
+| Job | `core/job.py` | Training job dataclass with lifecycle methods |
+| JobLogger | `core/job_logger.py` | JSONL append-only logger |
+
+#### 2. Distributed Worker Jobs (`guild/job_types.py`)
+For distributed tasks like eval, sparring, data generation.
+
+```python
+from guild.job_types import eval_job, Job, JobSpec
+
+# Create job spec
+spec = eval_job(skill_id="bin", level=5)
+job = Job.create(spec)
+
+# Submit to VaultKeeper
+vault.submit_job(job)
+```
+
+**Job Types:** `eval`, `sparring`, `data_gen`, `archive`, `analytics`, etc.
+
+| Module | Location | Purpose |
+|--------|----------|---------|
+| JobType | `guild/job_types.py` | Enum of distributed job types |
+| JobSpec | `guild/job_types.py` | Job specification for workers |
+| JobResult | `guild/job_types.py` | Worker return value |
+| job_dispatcher | `guild/job_dispatcher.py` | Submits jobs to workers |
+| job_router | `guild/job_router.py` | Routes jobs to appropriate workers |
+
+**Key Difference:**
+- `core/job.py` = File-based training lifecycle (daemon, hero loop)
+- `guild/job_types.py` = Distributed task execution (workers, VaultKeeper)
+
 ### Daemon Services (Extracted)
 | Module | Location | Responsibility |
 |--------|----------|----------------|

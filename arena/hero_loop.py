@@ -24,6 +24,8 @@ from typing import Optional, List, Dict, Any
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.paths import get_base_dir
+from core.job import Job
+from core.job_logger import JobLogger
 from arena.factory import create_trainer, load_hero_config, load_campaign_config
 
 
@@ -72,7 +74,13 @@ class HeroLoop:
         
         # Create trainer
         self.trainer = create_trainer(self.hero_config, campaign_path)
-        
+
+        # Job logger for tracking training jobs
+        status_dir = campaign_path / "status"
+        status_dir.mkdir(exist_ok=True)
+        self.job_logger = JobLogger(status_dir / "job_history.jsonl")
+        self.current_job: Optional[Job] = None
+
         # Stats
         self.total_steps = 0
         self.files_processed = 0
@@ -175,33 +183,66 @@ class HeroLoop:
     def _process_file(self, data_path: Path) -> bool:
         """
         Process a single training file.
-        
+
+        Creates a Job object to track the training lifecycle.
+
         Returns:
             True if training succeeded, False otherwise
         """
         self.logger.info(f"Training on: {data_path.name}")
-        
+
+        # Create Job and log queued state
+        num_examples = sum(1 for _ in open(data_path, 'r', encoding='utf-8'))
+        job = Job.from_file(
+            path=str(data_path),
+            hero_id=self.hero_id,
+            campaign_id=self.campaign_path.name,
+        )
+        job.num_examples = num_examples
+        self.job_logger.log_job(job)  # Log queued
+        self.current_job = job
+
+        # Mark as started
+        job.start()
+        self.job_logger.log_job(job)  # Log processing
+
+        # Execute training
         result = self.trainer.train(data_path)
-        
+
         if result.success:
             self.total_steps += result.steps_completed
             self.files_processed += 1
-            
+
             self.logger.info(f"Training complete: {result.steps_completed} steps, loss={result.final_loss:.4f}")
-            
+
+            # Mark job as completed
+            job.complete(
+                final_step=result.steps_completed,
+                final_loss=result.final_loss or 0.0,
+            )
+            self.job_logger.log_job(job)  # Log completed
+
             # Move to completed
             completed_path = self.completed_dir / data_path.name
             data_path.rename(completed_path)
             self.logger.info(f"  Moved to: {completed_path}")
-            
+
+            self.current_job = None
             return True
         else:
             self.logger.error(f"Training failed: {result.error_message}")
+
+            # Mark job as failed
+            job.fail(result.error_message or "Unknown error")
+            self.job_logger.log_job(job)  # Log failed
+
             # Move to failed directory
             failed_dir = self.campaign_path / "data" / "failed"
             failed_dir.mkdir(exist_ok=True)
             failed_path = failed_dir / data_path.name
             data_path.rename(failed_path)
+
+            self.current_job = None
             return False
     
     def run_once(self) -> bool:

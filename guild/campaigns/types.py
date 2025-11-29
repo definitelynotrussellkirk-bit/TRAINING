@@ -1,16 +1,36 @@
 """
 Campaign Types - Dataclasses for campaign management.
 
-A Campaign is a training run for a specific hero. Each campaign has:
-- Its own checkpoints directory
-- Its own status files (training_status, curriculum_state, etc.)
-- Metadata (name, dates, milestones)
-- Config overrides from the hero defaults
+Mental Model: A Campaign is a Hero's Journey to Maximum Potential
+=================================================================
 
-RPG Flavor:
-    A Campaign is an adventure - a hero's journey through training data,
-    battling loss functions, gaining XP, and leveling up skills.
-    Each campaign is a separate "save file" that can be archived or continued.
+A Campaign represents ONE ATTEMPT to push a hero (model) as far as it can go.
+Think of it like a playthrough in an RPG:
+
+- Hero = The model (fixed identity: Qwen3-0.6B, Qwen3-4B, etc.)
+- Campaign = One attempt to train that hero to its maximum potential
+- Continue = Keep training, keep learning, push further
+- Level Cap = The theoretical limit of what this hero can learn
+
+Each campaign has:
+- Its own checkpoints directory (save points on the journey)
+- Its own status files (current state of the adventure)
+- Progress tracking (how far have we pushed this hero?)
+- Milestones (notable achievements along the way)
+
+The goal of a campaign is to discover: "How far can this hero go?"
+- What skills can it master?
+- What's the lowest loss achievable?
+- Where does it plateau?
+
+Different heroes (models) have different potentials:
+- A 0.6B model might cap at skill level 20
+- A 4B model might reach level 50
+- We discover the cap by PLAYING (training)
+
+Starting points:
+- starting_checkpoint=None → Fresh start (new game)
+- starting_checkpoint="checkpoint-X" → Continue from save (or New Game+)
 """
 
 from dataclasses import dataclass, field
@@ -66,11 +86,18 @@ class CampaignStatus:
 @dataclass
 class Campaign:
     """
-    A training campaign for a hero.
+    A Hero's Journey to Maximum Potential.
 
-    A Campaign represents a single training run with its own checkpoints,
-    status files, and configuration. Multiple campaigns can exist for the
-    same hero (like save slots).
+    A Campaign represents ONE ATTEMPT to push a hero as far as it can go.
+    The goal is to discover: "What is this hero's level cap?"
+
+    Think of it as a playthrough:
+    - Continue training = keep pushing toward max potential
+    - Milestones = achievements along the way
+    - Peak metrics = personal bests in this run
+    - Archived = a completed journey (successful or not)
+
+    Multiple campaigns for the same hero = multiple attempts/playthroughs.
 
     Attributes:
         id: Campaign identifier (e.g., "campaign-001")
@@ -82,11 +109,13 @@ class Campaign:
         status: Current status (active, paused, archived)
         starting_checkpoint: Checkpoint to start from (None = base model)
         starting_step: Step number at start
-        current_step: Current training step
+        current_step: Current training step (XP earned)
         total_examples: Total examples trained on
         skills_focus: Skills being trained
         config_overrides: Overrides from hero defaults
         milestones: Notable events
+        peak_skill_levels: Highest skill levels achieved (journey progress)
+        peak_metrics: Best metrics achieved (personal bests)
         archived_at: When archived (if applicable)
     """
     id: str
@@ -98,11 +127,11 @@ class Campaign:
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     status: str = CampaignStatus.ACTIVE
 
-    # Starting point
+    # Starting point (None = fresh start, checkpoint = continue/NG+)
     starting_checkpoint: Optional[str] = None
     starting_step: int = 0
 
-    # Progress
+    # Progress - how far we've pushed this hero
     current_step: int = 0
     total_examples: int = 0
 
@@ -113,8 +142,16 @@ class Campaign:
     # Description
     description: str = ""
 
-    # History
+    # History & Achievements
     milestones: List[Milestone] = field(default_factory=list)
+
+    # Peak achievements - tracking "how far did we push?"
+    # e.g., {"sy": 15, "bin": 12} = highest skill levels reached
+    peak_skill_levels: Dict[str, int] = field(default_factory=dict)
+
+    # Personal bests - best metrics achieved in this campaign
+    # e.g., {"lowest_loss": 0.82, "highest_accuracy": 0.94}
+    peak_metrics: Dict[str, float] = field(default_factory=dict)
 
     # Archive info
     archived_at: Optional[str] = None
@@ -160,12 +197,15 @@ class Campaign:
             "skills_focus": self.skills_focus,
             "config_overrides": self.config_overrides,
             "milestones": [m.to_dict() for m in self.milestones],
+            # Peak achievements - how far did we push?
+            "peak_skill_levels": self.peak_skill_levels,
+            "peak_metrics": self.peak_metrics,
             "archived_at": self.archived_at,
         }
 
     @classmethod
     def from_dict(cls, data: Dict, path: Path) -> "Campaign":
-        """Create Campaign from dictionary."""
+        """Create Campaign from dictionary (loading a saved journey)."""
         milestones = [
             Milestone.from_dict(m) for m in data.get("milestones", [])
         ]
@@ -184,6 +224,9 @@ class Campaign:
             skills_focus=data.get("skills_focus", []),
             config_overrides=data.get("config_overrides", {}),
             milestones=milestones,
+            # Peak achievements - how far did we push in this journey?
+            peak_skill_levels=data.get("peak_skill_levels", {}),
+            peak_metrics=data.get("peak_metrics", {}),
             archived_at=data.get("archived_at"),
         )
 
@@ -211,6 +254,54 @@ class Campaign:
         if examples is not None:
             self.total_examples = examples
         self.save()
+
+    def update_peak_skill(self, skill_id: str, level: int) -> bool:
+        """
+        Update peak skill level if this is a new personal best.
+
+        This tracks "how far did we push this hero in this skill?"
+        Returns True if this was a new peak (we pushed further!).
+        """
+        current_peak = self.peak_skill_levels.get(skill_id, 0)
+        if level > current_peak:
+            self.peak_skill_levels[skill_id] = level
+            self.save()
+            return True
+        return False
+
+    def update_peak_metric(self, metric_name: str, value: float, lower_is_better: bool = True) -> bool:
+        """
+        Update peak metric if this is a new personal best.
+
+        This tracks "what's the best we've achieved on this metric?"
+        For loss: lower_is_better=True (0.5 beats 0.8)
+        For accuracy: lower_is_better=False (0.95 beats 0.80)
+
+        Returns True if this was a new peak.
+        """
+        current_peak = self.peak_metrics.get(metric_name)
+        is_new_peak = False
+
+        if current_peak is None:
+            is_new_peak = True
+        elif lower_is_better and value < current_peak:
+            is_new_peak = True
+        elif not lower_is_better and value > current_peak:
+            is_new_peak = True
+
+        if is_new_peak:
+            self.peak_metrics[metric_name] = value
+            self.save()
+            return True
+        return False
+
+    @property
+    def journey_summary(self) -> str:
+        """Get a one-line summary of this hero's journey."""
+        skills_str = ", ".join(
+            f"{s}:L{l}" for s, l in self.peak_skill_levels.items()
+        ) or "No skills yet"
+        return f"{self.name} - Step {self.current_step:,} - {skills_str}"
 
 
 @dataclass

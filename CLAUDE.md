@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-11-28
+**Last Updated:** 2025-11-29
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 
 ---
@@ -9,7 +9,27 @@
 
 **This is an RPG Idler game about training an AI hero.**
 
-Your hero **DIO** (a Qwen3-0.6B model) battles through quests (training data), learning skills (SY, BIN), and growing stronger. You watch from the **Tavern** as DIO fights, levels up, and becomes a champion.
+A **Campaign** is a hero's journey to maximum potential - one attempt to push a model as far as it can go. The goal: discover the level cap. How much can this hero learn?
+
+### The Core Mental Model
+
+| RPG Concept | Training Reality |
+|-------------|------------------|
+| **Hero** | A model (DIO=Qwen3-0.6B, FLO=Qwen3-4B) |
+| **Campaign** | One playthrough/attempt to reach max potential |
+| **Continue** | Keep training, keep learning, push further |
+| **Level Cap** | The theoretical limit of what this model can learn |
+| **Skill Levels** | Curriculum progression (L1→L50 per skill) |
+| **Personal Best** | Peak metrics achieved in this campaign |
+
+**Different heroes have different potentials:**
+- A 0.6B model might cap at skill level 20
+- A 4B model might reach level 50
+- We discover the cap by PLAYING (training)
+
+**Starting points:**
+- `starting_checkpoint=None` → Fresh start (new game)
+- `starting_checkpoint="checkpoint-X"` → Continue from save (or New Game+)
 
 ### The Experience
 

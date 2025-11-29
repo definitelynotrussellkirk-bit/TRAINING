@@ -52,6 +52,9 @@ from watchtower.chronicle import get_chronicle
 # Import API modules (extracted from this file)
 from tavern.api import heroes as heroes_api
 from tavern.api import analysis as analysis_api
+from tavern.api import skills as skills_api
+from tavern.api import vault as vault_api
+from tavern.api import jobs as jobs_api
 
 # Import events system
 try:
@@ -371,19 +374,19 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._serve_saga_stats()
 
         elif path == "/skills":
-            self._serve_skills()
+            skills_api.serve_skills(self)
 
         elif path.startswith("/skill/"):
             skill_id = path.replace("/skill/", "").strip("/")
             if skill_id:
-                self._serve_skill_page(skill_id)
+                self._serve_template("skill.html")  # Page template
             else:
                 self._send_error(400, "Missing skill ID")
 
         elif path.startswith("/skill-data/"):
             skill_id = path.replace("/skill-data/", "").strip("/")
             if skill_id:
-                self._serve_skill_data(skill_id)
+                skills_api.serve_skill_data(self, skill_id)
             else:
                 self._send_error(400, "Missing skill ID")
 
@@ -405,16 +408,16 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/vault/zones/refresh":
             self._serve_vault_zones(refresh=True)
 
-        # Ledger API - checkpoint stats and history
+        # Ledger API - checkpoint stats and history (uses vault_api)
         elif path == "/ledger":
-            self._serve_ledger_list(query)
+            vault_api.serve_ledger_list(self, query)
         elif path == "/ledger/summary":
-            self._serve_ledger_summary()
+            vault_api.serve_ledger_summary(self)
         elif path == "/ledger/best":
-            self._serve_ledger_best(query)
+            vault_api.serve_ledger_best(self, query)
         elif path.startswith("/ledger/"):
             step_str = path.replace("/ledger/", "")
-            self._serve_ledger_checkpoint(step_str)
+            vault_api.serve_ledger_checkpoint(self, step_str)
 
         # Checkpoint detail page
         elif path.startswith("/checkpoint/"):
@@ -427,7 +430,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path.startswith("/checkpoint-data/"):
             step_str = path.replace("/checkpoint-data/", "").strip("/")
             if step_str:
-                self._serve_checkpoint_data(step_str)
+                vault_api.serve_checkpoint_data(self, step_str)
             else:
                 self._send_error(400, "Missing checkpoint step")
 
@@ -450,29 +453,29 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/hero-model-info":
             heroes_api.serve_hero_model_info(self)
         elif path == "/api/skills":
-            self._serve_skills()
+            skills_api.serve_skills(self)
         elif path == "/api/titles":
-            self._serve_titles()
+            skills_api.serve_titles(self)
         elif path == "/api/curriculum":
-            self._serve_curriculum()
+            skills_api.serve_curriculum(self)
         elif path == "/api/passives/definitions":
             self._serve_passives_definitions()
         elif path == "/api/passives/summary":
             self._serve_passives_summary()
 
-        # Skill Engine - Primitives API
+        # Skill Engine - Primitives API (uses skills_api)
         elif path == "/api/engine/health":
-            self._serve_engine_health()
+            skills_api.serve_engine_health(self)
         elif path == "/api/engine/primitives":
             self._serve_all_primitives()
         elif path == "/api/engine/primitive-summary":
-            self._serve_primitive_summary()
+            skills_api.serve_primitive_summary(self)
         elif path.startswith("/api/engine/skill/") and path.endswith("/primitives"):
             skill_id = path.replace("/api/engine/skill/", "").replace("/primitives", "")
-            self._serve_skill_primitives(skill_id)
+            skills_api.serve_skill_primitives(self, skill_id)
         elif path.startswith("/api/engine/skill/") and path.endswith("/state"):
             skill_id = path.replace("/api/engine/skill/", "").replace("/state", "")
-            self._serve_skill_state(skill_id)
+            skills_api.serve_skill_state(self, skill_id)
 
         # Mantra - System prompt that's injected into all training
         elif path == "/mantra":
@@ -543,16 +546,16 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/battle-log" or path == "/battle_log" or path == "/battlelog":
             self._serve_template("battle_log.html")
 
-        # Jobs API - Distributed job execution
+        # Jobs API - Distributed job execution (uses jobs_api)
         elif path == "/jobs" or path == "/jobs.html":
             self._serve_template("jobs.html")
         elif path == "/api/jobs":
-            self._serve_jobs_list(query)
+            jobs_api.serve_jobs_list(self, query)
         elif path == "/api/jobs/stats":
-            self._serve_jobs_stats()
+            jobs_api.serve_jobs_stats(self)
         elif path.startswith("/api/jobs/"):
             job_id = path.replace("/api/jobs/", "")
-            self._serve_job(job_id)
+            jobs_api.serve_job(self, job_id)
 
         # Cluster Dashboard - Heterogeneous cluster status
         elif path == "/cluster" or path == "/cluster.html":

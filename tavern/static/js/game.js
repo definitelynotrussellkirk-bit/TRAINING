@@ -941,6 +941,93 @@ async function fetchCampaignData() {
 // Global poller group for managing all polling loops
 const pollers = createPollerGroup();
 
+// ============================================
+// MOMENTUM ENGINE - Forward Progress Tracking
+// ============================================
+
+/**
+ * Fetch and display momentum state (blockers, forward progress)
+ */
+async function fetchMomentum() {
+    try {
+        const res = await fetch('/api/momentum');
+        if (!res.ok) return;
+
+        const m = await res.json();
+        updateMomentumUI(m);
+    } catch (err) {
+        console.error('Failed to fetch momentum:', err);
+    }
+}
+
+/**
+ * Update the momentum card UI based on state
+ */
+function updateMomentumUI(m) {
+    const card = document.getElementById('momentumCard');
+    const badge = document.getElementById('momentumBadge');
+    const statusEl = document.getElementById('momentumStatus');
+    const blockerDiv = document.getElementById('momentumBlocker');
+
+    if (!card) return;
+
+    const status = m.status || 'idle';
+    const pb = m.primary_blocker;
+    const blockerCount = m.blocker_count || 0;
+
+    // Update badge
+    badge.className = 'momentum-badge ' + status;
+    statusEl.textContent = status.toUpperCase();
+
+    // Update card class
+    card.className = 'momentum-card';
+    if (status === 'blocked') card.classList.add('blocked');
+    if (pb && pb.severity === 'error') card.classList.add('error');
+
+    // Show card only if there are blockers
+    if (blockerCount > 0) {
+        card.style.display = 'block';
+
+        // Show primary blocker details
+        if (pb) {
+            blockerDiv.style.display = 'block';
+            document.getElementById('blockerWhat').textContent =
+                `Trying to: ${pb.what_i_was_trying}`;
+            document.getElementById('blockerWhy').textContent = pb.why_i_failed;
+            document.getElementById('blockerHow').textContent = pb.how_to_fix;
+
+            // Set up action button
+            const btn = document.getElementById('blockerActionBtn');
+            const action = pb.suggested_action;
+
+            if (action === 'open_campaign') {
+                btn.textContent = 'Open Campaign';
+                btn.onclick = () => (window.location.href = '/campaign');
+            } else if (action === 'open_guild') {
+                btn.textContent = 'Open Guild';
+                btn.onclick = () => (window.location.href = '/guild');
+            } else if (action === 'open_settings') {
+                btn.textContent = 'Open Settings';
+                btn.onclick = () => (window.location.href = '/settings');
+            } else if (action === 'open_quests') {
+                btn.textContent = 'Open Quests';
+                btn.onclick = () => (window.location.href = '/quests');
+            } else if (action === 'open_analysis') {
+                btn.textContent = 'Open Analysis';
+                btn.onclick = () => (window.location.href = '/analysis');
+            } else {
+                btn.textContent = 'Show Details';
+                btn.onclick = () => console.log('Blocker context:', pb.context);
+            }
+        } else {
+            blockerDiv.style.display = 'none';
+        }
+    } else {
+        // No blockers - hide the card entirely
+        card.style.display = 'none';
+    }
+}
+
 function init() {
     console.log('Realm of Training initializing...');
 
@@ -962,12 +1049,16 @@ function init() {
     // Fetch hint data (quests, task master)
     fetchHintData();
 
+    // Fetch momentum state (blockers, forward progress)
+    fetchMomentum();
+
     // Set up polling using createPollerGroup for centralized management
     pollers.add('gameData', fetchGameData, CONFIG.UPDATE_INTERVAL, { immediate: false });
     pollers.add('saga', fetchSaga, 5000, { immediate: false });
     pollers.add('hints', fetchHintData, 10000, { immediate: false });
     pollers.add('skills', fetchSkills, 30000, { immediate: false });
     pollers.add('time', updateTime, 1000, { immediate: false });
+    pollers.add('momentum', fetchMomentum, 15000, { immediate: false }); // Check momentum every 15s
 
     // Start all pollers
     pollers.startAll();

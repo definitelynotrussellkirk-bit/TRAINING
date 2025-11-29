@@ -1141,3 +1141,104 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* ========================================
+   MOMENTUM ENGINE - Forward Progress
+   ======================================== */
+
+.momentum-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.momentum-card.blocked {
+    border-color: var(--color-warning);
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.momentum-card.error {
+    border-color: var(--color-danger);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.momentum-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.momentum-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.momentum-badge.go {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--color-success);
+}
+
+.momentum-badge.blocked {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--color-warning);
+}
+
+.momentum-badge.idle {
+    background: rgba(107, 114, 128, 0.2);
+    color: var(--text-muted);
+}
+
+.momentum-title {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.momentum-blocker {
+    padding: 0.5rem;
+    background: var(--bg-highlight);
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+
+.blocker-what {
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.blocker-why {
+    color: var(--color-warning);
+    margin-bottom: 0.5rem;
+}
+
+.blocker-how {
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    font-style: italic;
+}
+
+.blocker-action-btn {
+    background: var(--color-warning);
+    color: #000;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.blocker-action-btn:hover {
+    background: #fbbf24;
+    transform: translateY(-1px);
+}

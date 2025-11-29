@@ -55,6 +55,7 @@ from tavern.api import analysis as analysis_api
 from tavern.api import skills as skills_api
 from tavern.api import vault as vault_api
 from tavern.api import jobs as jobs_api
+from tavern.api import momentum as momentum_api
 
 # Import events system
 try:
@@ -578,6 +579,10 @@ class TavernHandler(SimpleHTTPRequestHandler):
             heroes_api.serve_active_campaign(self)
         elif path == "/api/heroes":
             heroes_api.serve_heroes_data(self)
+
+        # Momentum Engine - Forward progress + blockers
+        elif path == "/api/momentum":
+            momentum_api.serve_momentum(self)
 
         # Analysis - Model Archaeology (uses analysis_api module)
         elif path == "/analysis" or path == "/analysis.html":

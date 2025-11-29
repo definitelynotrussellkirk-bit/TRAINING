@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Realm of Training</title>
-    <link rel="stylesheet" href="/static/css/game.css?v=3">
+    <!-- Shared theme (design tokens, badges, components) -->
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <!-- Main game styles -->
+    <link rel="stylesheet" href="/static/css/game.css?v=4">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -238,6 +241,12 @@
         <!-- Notifications will be injected here -->
     </div>
 
-    <script src="/static/js/game.js?v=15"></script>
+    <!-- Shared modules (load before game.js) -->
+    <script src="/static/js/formatters.js?v=1"></script>
+    <script src="/static/js/training_client.js?v=1"></script>
+    <script src="/static/js/polling.js?v=1"></script>
+    <script src="/static/js/training_controls.js?v=1"></script>
+    <!-- Main game logic -->
+    <script src="/static/js/game.js?v=16"></script>
 </body>
 </html>

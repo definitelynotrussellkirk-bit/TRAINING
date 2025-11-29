@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Vault - Realm of Training</title>
-    <link rel="stylesheet" href="/static/css/game.css?v=2">
+    <!-- Shared theme -->
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <link rel="stylesheet" href="/static/css/game.css?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         .vault-main {
@@ -441,6 +443,9 @@
     <nav class="game-nav" id="bottomNav"></nav>
     <script src="/static/js/nav.js"></script>
     <script src="/static/js/events.js"></script>
+    <!-- Shared modules -->
+    <script src="/static/js/formatters.js?v=1"></script>
+    <script src="/static/js/polling.js?v=1"></script>
 
     <script>
         // ============================================
@@ -452,9 +457,9 @@
         function $(sel) { return document.querySelector(sel); }
         function setText(sel, text) { const el = $(sel); if (el) el.textContent = text; }
 
-        // Update time display
+        // Update time display - using Format module
         function updateTime() {
-            setText('#timeDisplay', new Date().toLocaleTimeString('en-US', { hour12: false }));
+            setText('#timeDisplay', Format.timestamp(new Date()));
         }
         setInterval(updateTime, 1000);
         updateTime();
@@ -730,9 +735,10 @@
             }
         }
 
-        // Initialize
-        fetchVaultAssets();
-        setInterval(fetchVaultAssets, 10000); // Refresh every 10 seconds
+        // Initialize with createPoller
+        const vaultPoller = createPoller(fetchVaultAssets, 10000, { name: 'vault' });
+        fetchVaultAssets();  // Initial fetch
+        vaultPoller.start();
     </script>
 </body>
 </html>

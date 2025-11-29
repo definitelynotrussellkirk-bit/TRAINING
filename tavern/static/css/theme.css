@@ -1,0 +1,414 @@
+/**
+ * Realm of Training - Shared Theme
+ *
+ * Design tokens and reusable UI components.
+ * Include this before game.css in all templates.
+ */
+
+/* ========================================
+   DESIGN TOKENS
+   ======================================== */
+
+:root {
+    /* Background Colors */
+    --bg-dark: #0a0c10;
+    --bg-panel: #12151c;
+    --bg-card: #1a1e28;
+    --bg-highlight: #242a38;
+    --bg-surface: #1a1e28;
+
+    /* Border Colors */
+    --border-color: #2d3548;
+    --border-gold: #c9a227;
+    --border-subtle: #1f2937;
+
+    /* Text Colors */
+    --text-primary: #e8e6e3;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    --text-gold: #fbbf24;
+
+    /* Status Colors - Unified across all UIs */
+    --status-running: #22c55e;
+    --status-training: #22c55e;
+    --status-success: #10b981;
+    --status-paused: #f59e0b;
+    --status-warning: #f59e0b;
+    --status-stopped: #6b7280;
+    --status-idle: #6b7280;
+    --status-failed: #ef4444;
+    --status-error: #ef4444;
+    --status-champion: #a855f7;
+    --status-deployed: #06b6d4;
+    --status-pending: #3b82f6;
+
+    /* Game Colors */
+    --color-gold: #fbbf24;
+    --color-xp: #a855f7;
+    --color-health: #22c55e;
+    --color-damage: #ef4444;
+    --color-defense: #3b82f6;
+    --color-mana: #06b6d4;
+
+    /* Semantic Colors */
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-danger: #ef4444;
+    --color-info: #3b82f6;
+
+    /* Fonts */
+    --font-title: 'Cinzel', serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'Courier New', monospace;
+
+    /* Spacing */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 0.75rem;
+    --space-lg: 1rem;
+    --space-xl: 1.5rem;
+
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-full: 999px;
+
+    /* Effects */
+    --glow-gold: 0 0 20px rgba(251, 191, 36, 0.3);
+    --glow-purple: 0 0 20px rgba(168, 85, 247, 0.3);
+    --glow-red: 0 0 20px rgba(239, 68, 68, 0.2);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ========================================
+   UNIFIED BADGE SYSTEM
+   ======================================== */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    background: transparent;
+    white-space: nowrap;
+}
+
+/* Status badges - use for training state, job state, etc. */
+.badge--running,
+.badge--training {
+    border-color: var(--status-running);
+    color: var(--status-running);
+}
+
+.badge--success {
+    border-color: var(--status-success);
+    color: var(--status-success);
+}
+
+.badge--paused {
+    border-color: var(--status-paused);
+    color: var(--status-paused);
+}
+
+.badge--warning {
+    border-color: var(--status-warning);
+    color: var(--status-warning);
+}
+
+.badge--stopped,
+.badge--idle {
+    border-color: var(--status-stopped);
+    color: var(--status-stopped);
+}
+
+.badge--failed,
+.badge--error {
+    border-color: var(--status-failed);
+    color: var(--status-failed);
+}
+
+.badge--champion {
+    border-color: var(--status-champion);
+    color: var(--status-champion);
+}
+
+.badge--deployed {
+    border-color: var(--status-deployed);
+    color: var(--status-deployed);
+}
+
+.badge--pending {
+    border-color: var(--status-pending);
+    color: var(--status-pending);
+}
+
+/* Filled variant */
+.badge--filled {
+    background: currentColor;
+    color: var(--bg-dark);
+    border-color: transparent;
+}
+
+.badge--filled.badge--running,
+.badge--filled.badge--training {
+    background: var(--status-running);
+}
+
+.badge--filled.badge--paused,
+.badge--filled.badge--warning {
+    background: var(--status-warning);
+}
+
+.badge--filled.badge--failed,
+.badge--filled.badge--error {
+    background: var(--status-failed);
+}
+
+.badge--filled.badge--champion {
+    background: var(--status-champion);
+}
+
+/* Size variants */
+.badge--sm {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+}
+
+.badge--lg {
+    font-size: 0.85rem;
+    padding: 0.25rem 0.75rem;
+}
+
+/* ========================================
+   STAT CARD COMPONENT
+   ======================================== */
+
+.stat-card {
+    background: var(--bg-surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    padding: var(--space-sm) var(--space-md);
+}
+
+.stat-card__label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-xs);
+}
+
+.stat-card__value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+}
+
+.stat-card__sub {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+/* Stat card variants */
+.stat-card--success .stat-card__value {
+    color: var(--color-success);
+}
+
+.stat-card--warning .stat-card__value {
+    color: var(--color-warning);
+}
+
+.stat-card--danger .stat-card__value {
+    color: var(--color-danger);
+}
+
+.stat-card--gold .stat-card__value {
+    color: var(--color-gold);
+}
+
+/* Horizontal stat card */
+.stat-card--horizontal {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.stat-card--horizontal .stat-card__label {
+    margin-bottom: 0;
+}
+
+/* ========================================
+   BUTTON COMPONENTS
+   ======================================== */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn:hover {
+    background: var(--bg-highlight);
+    border-color: var(--color-gold);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn--primary {
+    background: var(--color-gold);
+    border-color: var(--color-gold);
+    color: var(--bg-dark);
+}
+
+.btn--primary:hover {
+    background: #e0a820;
+}
+
+.btn--danger {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}
+
+.btn--danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.btn--success {
+    border-color: var(--color-success);
+    color: var(--color-success);
+}
+
+.btn--success:hover {
+    background: rgba(34, 197, 94, 0.2);
+}
+
+.btn--sm {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.75rem;
+}
+
+.btn--lg {
+    padding: var(--space-md) var(--space-lg);
+    font-size: 1rem;
+}
+
+/* ========================================
+   PROGRESS BAR COMPONENT
+   ======================================== */
+
+.progress {
+    height: 8px;
+    background: var(--bg-dark);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.progress__bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-success), var(--color-warning));
+    border-radius: var(--radius-sm);
+    transition: width 0.3s ease;
+}
+
+.progress--success .progress__bar {
+    background: var(--color-success);
+}
+
+.progress--warning .progress__bar {
+    background: var(--color-warning);
+}
+
+.progress--danger .progress__bar {
+    background: var(--color-danger);
+}
+
+.progress--lg {
+    height: 12px;
+}
+
+.progress--xl {
+    height: 24px;
+    border-radius: var(--radius-md);
+}
+
+/* ========================================
+   PANEL/CARD CONTAINERS
+   ======================================== */
+
+.panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+}
+
+.panel__header {
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panel__title {
+    font-family: var(--font-title);
+    font-size: 1.1rem;
+    color: var(--color-gold);
+    margin: 0;
+}
+
+.panel__body {
+    padding: var(--space-lg);
+}
+
+.panel--highlight {
+    border-color: var(--border-gold);
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+.text-gold { color: var(--color-gold); }
+.text-success { color: var(--color-success); }
+.text-warning { color: var(--color-warning); }
+.text-danger { color: var(--color-danger); }
+
+.font-mono { font-family: var(--font-mono); }
+.font-title { font-family: var(--font-title); }
+
+.text-sm { font-size: 0.75rem; }
+.text-md { font-size: 0.875rem; }
+.text-lg { font-size: 1.125rem; }
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-xs { gap: var(--space-xs); }
+.gap-sm { gap: var(--space-sm); }
+.gap-md { gap: var(--space-md); }
+.gap-lg { gap: var(--space-lg); }

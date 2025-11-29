@@ -72,36 +72,26 @@ const GameState = {
 // UTILITY FUNCTIONS
 // ============================================
 
+// Formatting functions - delegate to shared Format module (formatters.js)
+// These wrappers maintain backward compatibility with existing code
 function formatNumber(num) {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return Math.round(num).toString();
+    return Format.compact(num);
 }
 
 function formatStrain(loss) {
-    // Strain = loss, lower is better
-    if (!loss || loss <= 0) return '--';
-    return loss.toFixed(4);
+    return Format.loss(loss);
 }
 
 function formatClarity(perplexity) {
-    // Clarity = 1/perplexity, higher is better
-    if (!perplexity || perplexity <= 0) return '--';
-    const clarity = 1 / perplexity;
-    return clarity.toFixed(3);
+    return Format.clarity(perplexity);
 }
 
 function formatETA(seconds) {
-    if (!seconds || seconds <= 0) return '--';
-    if (seconds < 60) return `${Math.round(seconds)}s`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${mins}m`;
+    return Format.eta(seconds);
 }
 
 function formatTime(date) {
-    return date.toLocaleTimeString('en-US', { hour12: false });
+    return Format.timestamp(date);
 }
 
 // ============================================
@@ -948,6 +938,9 @@ async function fetchCampaignData() {
 // INITIALIZATION
 // ============================================
 
+// Global poller group for managing all polling loops
+const pollers = createPollerGroup();
+
 function init() {
     console.log('Realm of Training initializing...');
 
@@ -969,22 +962,20 @@ function init() {
     // Fetch hint data (quests, task master)
     fetchHintData();
 
-    setInterval(fetchGameData, CONFIG.UPDATE_INTERVAL);
+    // Set up polling using createPollerGroup for centralized management
+    pollers.add('gameData', fetchGameData, CONFIG.UPDATE_INTERVAL, { immediate: false });
+    pollers.add('saga', fetchSaga, 5000, { immediate: false });
+    pollers.add('hints', fetchHintData, 10000, { immediate: false });
+    pollers.add('skills', fetchSkills, 30000, { immediate: false });
+    pollers.add('time', updateTime, 1000, { immediate: false });
 
-    // Refresh saga every 5 seconds (incremental, won't wipe)
-    setInterval(fetchSaga, 5000);
-
-    // Refresh hint data every 10 seconds (quests, task master status)
-    setInterval(fetchHintData, 10000);
-
-    // Refresh skills every 30 seconds (reads YAML + curriculum state)
-    setInterval(fetchSkills, 30000);
-
-    // Update time every second
-    setInterval(updateTime, 1000);
+    // Start all pollers
+    pollers.startAll();
 
     // Register for real-time SSE training updates
     registerTrainingEventHandlers();
+
+    console.log('[Game] Pollers initialized:', Object.keys(pollers.getAllStats()));
 }
 
 /**
@@ -1060,6 +1051,7 @@ function registerTrainingEventHandlers() {
 
 /**
  * Send control command to training daemon
+ * Uses TrainingClient for API abstraction
  * @param {string} action - 'pause', 'resume', or 'stop'
  */
 async function controlTraining(action) {
@@ -1073,29 +1065,20 @@ async function controlTraining(action) {
     if (btnStop) btnStop.disabled = true;
 
     try {
-        const response = await fetch('/api/daemon/control', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action })
-        });
+        // Use TrainingClient for API call
+        const result = await TrainingClient.controlTraining(action);
 
-        const result = await response.json();
-
-        if (result.success) {
-            // Update button states based on action
-            if (action === 'pause') {
-                if (btnPause) btnPause.style.display = 'none';
-                if (btnResume) btnResume.style.display = 'inline-flex';
-                addLocalLog(`Training paused - ${result.message}`, 'warning');
-            } else if (action === 'resume') {
-                if (btnPause) btnPause.style.display = 'inline-flex';
-                if (btnResume) btnResume.style.display = 'none';
-                addLocalLog(`Training resumed - ${result.message}`, 'success');
-            } else if (action === 'stop') {
-                addLocalLog(`Training stopped - ${result.message}`, 'warning');
-            }
-        } else {
-            addLocalLog(`Control failed: ${result.error}`, 'error');
+        // Update button states based on action
+        if (action === 'pause') {
+            if (btnPause) btnPause.style.display = 'none';
+            if (btnResume) btnResume.style.display = 'inline-flex';
+            addLocalLog(`Training paused - ${result.message}`, 'warning');
+        } else if (action === 'resume') {
+            if (btnPause) btnPause.style.display = 'inline-flex';
+            if (btnResume) btnResume.style.display = 'none';
+            addLocalLog(`Training resumed - ${result.message}`, 'success');
+        } else if (action === 'stop') {
+            addLocalLog(`Training stopped - ${result.message}`, 'warning');
         }
     } catch (error) {
         addLocalLog(`Control error: ${error.message}`, 'error');

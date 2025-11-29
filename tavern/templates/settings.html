@@ -4,64 +4,84 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - Realm of Training</title>
-    <link rel="stylesheet" href="/static/css/game.css?v=2">
+    <!-- Shared styles -->
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <link rel="stylesheet" href="/static/css/forms.css?v=1">
+    <link rel="stylesheet" href="/static/css/game.css?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        .settings-main {
+        /* 3-Pane Layout */
+        .settings-layout {
             display: grid;
-            grid-template-columns: 250px 1fr;
-            gap: 1.5rem;
-            padding: 1.5rem;
+            grid-template-columns: 200px 1fr 280px;
+            gap: var(--space-lg);
+            padding: var(--space-lg);
             height: calc(100vh - 120px);
             overflow: hidden;
         }
 
+        /* Left: Category Nav */
         .settings-nav {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: var(--space-xs);
+        }
+
+        .settings-nav__title {
+            font-family: var(--font-title);
+            font-size: 1.25rem;
+            color: var(--color-gold);
+            margin-bottom: var(--space-xs);
+        }
+
+        .settings-nav__subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: var(--space-md);
         }
 
         .settings-nav-item {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.75rem 1rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: left;
         }
 
         .settings-nav-item:hover {
-            border-color: var(--border-gold);
+            background: var(--bg-surface);
+            border-color: var(--border-color);
         }
 
         .settings-nav-item.active {
+            background: var(--bg-surface);
             border-color: var(--color-gold);
-            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(245, 158, 11, 0.1) 100%);
+            color: var(--text-primary);
         }
 
-        .settings-nav-icon {
-            font-size: 1.25rem;
+        .settings-nav-item.danger {
+            color: var(--color-danger);
         }
 
-        .settings-nav-label {
-            font-weight: 500;
+        .settings-nav-item.danger:hover,
+        .settings-nav-item.danger.active {
+            border-color: var(--color-danger);
         }
 
-        .settings-content {
+        /* Middle: Form Content */
+        .settings-main {
             overflow-y: auto;
-            padding-right: 0.5rem;
+            padding-right: var(--space-sm);
         }
 
         .settings-section {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
             display: none;
         }
 
@@ -69,315 +89,268 @@
             display: block;
         }
 
-        .settings-section h2 {
-            font-family: var(--font-display);
+        .settings-section__header {
+            margin-bottom: var(--space-lg);
+        }
+
+        .settings-section__title {
+            font-family: var(--font-title);
+            font-size: 1.5rem;
             color: var(--color-gold);
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
+            margin-bottom: var(--space-xs);
         }
 
-        .settings-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .settings-group h3 {
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .settings-row {
-            display: grid;
-            grid-template-columns: 200px 1fr;
-            gap: 1rem;
-            align-items: center;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .settings-row:last-child {
-            border-bottom: none;
-        }
-
-        .settings-label {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
-        .settings-label small {
-            display: block;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            opacity: 0.7;
-            margin-top: 0.25rem;
-        }
-
-        .settings-value {
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-            font-size: 0.9rem;
-        }
-
-        .settings-value.locked {
-            color: var(--text-muted);
-            font-style: italic;
-        }
-
-        /* Form inputs */
-        .settings-input {
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 0.5rem 0.75rem;
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-            font-size: 0.9rem;
-            width: 100%;
-            max-width: 300px;
-            transition: border-color 0.2s ease;
-        }
-
-        .settings-input:focus {
-            outline: none;
-            border-color: var(--color-gold);
-        }
-
-        .settings-input:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .settings-input[type="number"] {
-            max-width: 150px;
-        }
-
-        .settings-select {
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 0.5rem 0.75rem;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            cursor: pointer;
-            min-width: 150px;
-        }
-
-        .settings-toggle {
-            position: relative;
-            width: 48px;
-            height: 24px;
-            background: var(--bg-dark);
-            border-radius: 12px;
-            cursor: pointer;
-            transition: background 0.2s ease;
-        }
-
-        .settings-toggle.active {
-            background: var(--color-success);
-        }
-
-        .settings-toggle::after {
-            content: '';
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 50%;
-            transition: transform 0.2s ease;
-        }
-
-        .settings-toggle.active::after {
-            transform: translateX(24px);
-        }
-
-        /* Action buttons */
-        .settings-actions {
-            position: fixed;
-            bottom: 80px;
-            right: 2rem;
-            display: flex;
-            gap: 1rem;
-            background: var(--bg-panel);
-            padding: 1rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            border: 1px solid var(--border-color);
-            z-index: 100;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
-            pointer-events: none;
-        }
-
-        .settings-actions.visible {
-            opacity: 1;
-            transform: translateY(0);
-            pointer-events: all;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-primary {
-            background: var(--color-success);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            filter: brightness(1.1);
-        }
-
-        .btn-secondary {
-            background: var(--bg-dark);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--border-gold);
-        }
-
-        /* JSON view */
-        .json-view {
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 1rem;
-            font-family: var(--font-mono);
+        .settings-section__desc {
             font-size: 0.85rem;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            max-height: 400px;
+            color: var(--text-muted);
+        }
+
+        /* Right: Summary Panel */
+        .settings-summary {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
             overflow-y: auto;
         }
 
-        /* Status indicator */
-        .save-status {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .save-status.success {
-            color: var(--color-success);
-        }
-
-        .save-status.error {
-            color: var(--color-danger);
-        }
-
-        .save-status.pending {
-            color: var(--color-warning);
-        }
-
-        /* Defaults toolbar */
-        .defaults-toolbar {
-            position: fixed;
-            bottom: 80px;
-            left: 2rem;
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-            background: var(--bg-panel);
-            padding: 0.75rem 1rem;
-            border-radius: 10px;
+        .summary-card {
+            background: var(--bg-surface);
             border: 1px solid var(--border-color);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            z-index: 100;
+            border-radius: var(--radius-lg);
+            padding: var(--space-md);
         }
 
-        .defaults-toolbar .btn {
-            padding: 0.5rem 1rem;
-            font-size: 0.85rem;
+        .summary-card__title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--space-sm);
         }
 
-        .defaults-status {
-            font-size: 0.85rem;
-            margin-left: 0.5rem;
-        }
-
-        .defaults-status.success {
-            color: var(--color-success);
-        }
-
-        .defaults-status.error {
-            color: var(--color-danger);
-        }
-
-        /* Scheduler Styles */
-        .preset-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 0.75rem;
-        }
-
-        .preset-card {
-            padding: 0.75rem;
+        .summary-config {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
             background: var(--bg-dark);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            border-radius: var(--radius-sm);
+            padding: var(--space-sm);
+            max-height: 200px;
+            overflow: auto;
+            white-space: pre-wrap;
+            color: var(--text-secondary);
+        }
+
+        .summary-actions {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+
+        .summary-actions .btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .summary-status {
+            font-size: 0.8rem;
             text-align: center;
+            padding: var(--space-xs);
         }
 
-        .preset-card:hover {
+        /* VRAM Calculator */
+        .vram-calculator {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: var(--space-md);
+        }
+
+        .vram-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-sm);
+        }
+
+        .vram-header h4 {
+            margin: 0;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .vram-total {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+
+        .vram-total.safe { color: var(--color-success); }
+        .vram-total.warning { color: var(--color-warning); }
+        .vram-total.danger { color: var(--color-danger); }
+
+        .vram-bar-container {
+            background: var(--bg-dark);
+            border-radius: var(--radius-sm);
+            height: 20px;
+            overflow: hidden;
+            margin-bottom: var(--space-sm);
+            position: relative;
+        }
+
+        .vram-bar {
+            height: 100%;
+            display: flex;
+        }
+
+        .vram-segment { height: 100%; transition: width 0.3s ease; }
+        .vram-segment.model { background: #3B82F6; }
+        .vram-segment.optimizer { background: #8B5CF6; }
+        .vram-segment.gradients { background: #EC4899; }
+        .vram-segment.activations { background: #F59E0B; }
+
+        .vram-limit {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--color-danger);
+        }
+
+        .vram-breakdown {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-xs);
+            font-size: 0.75rem;
+        }
+
+        .vram-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .vram-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+        }
+
+        .vram-dot.model { background: #3B82F6; }
+        .vram-dot.optimizer { background: #8B5CF6; }
+        .vram-dot.gradients { background: #EC4899; }
+        .vram-dot.activations { background: #F59E0B; }
+
+        .vram-gpu-select {
+            display: flex;
+            gap: var(--space-xs);
+            margin-top: var(--space-sm);
+            flex-wrap: wrap;
+        }
+
+        .vram-gpu-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .vram-gpu-btn:hover { border-color: var(--color-gold); }
+        .vram-gpu-btn.active {
+            background: rgba(245, 158, 11, 0.2);
             border-color: var(--color-gold);
-            background: rgba(245, 158, 11, 0.1);
+            color: var(--text-primary);
         }
 
-        .preset-card.active {
-            border-color: var(--color-success);
-            background: rgba(76, 175, 80, 0.15);
+        .vram-tip {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: var(--space-sm);
+            padding: var(--space-xs);
+            background: var(--bg-dark);
+            border-radius: var(--radius-sm);
         }
 
-        .preset-card .preset-name {
+        .vram-tip strong { color: var(--color-gold); }
+
+        /* Skill Config Cards */
+        .skill-configs {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+
+        .skill-config-card {
+            display: grid;
+            grid-template-columns: 40px 1fr repeat(2, 80px);
+            gap: var(--space-md);
+            align-items: center;
+            padding: var(--space-md);
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+        }
+
+        .skill-config-card.disabled { opacity: 0.5; }
+
+        .skill-info .skill-name {
             font-weight: 600;
             color: var(--text-primary);
-            font-size: 0.85rem;
-            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
         }
 
-        .preset-card .preset-desc {
-            font-size: 0.75rem;
+        .skill-info .skill-level {
+            font-size: 0.8rem;
             color: var(--text-muted);
         }
 
+        .skill-info .mastered { color: var(--color-success); }
+
+        .skill-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+
+        .skill-input-group label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .skill-input-group input {
+            padding: 0.3rem 0.4rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.8rem;
+            width: 100%;
+        }
+
+        /* Strategy Grid */
         .strategy-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 0.75rem;
+            gap: var(--space-sm);
         }
 
         .strategy-card {
-            padding: 1rem;
+            padding: var(--space-md);
             background: var(--bg-dark);
             border: 2px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: var(--radius-md);
             cursor: pointer;
-            transition: all 0.2s ease;
             text-align: center;
+            transition: all 0.2s;
         }
 
-        .strategy-card:hover {
-            border-color: var(--color-gold);
-        }
-
+        .strategy-card:hover { border-color: var(--color-gold); }
         .strategy-card.selected {
             border-color: var(--color-gold);
             background: rgba(245, 158, 11, 0.2);
@@ -386,282 +359,67 @@
         .strategy-card .strategy-name {
             font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.15rem;
         }
 
         .strategy-card .strategy-desc {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .skill-configs {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .skill-config-card {
-            display: grid;
-            grid-template-columns: 50px 1fr repeat(3, 90px);
-            gap: 1rem;
-            align-items: center;
-            padding: 1rem;
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-        }
-
-        .skill-config-card.disabled {
-            opacity: 0.5;
-        }
-
-        .skill-toggle-box {
-            display: flex;
-            justify-content: center;
-        }
-
-        .skill-info-box {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .skill-info-box .skill-name {
-            font-weight: 600;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .skill-info-box .skill-level-info {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        .skill-info-box .skill-level-info .mastered {
-            color: var(--color-success);
-        }
-
-        .skill-input-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .skill-input-group label {
             font-size: 0.7rem;
             color: var(--text-muted);
-            margin-bottom: 0.25rem;
-            text-transform: uppercase;
         }
 
-        .skill-input-group input {
-            padding: 0.4rem 0.5rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-            width: 100%;
-        }
-
-        .next-decision-box {
-            padding: 1.25rem;
+        /* Next Decision Preview */
+        .next-decision {
+            padding: var(--space-md);
             background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(59, 130, 246, 0.15));
-            border-radius: 8px;
+            border-radius: var(--radius-md);
             text-align: center;
             border: 1px solid var(--border-gold);
         }
 
-        .next-decision-label {
-            font-size: 0.85rem;
+        .next-decision__label {
+            font-size: 0.8rem;
             color: var(--text-muted);
-            margin-bottom: 0.5rem;
         }
 
-        .next-decision-value {
-            font-size: 1.5rem;
+        .next-decision__value {
+            font-size: 1.25rem;
             font-weight: 700;
             color: var(--color-gold);
-            font-family: var(--font-display);
+            font-family: var(--font-title);
+            margin: var(--space-xs) 0;
         }
 
-        .next-decision-reason {
-            font-size: 0.85rem;
+        .next-decision__reason {
+            font-size: 0.75rem;
             color: var(--text-muted);
-            margin-top: 0.5rem;
         }
 
-        @media (max-width: 800px) {
+        @media (max-width: 1200px) {
+            .settings-layout {
+                grid-template-columns: 180px 1fr 240px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .settings-layout {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            .settings-nav {
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: var(--space-xs);
+            }
+            .settings-nav__title,
+            .settings-nav__subtitle {
+                display: none;
+            }
+            .settings-summary {
+                order: -1;
+            }
             .strategy-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
-            .skill-config-card {
-                grid-template-columns: 1fr;
-                gap: 0.75rem;
-            }
-        }
-
-        /* VRAM Calculator Styles */
-        .vram-calculator {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.25rem;
-            margin-top: 1rem;
-        }
-
-        .vram-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .vram-header h4 {
-            margin: 0;
-            color: var(--text-primary);
-            font-size: 0.95rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .vram-total {
-            font-size: 1.5rem;
-            font-weight: 700;
-            font-family: var(--font-mono);
-        }
-
-        .vram-total.safe {
-            color: var(--color-success);
-        }
-
-        .vram-total.warning {
-            color: var(--color-warning);
-        }
-
-        .vram-total.danger {
-            color: var(--color-danger);
-        }
-
-        .vram-bar-container {
-            background: var(--bg-dark);
-            border-radius: 8px;
-            height: 24px;
-            overflow: hidden;
-            margin-bottom: 1rem;
-            position: relative;
-        }
-
-        .vram-bar {
-            height: 100%;
-            transition: width 0.3s ease;
-            display: flex;
-        }
-
-        .vram-segment {
-            height: 100%;
-            transition: width 0.3s ease;
-        }
-
-        .vram-segment.model { background: #3B82F6; }
-        .vram-segment.optimizer { background: #8B5CF6; }
-        .vram-segment.gradients { background: #EC4899; }
-        .vram-segment.activations { background: #F59E0B; }
-
-        .vram-gpu-limit {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: var(--color-danger);
-            z-index: 10;
-        }
-
-        .vram-gpu-label {
-            position: absolute;
-            top: -18px;
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            transform: translateX(-50%);
-        }
-
-        .vram-breakdown {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.75rem;
-        }
-
-        .vram-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.85rem;
-        }
-
-        .vram-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 2px;
-            flex-shrink: 0;
-        }
-
-        .vram-dot.model { background: #3B82F6; }
-        .vram-dot.optimizer { background: #8B5CF6; }
-        .vram-dot.gradients { background: #EC4899; }
-        .vram-dot.activations { background: #F59E0B; }
-
-        .vram-item-label {
-            color: var(--text-muted);
-            flex: 1;
-        }
-
-        .vram-item-value {
-            font-family: var(--font-mono);
-            color: var(--text-primary);
-        }
-
-        .vram-gpu-select {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--border-color);
-        }
-
-        .vram-gpu-btn {
-            padding: 0.4rem 0.75rem;
-            font-size: 0.8rem;
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .vram-gpu-btn:hover {
-            border-color: var(--color-gold);
-        }
-
-        .vram-gpu-btn.active {
-            background: rgba(245, 158, 11, 0.2);
-            border-color: var(--color-gold);
-            color: var(--text-primary);
-        }
-
-        .vram-tip {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-top: 0.75rem;
-            padding: 0.5rem;
-            background: var(--bg-dark);
-            border-radius: 4px;
-        }
-
-        .vram-tip strong {
-            color: var(--color-gold);
         }
     </style>
 </head>
@@ -676,7 +434,7 @@
                 <div class="resource">
                     <span class="resource-icon">⚙️</span>
                     <span class="resource-label">CONFIG</span>
-                    <span class="resource-value" id="configStatus">Loaded</span>
+                    <span class="resource-value" id="configStatus">Loading</span>
                 </div>
             </div>
         </div>
@@ -685,272 +443,261 @@
         </div>
     </header>
 
-    <!-- MAIN SETTINGS AREA -->
-    <main class="settings-main">
-        <!-- LEFT NAV -->
-        <nav class="settings-nav">
-            <div class="settings-nav-item active" data-section="training">
-                <span class="settings-nav-icon">🎯</span>
-                <span class="settings-nav-label">Training</span>
-            </div>
-            <div class="settings-nav-item" data-section="generation">
-                <span class="settings-nav-icon">🔄</span>
-                <span class="settings-nav-label">Data Generation</span>
-            </div>
-            <div class="settings-nav-item" data-section="curriculum">
-                <span class="settings-nav-icon">📚</span>
-                <span class="settings-nav-label">Curriculum</span>
-            </div>
-            <div class="settings-nav-item" data-section="remote">
-                <span class="settings-nav-icon">🌐</span>
-                <span class="settings-nav-label">Remote Eval</span>
-            </div>
-            <div class="settings-nav-item" data-section="model">
-                <span class="settings-nav-icon">🤖</span>
-                <span class="settings-nav-label">Model Info</span>
-            </div>
-            <div class="settings-nav-item" data-section="raw">
-                <span class="settings-nav-icon">📄</span>
-                <span class="settings-nav-label">Raw JSON</span>
-            </div>
-        </nav>
+    <!-- 3-PANE LAYOUT -->
+    <div class="settings-layout">
+        <!-- LEFT: CATEGORY NAV -->
+        <aside class="settings-nav">
+            <h2 class="settings-nav__title">Settings</h2>
+            <p class="settings-nav__subtitle">Configure training behavior</p>
 
-        <!-- CONTENT -->
-        <div class="settings-content">
+            <button class="settings-nav-item active" data-section="training">
+                🎯 Training
+            </button>
+            <button class="settings-nav-item" data-section="data">
+                🔄 Data & Skills
+            </button>
+            <button class="settings-nav-item" data-section="scheduler">
+                📚 Scheduler
+            </button>
+            <button class="settings-nav-item" data-section="remote">
+                🌐 Remote Eval
+            </button>
+            <button class="settings-nav-item" data-section="model">
+                🤖 Model Info
+            </button>
+            <button class="settings-nav-item danger" data-section="danger">
+                ⚠️ Danger Zone
+            </button>
+        </aside>
+
+        <!-- MIDDLE: FORM CONTENT -->
+        <main class="settings-main">
             <!-- TRAINING SECTION -->
-            <section class="settings-section active" id="section-training">
-                <h2>🎯 Training Configuration</h2>
+            <section class="settings-section active" data-section="training">
+                <div class="settings-section__header">
+                    <h2 class="settings-section__title">Training Configuration</h2>
+                    <p class="settings-section__desc">Core hyperparameters and logging settings.</p>
+                </div>
 
-                <div class="settings-group">
-                    <h3>Hyperparameters</h3>
+                <div class="form-section">
+                    <div class="form-section__title">Hyperparameters</div>
+                    <div class="form-section__subtitle">These affect training speed, stability, and VRAM usage.</div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Batch Size
-                            <small>Samples per step</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Batch Size<small>Samples per step</small></div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="batch_size" min="1" max="32" value="1">
                         </div>
-                        <input type="number" class="settings-input" id="batch_size" min="1" max="32" value="1">
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Gradient Accumulation
-                            <small>Effective batch = batch × accum</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Gradient Accum<small>Effective batch = batch × accum</small></div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="gradient_accumulation" min="1" max="128" value="16">
                         </div>
-                        <input type="number" class="settings-input" id="gradient_accumulation" min="1" max="128" value="16">
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Learning Rate
-                            <small>Step size for optimization</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Learning Rate<small>Optimizer step size</small></div>
+                        <div class="form-row__value">
+                            <input type="text" class="form-input form-input--number" id="learning_rate" value="0.0004">
                         </div>
-                        <input type="text" class="settings-input" id="learning_rate" value="0.0004">
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Precision
-                            <small>Floating point format</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Precision<small>Floating point format</small></div>
+                        <div class="form-row__value">
+                            <select class="form-select" id="fp_precision">
+                                <option value="bf16">bf16 (Brain Float)</option>
+                                <option value="fp16">fp16 (Half)</option>
+                                <option value="fp32">fp32 (Full)</option>
+                            </select>
                         </div>
-                        <select class="settings-select" id="fp_precision">
-                            <option value="bf16">bf16 (Brain Float)</option>
-                            <option value="fp16">fp16 (Half)</option>
-                            <option value="fp32">fp32 (Full)</option>
-                        </select>
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Max Length
-                            <small>Maximum sequence length</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Max Length<small>Maximum sequence length</small></div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="max_length" min="512" max="8192" value="2048">
                         </div>
-                        <input type="number" class="settings-input" id="max_length" min="512" max="8192" value="2048">
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Gradient Checkpointing
-                            <small>Trade compute for memory</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Gradient Checkpoint<small>Trade compute for memory</small></div>
+                        <div class="form-row__value">
+                            <div class="form-toggle" id="use_gradient_checkpointing"></div>
                         </div>
-                        <div class="settings-toggle" id="use_gradient_checkpointing" onclick="toggleSetting(this)"></div>
-                    </div>
-
-                    <!-- VRAM Calculator -->
-                    <div class="vram-calculator" id="vramCalculator">
-                        <div class="vram-header">
-                            <h4>📊 Estimated VRAM Usage</h4>
-                            <div class="vram-total" id="vramTotal">-- GB</div>
-                        </div>
-
-                        <div class="vram-bar-container">
-                            <div class="vram-bar" id="vramBar">
-                                <div class="vram-segment model" id="vramModel"></div>
-                                <div class="vram-segment optimizer" id="vramOptimizer"></div>
-                                <div class="vram-segment gradients" id="vramGradients"></div>
-                                <div class="vram-segment activations" id="vramActivations"></div>
-                            </div>
-                            <div class="vram-gpu-limit" id="vramLimit" style="left: 100%;">
-                                <span class="vram-gpu-label" id="vramLimitLabel">24GB</span>
-                            </div>
-                        </div>
-
-                        <div class="vram-breakdown">
-                            <div class="vram-item">
-                                <div class="vram-dot model"></div>
-                                <span class="vram-item-label">Model Weights</span>
-                                <span class="vram-item-value" id="vramModelVal">--</span>
-                            </div>
-                            <div class="vram-item">
-                                <div class="vram-dot optimizer"></div>
-                                <span class="vram-item-label">Optimizer States</span>
-                                <span class="vram-item-value" id="vramOptimizerVal">--</span>
-                            </div>
-                            <div class="vram-item">
-                                <div class="vram-dot gradients"></div>
-                                <span class="vram-item-label">Gradients</span>
-                                <span class="vram-item-value" id="vramGradientsVal">--</span>
-                            </div>
-                            <div class="vram-item">
-                                <div class="vram-dot activations"></div>
-                                <span class="vram-item-label">Activations</span>
-                                <span class="vram-item-value" id="vramActivationsVal">--</span>
-                            </div>
-                        </div>
-
-                        <div class="vram-gpu-select">
-                            <span style="color: var(--text-muted); font-size: 0.8rem; margin-right: 0.5rem;">GPU:</span>
-                            <button class="vram-gpu-btn active" data-vram="24" onclick="setGpuVram(24)">RTX 4090 (24GB)</button>
-                            <button class="vram-gpu-btn" data-vram="24" onclick="setGpuVram(24)">RTX 3090 (24GB)</button>
-                            <button class="vram-gpu-btn" data-vram="16" onclick="setGpuVram(16)">RTX 4080 (16GB)</button>
-                            <button class="vram-gpu-btn" data-vram="12" onclick="setGpuVram(12)">RTX 4070 (12GB)</button>
-                        </div>
-
-                        <div class="vram-tip" id="vramTip"></div>
                     </div>
                 </div>
 
-                <div class="settings-group">
-                    <h3>Logging & Saves</h3>
-
-                    <div class="settings-row">
-                        <div class="settings-label">Log Steps</div>
-                        <input type="number" class="settings-input" id="log_steps" min="10" max="1000" value="200">
+                <!-- VRAM Calculator -->
+                <div class="vram-calculator">
+                    <div class="vram-header">
+                        <h4>📊 Estimated VRAM</h4>
+                        <div class="vram-total" id="vramTotal">-- GB</div>
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Eval Steps</div>
-                        <input type="number" class="settings-input" id="eval_steps" min="100" max="5000" value="500">
+                    <div class="vram-bar-container">
+                        <div class="vram-bar">
+                            <div class="vram-segment model" id="vramModel"></div>
+                            <div class="vram-segment optimizer" id="vramOptimizer"></div>
+                            <div class="vram-segment gradients" id="vramGradients"></div>
+                            <div class="vram-segment activations" id="vramActivations"></div>
+                        </div>
+                        <div class="vram-limit" id="vramLimit" style="left: 100%;"></div>
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Save Steps</div>
-                        <input type="number" class="settings-input" id="save_steps" min="500" max="10000" value="1000">
+                    <div class="vram-breakdown">
+                        <div class="vram-item">
+                            <div class="vram-dot model"></div>
+                            <span>Model</span>
+                            <span id="vramModelVal">--</span>
+                        </div>
+                        <div class="vram-item">
+                            <div class="vram-dot optimizer"></div>
+                            <span>Optimizer</span>
+                            <span id="vramOptimizerVal">--</span>
+                        </div>
+                        <div class="vram-item">
+                            <div class="vram-dot gradients"></div>
+                            <span>Gradients</span>
+                            <span id="vramGradientsVal">--</span>
+                        </div>
+                        <div class="vram-item">
+                            <div class="vram-dot activations"></div>
+                            <span>Activations</span>
+                            <span id="vramActivationsVal">--</span>
+                        </div>
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Profile</div>
-                        <select class="settings-select" id="profile_name">
-                            <option value="none">None</option>
-                            <option value="emoji_think">Emoji Think</option>
-                            <option value="regime3">Regime 3</option>
-                        </select>
+                    <div class="vram-gpu-select">
+                        <button class="vram-gpu-btn active" data-vram="24">RTX 4090</button>
+                        <button class="vram-gpu-btn" data-vram="24">RTX 3090</button>
+                        <button class="vram-gpu-btn" data-vram="16">RTX 4080</button>
+                        <button class="vram-gpu-btn" data-vram="12">RTX 4070</button>
+                    </div>
+
+                    <div class="vram-tip" id="vramTip"></div>
+                </div>
+
+                <div class="form-section">
+                    <div class="form-section__title">Logging & Checkpoints</div>
+
+                    <div class="form-row">
+                        <div class="form-row__label">Log Steps</div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="log_steps" min="10" max="1000" value="200">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-row__label">Eval Steps</div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="eval_steps" min="100" max="5000" value="500">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-row__label">Save Steps</div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="save_steps" min="500" max="10000" value="1000">
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- DATA GENERATION SECTION -->
-            <section class="settings-section" id="section-generation">
-                <h2>🔄 Data Generation</h2>
+            <!-- DATA & SKILLS SECTION -->
+            <section class="settings-section" data-section="data">
+                <div class="settings-section__header">
+                    <h2 class="settings-section__title">Data & Skills</h2>
+                    <p class="settings-section__desc">Configure data generation and skill training.</p>
+                </div>
 
-                <div class="settings-group">
-                    <h3>Auto-Generate</h3>
+                <div class="form-section">
+                    <div class="form-section__title">Auto-Generate</div>
+                    <div class="form-section__subtitle">Automatically generate training data when queue runs low.</div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Enabled</div>
-                        <div class="settings-toggle" id="auto_generate_enabled" onclick="toggleSetting(this)"></div>
-                    </div>
-
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Batch Count
-                            <small>Examples per generation</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Enabled</div>
+                        <div class="form-row__value">
+                            <div class="form-toggle" id="auto_generate_enabled"></div>
                         </div>
-                        <input type="number" class="settings-input" id="auto_generate_count" min="10" max="1000" value="100">
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Min Queue Depth
-                            <small>Keep this many items ready</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Batch Count<small>Examples per generation</small></div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="auto_generate_count" min="10" max="1000" value="100">
                         </div>
-                        <input type="number" class="settings-input" id="auto_generate_min_queue" min="1" max="10" value="2">
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Cooldown (sec)
-                            <small>Wait between generations</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Min Queue Depth<small>Trigger threshold</small></div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="auto_generate_min_queue" min="1" max="10" value="2">
                         </div>
-                        <input type="number" class="settings-input" id="auto_generate_cooldown" min="60" max="3600" value="180">
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">API Host</div>
-                        <input type="text" class="settings-input" id="auto_generate_host" value="localhost">
-                    </div>
-
-                    <div class="settings-row">
-                        <div class="settings-label">API Port</div>
-                        <input type="number" class="settings-input" id="auto_generate_port" min="1" max="65535" value="8080">
+                    <div class="form-row">
+                        <div class="form-row__label">Cooldown (sec)</div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="auto_generate_cooldown" min="60" max="3600" value="180">
+                        </div>
                     </div>
                 </div>
 
-                <div class="settings-group">
-                    <h3>Self-Correction</h3>
+                <div class="form-section">
+                    <div class="form-section__title">Self-Correction</div>
+                    <div class="form-section__subtitle">Generate corrections from model mistakes.</div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Enabled</div>
-                        <div class="settings-toggle" id="self_correction_enabled" onclick="toggleSetting(this)"></div>
+                    <div class="form-row">
+                        <div class="form-row__label">Enabled</div>
+                        <div class="form-row__value">
+                            <div class="form-toggle" id="self_correction_enabled"></div>
+                        </div>
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Auto Queue</div>
-                        <div class="settings-toggle" id="self_correction_auto_queue" onclick="toggleSetting(this)"></div>
+                    <div class="form-row">
+                        <div class="form-row__label">Auto Queue</div>
+                        <div class="form-row__value">
+                            <div class="form-toggle" id="self_correction_auto_queue"></div>
+                        </div>
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Max Examples</div>
-                        <input type="number" class="settings-input" id="self_correction_max" min="10" max="1000" value="200">
+                    <div class="form-row">
+                        <div class="form-row__label">Max Examples</div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="self_correction_max" min="10" max="1000" value="200">
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- CURRICULUM SECTION -->
-            <section class="settings-section" id="section-curriculum">
-                <h2>📚 Curriculum & Scheduler</h2>
+            <!-- SCHEDULER SECTION -->
+            <section class="settings-section" data-section="scheduler">
+                <div class="settings-section__header">
+                    <h2 class="settings-section__title">Curriculum Scheduler</h2>
+                    <p class="settings-section__desc">Control skill progression and training order.</p>
+                </div>
 
-                <!-- Quick Presets -->
-                <div class="settings-group">
-                    <h3>Quick Presets</h3>
+                <div class="form-section">
+                    <div class="form-section__title">Quick Presets</div>
                     <div class="preset-grid" id="schedulerPresets">
                         <!-- Filled by JS -->
                     </div>
                 </div>
 
-                <!-- Next Decision Preview -->
-                <div class="settings-group">
-                    <h3>Next Training Batch</h3>
-                    <div class="next-decision-box" id="nextDecisionBox">
-                        <div class="next-decision-label">If queue is empty, will generate:</div>
-                        <div class="next-decision-value" id="nextDecisionValue">Loading...</div>
-                        <div class="next-decision-reason" id="nextDecisionReason"></div>
+                <div class="form-section">
+                    <div class="form-section__title">Next Training Batch</div>
+                    <div class="next-decision" id="nextDecisionBox">
+                        <div class="next-decision__label">If queue is empty, will generate:</div>
+                        <div class="next-decision__value" id="nextDecisionValue">Loading...</div>
+                        <div class="next-decision__reason" id="nextDecisionReason"></div>
                     </div>
                 </div>
 
-                <!-- Strategy Selection -->
-                <div class="settings-group">
-                    <h3>Scheduling Strategy</h3>
+                <div class="form-section">
+                    <div class="form-section__title">Scheduling Strategy</div>
                     <div class="strategy-grid" id="strategyGrid">
                         <div class="strategy-card" data-strategy="equal">
                             <div class="strategy-name">Equal</div>
@@ -971,250 +718,276 @@
                     </div>
                 </div>
 
-                <!-- Per-Skill Configuration -->
-                <div class="settings-group">
-                    <h3>Skill Configuration</h3>
+                <div class="form-section">
+                    <div class="form-section__title">Skill Configuration</div>
                     <div class="skill-configs" id="skillConfigs">
                         <!-- Filled by JS -->
                     </div>
                 </div>
 
-                <!-- Progression Settings -->
-                <div class="settings-group">
-                    <h3>Progression</h3>
+                <div class="form-section">
+                    <div class="form-section__title">Progression</div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Auto-Progression</div>
-                        <div class="settings-toggle" id="curriculum_enabled" onclick="toggleSetting(this)"></div>
-                    </div>
-
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Target Accuracy
-                            <small>Required to level up (80% = 0.8)</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Auto-Progression</div>
+                        <div class="form-row__value">
+                            <div class="form-toggle" id="curriculum_enabled"></div>
                         </div>
-                        <input type="number" class="settings-input" id="curriculum_target" min="0.5" max="1.0" step="0.05" value="0.80">
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Advancement Evals
-                            <small>Consecutive passes needed</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Target Accuracy<small>Required to level up</small></div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="curriculum_target" min="0.5" max="1.0" step="0.05" value="0.80">
                         </div>
-                        <input type="number" class="settings-input" id="advancement_evals" min="1" max="10" value="3">
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Batch Size
-                            <small>Examples per generation</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Advancement Evals<small>Consecutive passes needed</small></div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="advancement_evals" min="1" max="10" value="3">
                         </div>
-                        <input type="number" class="settings-input" id="scheduler_batch_size" min="10" max="500" value="100">
-                    </div>
-                </div>
-
-                <!-- Retention Settings -->
-                <div class="settings-group">
-                    <h3>Retention</h3>
-
-                    <div class="settings-row">
-                        <div class="settings-label">Enabled</div>
-                        <div class="settings-toggle" id="retention_enabled" onclick="toggleSetting(this)"></div>
                     </div>
                 </div>
             </section>
 
             <!-- REMOTE EVAL SECTION -->
-            <section class="settings-section" id="section-remote">
-                <h2>🌐 Remote Evaluation (RTX 3090)</h2>
+            <section class="settings-section" data-section="remote">
+                <div class="settings-section__header">
+                    <h2 class="settings-section__title">Remote Evaluation</h2>
+                    <p class="settings-section__desc">Configure the RTX 3090 inference server for evaluation.</p>
+                </div>
 
-                <div class="settings-group">
-                    <h3>Connection</h3>
+                <div class="form-section">
+                    <div class="form-section__title">Connection</div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Enabled</div>
-                        <div class="settings-toggle" id="remote_enabled" onclick="toggleSetting(this)"></div>
-                    </div>
-
-                    <div class="settings-row">
-                        <div class="settings-label">Host</div>
-                        <input type="text" class="settings-input" id="remote_host" placeholder="Loading...">
-                    </div>
-
-                    <div class="settings-row">
-                        <div class="settings-label">Port</div>
-                        <input type="number" class="settings-input" id="remote_port" min="1" max="65535" value="8765">
-                    </div>
-
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            Eval Interval (steps)
-                            <small>Steps between remote evals</small>
+                    <div class="form-row">
+                        <div class="form-row__label">Enabled</div>
+                        <div class="form-row__value">
+                            <div class="form-toggle" id="remote_enabled"></div>
                         </div>
-                        <input type="number" class="settings-input" id="remote_interval" min="1000" max="50000" value="5000">
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Sync Checkpoints</div>
-                        <div class="settings-toggle" id="remote_sync" onclick="toggleSetting(this)"></div>
+                    <div class="form-row">
+                        <div class="form-row__label">Host</div>
+                        <div class="form-row__value">
+                            <input type="text" class="form-input" id="remote_host" placeholder="Loading...">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-row__label">Port</div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="remote_port" min="1" max="65535" value="8765">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-row__label">Eval Interval<small>Steps between remote evals</small></div>
+                        <div class="form-row__value">
+                            <input type="number" class="form-input form-input--number" id="remote_interval" min="1000" max="50000" value="5000">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-row__label">Sync Checkpoints</div>
+                        <div class="form-row__value">
+                            <div class="form-toggle" id="remote_sync"></div>
+                        </div>
                     </div>
                 </div>
             </section>
 
             <!-- MODEL INFO SECTION -->
-            <section class="settings-section" id="section-model">
-                <h2>🤖 Model Information</h2>
+            <section class="settings-section" data-section="model">
+                <div class="settings-section__header">
+                    <h2 class="settings-section__title">Model Information</h2>
+                    <p class="settings-section__desc">Locked configuration that cannot be changed mid-training.</p>
+                </div>
 
-                <div class="settings-group">
-                    <h3>Locked Configuration</h3>
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
-                        These values cannot be changed without restarting training from scratch.
-                    </p>
+                <div class="form-section">
+                    <div class="form-section__title">Locked Configuration</div>
+                    <div class="form-section__subtitle">Changing these requires restarting training from scratch.</div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Base Model</div>
-                        <div class="settings-value locked" id="locked_base_model">--</div>
+                    <div class="form-row">
+                        <div class="form-row__label">Base Model</div>
+                        <div class="form-row__value">
+                            <span class="form-value form-value--muted" id="locked_base_model">--</span>
+                        </div>
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Architecture</div>
-                        <div class="settings-value locked" id="locked_architecture">--</div>
+                    <div class="form-row">
+                        <div class="form-row__label">Architecture</div>
+                        <div class="form-row__value">
+                            <span class="form-value form-value--muted" id="locked_architecture">--</span>
+                        </div>
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Max Context</div>
-                        <div class="settings-value locked" id="locked_context">--</div>
+                    <div class="form-row">
+                        <div class="form-row__label">Max Context</div>
+                        <div class="form-row__value">
+                            <span class="form-value form-value--muted" id="locked_context">--</span>
+                        </div>
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Vocab Size</div>
-                        <div class="settings-value locked" id="locked_vocab">--</div>
+                    <div class="form-row">
+                        <div class="form-row__label">Vocab Size</div>
+                        <div class="form-row__value">
+                            <span class="form-value form-value--muted" id="locked_vocab">--</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="settings-group">
-                    <h3>Paths</h3>
+                <div class="form-section">
+                    <div class="form-section__title">Paths</div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Model Path</div>
-                        <div class="settings-value" id="path_model">--</div>
+                    <div class="form-row">
+                        <div class="form-row__label">Model Path</div>
+                        <div class="form-row__value">
+                            <span class="form-value" id="path_model" style="font-size: 0.75rem; word-break: break-all;">--</span>
+                        </div>
                     </div>
 
-                    <div class="settings-row">
-                        <div class="settings-label">Current Model Dir</div>
-                        <div class="settings-value" id="path_current">--</div>
+                    <div class="form-row">
+                        <div class="form-row__label">Current Model Dir</div>
+                        <div class="form-row__value">
+                            <span class="form-value" id="path_current" style="font-size: 0.75rem; word-break: break-all;">--</span>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- RAW JSON SECTION -->
-            <section class="settings-section" id="section-raw">
-                <h2>📄 Raw Configuration</h2>
+            <!-- DANGER ZONE SECTION -->
+            <section class="settings-section" data-section="danger">
+                <div class="settings-section__header">
+                    <h2 class="settings-section__title" style="color: var(--color-danger);">Danger Zone</h2>
+                    <p class="settings-section__desc">Destructive operations. Be careful!</p>
+                </div>
 
-                <div class="settings-group">
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
-                        Full config.json content (read-only view)
-                    </p>
-                    <pre class="json-view" id="rawConfig">Loading...</pre>
+                <div class="form-section form-section--danger">
+                    <div class="form-section__title">Reset Settings</div>
+                    <div class="form-section__subtitle">Restore config from saved defaults. Current settings will be backed up.</div>
+                    <div class="form-actions">
+                        <button class="btn btn--danger" id="btn-restore-defaults">Restore Defaults</button>
+                    </div>
+                </div>
+
+                <div class="form-section form-section--danger">
+                    <div class="form-section__title">Raw Configuration</div>
+                    <div class="form-section__subtitle">Full config.json content (read-only)</div>
+                    <pre class="config-preview" id="rawConfig">Loading...</pre>
                 </div>
             </section>
-        </div>
-    </main>
+        </main>
 
-    <!-- SAVE ACTIONS (appears when changes detected) -->
-    <div class="settings-actions" id="settingsActions">
-        <span class="save-status" id="saveStatus"></span>
-        <button class="btn btn-secondary" onclick="resetChanges()">Reset</button>
-        <button class="btn btn-primary" onclick="saveConfig()">Save Changes</button>
-    </div>
+        <!-- RIGHT: SUMMARY PANEL -->
+        <aside class="settings-summary">
+            <div class="summary-card">
+                <div class="summary-card__title">Effective Config</div>
+                <pre class="summary-config" id="effectiveConfig">{}</pre>
+            </div>
 
-    <!-- DEFAULTS TOOLBAR (always visible) -->
-    <div class="defaults-toolbar" id="defaultsToolbar">
-        <button class="btn btn-secondary" onclick="restoreDefaults()" title="Restore from saved defaults">
-            Restore Defaults
-        </button>
-        <button class="btn btn-secondary" onclick="saveAsDefault()" title="Save current config as default">
-            Save as Default
-        </button>
-        <span class="defaults-status" id="defaultsStatus"></span>
+            <div class="summary-card">
+                <div class="summary-card__title">Actions</div>
+                <div class="summary-actions">
+                    <button class="btn btn--primary" id="btn-save" disabled>Save Changes</button>
+                    <button class="btn" id="btn-reset" disabled>Discard Changes</button>
+                    <button class="btn" id="btn-save-default">Save as Default</button>
+                </div>
+                <div class="summary-status" id="saveStatus"></div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-card__title">Quick Tips</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">
+                    <p style="margin-bottom: 0.5rem;">• Batch size × Grad Accum = Effective batch</p>
+                    <p style="margin-bottom: 0.5rem;">• Lower LR for stability, higher for speed</p>
+                    <p>• Enable gradient checkpointing to save VRAM</p>
+                </div>
+            </div>
+        </aside>
     </div>
 
     <!-- NAVIGATION (dynamic) -->
     <nav class="game-nav" id="bottomNav"></nav>
     <script src="/static/js/nav.js"></script>
     <script src="/static/js/events.js"></script>
+    <!-- Shared modules -->
+    <script src="/static/js/formatters.js?v=1"></script>
+    <script src="/static/js/settings_client.js?v=1"></script>
 
     <script>
         // ============================================
-        // SETTINGS PAGE JAVASCRIPT
+        // SETTINGS PAGE - Clean Rewrite
         // ============================================
 
         let originalConfig = null;
         let currentConfig = null;
         let hasChanges = false;
+        let schedulerStatus = null;
 
-        // DOM helpers
-        function $(sel) { return document.querySelector(sel); }
-        function $$(sel) { return document.querySelectorAll(sel); }
-        function setText(sel, text) { const el = $(sel); if (el) el.textContent = text; }
+        const $ = (sel) => document.querySelector(sel);
+        const $$ = (sel) => document.querySelectorAll(sel);
+        const setText = (sel, text) => { const el = $(sel); if (el) el.textContent = text; };
 
-        // Time display
-        function updateTime() {
-            setText('#timeDisplay', new Date().toLocaleTimeString('en-US', { hour12: false }));
-        }
-        setInterval(updateTime, 1000);
-        updateTime();
+        // ============================================
+        // SECTION NAVIGATION
+        // ============================================
 
-        // Section navigation
         $$('.settings-nav-item').forEach(item => {
             item.addEventListener('click', () => {
+                const section = item.dataset.section;
+
                 // Update nav
                 $$('.settings-nav-item').forEach(i => i.classList.remove('active'));
                 item.classList.add('active');
 
                 // Update content
-                const section = item.dataset.section;
-                $$('.settings-section').forEach(s => s.classList.remove('active'));
-                $(`#section-${section}`)?.classList.add('active');
+                $$('.settings-section').forEach(s => {
+                    s.classList.toggle('active', s.dataset.section === section);
+                });
             });
         });
 
-        // Toggle switches
-        function toggleSetting(el) {
-            el.classList.toggle('active');
-            checkForChanges();
+        // ============================================
+        // TOGGLE SWITCHES
+        // ============================================
+
+        $$('.form-toggle').forEach(toggle => {
+            toggle.addEventListener('click', () => {
+                toggle.classList.toggle('active');
+                checkForChanges();
+
+                // VRAM recalc if gradient checkpointing
+                if (toggle.id === 'use_gradient_checkpointing') {
+                    calculateVram();
+                }
+            });
+        });
+
+        function setToggle(sel, value) {
+            const el = $(sel);
+            if (el) el.classList.toggle('active', !!value);
         }
 
-        // Load config from server
+        function getToggle(sel) {
+            return $(sel)?.classList.contains('active') || false;
+        }
+
+        // ============================================
+        // CONFIG LOAD/SAVE
+        // ============================================
+
         async function loadConfig() {
             try {
-                const response = await fetch('/config');
-                if (!response.ok) throw new Error('Failed to load config');
-
-                const config = await response.json();
+                const config = await SettingsClient.load();
                 originalConfig = JSON.parse(JSON.stringify(config));
                 currentConfig = config;
-
                 populateForm(config);
                 setText('#configStatus', 'Loaded');
             } catch (error) {
                 console.error('Failed to load config:', error);
                 setText('#configStatus', 'Error');
-            }
-        }
-
-        async function loadDefaultInferenceHost() {
-            try {
-                const response = await fetch('/oracle/hosts');
-                const data = await response.json();
-                if (data.hosts && data.hosts.length > 0) {
-                    // Use the first inference host as default
-                    const firstHost = data.hosts[0];
-                    $('#remote_host').value = firstHost.host;
-                }
-            } catch (error) {
-                console.error('Failed to load inference hosts:', error);
-                $('#remote_host').placeholder = 'Host not configured';
             }
         }
 
@@ -1231,15 +1004,12 @@
             $('#log_steps').value = config.log_steps || 200;
             $('#eval_steps').value = config.eval_steps || 500;
             $('#save_steps').value = config.save_steps || 1000;
-            $('#profile_name').value = config.profile?.name || 'none';
 
             // Auto-generate
             setToggle('#auto_generate_enabled', config.auto_generate?.enabled);
             $('#auto_generate_count').value = config.auto_generate?.count || 100;
             $('#auto_generate_min_queue').value = config.auto_generate?.min_queue_depth || 2;
             $('#auto_generate_cooldown').value = config.auto_generate?.cooldown_sec || 180;
-            $('#auto_generate_host').value = config.auto_generate?.host || 'localhost';
-            $('#auto_generate_port').value = config.auto_generate?.port || 8080;
 
             // Self-correction
             setToggle('#self_correction_enabled', config.self_correction?.enabled);
@@ -1249,13 +1019,10 @@
             // Curriculum
             setToggle('#curriculum_enabled', config.curriculum?.enabled);
             $('#curriculum_target').value = config.curriculum?.target_accuracy || 0.80;
-
-            // Retention
-            setToggle('#retention_enabled', config.retention?.enabled);
+            $('#advancement_evals').value = config.curriculum?.advancement_evals || 3;
 
             // Remote eval
             setToggle('#remote_enabled', config.remote_eval?.enabled);
-            // Get default from inference hosts if not set
             if (config.remote_eval?.host) {
                 $('#remote_host').value = config.remote_eval.host;
             } else {
@@ -1278,27 +1045,26 @@
             // Raw JSON
             $('#rawConfig').textContent = JSON.stringify(config, null, 2);
 
+            // Effective config summary
+            updateEffectiveConfig();
+
             // Add change listeners
             addChangeListeners();
         }
 
-        function setToggle(sel, value) {
-            const el = $(sel);
-            if (el) {
-                if (value) {
-                    el.classList.add('active');
-                } else {
-                    el.classList.remove('active');
+        async function loadDefaultInferenceHost() {
+            try {
+                const data = await SettingsClient.loadInferenceHosts();
+                if (data.hosts?.length > 0) {
+                    $('#remote_host').value = data.hosts[0].host;
                 }
+            } catch (error) {
+                $('#remote_host').placeholder = 'Not configured';
             }
         }
 
-        function getToggle(sel) {
-            return $(sel)?.classList.contains('active') || false;
-        }
-
         function addChangeListeners() {
-            $$('.settings-input, .settings-select').forEach(el => {
+            $$('.form-input, .form-select').forEach(el => {
                 el.addEventListener('input', checkForChanges);
                 el.addEventListener('change', checkForChanges);
             });
@@ -1308,18 +1074,38 @@
             const current = gatherFormData();
             hasChanges = JSON.stringify(current) !== JSON.stringify(originalConfig);
 
-            const actions = $('#settingsActions');
+            $('#btn-save').disabled = !hasChanges;
+            $('#btn-reset').disabled = !hasChanges;
+
             if (hasChanges) {
-                actions.classList.add('visible');
-                $('#saveStatus').textContent = '';
-                $('#saveStatus').className = 'save-status';
+                setText('#saveStatus', 'Unsaved changes');
+                $('#saveStatus').style.color = 'var(--color-warning)';
             } else {
-                actions.classList.remove('visible');
+                setText('#saveStatus', '');
             }
+
+            updateEffectiveConfig();
+        }
+
+        function updateEffectiveConfig() {
+            const current = gatherFormData();
+            // Show a subset of key values
+            const summary = {
+                batch_size: current.batch_size,
+                gradient_accumulation: current.gradient_accumulation,
+                effective_batch: current.batch_size * current.gradient_accumulation,
+                learning_rate: current.learning_rate,
+                precision: current.hyperparams?.fp_precision,
+                max_length: current.max_length,
+                gradient_checkpointing: current.hyperparams?.use_gradient_checkpointing,
+                save_steps: current.save_steps,
+                eval_steps: current.eval_steps
+            };
+            $('#effectiveConfig').textContent = JSON.stringify(summary, null, 2);
         }
 
         function gatherFormData() {
-            const config = JSON.parse(JSON.stringify(originalConfig));
+            const config = JSON.parse(JSON.stringify(originalConfig || {}));
 
             // Training
             config.batch_size = parseInt($('#batch_size').value);
@@ -1339,17 +1125,12 @@
             config.hyperparams.fp_precision = $('#fp_precision').value;
             config.hyperparams.use_gradient_checkpointing = getToggle('#use_gradient_checkpointing');
 
-            // Profile
-            config.profile = { name: $('#profile_name').value };
-
             // Auto-generate
             config.auto_generate = config.auto_generate || {};
             config.auto_generate.enabled = getToggle('#auto_generate_enabled');
             config.auto_generate.count = parseInt($('#auto_generate_count').value);
             config.auto_generate.min_queue_depth = parseInt($('#auto_generate_min_queue').value);
             config.auto_generate.cooldown_sec = parseInt($('#auto_generate_cooldown').value);
-            config.auto_generate.host = $('#auto_generate_host').value;
-            config.auto_generate.port = parseInt($('#auto_generate_port').value);
 
             // Self-correction
             config.self_correction = config.self_correction || {};
@@ -1361,10 +1142,7 @@
             config.curriculum = config.curriculum || {};
             config.curriculum.enabled = getToggle('#curriculum_enabled');
             config.curriculum.target_accuracy = parseFloat($('#curriculum_target').value);
-
-            // Retention
-            config.retention = config.retention || {};
-            config.retention.enabled = getToggle('#retention_enabled');
+            config.curriculum.advancement_evals = parseInt($('#advancement_evals').value);
 
             // Remote eval
             config.remote_eval = config.remote_eval || {};
@@ -1377,480 +1155,289 @@
             return config;
         }
 
-        function resetChanges() {
-            populateForm(originalConfig);
-            hasChanges = false;
-            $('#settingsActions').classList.remove('visible');
-        }
+        // ============================================
+        // BUTTON HANDLERS
+        // ============================================
 
-        async function saveConfig() {
+        $('#btn-save').addEventListener('click', async () => {
             const status = $('#saveStatus');
             status.textContent = 'Saving...';
-            status.className = 'save-status pending';
+            status.style.color = 'var(--color-warning)';
 
             try {
                 const config = gatherFormData();
-                const response = await fetch('/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
-                });
+                await SettingsClient.save(config);
 
-                if (!response.ok) throw new Error('Save failed');
+                status.textContent = 'Saved!';
+                status.style.color = 'var(--color-success)';
+                originalConfig = JSON.parse(JSON.stringify(config));
+                hasChanges = false;
+                $('#btn-save').disabled = true;
+                $('#btn-reset').disabled = true;
+                $('#rawConfig').textContent = JSON.stringify(config, null, 2);
 
-                const result = await response.json();
-                if (result.success) {
-                    status.textContent = 'Saved!';
-                    status.className = 'save-status success';
-                    originalConfig = JSON.parse(JSON.stringify(config));
-                    hasChanges = false;
-
-                    // Update raw view
-                    $('#rawConfig').textContent = JSON.stringify(config, null, 2);
-
-                    setTimeout(() => {
-                        $('#settingsActions').classList.remove('visible');
-                    }, 1500);
-                } else {
-                    throw new Error(result.error || 'Unknown error');
-                }
+                setTimeout(() => setText('#saveStatus', ''), 2000);
             } catch (error) {
                 status.textContent = `Error: ${error.message}`;
-                status.className = 'save-status error';
+                status.style.color = 'var(--color-danger)';
             }
-        }
+        });
 
-        async function saveAsDefault() {
-            const status = $('#defaultsStatus');
-            status.textContent = 'Saving...';
-            status.className = 'defaults-status';
+        $('#btn-reset').addEventListener('click', () => {
+            populateForm(originalConfig);
+            hasChanges = false;
+            $('#btn-save').disabled = true;
+            $('#btn-reset').disabled = true;
+            setText('#saveStatus', '');
+        });
 
+        $('#btn-save-default').addEventListener('click', async () => {
+            const status = $('#saveStatus');
             try {
-                const response = await fetch('/config/save-default', { method: 'POST' });
-                const result = await response.json();
-
-                if (result.success) {
-                    status.textContent = 'Saved as default!';
-                    status.className = 'defaults-status success';
-                    setTimeout(() => { status.textContent = ''; }, 3000);
-                } else {
-                    throw new Error(result.error || 'Failed to save');
-                }
+                await SettingsClient.saveAsDefault();
+                status.textContent = 'Saved as default!';
+                status.style.color = 'var(--color-success)';
+                setTimeout(() => setText('#saveStatus', ''), 2000);
             } catch (error) {
                 status.textContent = error.message;
-                status.className = 'defaults-status error';
+                status.style.color = 'var(--color-danger)';
             }
-        }
+        });
 
-        async function restoreDefaults() {
-            if (!confirm('Restore config from saved defaults? Current settings will be backed up.')) {
-                return;
-            }
-
-            const status = $('#defaultsStatus');
-            status.textContent = 'Restoring...';
-            status.className = 'defaults-status';
+        $('#btn-restore-defaults').addEventListener('click', async () => {
+            if (!confirm('Restore config from saved defaults? Current settings will be backed up.')) return;
 
             try {
-                const response = await fetch('/config/restore-default', { method: 'POST' });
-                const result = await response.json();
-
-                if (result.success) {
-                    status.textContent = 'Restored!';
-                    status.className = 'defaults-status success';
-
-                    // Reload the form with restored config
-                    if (result.config) {
-                        originalConfig = JSON.parse(JSON.stringify(result.config));
-                        currentConfig = result.config;
-                        populateForm(result.config);
-                        hasChanges = false;
-                        $('#settingsActions').classList.remove('visible');
-                    }
-
-                    setTimeout(() => { status.textContent = ''; }, 3000);
-                } else {
-                    throw new Error(result.error || 'Failed to restore');
+                const result = await SettingsClient.restoreDefault();
+                if (result.config) {
+                    originalConfig = JSON.parse(JSON.stringify(result.config));
+                    populateForm(result.config);
+                    hasChanges = false;
+                    $('#btn-save').disabled = true;
+                    $('#btn-reset').disabled = true;
                 }
+                const status = $('#saveStatus');
+                status.textContent = 'Restored!';
+                status.style.color = 'var(--color-success)';
+                setTimeout(() => setText('#saveStatus', ''), 2000);
             } catch (error) {
+                const status = $('#saveStatus');
                 status.textContent = error.message;
-                status.className = 'defaults-status error';
+                status.style.color = 'var(--color-danger)';
             }
-        }
+        });
 
         // ============================================
         // VRAM CALCULATOR
         // ============================================
 
-        // Model specs for Qwen3-0.6B
-        const MODEL_PARAMS = 620_000_000;  // ~620M parameters
+        const MODEL_PARAMS = 620_000_000;
         const HIDDEN_DIM = 1024;
         const NUM_LAYERS = 28;
-        const NUM_HEADS = 16;
-
-        let selectedGpuVram = 24;  // GB
+        let selectedGpuVram = 24;
 
         function calculateVram() {
             const batchSize = parseInt($('#batch_size')?.value) || 1;
             const maxLength = parseInt($('#max_length')?.value) || 2048;
             const precision = $('#fp_precision')?.value || 'bf16';
-            const gradCheckpoint = $('#use_gradient_checkpointing')?.classList.contains('active') || false;
+            const gradCheckpoint = getToggle('#use_gradient_checkpointing');
 
-            // Bytes per parameter based on precision
-            const bytesPerParam = {
-                'bf16': 2,
-                'fp16': 2,
-                'fp32': 4
-            }[precision] || 2;
+            const bytesPerParam = { 'bf16': 2, 'fp16': 2, 'fp32': 4 }[precision] || 2;
 
-            // 1. Model Weights (in bytes)
             const modelWeights = MODEL_PARAMS * bytesPerParam;
-
-            // 2. Optimizer States (AdamW: momentum + variance, always fp32)
-            const optimizerStates = MODEL_PARAMS * 4 * 2;  // 2 states × 4 bytes each
-
-            // 3. Gradients (same precision as model)
+            const optimizerStates = MODEL_PARAMS * 4 * 2;
             const gradients = MODEL_PARAMS * bytesPerParam;
 
-            // 4. Activations (the complex part)
-            // Simplified formula: batch × seq × hidden × layers × factor
-            // Factor accounts for attention scores, intermediate activations, etc.
-            let activationFactor = 34;  // Empirical factor for transformer training
-            if (gradCheckpoint) {
-                // Gradient checkpointing reduces activation memory by ~sqrt(layers)
-                activationFactor = activationFactor / Math.sqrt(NUM_LAYERS);
-            }
+            let activationFactor = 34;
+            if (gradCheckpoint) activationFactor /= Math.sqrt(NUM_LAYERS);
             const activations = batchSize * maxLength * HIDDEN_DIM * NUM_LAYERS * bytesPerParam * activationFactor / NUM_LAYERS;
 
-            // Convert to GB
             const toGB = (bytes) => bytes / (1024 ** 3);
 
-            const modelGB = toGB(modelWeights);
-            const optimizerGB = toGB(optimizerStates);
-            const gradientsGB = toGB(gradients);
-            const activationsGB = toGB(activations);
-            const totalGB = modelGB + optimizerGB + gradientsGB + activationsGB;
+            const vram = {
+                model: toGB(modelWeights),
+                optimizer: toGB(optimizerStates),
+                gradients: toGB(gradients),
+                activations: toGB(activations),
+                total: toGB(modelWeights + optimizerStates + gradients + activations)
+            };
 
-            // Update UI
-            updateVramUI({
-                model: modelGB,
-                optimizer: optimizerGB,
-                gradients: gradientsGB,
-                activations: activationsGB,
-                total: totalGB
-            });
+            updateVramUI(vram);
         }
 
         function updateVramUI(vram) {
-            const total = vram.total;
-            const maxDisplay = Math.max(selectedGpuVram * 1.2, total * 1.1);
+            const maxDisplay = Math.max(selectedGpuVram * 1.2, vram.total * 1.1);
 
-            // Update total display
             const totalEl = $('#vramTotal');
-            totalEl.textContent = `${total.toFixed(1)} GB`;
+            totalEl.textContent = `${vram.total.toFixed(1)} GB`;
             totalEl.className = 'vram-total';
-            if (total <= selectedGpuVram * 0.7) {
-                totalEl.classList.add('safe');
-            } else if (total <= selectedGpuVram * 0.9) {
-                totalEl.classList.add('warning');
-            } else {
-                totalEl.classList.add('danger');
-            }
+            if (vram.total <= selectedGpuVram * 0.7) totalEl.classList.add('safe');
+            else if (vram.total <= selectedGpuVram * 0.9) totalEl.classList.add('warning');
+            else totalEl.classList.add('danger');
 
-            // Update bar segments
             const pct = (val) => `${(val / maxDisplay * 100).toFixed(1)}%`;
             $('#vramModel').style.width = pct(vram.model);
             $('#vramOptimizer').style.width = pct(vram.optimizer);
             $('#vramGradients').style.width = pct(vram.gradients);
             $('#vramActivations').style.width = pct(vram.activations);
 
-            // Update GPU limit marker
-            const limitPct = (selectedGpuVram / maxDisplay * 100);
-            $('#vramLimit').style.left = `${limitPct}%`;
-            $('#vramLimitLabel').textContent = `${selectedGpuVram}GB`;
+            $('#vramLimit').style.left = `${(selectedGpuVram / maxDisplay * 100)}%`;
 
-            // Update breakdown values
-            setText('#vramModelVal', `${vram.model.toFixed(2)} GB`);
-            setText('#vramOptimizerVal', `${vram.optimizer.toFixed(2)} GB`);
-            setText('#vramGradientsVal', `${vram.gradients.toFixed(2)} GB`);
-            setText('#vramActivationsVal', `${vram.activations.toFixed(2)} GB`);
+            setText('#vramModelVal', `${vram.model.toFixed(1)}GB`);
+            setText('#vramOptimizerVal', `${vram.optimizer.toFixed(1)}GB`);
+            setText('#vramGradientsVal', `${vram.gradients.toFixed(1)}GB`);
+            setText('#vramActivationsVal', `${vram.activations.toFixed(1)}GB`);
 
-            // Update tip
-            updateVramTip(vram.total);
-        }
-
-        function updateVramTip(totalGB) {
-            const tipEl = $('#vramTip');
-            const headroom = selectedGpuVram - totalGB;
-            const gradCheckpoint = $('#use_gradient_checkpointing')?.classList.contains('active');
-            const batchSize = parseInt($('#batch_size')?.value) || 1;
-
-            if (totalGB > selectedGpuVram) {
-                const suggestions = [];
-                if (!gradCheckpoint) suggestions.push('enable gradient checkpointing');
-                if (batchSize > 1) suggestions.push('reduce batch size');
-                suggestions.push('reduce max length');
-
-                tipEl.innerHTML = `<strong>⚠️ Over limit!</strong> Try: ${suggestions.join(', ')}`;
+            // Tip
+            const tip = $('#vramTip');
+            const headroom = selectedGpuVram - vram.total;
+            if (vram.total > selectedGpuVram) {
+                tip.innerHTML = `<strong>Over limit!</strong> Enable gradient checkpointing or reduce batch size.`;
             } else if (headroom < 2) {
-                tipEl.innerHTML = `<strong>⚡ Tight fit.</strong> Leave ~2GB headroom for CUDA kernels and peaks.`;
-            } else if (headroom > 8 && batchSize < 4) {
-                tipEl.innerHTML = `<strong>💡 Room to spare.</strong> Consider increasing batch size for faster training.`;
+                tip.innerHTML = `<strong>Tight fit.</strong> Leave ~2GB for CUDA kernels.`;
+            } else if (headroom > 8) {
+                tip.innerHTML = `<strong>Room to spare.</strong> Consider larger batch size.`;
             } else {
-                tipEl.innerHTML = `<strong>✓ Good fit.</strong> ~${headroom.toFixed(1)}GB headroom available.`;
+                tip.innerHTML = `<strong>Good fit.</strong> ~${headroom.toFixed(1)}GB headroom.`;
             }
         }
 
-        function setGpuVram(vram) {
-            selectedGpuVram = vram;
-            $$('.vram-gpu-btn').forEach(btn => {
-                btn.classList.toggle('active', parseInt(btn.dataset.vram) === vram && btn.textContent.includes(vram + 'GB'));
+        $$('.vram-gpu-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedGpuVram = parseInt(btn.dataset.vram);
+                $$('.vram-gpu-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                calculateVram();
             });
-            // Re-highlight the clicked one specifically
-            event.target.classList.add('active');
-            calculateVram();
-        }
+        });
 
-        // Hook VRAM calculation to input changes
-        function hookVramCalculator() {
-            ['batch_size', 'max_length', 'fp_precision'].forEach(id => {
-                const el = $(`#${id}`);
-                if (el) {
-                    el.addEventListener('input', calculateVram);
-                    el.addEventListener('change', calculateVram);
-                }
-            });
-
-            // Also recalculate when gradient checkpointing is toggled
-            const origToggle = window.toggleSetting;
-            window.toggleSetting = function(el) {
-                origToggle(el);
-                if (el.id === 'use_gradient_checkpointing') {
-                    calculateVram();
-                }
-            };
-        }
+        ['batch_size', 'max_length', 'fp_precision'].forEach(id => {
+            const el = $(`#${id}`);
+            if (el) {
+                el.addEventListener('input', calculateVram);
+                el.addEventListener('change', calculateVram);
+            }
+        });
 
         // ============================================
-        // SCHEDULER FUNCTIONALITY
+        // SCHEDULER
         // ============================================
-
-        let schedulerStatus = null;
-        let schedulerPresets = [];
 
         async function loadScheduler() {
             try {
-                // Load status and presets in parallel
-                const [statusRes, presetsRes] = await Promise.all([
-                    fetch('/api/scheduler'),
-                    fetch('/api/scheduler/presets')
+                const [status, presets] = await Promise.all([
+                    SettingsClient.loadScheduler(),
+                    SettingsClient.loadSchedulerPresets()
                 ]);
-
-                schedulerStatus = await statusRes.json();
-                const presetsData = await presetsRes.json();
-                schedulerPresets = presetsData.presets || [];
-
-                renderSchedulerUI();
+                schedulerStatus = status;
+                renderSchedulerUI(status, presets.presets || []);
             } catch (error) {
                 console.error('Failed to load scheduler:', error);
             }
         }
 
-        function renderSchedulerUI() {
-            renderPresets();
-            renderStrategy();
-            renderSkillConfigs();
-            renderNextDecision();
-        }
+        function renderSchedulerUI(status, presets) {
+            // Presets
+            const presetsEl = $('#schedulerPresets');
+            if (presetsEl && presets.length > 0) {
+                presetsEl.innerHTML = presets.map(p => `
+                    <div class="preset-card" data-preset="${p.id}">
+                        <div class="preset-card__name">${p.id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+                        <div class="preset-card__desc">${p.description || ''}</div>
+                    </div>
+                `).join('');
 
-        function renderPresets() {
-            const container = $('#schedulerPresets');
-            if (!container || !schedulerPresets.length) return;
+                presetsEl.querySelectorAll('.preset-card').forEach(card => {
+                    card.addEventListener('click', () => applyPreset(card.dataset.preset));
+                });
+            }
 
-            container.innerHTML = schedulerPresets.map(preset => `
-                <div class="preset-card" data-preset="${preset.id}" onclick="applyPreset('${preset.id}')">
-                    <div class="preset-name">${formatPresetName(preset.id)}</div>
-                    <div class="preset-desc">${preset.description || ''}</div>
-                </div>
-            `).join('');
-        }
-
-        function formatPresetName(id) {
-            return id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        }
-
-        function renderStrategy() {
-            if (!schedulerStatus) return;
-
+            // Strategy
             $$('.strategy-card').forEach(card => {
-                card.classList.toggle('selected', card.dataset.strategy === schedulerStatus.strategy);
-            });
-
-            // Add click handlers
-            $$('.strategy-card').forEach(card => {
-                card.onclick = () => {
+                card.classList.toggle('selected', card.dataset.strategy === status.strategy);
+                card.addEventListener('click', () => {
                     $$('.strategy-card').forEach(c => c.classList.remove('selected'));
                     card.classList.add('selected');
                     checkForChanges();
-                };
+                });
             });
-        }
 
-        function renderSkillConfigs() {
-            const container = $('#skillConfigs');
-            if (!container || !schedulerStatus?.skills) return;
-
-            const icons = { sy: '🧩', bin: '🔢' };
-
-            container.innerHTML = schedulerStatus.skills.map(skill => `
-                <div class="skill-config-card ${skill.enabled ? '' : 'disabled'}" data-skill="${skill.id}">
-                    <div class="skill-toggle-box">
-                        <div class="settings-toggle ${skill.enabled ? 'active' : ''}"
-                             id="skill_${skill.id}_enabled"
-                             onclick="toggleSkillEnabled('${skill.id}', this)"></div>
-                    </div>
-                    <div class="skill-info-box">
-                        <div class="skill-name">
-                            ${icons[skill.id] || '⚡'} ${skill.id.toUpperCase()}
+            // Skill configs
+            const skillsEl = $('#skillConfigs');
+            if (skillsEl && status.skills) {
+                const icons = { sy: '🧩', bin: '🔢' };
+                skillsEl.innerHTML = status.skills.map(s => `
+                    <div class="skill-config-card ${s.enabled ? '' : 'disabled'}" data-skill="${s.id}">
+                        <div class="form-toggle ${s.enabled ? 'active' : ''}" id="skill_${s.id}_enabled"></div>
+                        <div class="skill-info">
+                            <div class="skill-name">${icons[s.id] || '⚡'} ${s.id.toUpperCase()}</div>
+                            <div class="skill-level">L${s.current_level}/${s.max_level} ${s.current_level >= s.max_level ? '<span class="mastered">Mastered</span>' : ''}</div>
                         </div>
-                        <div class="skill-level-info">
-                            Level ${skill.current_level} / ${skill.max_level}
-                            ${skill.current_level >= skill.max_level ? '<span class="mastered">✓ Mastered</span>' : ''}
+                        <div class="skill-input-group">
+                            <label>Priority</label>
+                            <input type="number" min="1" max="99" value="${s.priority}" id="skill_${s.id}_priority">
+                        </div>
+                        <div class="skill-input-group">
+                            <label>Weight</label>
+                            <input type="number" min="0" max="10" step="0.5" value="${s.weight}" id="skill_${s.id}_weight">
                         </div>
                     </div>
-                    <div class="skill-input-group">
-                        <label>Priority</label>
-                        <input type="number" min="1" max="99" value="${skill.priority}"
-                               id="skill_${skill.id}_priority"
-                               onchange="checkForChanges()">
-                    </div>
-                    <div class="skill-input-group">
-                        <label>Weight</label>
-                        <input type="number" min="0" max="10" step="0.5" value="${skill.weight}"
-                               id="skill_${skill.id}_weight"
-                               onchange="checkForChanges()">
-                    </div>
-                    <div class="skill-input-group">
-                        <label>Generated</label>
-                        <input type="text" value="${skill.examples_generated.toLocaleString()}" disabled
-                               style="color: var(--text-muted);">
-                    </div>
-                </div>
-            `).join('');
-        }
+                `).join('');
 
-        function toggleSkillEnabled(skillId, el) {
-            el.classList.toggle('active');
-            const card = el.closest('.skill-config-card');
-            card.classList.toggle('disabled', !el.classList.contains('active'));
-            checkForChanges();
-        }
+                // Attach toggle handlers
+                skillsEl.querySelectorAll('.form-toggle').forEach(toggle => {
+                    toggle.addEventListener('click', () => {
+                        toggle.classList.toggle('active');
+                        toggle.closest('.skill-config-card').classList.toggle('disabled', !toggle.classList.contains('active'));
+                        checkForChanges();
+                    });
+                });
+            }
 
-        function renderNextDecision() {
-            if (!schedulerStatus?.next_decision) return;
-
-            const d = schedulerStatus.next_decision;
-            setText('#nextDecisionValue', `${d.skill_id.toUpperCase()} Level ${d.level} × ${d.count}`);
-            setText('#nextDecisionReason', d.reason);
+            // Next decision
+            if (status.next_decision) {
+                const d = status.next_decision;
+                setText('#nextDecisionValue', `${d.skill_id.toUpperCase()} Level ${d.level} × ${d.count}`);
+                setText('#nextDecisionReason', d.reason);
+            }
         }
 
         async function applyPreset(presetId) {
             try {
-                const response = await fetch('/api/scheduler/preset', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({preset: presetId})
+                const result = await SettingsClient.applySchedulerPreset(presetId);
+                schedulerStatus = result.status;
+                renderSchedulerUI(result.status, []);
+
+                $$('.preset-card').forEach(card => {
+                    card.classList.toggle('active', card.dataset.preset === presetId);
                 });
-                const data = await response.json();
 
-                if (data.success) {
-                    schedulerStatus = data.status;
-                    renderSchedulerUI();
-
-                    // Mark preset as active
-                    $$('.preset-card').forEach(card => {
-                        card.classList.toggle('active', card.dataset.preset === presetId);
-                    });
-
-                    // Show brief confirmation
-                    showSchedulerMessage('success', `Applied: ${formatPresetName(presetId)}`);
-                } else {
-                    showSchedulerMessage('error', data.error || 'Failed to apply preset');
-                }
+                const status = $('#saveStatus');
+                status.textContent = `Applied: ${presetId.replace(/_/g, ' ')}`;
+                status.style.color = 'var(--color-success)';
+                setTimeout(() => setText('#saveStatus', ''), 2000);
             } catch (error) {
-                showSchedulerMessage('error', 'Failed to apply preset');
+                const status = $('#saveStatus');
+                status.textContent = error.message;
+                status.style.color = 'var(--color-danger)';
             }
         }
 
-        function showSchedulerMessage(type, message) {
-            // Reuse the save status for brief messages
-            const status = $('#saveStatus');
-            const actions = $('#settingsActions');
+        // ============================================
+        // TIME DISPLAY
+        // ============================================
 
-            status.textContent = message;
-            status.className = `save-status ${type}`;
-            actions.classList.add('visible');
-
-            setTimeout(() => {
-                if (!hasChanges) {
-                    actions.classList.remove('visible');
-                }
-            }, 2000);
+        function updateTime() {
+            setText('#timeDisplay', Format.timestamp(new Date()));
         }
+        setInterval(updateTime, 1000);
+        updateTime();
 
-        async function saveSchedulerConfig() {
-            // Gather scheduler state from UI
-            const strategy = $('.strategy-card.selected')?.dataset.strategy || 'equal';
+        // ============================================
+        // INIT
+        // ============================================
 
-            const skills = {};
-            schedulerStatus?.skills.forEach(skill => {
-                const enabledEl = $(`#skill_${skill.id}_enabled`);
-                const priorityEl = $(`#skill_${skill.id}_priority`);
-                const weightEl = $(`#skill_${skill.id}_weight`);
-
-                skills[skill.id] = {
-                    enabled: enabledEl?.classList.contains('active') ?? skill.enabled,
-                    priority: parseInt(priorityEl?.value) || skill.priority,
-                    weight: parseFloat(weightEl?.value) || skill.weight,
-                };
-            });
-
-            try {
-                const response = await fetch('/api/scheduler/config', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ strategy, skills })
-                });
-                const data = await response.json();
-
-                if (data.success) {
-                    // Reload scheduler to get updated next decision
-                    await loadScheduler();
-                    return true;
-                } else {
-                    console.error('Scheduler save failed:', data.error);
-                    return false;
-                }
-            } catch (error) {
-                console.error('Failed to save scheduler:', error);
-                return false;
-            }
-        }
-
-        // Extend the existing saveConfig to also save scheduler
-        const originalSaveConfig = saveConfig;
-        saveConfig = async function() {
-            // Save scheduler first
-            await saveSchedulerConfig();
-            // Then save main config
-            await originalSaveConfig();
-        };
-
-        // Initialize
-        loadConfig().then(() => {
-            hookVramCalculator();
-            calculateVram();
-        });
+        loadConfig().then(() => calculateVram());
         loadScheduler();
     </script>
 </body>

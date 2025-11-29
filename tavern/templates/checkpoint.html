@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkpoint Details - Realm of Training</title>
-    <link rel="stylesheet" href="/static/css/game.css?v=2">
+    <!-- Shared theme -->
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <link rel="stylesheet" href="/static/css/game.css?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         .checkpoint-page {
@@ -447,6 +449,8 @@
     <!-- NAVIGATION (dynamic) -->
     <nav class="game-nav" id="bottomNav"></nav>
     <script src="/static/js/nav.js"></script>
+    <!-- Shared modules -->
+    <script src="/static/js/formatters.js?v=1"></script>
 
     <script>
         // Get step from URL
@@ -537,52 +541,52 @@
                 icon.classList.add('champion');
             }
 
-            // Badges
+            // Badges - using unified badge system from theme.css
             const badges = document.getElementById('badges');
             badges.innerHTML = '';
             if (isBase) {
-                badges.innerHTML += '<span class="checkpoint-badge" style="background: rgba(136, 136, 136, 0.2); border-color: #888;">Untrained</span>';
+                badges.innerHTML += '<span class="badge badge--idle">Untrained</span>';
                 if (ledger.model_type) {
-                    badges.innerHTML += `<span class="checkpoint-badge">${ledger.model_type}</span>`;
+                    badges.innerHTML += `<span class="badge">${ledger.model_type}</span>`;
                 }
                 if (ledger.hidden_size && ledger.num_layers) {
-                    badges.innerHTML += `<span class="checkpoint-badge">${ledger.hidden_size}d × ${ledger.num_layers}L</span>`;
+                    badges.innerHTML += `<span class="badge">${ledger.hidden_size}d × ${ledger.num_layers}L</span>`;
                 }
             } else {
                 if (comparison.is_best) {
-                    badges.innerHTML += '<span class="checkpoint-badge champion">Champion</span>';
+                    badges.innerHTML += '<span class="badge badge--champion">Champion</span>';
                 }
                 if (deployment.deployed) {
-                    badges.innerHTML += '<span class="checkpoint-badge deployed">Deployed</span>';
+                    badges.innerHTML += '<span class="badge badge--deployed">Deployed</span>';
                 }
                 if (physical.has_optimizer) {
-                    badges.innerHTML += '<span class="checkpoint-badge has-optimizer">Has Optimizer</span>';
+                    badges.innerHTML += '<span class="badge badge--pending">Has Optimizer</span>';
                 }
                 if (ledger.skill_name) {
-                    badges.innerHTML += `<span class="checkpoint-badge">${ledger.skill_name} L${ledger.skill_level || '?'}</span>`;
+                    badges.innerHTML += `<span class="badge">${ledger.skill_name} L${ledger.skill_level || '?'}</span>`;
                 }
             }
 
-            // Main stats
-            document.getElementById('trainLoss').textContent = ledger.train_loss ? ledger.train_loss.toFixed(4) : '-';
-            document.getElementById('valLoss').textContent = ledger.val_loss ? ledger.val_loss.toFixed(4) : '-';
-            document.getElementById('sizeGb').textContent = physical.total_size_gb || (ledger.size_bytes ? (ledger.size_bytes / 1024**3).toFixed(2) : '-');
+            // Main stats - using Format module
+            document.getElementById('trainLoss').textContent = Format.loss(ledger.train_loss);
+            document.getElementById('valLoss').textContent = Format.loss(ledger.val_loss);
+            document.getElementById('sizeGb').textContent = physical.total_size_gb || (ledger.size_bytes ? Format.metric(ledger.size_bytes / 1024**3, 2) : '-');
 
             // Color code loss
             if (ledger.train_loss && ledger.train_loss < 0.5) {
                 document.getElementById('trainLoss').classList.add('good');
             }
 
-            // Training stats table
+            // Training stats table - using Format module
             const trainingStats = document.getElementById('trainingStats');
             trainingStats.innerHTML = `
                 <div class="stats-row">
                     <span class="stats-label">Train Loss</span>
-                    <span class="stats-value">${ledger.train_loss?.toFixed(6) || '-'}</span>
+                    <span class="stats-value">${Format.metric(ledger.train_loss, 6)}</span>
                 </div>
                 <div class="stats-row">
                     <span class="stats-label">Val Loss</span>
-                    <span class="stats-value">${ledger.val_loss?.toFixed(6) || '-'}</span>
+                    <span class="stats-value">${Format.metric(ledger.val_loss, 6)}</span>
                 </div>
                 <div class="stats-row">
                     <span class="stats-label">Learning Rate</span>
@@ -590,15 +594,15 @@
                 </div>
                 <div class="stats-row">
                     <span class="stats-label">Epoch</span>
-                    <span class="stats-value">${ledger.epoch?.toFixed(2) || '-'}</span>
+                    <span class="stats-value">${Format.metric(ledger.epoch, 2)}</span>
                 </div>
                 <div class="stats-row">
                     <span class="stats-label">Accuracy</span>
-                    <span class="stats-value">${ledger.accuracy ? (ledger.accuracy * 100).toFixed(1) + '%' : '-'}</span>
+                    <span class="stats-value">${Format.percent(ledger.accuracy)}</span>
                 </div>
                 <div class="stats-row">
                     <span class="stats-label">Perplexity</span>
-                    <span class="stats-value">${ledger.perplexity?.toFixed(2) || '-'}</span>
+                    <span class="stats-value">${Format.metric(ledger.perplexity, 2)}</span>
                 </div>
             `;
 
@@ -631,14 +635,14 @@
                 </div>
             `;
 
-            // Comparison scores
+            // Comparison scores - using Format module
             const compContent = document.getElementById('comparisonContent');
             if (comparison.composite_score || comparison.metrics) {
                 let html = '<div class="metrics-grid">';
                 if (comparison.composite_score) {
                     html += `
                         <div class="metric-box">
-                            <div class="metric-value">${comparison.composite_score.toFixed(3)}</div>
+                            <div class="metric-value">${Format.metric(comparison.composite_score, 3)}</div>
                             <div class="metric-label">Composite</div>
                         </div>
                     `;
@@ -655,7 +659,7 @@
                     for (const [key, value] of Object.entries(comparison.metrics)) {
                         html += `
                             <div class="metric-box">
-                                <div class="metric-value">${typeof value === 'number' ? value.toFixed(3) : value}</div>
+                                <div class="metric-value">${typeof value === 'number' ? Format.metric(value, 3) : value}</div>
                                 <div class="metric-label">${key}</div>
                             </div>
                         `;
@@ -667,7 +671,7 @@
                 compContent.innerHTML = '<p style="color: #4CAF50;">This is the current best checkpoint!</p>';
             }
 
-            // Evaluation results
+            // Evaluation results - using Format module
             const evalsContent = document.getElementById('evaluationsContent');
             const evaluations = data.evaluations || {};
             if (evaluations.has_data) {
@@ -679,7 +683,7 @@
                     html += `
                         <div class="metric-box" style="grid-column: span 2;">
                             <div class="metric-value" style="color: ${curr.accuracy >= 0.8 ? '#4CAF50' : '#ff9800'};">
-                                ${(curr.accuracy * 100).toFixed(1)}%
+                                ${Format.percent(curr.accuracy)}
                             </div>
                             <div class="metric-label">Curriculum L${curr.level} (${curr.problems_correct}/${curr.problems_total})</div>
                         </div>
@@ -692,7 +696,7 @@
                         html += `
                             <div class="metric-box">
                                 <div class="metric-value" style="color: ${eval_.accuracy >= 0.8 ? '#4CAF50' : '#ff9800'};">
-                                    ${(eval_.accuracy * 100).toFixed(1)}%
+                                    ${Format.percent(eval_.accuracy)}
                                 </div>
                                 <div class="metric-label">${eval_.skill} L${eval_.level}</div>
                             </div>
@@ -708,7 +712,7 @@
                         html += `
                             <div style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
                                 <div style="font-weight: 600; margin-bottom: 0.5rem;">
-                                    ${detail.skill} L${detail.level} @ step ${detail.step} — ${(detail.accuracy * 100).toFixed(0)}% (${detail.correct}/${detail.total})
+                                    ${detail.skill} L${detail.level} @ step ${detail.step} — ${Format.percent(detail.accuracy, 0)} (${detail.correct}/${detail.total})
                                 </div>
                         `;
                         if (detail.results?.length > 0) {
@@ -745,7 +749,7 @@
                         html += `
                             <div class="metric-box">
                                 <div class="metric-value" style="color: ${p.accuracy >= 0.7 ? '#4CAF50' : p.accuracy >= 0.5 ? '#ff9800' : '#f44336'};">
-                                    ${(p.accuracy * 100).toFixed(1)}%
+                                    ${Format.percent(p.accuracy)}
                                 </div>
                                 <div class="metric-label">${p.passive_id} (${p.mode})</div>
                             </div>

@@ -112,6 +112,111 @@ const HintState = {
     valTrainGap: 0,
 };
 
+// ============================================
+// REALM STATE INTEGRATION
+// Sync from unified RealmState to GameState
+// ============================================
+
+/**
+ * Subscribe to RealmState and sync to GameState.
+ * This replaces the old fetchGameData polling for core training status.
+ */
+function initRealmStateSync() {
+    // Check if RealmState is available
+    if (typeof RealmState === 'undefined') {
+        console.warn('[Game] RealmState not available, falling back to legacy polling');
+        return false;
+    }
+
+    console.log('[Game] Syncing with RealmState (single source of truth)');
+
+    // Subscribe to training state changes
+    RealmState.subscribe('training', (training) => {
+        // Sync training data to GameState
+        GameState.isTraining = training.status === 'training';
+        GameState.currentStep = training.step || 0;
+        GameState.totalSteps = training.totalSteps || 0;
+        GameState.loss = training.loss || 0;
+        GameState.learningRate = training.learningRate || 0;
+        GameState.currentQuest = training.file || null;
+        GameState.stepsPerSecond = training.speed || 0;
+        GameState.etaSeconds = training.etaSeconds || 0;
+
+        // Calculate quest progress
+        if (GameState.totalSteps > 0) {
+            GameState.questProgress = Math.round((GameState.currentStep / GameState.totalSteps) * 100);
+        }
+
+        // Update UI
+        updateBattleStatus();
+        updateTrainingUI();
+    });
+
+    // Subscribe to queue state changes
+    RealmState.subscribe('queue', (queue) => {
+        HintState.queueTotal = queue.depth || 0;
+        HintState.queueHigh = queue.highPriority || 0;
+        HintState.queueNormal = queue.normalPriority || 0;
+        HintState.queueLow = queue.lowPriority || 0;
+
+        // Update queue warning
+        updateQueueWarning(queue.status);
+    });
+
+    // Subscribe to events (battle log)
+    RealmState.subscribe('events', (events) => {
+        // Update battle log display
+        renderBattleLogFromRealm(events);
+    });
+
+    return true;
+}
+
+/**
+ * Update queue warning banner based on queue status
+ */
+function updateQueueWarning(status) {
+    const questLabel = document.querySelector('.quest-label');
+    if (!questLabel) return;
+
+    if (status === 'empty' || status === 'low') {
+        questLabel.innerHTML = '<span class="warning">📦 Queue running low. Prepare more quests.</span>';
+    }
+}
+
+/**
+ * Render battle log from RealmState events
+ */
+function renderBattleLogFromRealm(events) {
+    const container = document.getElementById('logEntries');
+    if (!container || !events || events.length === 0) return;
+
+    // Clear and rebuild (events come newest first)
+    container.innerHTML = '';
+
+    for (const event of events.slice(0, 30)) {  // Show last 30
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${event.severity || 'info'}`;
+
+        const time = event.timestamp
+            ? new Date(event.timestamp).toLocaleTimeString('en-US', { hour12: false })
+            : '--:--:--';
+
+        entry.innerHTML = `${event.icon || '📢'} <span class="log-time">[${time}]</span> <span class="log-channel">${event.channel || 'system'}</span> ${escapeHtmlSafe(event.message || '')}`;
+        container.appendChild(entry);
+    }
+}
+
+/**
+ * Safe HTML escaping
+ */
+function escapeHtmlSafe(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 // Fetch additional data for hints (called less frequently)
 async function fetchHintData() {
     try {
@@ -578,79 +683,96 @@ function updateTime() {
 }
 
 // ============================================
-// SAGA (Persistent Battle Log)
+// BATTLE LOG (from core.battle_log)
 // ============================================
 
-// Track what we've already displayed to avoid duplicates
-let lastSagaTimestamp = null;
-let sagaInitialized = false;
+// Track displayed events to avoid duplicates
+let lastBattleLogTimestamp = null;
+let battleLogInitialized = false;
+let displayedEventIds = new Set();
 
 async function fetchSaga() {
+    // Now uses the battle_log API instead of saga
     try {
-        const response = await fetch(`/saga?limit=30&_t=${Date.now()}`, {
+        const response = await fetch(`/api/battle_log?limit=30&_t=${Date.now()}`, {
             cache: 'no-store'
         });
         if (!response.ok) return;
 
         const data = await response.json();
-        if (data.tales && data.tales.length > 0) {
-            renderSaga(data.tales);
+        if (data.events && data.events.length > 0) {
+            renderBattleLog(data.events);
         }
     } catch (error) {
-        console.error('Failed to fetch saga:', error);
+        console.error('Failed to fetch battle log:', error);
     }
 }
 
-function renderSaga(tales) {
+function renderBattleLog(events) {
     const container = $('#logEntries');
     if (!container) return;
 
     // First load: replace everything
-    if (!sagaInitialized) {
+    if (!battleLogInitialized) {
         container.innerHTML = '';
-        sagaInitialized = true;
+        battleLogInitialized = true;
     }
 
-    // Tales come newest-first, we display newest at top
-    // Only add tales we haven't seen (based on timestamp)
-    const newTales = [];
-    for (const tale of tales) {
-        const taleTs = `${tale.date}T${tale.time}`;
-        if (lastSagaTimestamp && taleTs <= lastSagaTimestamp) {
-            break;  // Already have this and older ones
+    // Events come newest-first, we display newest at top
+    // Only add events we haven't seen (based on id)
+    const newEvents = [];
+    for (const event of events) {
+        if (displayedEventIds.has(event.id)) {
+            continue;  // Already displayed
         }
-        newTales.push(tale);
+        newEvents.push(event);
+        displayedEventIds.add(event.id);
     }
 
     // Update timestamp tracker
-    if (tales.length > 0) {
-        lastSagaTimestamp = `${tales[0].date}T${tales[0].time}`;
+    if (events.length > 0) {
+        lastBattleLogTimestamp = events[0].timestamp;
     }
 
-    // Add new tales at the top (they're already newest-first)
-    for (const tale of newTales.reverse()) {
+    // Add new events at the top (reverse to maintain order)
+    for (const event of newEvents.reverse()) {
         const entry = document.createElement('div');
-        entry.className = `log-entry ${getCategoryClass(tale.category)}`;
-        entry.innerHTML = `${tale.icon} [${tale.time}] ${tale.message}`;
+        entry.className = `log-entry ${getSeverityClass(event.severity)}`;
+
+        // Format timestamp to just time
+        const time = event.timestamp ? new Date(event.timestamp).toLocaleTimeString('en-US', { hour12: false }) : '--:--:--';
+
+        entry.innerHTML = `${event.icon || '📢'} <span class="log-time">[${time}]</span> <span class="log-channel">${event.channel}</span> ${escapeHtml(event.message)}`;
         container.insertBefore(entry, container.firstChild);
     }
 
     // Keep only 30 entries max
     while (container.children.length > 30) {
-        container.removeChild(container.lastChild);
+        const removed = container.lastChild;
+        container.removeChild(removed);
     }
 }
 
-function getCategoryClass(category) {
+function getSeverityClass(severity) {
     const classMap = {
-        'quest': 'info',
-        'combat': 'info',
-        'hero': 'success',
-        'champion': 'success',
-        'training': 'info',
-        'system': 'warning',
+        'info': 'info',
+        'success': 'success',
+        'warning': 'warning',
+        'error': 'error',
     };
-    return classMap[category] || 'info';
+    return classMap[severity] || 'info';
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Legacy alias for compatibility
+function getCategoryClass(category) {
+    return getSeverityClass(category);
 }
 
 // Local log for immediate feedback (before chronicle catches up)
@@ -1607,13 +1729,25 @@ function init() {
     // Fetch skills (from YAML configs)
     fetchSkills();
 
-    // Fetch saga (persistent battle log)
-    fetchSaga();
+    // Try to use unified RealmState (single source of truth)
+    const realmSyncActive = initRealmStateSync();
 
-    // Start data fetching (includes vault data)
-    fetchGameData();
+    if (realmSyncActive) {
+        console.log('[Game] Using RealmState for training/queue/events data');
+        // RealmState handles: training status, queue, battle log
+        // We still need: GPU, vault, curriculum from /api/game
+        fetchGameData();
+        pollers.add('gameData', fetchGameData, CONFIG.UPDATE_INTERVAL, { immediate: false });
+    } else {
+        console.log('[Game] Falling back to legacy polling');
+        // Legacy: Fetch saga (battle log) and game data separately
+        fetchSaga();
+        fetchGameData();
+        pollers.add('gameData', fetchGameData, CONFIG.UPDATE_INTERVAL, { immediate: false });
+        pollers.add('saga', fetchSaga, 5000, { immediate: false });
+    }
 
-    // Fetch hint data (quests, task master)
+    // Fetch hint data (quests, task master) - still needed
     fetchHintData();
 
     // Fetch momentum state (blockers, forward progress)
@@ -1622,18 +1756,16 @@ function init() {
     // Fetch next action recommendation (main CTA)
     refreshNextAction();
 
-    // Set up polling using createPollerGroup for centralized management
-    pollers.add('gameData', fetchGameData, CONFIG.UPDATE_INTERVAL, { immediate: false });
-    pollers.add('saga', fetchSaga, 5000, { immediate: false });
+    // Set up polling for secondary data
     pollers.add('hints', fetchHintData, 10000, { immediate: false });
     pollers.add('skills', fetchSkills, 30000, { immediate: false });
     pollers.add('time', updateTime, 1000, { immediate: false });
-    pollers.add('momentum', fetchMomentum, 15000, { immediate: false }); // Check momentum every 15s
+    pollers.add('momentum', fetchMomentum, 15000, { immediate: false });
 
     // Start all pollers
     pollers.startAll();
 
-    // Register for real-time SSE training updates
+    // Register for real-time SSE training updates (in addition to RealmState)
     registerTrainingEventHandlers();
 
     console.log('[Game] Pollers initialized:', Object.keys(pollers.getAllStats()));

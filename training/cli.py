@@ -42,6 +42,7 @@ def run_command(command: str, args) -> int:
         "start-all": cmd_start_all,
         "stop-all": cmd_stop_all,
         "status": cmd_status,
+        "reset": cmd_reset,
     }
     handler = handlers.get(command)
     if handler:
@@ -654,5 +655,139 @@ def cmd_status(args) -> int:
             print(f"  Unable to read: {e}")
     else:
         print("  No training status file")
+
+    return 0
+
+
+# =============================================================================
+# RESET COMMAND - Clear stale state while preserving models
+# =============================================================================
+
+def cmd_reset(args) -> int:
+    """
+    Reset training environment.
+
+    Clears runtime state that may be stale or corrupted:
+    - .pids/ (daemon PID files)
+    - control/state.json (training state)
+    - status/training_status.json (last training status)
+    - status/events.jsonl (event log)
+
+    Preserves:
+    - campaigns/ (all hero data and checkpoints)
+    - models/ (all model files)
+    - vault/jobs.db (unless --clear-jobs)
+    - config.json (root configuration)
+    """
+    base_dir = get_base_dir()
+
+    print("=" * 60)
+    print("REALM OF TRAINING - Environment Reset")
+    print("=" * 60)
+    print()
+    print("This will clear runtime state while preserving models and campaigns.")
+    print()
+    print("Will clear:")
+    print("  - .pids/ (daemon PID files)")
+    print("  - control/state.json (training state)")
+    print("  - status/training_status.json (last status)")
+    print("  - status/events.jsonl (event log)")
+    if not getattr(args, 'keep_jobs', False):
+        print("  - Pending/running jobs in vault/jobs.db")
+    print()
+    print("Will preserve:")
+    print("  - campaigns/ (all hero data and checkpoints)")
+    print("  - models/ (all model files)")
+    print("  - control/active_campaign.json (campaign selection)")
+    if getattr(args, 'keep_jobs', False):
+        print("  - vault/jobs.db (job database)")
+    print()
+
+    # Confirm unless --yes
+    if not getattr(args, 'yes', False):
+        confirm = input("Proceed? [y/N] ").strip().lower()
+        if confirm != 'y':
+            print("Cancelled.")
+            return 0
+
+    # Step 1: Stop all daemons
+    print("\n[1/4] Stopping daemons...")
+    stopped = 0
+    pids_dir = base_dir / ".pids"
+    if pids_dir.exists():
+        for pid_file in pids_dir.glob("*.pid"):
+            try:
+                pid = int(pid_file.read_text().strip())
+                os.kill(pid, signal.SIGTERM)
+                print(f"  Stopped {pid_file.stem} (PID {pid})")
+                stopped += 1
+            except (ValueError, ProcessLookupError, PermissionError):
+                pass
+    print(f"  {stopped} daemon(s) stopped")
+
+    # Step 2: Clear PID files
+    print("\n[2/4] Clearing PID files...")
+    cleared = 0
+    if pids_dir.exists():
+        for pid_file in pids_dir.glob("*.pid"):
+            try:
+                pid_file.unlink()
+                cleared += 1
+            except Exception:
+                pass
+    print(f"  {cleared} PID file(s) cleared")
+
+    # Step 3: Clear state files
+    print("\n[3/4] Clearing state files...")
+    state_files = [
+        base_dir / "control" / "state.json",
+        base_dir / "status" / "training_status.json",
+        base_dir / "status" / "events.jsonl",
+    ]
+    cleared_state = 0
+    for state_file in state_files:
+        if state_file.exists():
+            try:
+                state_file.unlink()
+                print(f"  Cleared {state_file.name}")
+                cleared_state += 1
+            except Exception as e:
+                print(f"  Failed to clear {state_file.name}: {e}")
+    print(f"  {cleared_state} state file(s) cleared")
+
+    # Step 4: Clear pending jobs (unless --keep-jobs)
+    if not getattr(args, 'keep_jobs', False):
+        print("\n[4/4] Clearing pending jobs...")
+        try:
+            from jobs.store import get_store
+            store = get_store()
+            # Cancel all pending/claimed/running jobs
+            from guild.job_types import JobStatus
+            jobs = store.list_jobs(status=JobStatus.PENDING, limit=1000)
+            jobs += store.list_jobs(status=JobStatus.CLAIMED, limit=1000)
+            jobs += store.list_jobs(status=JobStatus.RUNNING, limit=1000)
+            cancelled = 0
+            for job in jobs:
+                try:
+                    store.cancel(job.job_id, actor="reset")
+                    cancelled += 1
+                except Exception:
+                    pass
+            print(f"  {cancelled} job(s) cancelled")
+        except ImportError:
+            print("  Job store not available (skipped)")
+        except Exception as e:
+            print(f"  Error clearing jobs: {e}")
+    else:
+        print("\n[4/4] Keeping jobs (--keep-jobs)")
+
+    print()
+    print("=" * 60)
+    print("Reset complete!")
+    print()
+    print("Next steps:")
+    print("  1. python -m training play    # Start fresh")
+    print("  2. python -m training status  # Verify clean state")
+    print("=" * 60)
 
     return 0

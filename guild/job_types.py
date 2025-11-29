@@ -504,15 +504,40 @@ def eval_job(
     level: int = 1,
     batch_size: int = 100,
     priority: JobPriority = JobPriority.HIGH,
+    # Model identity fields (for run-independent evals)
+    hero_id: Optional[str] = None,
+    campaign_id: Optional[str] = None,
+    checkpoint_id: Optional[str] = None,
+    checkpoint_path: Optional[str] = None,
+    context_hash: Optional[str] = None,
 ) -> JobSpec:
-    """Create an eval job spec."""
+    """
+    Create an eval job spec.
+
+    If model identity fields are provided, the eval is anchored to
+    that specific model version. Otherwise, workers may use the
+    current active model (not recommended for reproducibility).
+    """
+    payload = {
+        "skill_id": skill_id,
+        "level": level,
+        "batch_size": batch_size,
+    }
+    # Add model identity if provided
+    if hero_id:
+        payload["hero_id"] = hero_id
+    if campaign_id:
+        payload["campaign_id"] = campaign_id
+    if checkpoint_id:
+        payload["checkpoint_id"] = checkpoint_id
+    if checkpoint_path:
+        payload["checkpoint_path"] = checkpoint_path
+    if context_hash:
+        payload["context_hash"] = context_hash
+
     return JobSpec(
         job_type=JobType.EVAL,
-        payload={
-            "skill_id": skill_id,
-            "level": level,
-            "batch_size": batch_size,
-        },
+        payload=payload,
         priority=priority,
         tags=["eval", skill_id],
     )
@@ -523,15 +548,39 @@ def sparring_job(
     count: int = 100,
     checkpoint: Optional[str] = None,
     priority: JobPriority = JobPriority.HIGH,
+    # Model identity fields
+    hero_id: Optional[str] = None,
+    campaign_id: Optional[str] = None,
+    checkpoint_id: Optional[str] = None,
+    checkpoint_path: Optional[str] = None,
+    context_hash: Optional[str] = None,
 ) -> JobSpec:
-    """Create a sparring job spec."""
+    """
+    Create a sparring job spec.
+
+    If model identity fields are provided, the sparring is anchored to
+    that specific model version.
+    """
+    payload = {
+        "skill_id": skill_id,
+        "count": count,
+        "checkpoint": checkpoint,
+    }
+    # Add model identity if provided
+    if hero_id:
+        payload["hero_id"] = hero_id
+    if campaign_id:
+        payload["campaign_id"] = campaign_id
+    if checkpoint_id:
+        payload["checkpoint_id"] = checkpoint_id
+    if checkpoint_path:
+        payload["checkpoint_path"] = checkpoint_path
+    if context_hash:
+        payload["context_hash"] = context_hash
+
     return JobSpec(
         job_type=JobType.SPARRING,
-        payload={
-            "skill_id": skill_id,
-            "count": count,
-            "checkpoint": checkpoint,
-        },
+        payload=payload,
         priority=priority,
         tags=["sparring", skill_id],
     )

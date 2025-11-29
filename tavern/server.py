@@ -711,6 +711,9 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Setup API - Quick start for first-run
         elif path == "/api/setup/quick-start":
             setup_api.serve_quick_start(self)
+        # Reset API - Clear stale state
+        elif path == "/api/reset":
+            self._handle_reset()
         else:
             self._send_error(404, "Endpoint not found")
 
@@ -3047,8 +3050,21 @@ class TavernHandler(SimpleHTTPRequestHandler):
             level = int(body.get("level", 1))
             batch_size = int(body.get("batch_size", 100))
 
+            # Get RunContext for model identity anchoring
+            from core.run_context import get_run_context
+            ctx = get_run_context()
+
             from jobs import eval_job
-            spec = eval_job(skill_id, level, batch_size)
+            spec = eval_job(
+                skill_id,
+                level,
+                batch_size,
+                # Anchor to current run context
+                hero_id=ctx.hero_id,
+                campaign_id=ctx.campaign_id,
+                checkpoint_path=ctx.current_model_dir,
+                context_hash=ctx.context_hash(),
+            )
             job_id = client.submit(spec)
 
             self._send_json({
@@ -3056,6 +3072,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 "job_id": job_id,
                 "skill_id": skill_id,
                 "level": level,
+                "hero_id": ctx.hero_id,
+                "context_hash": ctx.context_hash(),
             }, 201)
 
         except Exception as e:
@@ -3079,6 +3097,102 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Cancel job error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
+    def _handle_reset(self):
+        """
+        Reset training environment - clear stale state while preserving models.
+
+        This is a destructive operation that:
+        - Stops running daemons
+        - Clears PID files
+        - Clears state files (control/state.json, status/training_status.json)
+        - Optionally cancels pending jobs
+
+        POST /api/reset
+        Body: {"keep_jobs": false}  # optional
+        """
+        try:
+            import os
+            import signal
+            from pathlib import Path
+            from core.paths import get_base_dir
+
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = {}
+            if content_length > 0:
+                body = json.loads(self.rfile.read(content_length).decode())
+
+            keep_jobs = body.get("keep_jobs", False)
+            base_dir = get_base_dir()
+
+            results = {
+                "daemons_stopped": 0,
+                "pids_cleared": 0,
+                "state_files_cleared": 0,
+                "jobs_cancelled": 0,
+            }
+
+            # Step 1: Stop daemons
+            pids_dir = base_dir / ".pids"
+            if pids_dir.exists():
+                for pid_file in pids_dir.glob("*.pid"):
+                    try:
+                        pid = int(pid_file.read_text().strip())
+                        os.kill(pid, signal.SIGTERM)
+                        results["daemons_stopped"] += 1
+                    except (ValueError, ProcessLookupError, PermissionError):
+                        pass
+
+            # Step 2: Clear PID files
+            if pids_dir.exists():
+                for pid_file in pids_dir.glob("*.pid"):
+                    try:
+                        pid_file.unlink()
+                        results["pids_cleared"] += 1
+                    except Exception:
+                        pass
+
+            # Step 3: Clear state files
+            state_files = [
+                base_dir / "control" / "state.json",
+                base_dir / "status" / "training_status.json",
+                base_dir / "status" / "events.jsonl",
+            ]
+            for state_file in state_files:
+                if state_file.exists():
+                    try:
+                        state_file.unlink()
+                        results["state_files_cleared"] += 1
+                    except Exception:
+                        pass
+
+            # Step 4: Cancel pending jobs
+            if not keep_jobs:
+                try:
+                    from jobs.store import get_store
+                    from guild.job_types import JobStatus
+                    store = get_store()
+                    jobs = store.list_jobs(status=JobStatus.PENDING, limit=1000)
+                    jobs += store.list_jobs(status=JobStatus.CLAIMED, limit=1000)
+                    jobs += store.list_jobs(status=JobStatus.RUNNING, limit=1000)
+                    for job in jobs:
+                        try:
+                            store.cancel(job.job_id, actor="reset")
+                            results["jobs_cancelled"] += 1
+                        except Exception:
+                            pass
+                except Exception as e:
+                    logger.warning(f"Could not clear jobs: {e}")
+
+            self._send_json({
+                "success": True,
+                "message": "Environment reset complete",
+                "results": results,
+            })
+
+        except Exception as e:
+            logger.error(f"Reset error: {e}")
             self._send_json({"success": False, "error": str(e)}, 500)
 
     # =========================================================================

@@ -76,6 +76,22 @@ def main():
         help="Show current status of all services"
     )
 
+    # reset command
+    p_reset = subparsers.add_parser(
+        "reset",
+        help="Reset training environment (clear stale state, keep models)"
+    )
+    p_reset.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip confirmation prompt"
+    )
+    p_reset.add_argument(
+        "--keep-jobs",
+        action="store_true",
+        help="Keep job database (don't clear pending jobs)"
+    )
+
     args = parser.parse_args()
 
     if args.command is None:

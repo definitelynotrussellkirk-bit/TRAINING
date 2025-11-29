@@ -16,8 +16,10 @@ Usage:
     ctx = get_run_context()
     print(ctx.model_path)        # From active campaign's config
     print(ctx.locked.base_model) # From hero's model definition
+    print(ctx.context_hash())    # For job payload verification
 """
 
+import hashlib
 import json
 import logging
 from dataclasses import dataclass, field, asdict
@@ -88,6 +90,49 @@ class RunContext:
             result["locked"] = asdict(self.locked)
         result["daemon"] = asdict(self.daemon)
         return result
+
+    def context_hash(self) -> str:
+        """
+        Compute a hash of the stable identity fields.
+
+        This hash can be included in job payloads for verification.
+        Workers can check that their view of RunContext matches the
+        hash in the job payload to detect context drift.
+
+        Only includes immutable identity fields, not runtime state:
+        - hero_id, campaign_id
+        - model_path, base_model
+        - locked config (architecture, context_length, vocab_size)
+        """
+        identity = {
+            "hero_id": self.hero_id,
+            "campaign_id": self.campaign_id,
+            "model_path": self.model_path,
+            "base_model": self.base_model,
+        }
+        if self.locked:
+            identity["locked"] = {
+                "base_model": self.locked.base_model,
+                "architecture": self.locked.architecture,
+                "context_length": self.locked.context_length,
+                "vocab_size": self.locked.vocab_size,
+            }
+        # Stable JSON representation
+        canonical = json.dumps(identity, sort_keys=True)
+        return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+    def identity_summary(self) -> Dict[str, Any]:
+        """
+        Return the identity fields used for hashing.
+
+        Useful for debugging context mismatch errors.
+        """
+        return {
+            "hero_id": self.hero_id,
+            "campaign_id": self.campaign_id,
+            "model_path": self.model_path,
+            "context_hash": self.context_hash(),
+        }
 
 
 def _get_base_dir() -> Path:

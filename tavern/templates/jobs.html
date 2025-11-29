@@ -315,6 +315,70 @@
             to { transform: rotate(360deg); }
         }
 
+        /* Warnings panel */
+        .warnings-panel {
+            background: #3a1a1a;
+            border: 1px solid #ff6b6b;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .warnings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(255, 107, 107, 0.15);
+        }
+        .warnings-header h3 {
+            margin: 0;
+            color: #ff6b6b;
+            font-size: 1rem;
+        }
+        #warnings-count {
+            background: #ff6b6b;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+        #warnings-list {
+            padding: 12px 16px;
+        }
+        .warning-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        .warning-item:last-child { margin-bottom: 0; }
+        .warning-severity {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .warning-severity.critical { background: #ff6b6b; }
+        .warning-severity.warning { background: #ffa726; }
+        .warning-details {
+            flex: 1;
+        }
+        .warning-title {
+            font-weight: 500;
+            color: #e0e0e0;
+        }
+        .warning-subtitle {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        .warning-age {
+            font-size: 0.85rem;
+            color: #ff6b6b;
+            font-weight: 500;
+        }
+
         /* Toast notifications */
         .toast {
             position: fixed;
@@ -354,6 +418,15 @@
             <span class="health-icon" id="health-icon">●</span>
             <span class="health-status" id="health-status">Checking...</span>
             <span class="health-alerts" id="health-alerts"></span>
+        </div>
+
+        <!-- Warnings Panel (hidden by default) -->
+        <div class="warnings-panel" id="warnings-panel" style="display: none;">
+            <div class="warnings-header">
+                <h3>Warnings</h3>
+                <span id="warnings-count">0 issues</span>
+            </div>
+            <div id="warnings-list"></div>
         </div>
 
         <!-- Stats -->
@@ -518,6 +591,49 @@
             }
         }
 
+        async function fetchWarnings() {
+            try {
+                const res = await fetch('/api/jobs/warnings');
+                const data = await res.json();
+
+                const panel = document.getElementById('warnings-panel');
+                const count = document.getElementById('warnings-count');
+                const list = document.getElementById('warnings-list');
+
+                const total = data.summary?.total || 0;
+                const critical = data.summary?.critical || 0;
+
+                if (total === 0) {
+                    panel.style.display = 'none';
+                    return;
+                }
+
+                panel.style.display = 'block';
+                count.textContent = `${total} issue${total === 1 ? '' : 's'} (${critical} critical)`;
+
+                // Combine all warnings
+                const allWarnings = [
+                    ...(data.stuck_pending || []).map(w => ({...w, type: 'Stuck Pending'})),
+                    ...(data.stuck_running || []).map(w => ({...w, type: 'Stuck Running'})),
+                    ...(data.orphaned_jobs || []).map(w => ({...w, type: 'Orphaned'}))
+                ];
+
+                list.innerHTML = allWarnings.map(w => `
+                    <div class="warning-item">
+                        <span class="warning-severity ${w.severity}"></span>
+                        <div class="warning-details">
+                            <div class="warning-title">${w.type}: ${w.job_id}</div>
+                            <div class="warning-subtitle">${w.job_type} - ${w.reason}</div>
+                        </div>
+                        <span class="warning-age">${w.age_human || '-'}</span>
+                    </div>
+                `).join('');
+
+            } catch (e) {
+                console.error('Warnings fetch error:', e);
+            }
+        }
+
         async function fetchStats() {
             try {
                 const res = await fetch('/api/jobs/stats');
@@ -645,7 +761,7 @@
             const icon = document.getElementById('refresh-icon');
             icon.classList.add('refreshing');
 
-            await Promise.all([fetchHealth(), fetchStats(), fetchWorkers(), fetchJobs()]);
+            await Promise.all([fetchHealth(), fetchWarnings(), fetchStats(), fetchWorkers(), fetchJobs()]);
 
             setTimeout(() => icon.classList.remove('refreshing'), 500);
         }

@@ -93,6 +93,12 @@ class EvalWorker(BaseWorker):
 
         logger.info(f"Handling {job_type} job {job_id}")
 
+        # Verify context hash if provided (detects context drift)
+        mismatch = self._verify_context_hash(payload)
+        if mismatch:
+            logger.warning(f"Context mismatch for job {job_id}: {mismatch}")
+            # Log warning but continue - job payload has explicit identity
+
         if job_type == "eval":
             return self._handle_eval(payload)
         elif job_type == "sparring":
@@ -101,6 +107,37 @@ class EvalWorker(BaseWorker):
             return self._handle_inference(payload)
         else:
             raise ValueError(f"Unknown job type: {job_type}")
+
+    def _verify_context_hash(self, payload: Dict[str, Any]) -> Optional[str]:
+        """
+        Verify context hash in payload matches current RunContext.
+
+        This is a warning-only check - jobs with explicit model identity
+        in their payload are still valid even if context has drifted.
+
+        Returns:
+            Mismatch description if detected, None if OK or no hash in payload
+        """
+        job_hash = payload.get("context_hash")
+        if not job_hash:
+            # No hash in payload - skip verification
+            return None
+
+        try:
+            from core.run_context import get_run_context
+            ctx = get_run_context()
+            current_hash = ctx.context_hash()
+
+            if job_hash != current_hash:
+                return (
+                    f"Job context_hash={job_hash[:8]}... does not match "
+                    f"current={current_hash[:8]}... "
+                    f"(job.hero={payload.get('hero_id')}, current.hero={ctx.hero_id})"
+                )
+        except Exception as e:
+            logger.warning(f"Could not verify context hash: {e}")
+
+        return None
 
     def _handle_eval(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """

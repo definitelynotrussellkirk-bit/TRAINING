@@ -1032,13 +1032,9 @@
             $('#remote_interval').value = config.remote_eval?.eval_interval_steps || 5000;
             setToggle('#remote_sync', config.remote_eval?.sync_checkpoints);
 
-            // Model info comes from active hero, not config.json
-            // (config.locked is stale/global, hero info is per-campaign)
+            // Model info AND paths come from /api/run-context (single source of truth)
+            // This ensures model identity and paths are consistent with the active campaign
             loadHeroModelInfo();
-
-            // Paths (still from config for now)
-            setText('#path_model', config.model_path || '--');
-            setText('#path_current', config.current_model_dir || '--');
 
             // Raw JSON
             $('#rawConfig').textContent = JSON.stringify(config, null, 2);
@@ -1063,46 +1059,42 @@
 
         async function loadHeroModelInfo() {
             /**
-             * Load model info from the ACTIVE HERO (not config.json).
-             * This ensures the Model Info section shows the correct hero's model,
-             * not stale/hardcoded DIO data.
+             * Load model info from /api/run-context (single source of truth).
+             * This ensures Model Info AND Paths are consistent and come from
+             * the active campaign, not a mix of stale sources.
              */
             try {
-                const heroRes = await fetch('/api/hero');
-                if (!heroRes.ok) throw new Error('Hero API failed');
-                const hero = await heroRes.json();
+                const res = await fetch('/api/run-context');
+                if (!res.ok) throw new Error('RunContext API failed');
+                const ctx = await res.json();
 
-                // Also get the hero config for more details
-                const configRes = await fetch(`/api/active-campaign`);
-                const campaign = configRes.ok ? await configRes.json() : null;
-
-                // Get hero config YAML for full model details
-                let heroConfig = null;
-                if (hero.hero_id) {
-                    try {
-                        const yamlRes = await fetch(`/api/hero-config/${hero.hero_id}`);
-                        if (yamlRes.ok) heroConfig = await yamlRes.json();
-                    } catch (e) {
-                        // Hero config endpoint may not exist
-                    }
+                // Update Model Info section
+                if (ctx.locked) {
+                    setText('#locked_base_model', ctx.locked.base_model || '--');
+                    setText('#locked_architecture', ctx.locked.architecture || '--');
+                    setText('#locked_context', ctx.locked.context_length?.toLocaleString() || '--');
+                    setText('#locked_vocab', ctx.locked.vocab_size?.toLocaleString() || '--');
+                } else {
+                    setText('#locked_base_model', '--');
+                    setText('#locked_architecture', '--');
+                    setText('#locked_context', '--');
+                    setText('#locked_vocab', '--');
                 }
 
-                // Update Model Info section with active hero's data
-                setText('#locked_base_model', hero.model_name || heroConfig?.model?.hf_name || '--');
-                setText('#locked_architecture', heroConfig?.model?.architecture || hero.model_family || '--');
-                setText('#locked_context', heroConfig?.model?.context_length?.toLocaleString() || '--');
-                setText('#locked_vocab', heroConfig?.model?.vocab_size?.toLocaleString() || '--');
+                // Update Paths section FROM RUN CONTEXT (not root config)
+                setText('#path_model', ctx.model_path || '--');
+                setText('#path_current', ctx.current_model_dir || '--');
 
-                // Update path to campaign path if available
-                if (campaign?.campaign_path) {
-                    setText('#path_current', campaign.campaign_path);
+                // Show warnings if any
+                if (ctx._warnings?.length > 0) {
+                    console.warn('[Settings] RunContext warnings:', ctx._warnings);
                 }
 
-                // Log what hero we're showing
-                console.log(`[Settings] Model Info for: ${hero.name} (${hero.hero_id})`);
+                // Log what we're showing
+                console.log(`[Settings] Model Info for: ${ctx.hero_name || 'Unknown'} (${ctx.hero_id || 'legacy'})`);
 
             } catch (error) {
-                console.error('Failed to load hero model info:', error);
+                console.error('Failed to load run context:', error);
                 setText('#locked_base_model', 'Error loading');
                 setText('#locked_architecture', '--');
                 setText('#locked_context', '--');

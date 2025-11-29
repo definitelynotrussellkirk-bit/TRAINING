@@ -21,7 +21,28 @@ window.fetchCampaignContext = async function() {
 };
 
 /**
+ * Fetch run context (single source of truth for current training run).
+ *
+ * Returns all info needed for settings/status pages:
+ * - hero_id, hero_name, hero_icon, hero_rpg_name
+ * - campaign_id, campaign_name, campaign_path
+ * - model_path, current_model_dir, base_model
+ * - locked: {base_model, architecture, context_length, vocab_size}
+ * - daemon: {running, pid, last_heartbeat}
+ * - auto_run, auto_generate
+ * - is_legacy_mode, is_first_run
+ *
+ * @returns {Promise<Object>}
+ */
+window.fetchRunContext = async function() {
+    const resp = await fetch('/api/run-context');
+    if (!resp.ok) throw new Error('Failed to load run context');
+    return await resp.json();
+};
+
+/**
  * Fetch merged hero + model info (single endpoint).
+ * @deprecated Use fetchRunContext() instead for consistent data
  *
  * Returns all info needed for settings/status pages:
  * - hero_id, hero_name

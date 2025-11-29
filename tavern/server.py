@@ -59,6 +59,7 @@ from tavern.api import momentum as momentum_api
 from tavern.api import train as train_api
 from tavern.api import generate as generate_api
 from tavern.api import setup as setup_api
+from tavern.api import run_context as run_context_api
 
 # Import events system
 try:
@@ -604,6 +605,10 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Setup API - First-run detection and onboarding
         elif path == "/api/setup/status":
             setup_api.serve_setup_status(self)
+
+        # Run Context API - Single source of truth for current training run
+        elif path == "/api/run-context":
+            run_context_api.serve_run_context(self)
 
         # Analysis - Model Archaeology (uses analysis_api module)
         elif path == "/analysis" or path == "/analysis.html":

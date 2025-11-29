@@ -32,6 +32,20 @@ except ImportError:
     WORLD_STATE_AVAILABLE = False
     HeartbeatWriter = None
 
+# Realm Store - single source of truth for UI state
+try:
+    from core.realm_store import (
+        update_training as realm_update_training,
+        update_worker as realm_update_worker,
+        emit_event as realm_emit_event,
+    )
+    REALM_STORE_AVAILABLE = True
+except ImportError:
+    REALM_STORE_AVAILABLE = False
+    def realm_update_training(**kwargs): pass
+    def realm_update_worker(worker_id, **kwargs): pass
+    def realm_emit_event(kind, message, **kwargs): pass
+
 # Optional imports for remote evaluation
 try:
     from data_manager.remote_evaluator import RemoteEvaluator
@@ -435,6 +449,37 @@ class LiveMonitorCallback(TrainerCallback):
                 skill_context=self.skill_context,
             )
 
+            # NEW: Update RealmStore (single source of truth for UI)
+            if REALM_STORE_AVAILABLE:
+                # Calculate ETA
+                eta_seconds = None
+                if self.steps_per_sec_ema and self.steps_per_sec_ema > 0:
+                    remaining_steps = self.total_steps - state.global_step
+                    if remaining_steps > 0:
+                        eta_seconds = int(remaining_steps / self.steps_per_sec_ema)
+
+                realm_update_training(
+                    status="training",
+                    step=state.global_step,
+                    total_steps=self.total_steps,
+                    loss=round(current_loss, 4) if current_loss else None,
+                    learning_rate=current_lr,
+                    file=self.current_file,
+                    speed=round(self.steps_per_sec_ema, 3) if self.steps_per_sec_ema else None,
+                    eta_seconds=eta_seconds,
+                )
+
+                # Also update worker state
+                realm_update_worker(
+                    worker_id="training_daemon",
+                    role="training",
+                    status="running",
+                    current_job=self.current_file,
+                    step=state.global_step,
+                    total_steps=self.total_steps,
+                    it_per_sec=round(self.steps_per_sec_ema, 3) if self.steps_per_sec_ema else None,
+                )
+
             # World State heartbeat - emit during training with live stats
             if self.heartbeat_writer:
                 try:
@@ -562,6 +607,25 @@ class LiveMonitorCallback(TrainerCallback):
                             step=state.global_step,
                             path=str(record.path) if record else str(checkpoint_dir),
                             loss=train_loss,
+                        )
+                    except Exception:
+                        pass
+
+                # NEW: RealmStore - emit checkpoint_saved to battle log
+                if REALM_STORE_AVAILABLE:
+                    try:
+                        loss_str = f"loss: {train_loss:.4f}" if train_loss else ""
+                        realm_emit_event(
+                            kind="checkpoint_saved",
+                            message=f"💾 Saved checkpoint {state.global_step:,} ({loss_str})",
+                            channel="training",
+                            severity="success",
+                            details={
+                                "step": state.global_step,
+                                "loss": train_loss,
+                                "val_loss": val_loss,
+                                "canonical_name": record.canonical_name if record else None,
+                            },
                         )
                     except Exception:
                         pass

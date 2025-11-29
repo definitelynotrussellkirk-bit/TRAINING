@@ -530,9 +530,13 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/daemon/status":
             self._serve_daemon_status()
 
-        # Weaver (orchestrator) status
+        # Weaver (orchestrator) status and control
         elif path == "/api/weaver/status":
             self._serve_weaver_status()
+        elif path == "/api/weaver/start":
+            self._weaver_start()
+        elif path == "/api/weaver/stop":
+            self._weaver_stop()
 
         # Task Master (background task scheduler) status
         elif path == "/api/task-master":
@@ -630,10 +634,14 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # World State API - Single authoritative snapshot of the Realm
         elif path == "/api/world-state":
             self._serve_world_state()
+        elif path == "/api/realm":
+            self._serve_realm_state()
         elif path == "/api/realm-mode":
             self._serve_realm_mode()
         elif path == "/api/battle-log":
             self._serve_battle_log(query)
+        elif path == "/api/battle_log":
+            self._serve_battle_log_v2(query)
 
         # Analysis - Model Archaeology (uses analysis_api module)
         elif path == "/analysis" or path == "/analysis.html":
@@ -845,6 +853,129 @@ class TavernHandler(SimpleHTTPRequestHandler):
             logger.error(f"World state error: {e}")
             self._send_json({"error": str(e)}, 500)
 
+    def _serve_realm_state(self):
+        """
+        Serve unified realm state from realm_store.json file.
+
+        This is the NEW single source of truth API. Combines:
+        - Training state (step, loss, speed, etc.)
+        - Queue state (depth, priorities)
+        - Worker states (heartbeats)
+        - Hero state (level, xp)
+        - Recent events (battle log)
+        - Mode state
+
+        Reads directly from file to ensure fresh data (producers write to file).
+        """
+        try:
+            import json
+            from datetime import datetime
+
+            # Read directly from file for fresh data (don't use singleton)
+            realm_file = BASE_DIR / "status" / "realm_store.json"
+
+            if realm_file.exists():
+                with open(realm_file) as f:
+                    data = json.load(f)
+
+                # Add response timestamp
+                data["timestamp"] = datetime.now().isoformat()
+
+                # Return file contents directly
+                self._send_json(data)
+            else:
+                # Fall back to legacy sources
+                self._serve_realm_state_legacy()
+
+        except Exception as e:
+            logger.error(f"Realm state error: {e}")
+            # Fall back to legacy
+            self._serve_realm_state_legacy()
+
+    def _serve_realm_state_legacy(self):
+        """Serve realm state from legacy sources (training_status.json, etc.)."""
+        try:
+            from core.world_state import get_world_state
+            state = get_world_state()
+            self._send_json(state)
+        except Exception as e:
+            logger.error(f"Legacy realm state error: {e}")
+            self._send_json({
+                "error": "Realm store not available",
+                "state": {},
+                "events": [],
+            }, 503)
+
+    def _populate_store_from_legacy(self, store):
+        """Populate realm store from legacy sources during transition."""
+        try:
+            # Pull from training_status.json
+            status_file = BASE_DIR / "status" / "training_status.json"
+            if status_file.exists():
+                with open(status_file) as f:
+                    status = json.load(f)
+                store.update_training(
+                    status=status.get("status", "idle"),
+                    step=status.get("current_step", 0),
+                    total_steps=status.get("total_steps", 0),
+                    loss=status.get("loss"),
+                    learning_rate=status.get("learning_rate"),
+                    file=status.get("current_file"),
+                )
+
+            # Pull from queue
+            try:
+                from core.training_queue import TrainingQueue
+                queue = TrainingQueue(str(BASE_DIR / "queue"))
+                depth, breakdown = queue.get_depth_with_breakdown()
+                store.update_queue(
+                    depth=depth,
+                    high_priority=breakdown.get("high", 0),
+                    normal_priority=breakdown.get("normal", 0),
+                    low_priority=breakdown.get("low", 0),
+                    status="ok" if depth > 5 else ("low" if depth > 0 else "empty"),
+                )
+            except Exception:
+                pass
+
+            # Pull from heartbeats
+            heartbeat_dir = BASE_DIR / "status" / "heartbeats"
+            if heartbeat_dir.exists():
+                for hb_file in heartbeat_dir.glob("*.json"):
+                    try:
+                        with open(hb_file) as f:
+                            hb = json.load(f)
+                        store.update_worker(
+                            worker_id=hb.get("worker_id", hb_file.stem),
+                            role=hb.get("role", "unknown"),
+                            status=hb.get("status", "unknown"),
+                            device=hb.get("device"),
+                            current_job=hb.get("current_job"),
+                        )
+                    except Exception:
+                        pass
+
+            # Pull from battle_log
+            try:
+                from core.battle_log import get_battle_logger
+                bl = get_battle_logger()
+                events = bl.get_events(limit=30)
+                for e in events:
+                    store.emit_event(
+                        kind=e.source or "legacy",
+                        message=e.message,
+                        channel=e.channel,
+                        severity=e.severity,
+                        details=e.details,
+                    )
+            except Exception:
+                pass
+
+            store.flush()
+
+        except Exception as e:
+            logger.error(f"Failed to populate store from legacy: {e}")
+
     def _serve_realm_mode(self):
         """Serve current realm mode."""
         try:
@@ -930,6 +1061,62 @@ class TavernHandler(SimpleHTTPRequestHandler):
             }, 503)
         except Exception as e:
             logger.error(f"Battle log error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_battle_log_v2(self, query: dict):
+        """Serve battle log with full event objects (for battle_log.html UI)."""
+        try:
+            from core.battle_log import get_battle_logger, CHANNEL_ICONS
+
+            logger_inst = get_battle_logger()
+            limit = int(query.get("limit", [100])[0])
+            since = query.get("since", [None])[0]
+
+            # Get events
+            events = logger_inst.get_events(limit=limit, since=since)
+
+            # Format for UI
+            formatted_events = []
+            channel_counts = {}
+
+            for e in events:
+                channel = e.channel
+                channel_counts[channel] = channel_counts.get(channel, 0) + 1
+
+                formatted_events.append({
+                    "id": e.id,
+                    "timestamp": e.timestamp,
+                    "channel": channel,
+                    "severity": e.severity,
+                    "message": e.message,
+                    "source": e.source,
+                    "icon": CHANNEL_ICONS.get(channel, "📢"),
+                    "details": e.details,
+                })
+
+            # Get next_since for pagination
+            next_since = None
+            if formatted_events:
+                next_since = formatted_events[0]["timestamp"]
+
+            self._send_json({
+                "events": formatted_events,
+                "channel_counts": channel_counts,
+                "next_since": next_since,
+                "total": len(formatted_events),
+            })
+
+        except ImportError as e:
+            logger.warning(f"Battle log not available: {e}")
+            self._send_json({
+                "events": [],
+                "channel_counts": {},
+                "next_since": None,
+                "total": 0,
+                "error": "Battle log system not available",
+            })
+        except Exception as e:
+            logger.error(f"Battle log v2 error: {e}")
             self._send_json({"error": str(e)}, 500)
 
     # =========================================
@@ -1825,6 +2012,115 @@ class TavernHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Weaver status error: {e}")
             self._send_json({"error": str(e)}, 500)
+
+    def _weaver_start(self):
+        """Start the Weaver daemon."""
+        try:
+            import subprocess
+
+            pid_file = BASE_DIR / ".pids" / "weaver.pid"
+
+            # Check if already running
+            if pid_file.exists():
+                try:
+                    pid = int(pid_file.read_text().strip())
+                    os.kill(pid, 0)
+                    self._send_json({
+                        "success": False,
+                        "message": f"Weaver already running (PID {pid})"
+                    })
+                    return
+                except (ValueError, ProcessLookupError, PermissionError):
+                    # Stale PID file, remove it
+                    pid_file.unlink(missing_ok=True)
+
+            # Start Weaver daemon
+            log_file = BASE_DIR / "logs" / "weaver.log"
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(log_file, "a") as log:
+                proc = subprocess.Popen(
+                    ["python3", str(BASE_DIR / "weaver" / "weaver.py"), "--daemon"],
+                    cwd=str(BASE_DIR),
+                    stdout=log,
+                    stderr=log,
+                    start_new_session=True,
+                )
+
+            # Wait briefly for startup
+            import time
+            time.sleep(2)
+
+            # Check if started successfully
+            if pid_file.exists():
+                pid = int(pid_file.read_text().strip())
+                self._send_json({
+                    "success": True,
+                    "message": f"Weaver started (PID {pid})",
+                    "pid": pid
+                })
+            else:
+                self._send_json({
+                    "success": False,
+                    "message": "Weaver failed to start - check logs/weaver.log"
+                })
+
+        except Exception as e:
+            logger.error(f"Weaver start error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
+    def _weaver_stop(self):
+        """Stop the Weaver daemon."""
+        try:
+            pid_file = BASE_DIR / ".pids" / "weaver.pid"
+
+            if not pid_file.exists():
+                self._send_json({
+                    "success": False,
+                    "message": "Weaver not running (no PID file)"
+                })
+                return
+
+            try:
+                pid = int(pid_file.read_text().strip())
+                os.kill(pid, signal.SIGTERM)
+
+                # Wait for graceful shutdown
+                import time
+                for _ in range(10):
+                    time.sleep(0.5)
+                    try:
+                        os.kill(pid, 0)
+                    except ProcessLookupError:
+                        break
+                else:
+                    # Force kill if still running
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
+                pid_file.unlink(missing_ok=True)
+                self._send_json({
+                    "success": True,
+                    "message": f"Weaver stopped (was PID {pid})"
+                })
+
+            except ProcessLookupError:
+                pid_file.unlink(missing_ok=True)
+                self._send_json({
+                    "success": True,
+                    "message": "Weaver was not running (stale PID file removed)"
+                })
+            except PermissionError:
+                self._send_json({
+                    "success": False,
+                    "message": "Permission denied stopping Weaver"
+                }, 403)
+
+        except Exception as e:
+            logger.error(f"Weaver stop error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
 
     def _serve_task_master_status(self):
         """Get Task Master (background task scheduler) status."""

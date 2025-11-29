@@ -77,6 +77,7 @@ from urllib import request, error
 
 # Add paths
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))  # Base dir for trainer/ module
 sys.path.insert(0, str(Path(__file__).parent.parent / "management"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
 
@@ -145,6 +146,26 @@ except ImportError:
     HeartbeatWriter = None
     def get_realm_mode(): return "training"
     def can_start_training(manual=False): return True
+
+# Realm Store - single source of truth for all UI state
+try:
+    from core.realm_store import (
+        update_training as realm_update_training,
+        emit_event as realm_emit_event,
+        update_worker as realm_update_worker,
+        update_queue as realm_update_queue,
+        update_hero as realm_update_hero,
+        set_mode as realm_set_mode,
+    )
+    REALM_STORE_AVAILABLE = True
+except ImportError:
+    REALM_STORE_AVAILABLE = False
+    def realm_update_training(**kwargs): pass
+    def realm_emit_event(kind, message, **kwargs): pass
+    def realm_update_worker(worker_id, **kwargs): pass
+    def realm_update_queue(**kwargs): pass
+    def realm_update_hero(**kwargs): pass
+    def realm_set_mode(mode, reason=""): pass
 
 # Add format variety support
 import random
@@ -1108,6 +1129,20 @@ class TrainingDaemon:
             elapsed = time.time() - start_time
             self.logger.info(f"Training completed in {elapsed/60:.1f} minutes")
 
+            # Verify status was updated during training (detect callback wiring bugs)
+            try:
+                from core.status_monitor import check_status_staleness
+                staleness = check_status_staleness(max_stale_seconds=120.0)
+                if staleness.is_stale:
+                    self.logger.error("=" * 60)
+                    self.logger.error("⚠️  CALLBACK BUG DETECTED!")
+                    self.logger.error(f"   Status file not updated for {staleness.stale_seconds:.0f}s")
+                    self.logger.error(f"   Stuck at step {staleness.current_step}")
+                    self.logger.error("   LiveMonitorCallback may not be wired correctly")
+                    self.logger.error("=" * 60)
+            except Exception as e:
+                self.logger.debug(f"Staleness check failed: {e}")
+
             # Log summary
             if result.success:
                 summary = {
@@ -1256,27 +1291,53 @@ class TrainingDaemon:
         total_steps: int = None,
         it_per_sec: float = None,
         current_file: str = None,
+        loss: float = None,
     ):
-        """Emit heartbeat for World State tracking."""
-        if not self.heartbeat_writer:
-            return
+        """Emit heartbeat for World State tracking and RealmStore."""
+        # Legacy heartbeat writer
+        if self.heartbeat_writer:
+            extra = {}
+            if step is not None:
+                extra["step"] = step
+            if total_steps is not None:
+                extra["total_steps"] = total_steps
+            if it_per_sec is not None:
+                extra["it_per_sec"] = it_per_sec
+            if current_file:
+                extra["current_file"] = current_file
 
-        extra = {}
-        if step is not None:
-            extra["step"] = step
-        if total_steps is not None:
-            extra["total_steps"] = total_steps
-        if it_per_sec is not None:
-            extra["it_per_sec"] = it_per_sec
-        if current_file:
-            extra["current_file"] = current_file
+            self.heartbeat_writer.beat(
+                status=status,
+                current_job_id=current_job_id,
+                current_job_type="train" if current_job_id else None,
+                extra=extra,
+            )
 
-        self.heartbeat_writer.beat(
-            status=status,
-            current_job_id=current_job_id,
-            current_job_type="train" if current_job_id else None,
-            extra=extra,
-        )
+        # NEW: Write to RealmStore (single source of truth)
+        if REALM_STORE_AVAILABLE:
+            # Update worker heartbeat
+            realm_update_worker(
+                worker_id="training_daemon",
+                role="training",
+                status=status,
+                device="GPU0",
+                current_job=current_job_id,
+                step=step,
+                total_steps=total_steps,
+                it_per_sec=it_per_sec,
+                current_file=current_file,
+            )
+
+            # Update training state if we have metrics
+            training_status = "training" if status == "running" else status
+            realm_update_training(
+                status=training_status,
+                step=step,
+                total_steps=total_steps,
+                file=current_file,
+                speed=it_per_sec,
+                loss=loss,
+            )
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully"""
@@ -1634,6 +1695,15 @@ class TrainingDaemon:
         self.recover_orphaned_files()
         self.cleanup_stale_state()
 
+        # Clean up stale heartbeats from previous crashes
+        if WORLD_STATE_AVAILABLE:
+            try:
+                from core.heartbeat import cleanup_stale_heartbeats
+                cleanup_stale_heartbeats(max_age_seconds=300)
+                self.logger.info("🧹 Cleaned up stale heartbeats")
+            except Exception as e:
+                self.logger.warning(f"Failed to clean heartbeats: {e}")
+
         self.logger.info("")
         self.logger.info("Configuration:")
         self.logger.info(f"  Model: {self.config.get('model_path') or self.config['model_name']}")
@@ -1711,6 +1781,17 @@ class TrainingDaemon:
                 # Get queue status
                 queue_status = self.queue.get_queue_status()
 
+                # NEW: Update realm_store with queue state
+                if REALM_STORE_AVAILABLE:
+                    total = queue_status["total_queued"]
+                    realm_update_queue(
+                        depth=total,
+                        high_priority=queue_status["queued"].get("high", 0),
+                        normal_priority=queue_status["queued"].get("normal", 0),
+                        low_priority=queue_status["queued"].get("low", 0),
+                        status="ok" if total > 5 else ("low" if total > 0 else "empty"),
+                    )
+
                 if queue_status["total_queued"] > 0:
                     self.logger.info(f"Queue: {queue_status['queued']['high']} high, {queue_status['queued']['normal']} normal, {queue_status['queued']['low']} low")
 
@@ -1749,6 +1830,10 @@ class TrainingDaemon:
                             current_file=data_file.name,
                         )
 
+                        # Count examples first (needed for events and job tracking)
+                        from core.job import Job
+                        num_examples = sum(1 for _ in open(data_file, 'r', encoding='utf-8'))
+
                         # Emit training_started event
                         if WORLD_STATE_AVAILABLE:
                             emit_event(
@@ -1757,6 +1842,20 @@ class TrainingDaemon:
                                 job_name=data_file.name,
                                 total_examples=num_examples,
                             )
+
+                        # NEW: Emit to RealmStore battle log
+                        if REALM_STORE_AVAILABLE:
+                            realm_emit_event(
+                                kind="training_started",
+                                message=f"⚔️ Battle started: {data_file.name} ({num_examples:,} examples)",
+                                channel="training",
+                                severity="info",
+                                details={
+                                    "job_id": data_file.name,
+                                    "total_examples": num_examples,
+                                },
+                            )
+                            realm_set_mode("training", reason=f"Training {data_file.name}")
 
                         # Record start metrics for impact tracking
                         start_metrics = self.get_current_training_metrics()
@@ -1769,8 +1868,6 @@ class TrainingDaemon:
                         )
 
                         # Create Job object (first-class job abstraction)
-                        from core.job import Job
-                        num_examples = sum(1 for _ in open(data_file, 'r', encoding='utf-8'))
                         job = Job.from_file(
                             path=str(data_file),
                             priority=self._get_file_priority(data_file),
@@ -1824,6 +1921,21 @@ class TrainingDaemon:
                                     final_step=end_metrics['step'],
                                     final_loss=end_metrics['loss'],
                                 )
+
+                            # NEW: Emit to RealmStore battle log
+                            if REALM_STORE_AVAILABLE:
+                                loss_str = f"{end_metrics['loss']:.4f}" if end_metrics['loss'] else "N/A"
+                                realm_emit_event(
+                                    kind="training_completed",
+                                    message=f"✅ Battle won: {data_file.name} (loss: {loss_str})",
+                                    channel="training",
+                                    severity="success",
+                                    details={
+                                        "job_id": data_file.name,
+                                        "final_step": end_metrics['step'],
+                                        "final_loss": end_metrics['loss'],
+                                    },
+                                )
                         elif self.controller.should_skip_current_file():
                             self.controller.clear_skip()
                             self.queue.mark_skipped(data_file, reason="Skipped by user")
@@ -1843,6 +1955,20 @@ class TrainingDaemon:
                             )
                             self.job_logger.log_job(job)  # Log failed state
 
+                            # NEW: Emit to RealmStore battle log
+                            if REALM_STORE_AVAILABLE:
+                                realm_emit_event(
+                                    kind="training_failed",
+                                    message=f"❌ Battle lost: {data_file.name}",
+                                    channel="training",
+                                    severity="error",
+                                    details={
+                                        "job_id": data_file.name,
+                                        "final_step": end_metrics['step'],
+                                        "final_loss": end_metrics['loss'],
+                                    },
+                                )
+
                         # Clear current job ID
                         self.current_job_id = None
 
@@ -1852,6 +1978,11 @@ class TrainingDaemon:
                     # Update controller to idle after processing
                     self.controller.update_state("idle")
 
+                    # NEW: Update realm_store to idle
+                    if REALM_STORE_AVAILABLE:
+                        realm_update_training(status="idle", file=None)
+                        realm_set_mode("idle", reason="Queue processing complete")
+
                     # Check if Quest Board needs topping up
                     self.maybe_auto_generate(queue_status)
 
@@ -1859,6 +1990,11 @@ class TrainingDaemon:
                     # No files, just log periodically
                     if iteration % 10 == 0:  # Every 10 iterations
                         self.logger.info(f"Queue empty. Waiting... (iteration {iteration})")
+
+                        # NEW: Make sure realm_store reflects idle state
+                        if REALM_STORE_AVAILABLE:
+                            realm_update_training(status="idle", file=None)
+
                     self.maybe_auto_generate(queue_status)
 
                 # Sleep until next check

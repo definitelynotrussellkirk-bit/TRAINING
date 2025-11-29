@@ -1032,13 +1032,11 @@
             $('#remote_interval').value = config.remote_eval?.eval_interval_steps || 5000;
             setToggle('#remote_sync', config.remote_eval?.sync_checkpoints);
 
-            // Locked values
-            setText('#locked_base_model', config.locked?.base_model || '--');
-            setText('#locked_architecture', config.locked?.model_architecture || '--');
-            setText('#locked_context', config.locked?.max_context_length?.toLocaleString() || '--');
-            setText('#locked_vocab', config.locked?.vocab_size?.toLocaleString() || '--');
+            // Model info comes from active hero, not config.json
+            // (config.locked is stale/global, hero info is per-campaign)
+            loadHeroModelInfo();
 
-            // Paths
+            // Paths (still from config for now)
             setText('#path_model', config.model_path || '--');
             setText('#path_current', config.current_model_dir || '--');
 
@@ -1060,6 +1058,55 @@
                 }
             } catch (error) {
                 $('#remote_host').placeholder = 'Not configured';
+            }
+        }
+
+        async function loadHeroModelInfo() {
+            /**
+             * Load model info from the ACTIVE HERO (not config.json).
+             * This ensures the Model Info section shows the correct hero's model,
+             * not stale/hardcoded DIO data.
+             */
+            try {
+                const heroRes = await fetch('/api/hero');
+                if (!heroRes.ok) throw new Error('Hero API failed');
+                const hero = await heroRes.json();
+
+                // Also get the hero config for more details
+                const configRes = await fetch(`/api/active-campaign`);
+                const campaign = configRes.ok ? await configRes.json() : null;
+
+                // Get hero config YAML for full model details
+                let heroConfig = null;
+                if (hero.hero_id) {
+                    try {
+                        const yamlRes = await fetch(`/api/hero-config/${hero.hero_id}`);
+                        if (yamlRes.ok) heroConfig = await yamlRes.json();
+                    } catch (e) {
+                        // Hero config endpoint may not exist
+                    }
+                }
+
+                // Update Model Info section with active hero's data
+                setText('#locked_base_model', hero.model_name || heroConfig?.model?.hf_name || '--');
+                setText('#locked_architecture', heroConfig?.model?.architecture || hero.model_family || '--');
+                setText('#locked_context', heroConfig?.model?.context_length?.toLocaleString() || '--');
+                setText('#locked_vocab', heroConfig?.model?.vocab_size?.toLocaleString() || '--');
+
+                // Update path to campaign path if available
+                if (campaign?.campaign_path) {
+                    setText('#path_current', campaign.campaign_path);
+                }
+
+                // Log what hero we're showing
+                console.log(`[Settings] Model Info for: ${hero.name} (${hero.hero_id})`);
+
+            } catch (error) {
+                console.error('Failed to load hero model info:', error);
+                setText('#locked_base_model', 'Error loading');
+                setText('#locked_architecture', '--');
+                setText('#locked_context', '--');
+                setText('#locked_vocab', '--');
             }
         }
 

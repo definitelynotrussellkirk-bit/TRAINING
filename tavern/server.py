@@ -71,6 +71,24 @@ def get_saga_reader():
     return _saga_reader
 
 
+def get_active_hero_id() -> str:
+    """
+    Get the active hero_id from the current campaign.
+
+    Returns the hero_id from control/active_campaign.json, or None if no campaign is active.
+    This replaces hardcoded "dio-qwen3-0.6b" defaults throughout the codebase.
+    """
+    try:
+        campaign_file = BASE_DIR / "control" / "active_campaign.json"
+        if campaign_file.exists():
+            with open(campaign_file) as f:
+                data = json.load(f)
+                return data.get("hero_id")
+    except Exception as e:
+        logger.warning(f"Failed to get active hero_id: {e}")
+    return None
+
+
 # Skill loader - uses SkillEngine
 def get_skills_data():
     """Load skill data from SkillEngine (single source of truth)."""
@@ -422,6 +440,9 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._serve_template("guild.html")
         elif path == "/api/hero":
             self._serve_hero_info()
+        elif path.startswith("/api/hero-config/"):
+            hero_id = path.replace("/api/hero-config/", "")
+            self._serve_hero_config(hero_id)
         elif path == "/api/skills":
             self._serve_skills()
         elif path == "/api/titles":
@@ -1151,6 +1172,24 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 "campaign_id": "",
                 "error": str(e)
             })
+
+    def _serve_hero_config(self, hero_id: str):
+        """Serve hero configuration YAML as JSON for a specific hero."""
+        try:
+            import yaml
+            hero_file = BASE_DIR / "configs" / "heroes" / f"{hero_id}.yaml"
+
+            if not hero_file.exists():
+                self._send_json({"error": f"Hero config not found: {hero_id}"}, 404)
+                return
+
+            with open(hero_file) as f:
+                config = yaml.safe_load(f)
+
+            self._send_json(config)
+        except Exception as e:
+            logger.error(f"Hero config error for {hero_id}: {e}")
+            self._send_json({"error": str(e)}, 500)
 
     def _serve_skills(self):
         """Serve skill data from YAML configs."""
@@ -2160,12 +2199,15 @@ class TavernHandler(SimpleHTTPRequestHandler):
     def _get_analysis_dir(self, campaign_id: str, hero_id: str = None) -> Path:
         """Get the analysis directory for a campaign."""
         if not hero_id:
-            hero_id = "dio-qwen3-0.6b"  # Default hero
+            hero_id = get_active_hero_id()  # Use active campaign's hero
+        if not hero_id:
+            logger.warning("No active hero, cannot resolve analysis dir")
+            return BASE_DIR / "campaigns" / "unknown" / campaign_id / "analysis"
         return BASE_DIR / "campaigns" / hero_id / campaign_id / "analysis"
 
     def _serve_analysis_layer_stats_list(self, campaign_id: str, query: dict):
         """List available layer stats for a campaign."""
-        hero_id = query.get("hero_id", ["dio-qwen3-0.6b"])[0]
+        hero_id = query.get("hero_id", [get_active_hero_id()])[0]
         analysis_dir = self._get_analysis_dir(campaign_id, hero_id) / "layer_stats"
 
         if not analysis_dir.exists():
@@ -2208,7 +2250,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
     def _serve_analysis_layer_stats_detail(self, campaign_id: str, checkpoint_name: str, query: dict):
         """Get full layer stats for a specific checkpoint."""
-        hero_id = query.get("hero_id", ["dio-qwen3-0.6b"])[0]
+        hero_id = query.get("hero_id", [get_active_hero_id()])[0]
         analysis_dir = self._get_analysis_dir(campaign_id, hero_id) / "layer_stats"
 
         # Handle both "183000" and "ckpt-183000.layer_stats.json" formats
@@ -2238,7 +2280,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
         Returns per-layer drift over checkpoints for heatmap/chart display.
         """
-        hero_id = query.get("hero_id", ["dio-qwen3-0.6b"])[0]
+        hero_id = query.get("hero_id", [get_active_hero_id()])[0]
         layer_filter = query.get("layers", [None])[0]  # Comma-separated layer names
         max_layers = int(query.get("max_layers", [30])[0])
 
@@ -2303,7 +2345,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
     def _serve_analysis_top_movers(self, campaign_id: str, query: dict):
         """Get layers that changed the most across training."""
-        hero_id = query.get("hero_id", ["dio-qwen3-0.6b"])[0]
+        hero_id = query.get("hero_id", [get_active_hero_id()])[0]
         top_n = int(query.get("n", [10])[0])
 
         analysis_dir = self._get_analysis_dir(campaign_id, hero_id) / "layer_stats"

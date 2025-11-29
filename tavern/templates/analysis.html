@@ -455,7 +455,7 @@
                     <option value="">Loading campaigns...</option>
                 </select>
                 <select class="control-select" id="heroSelect">
-                    <option value="dio-qwen3-0.6b">DIO (Qwen3-0.6B)</option>
+                    <option value="">Loading heroes...</option>
                 </select>
                 <button class="refresh-btn" onclick="loadData()">Refresh</button>
             </div>
@@ -573,9 +573,9 @@
     <script src="/static/js/nav.js"></script>
 
     <script>
-        // State
-        let campaignId = 'campaign-001';  // Default
-        let heroId = 'dio-qwen3-0.6b';
+        // State - initialized from active campaign, not hardcoded
+        let campaignId = null;
+        let heroId = null;
         let timelineData = null;
         let moversData = null;
         let checkpointData = null;
@@ -593,31 +593,54 @@
             try {
                 const resp = await fetch('/api/campaigns');
                 const data = await resp.json();
-                const select = document.getElementById('campaignSelect');
+                const campaignSelect = document.getElementById('campaignSelect');
+                const heroSelect = document.getElementById('heroSelect');
 
+                // Set from active campaign
                 if (data.active) {
                     campaignId = data.active.id;
+                    heroId = data.active.hero_id;  // Use active hero, not hardcoded
+                }
+
+                // Build hero list from campaign data
+                const heroes = Object.keys(data.campaigns || {});
+                heroSelect.innerHTML = heroes.map(h => `
+                    <option value="${h}" ${h === heroId ? 'selected' : ''}>
+                        ${h.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    </option>
+                `).join('');
+
+                if (heroes.length === 0) {
+                    heroSelect.innerHTML = '<option value="">No heroes</option>';
                 }
 
                 // Build campaign list
                 const campaigns = [];
-                for (const [heroId, heroCampaigns] of Object.entries(data.campaigns || {})) {
+                for (const [hId, heroCampaigns] of Object.entries(data.campaigns || {})) {
                     for (const c of heroCampaigns) {
                         if (c.status !== 'archived') {
-                            campaigns.push(c);
+                            campaigns.push({ ...c, hero_id: hId });
                         }
                     }
                 }
 
-                select.innerHTML = campaigns.map(c => `
-                    <option value="${c.id}" ${c.id === campaignId ? 'selected' : ''}>
+                campaignSelect.innerHTML = campaigns.map(c => `
+                    <option value="${c.id}" data-hero="${c.hero_id}" ${c.id === campaignId ? 'selected' : ''}>
                         ${c.name}
                     </option>
                 `).join('');
 
                 if (campaigns.length === 0) {
-                    select.innerHTML = '<option value="">No campaigns</option>';
+                    campaignSelect.innerHTML = '<option value="">No campaigns</option>';
                 }
+
+                // Sync hero dropdown when campaign changes
+                campaignSelect.addEventListener('change', () => {
+                    const selectedOption = campaignSelect.selectedOptions[0];
+                    if (selectedOption && selectedOption.dataset.hero) {
+                        heroSelect.value = selectedOption.dataset.hero;
+                    }
+                });
 
             } catch (err) {
                 console.error('Failed to load campaigns:', err);
@@ -626,8 +649,13 @@
 
         // Load all analysis data
         async function loadData() {
-            campaignId = document.getElementById('campaignSelect').value || 'campaign-001';
-            heroId = document.getElementById('heroSelect').value || 'dio-qwen3-0.6b';
+            campaignId = document.getElementById('campaignSelect').value || campaignId;
+            heroId = document.getElementById('heroSelect').value || heroId;
+
+            if (!campaignId || !heroId) {
+                console.warn('No campaign or hero selected');
+                return;
+            }
 
             await Promise.all([
                 loadTimeline(),

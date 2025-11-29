@@ -93,7 +93,22 @@ def get_active_hero() -> Dict[str, Any]:
     get_active_campaign.cache_clear()
 
     campaign = get_active_campaign()
-    hero_id = campaign.get("hero_id", "dio-qwen3-0.6b")  # Default to DIO if no campaign
+    hero_id = campaign.get("hero_id") if campaign else None
+
+    if not hero_id:
+        # No active campaign - return placeholder
+        return {
+            "name": "No Hero",
+            "rpg_name": "Awaiting Destiny",
+            "description": "No campaign is active. Start a campaign to begin training.",
+            "icon": "❓",
+            "model_name": "None",
+            "model_family": "unknown",
+            "model_size": 0,
+            "hero_id": None,
+            "campaign_id": "",
+            "campaign_path": "",
+        }
 
     config = get_hero_config(hero_id)
 
@@ -107,17 +122,22 @@ def get_active_hero() -> Dict[str, Any]:
     else:
         model_display = model_name
 
-    # Map hero to icon (can be extended)
-    icon_map = {
-        "dio-qwen3-0.6b": "🧔🏽",
-        "titan-qwen3-4b": "🧙‍♂️",
-    }
+    # Map hero to icon - read from config or use default
+    display_info = config.get("display", {})
+    icon = display_info.get("emoji", "🦸")  # Get from hero config
+    if not icon:
+        # Fallback map for heroes without display.emoji
+        icon_map = {
+            "dio-qwen3-0.6b": "🧔🏽",
+            "titan-qwen3-4b": "👩",
+        }
+        icon = icon_map.get(hero_id, "🦸")
 
     return {
         "name": config.get("name", "Hero"),
         "rpg_name": config.get("rpg_name", "The Apprentice"),
         "description": config.get("description", ""),
-        "icon": icon_map.get(hero_id, "🦸"),
+        "icon": icon,
         "model_name": model_display,
         "model_family": model_info.get("family", "unknown"),
         "model_size": model_info.get("size_b", 0),

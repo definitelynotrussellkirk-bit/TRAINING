@@ -1487,8 +1487,15 @@ class TavernHandler(SimpleHTTPRequestHandler):
         try:
             from core.evaluation_ledger import get_eval_ledger
 
-            # Map skill IDs
-            id_mapping = {"sy": "syllo", "bin": "binary", "syllo": "syllo", "binary": "binary"}
+            # Normalize skill IDs - ledger uses short names (bin, sy)
+            # but may also have legacy records with long names (binary, syllo)
+            id_mapping = {
+                "binary": "bin",
+                "syllo": "sy",
+                # Short names pass through as-is
+                "bin": "bin",
+                "sy": "sy",
+            }
             skill_name = id_mapping.get(skill_id, skill_id)
 
             response = {
@@ -1505,8 +1512,14 @@ class TavernHandler(SimpleHTTPRequestHandler):
             # Force reload to get fresh data (fixes stale eval results)
             ledger.reload()
 
-            # Get latest eval for this skill
+            # Alternate name for fallback lookups
+            alt_names = {"bin": "binary", "sy": "syllo", "binary": "bin", "syllo": "sy"}
+            alt_name = alt_names.get(skill_name)
+
+            # Get latest eval for this skill (try both short and long names)
             latest_record = ledger.get_latest(skill_name)
+            if not latest_record and alt_name:
+                latest_record = ledger.get_latest(alt_name)
 
             if latest_record:
                 # Filter by level if specified
@@ -1533,11 +1546,15 @@ class TavernHandler(SimpleHTTPRequestHandler):
                         "results": results,
                     }
 
-            # Get history (last 10 evals for this skill)
+            # Get history (last 10 evals for this skill) - try both names
             if level:
                 history_records = ledger.get_by_skill(skill_name, level=int(level))
+                if not history_records and alt_name:
+                    history_records = ledger.get_by_skill(alt_name, level=int(level))
             else:
                 history_records = ledger.get_by_skill(skill_name)
+                if not history_records and alt_name:
+                    history_records = ledger.get_by_skill(alt_name)
 
             # Convert to history format
             history = []

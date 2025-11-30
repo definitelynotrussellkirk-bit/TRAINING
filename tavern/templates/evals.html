@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evals - Checkpoint Evaluations</title>
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <link rel="stylesheet" href="/static/css/game.css?v=4">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-body), system-ui, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-card) 100%);
+            border-bottom: 1px solid var(--border-gold);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-gold);
+            font-family: var(--font-title), serif;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-md);
+            transition: all 0.2s;
+        }
+
+        .nav-links a:hover {
+            background: var(--bg-highlight);
+            color: var(--text-primary);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Summary Cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+        }
+
+        .summary-card .label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-card .value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-gold);
+        }
+
+        .summary-card .sub {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        /* Filter Controls */
+        .filters {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filters label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .filters input, .filters select {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 0.5rem 0.75rem;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .filters input:focus, .filters select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .btn {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn-danger {
+            background: var(--accent-red);
+        }
+
+        .btn-small {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        /* Eval Table */
+        .eval-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+
+        .eval-table th, .eval-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .eval-table th {
+            background: var(--bg-panel);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .eval-table tr:hover {
+            background: var(--bg-highlight);
+        }
+
+        .eval-table .accuracy {
+            font-weight: 600;
+        }
+
+        .eval-table .accuracy.high { color: var(--accent-green); }
+        .eval-table .accuracy.medium { color: var(--accent-yellow); }
+        .eval-table .accuracy.low { color: var(--accent-red); }
+
+        .eval-table .skill-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .eval-table .skill-badge.bin { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
+        .eval-table .skill-badge.sy { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+
+        .eval-table .type-badge {
+            display: inline-block;
+            padding: 0.125rem 0.375rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            background: var(--bg-panel);
+            color: var(--text-muted);
+        }
+
+        .checkpoint-link {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        .checkpoint-link:hover {
+            text-decoration: underline;
+        }
+
+        .timestamp {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        /* Per-Skill Summary */
+        .skill-summaries {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .skill-summary-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+        }
+
+        .skill-summary-card .skill-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .skill-summary-card .skill-icon {
+            font-size: 1.5rem;
+        }
+
+        .skill-summary-card .skill-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .skill-summary-card .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .skill-summary-card .stat {
+            font-size: 0.875rem;
+        }
+
+        .skill-summary-card .stat .label {
+            color: var(--text-muted);
+        }
+
+        .skill-summary-card .stat .value {
+            color: var(--text-gold);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Evals</h1>
+        <nav class="nav-links">
+            <a href="/game">Battle</a>
+            <a href="/guild">Guild</a>
+            <a href="/evals" style="color: var(--text-gold);">Evals</a>
+            <a href="/vault">Vault</a>
+            <a href="/oracle">Oracle</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <!-- Summary Stats -->
+        <div class="summary-row" id="summary-stats">
+            <div class="summary-card">
+                <div class="label">Total Evals</div>
+                <div class="value" id="total-evals">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">Skills Evaluated</div>
+                <div class="value" id="skills-count">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">Latest Eval</div>
+                <div class="value" id="latest-accuracy">-</div>
+                <div class="sub" id="latest-info"></div>
+            </div>
+        </div>
+
+        <!-- Per-Skill Summaries -->
+        <div class="skill-summaries" id="skill-summaries"></div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <label>
+                Skill:
+                <select id="filter-skill">
+                    <option value="">All Skills</option>
+                    <option value="bin">BIN</option>
+                    <option value="sy">SY</option>
+                </select>
+            </label>
+            <label>
+                Checkpoint:
+                <input type="number" id="filter-checkpoint" placeholder="Step #" min="0" style="width: 120px;">
+            </label>
+            <label>
+                Level:
+                <input type="number" id="filter-level" placeholder="Level" min="1" max="50" style="width: 80px;">
+            </label>
+            <button class="btn" id="apply-filters">Apply</button>
+            <button class="btn" style="background: var(--bg-panel); color: var(--text-secondary);" id="clear-filters">Clear</button>
+        </div>
+
+        <!-- Eval Table -->
+        <table class="eval-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Checkpoint</th>
+                    <th>Skill</th>
+                    <th>Level</th>
+                    <th>Accuracy</th>
+                    <th>Correct</th>
+                    <th>Type</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="eval-rows">
+                <tr><td colspan="8" class="loading">Loading evaluations...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script src="/static/js/evals.js"></script>
+</body>
+</html>

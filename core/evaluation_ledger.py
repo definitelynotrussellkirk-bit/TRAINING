@@ -57,6 +57,24 @@ class EvalRecord:
     eval_type: str = "quick"  # "quick" (5 problems) or "full" (all levels)
     problems: List[Dict[str, Any]] = field(default_factory=list)  # Individual results
 
+    # === Model Identity Fields (for job system integration) ===
+    # These are optional for backwards compatibility with existing records
+    hero_id: Optional[str] = None  # e.g., "dio-qwen3-0.6b"
+    campaign_id: Optional[str] = None  # e.g., "campaign-001"
+    checkpoint_id: Optional[str] = None  # e.g., "checkpoint-175000"
+    checkpoint_path: Optional[str] = None  # Full path for model loading
+    context_hash: Optional[str] = None  # Hash for drift detection
+
+    # === Job System Fields ===
+    job_id: Optional[str] = None  # Job ID from job store
+    worker_id: Optional[str] = None  # Worker that executed the eval
+
+    # === Extended Metrics ===
+    metrics: Dict[str, Any] = field(default_factory=dict)  # Additional metrics
+    started_at: Optional[float] = None  # Unix timestamp
+    ended_at: Optional[float] = None  # Unix timestamp
+    error: Optional[str] = None  # Error message if failed
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'EvalRecord':
         return cls(
@@ -70,6 +88,20 @@ class EvalRecord:
             validation_type=data.get("validation_type", "static"),
             eval_type=data.get("eval_type", "quick"),
             problems=data.get("problems", []),
+            # Model identity fields
+            hero_id=data.get("hero_id"),
+            campaign_id=data.get("campaign_id"),
+            checkpoint_id=data.get("checkpoint_id"),
+            checkpoint_path=data.get("checkpoint_path"),
+            context_hash=data.get("context_hash"),
+            # Job system fields
+            job_id=data.get("job_id"),
+            worker_id=data.get("worker_id"),
+            # Extended metrics
+            metrics=data.get("metrics", {}),
+            started_at=data.get("started_at"),
+            ended_at=data.get("ended_at"),
+            error=data.get("error"),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -79,6 +111,23 @@ class EvalRecord:
     def key(self) -> str:
         """Unique key for this evaluation."""
         return f"{self.checkpoint_step}:{self.skill}:{self.level}"
+
+    @property
+    def identity_key(self) -> str:
+        """Full identity key including hero/campaign (for job-based queries)."""
+        return f"{self.hero_id or 'unknown'}:{self.campaign_id or 'unknown'}:{self.checkpoint_step}:{self.skill}:{self.level}"
+
+    @property
+    def duration_seconds(self) -> Optional[float]:
+        """Calculate duration from timestamps."""
+        if self.started_at and self.ended_at:
+            return self.ended_at - self.started_at
+        return None
+
+    @property
+    def display_summary(self) -> str:
+        """Human-readable one-line summary."""
+        return f"{self.skill} L{self.level}: {self.accuracy*100:.1f}% ({self.correct}/{self.total})"
 
 
 @dataclass
@@ -93,8 +142,15 @@ class EvalQueueEntry:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'EvalQueueEntry':
+        # Normalize checkpoint_step: handle both int and "checkpoint-XXXXX" string
+        checkpoint_step_raw = data["checkpoint_step"]
+        if isinstance(checkpoint_step_raw, str):
+            checkpoint_step = extract_checkpoint_step(checkpoint_step_raw)
+        else:
+            checkpoint_step = int(checkpoint_step_raw)
+
         return cls(
-            checkpoint_step=data["checkpoint_step"],
+            checkpoint_step=checkpoint_step,
             skill=data["skill"],
             level=data.get("level"),
             queued_at=data["queued_at"],
@@ -124,28 +180,47 @@ class EvaluationLedger:
         self._lock = Lock()
         self._cache: Dict[str, EvalRecord] = {}
         self._loaded = False
+        self._last_mtime: float = 0.0  # Track file modification time
 
     def _ensure_loaded(self):
-        """Load ledger from disk if not already loaded."""
-        if self._loaded:
-            return
+        """Load ledger from disk if not already loaded or if file has been updated."""
+        # Check if file exists and get its modification time
+        if self.ledger_file.exists():
+            current_mtime = self.ledger_file.stat().st_mtime
+
+            # Reload if file has been modified since last load
+            if self._loaded and current_mtime <= self._last_mtime:
+                return  # File hasn't changed, use cached data
+        elif self._loaded:
+            return  # No file exists, use cached data if we have it
 
         with self._lock:
-            if self._loaded:
-                return
-
+            # Double-check after acquiring lock
             if self.ledger_file.exists():
+                current_mtime = self.ledger_file.stat().st_mtime
+                if self._loaded and current_mtime <= self._last_mtime:
+                    return
+
                 try:
+                    self._cache.clear()  # Clear old data before reloading
                     with open(self.ledger_file) as f:
                         data = json.load(f)
                     for record_data in data.get("evaluations", []):
                         record = EvalRecord.from_dict(record_data)
                         self._cache[record.key] = record
+                    self._last_mtime = current_mtime
                     logger.info(f"Loaded {len(self._cache)} evaluation records")
                 except Exception as e:
                     logger.error(f"Failed to load evaluation ledger: {e}")
 
             self._loaded = True
+
+    def reload(self):
+        """Force reload ledger from disk (clears cache and reloads)."""
+        with self._lock:
+            self._loaded = False
+            self._cache.clear()
+        self._ensure_loaded()
 
     def _save(self):
         """Save ledger to disk."""
@@ -317,6 +392,204 @@ class EvaluationLedger:
             "latest": self.get_latest().to_dict() if self.get_latest() else None,
         }
 
+    # =========================================================================
+    # JOB SYSTEM INTEGRATION - Query by job/hero/campaign identity
+    # =========================================================================
+
+    def get_by_job(self, job_id: str) -> Optional[EvalRecord]:
+        """Get evaluation result for a specific job ID."""
+        self._ensure_loaded()
+        for record in self._cache.values():
+            if record.job_id == job_id:
+                return record
+        return None
+
+    def get_by_hero_campaign(
+        self,
+        hero_id: str,
+        campaign_id: Optional[str] = None,
+        skill: Optional[str] = None,
+        level: Optional[int] = None,
+    ) -> List[EvalRecord]:
+        """
+        Get all evaluations for a hero (optionally filtered by campaign/skill/level).
+
+        Useful for campaign-scoped views and analytics.
+        """
+        self._ensure_loaded()
+        results = []
+        for record in self._cache.values():
+            if record.hero_id != hero_id:
+                continue
+            if campaign_id and record.campaign_id != campaign_id:
+                continue
+            if skill and record.skill != skill:
+                continue
+            if level is not None and record.level != level:
+                continue
+            results.append(record)
+        return sorted(results, key=lambda x: x.timestamp, reverse=True)
+
+    def get_checkpoint_skills(
+        self,
+        checkpoint_step: int,
+        hero_id: Optional[str] = None,
+        campaign_id: Optional[str] = None,
+    ) -> Dict[str, EvalRecord]:
+        """
+        Get latest eval for each skill at a checkpoint.
+
+        Returns dict mapping "skill:level" to EvalRecord.
+        Useful for displaying skill cards on checkpoint detail page.
+        """
+        evals = self.get_by_checkpoint(checkpoint_step)
+
+        # Filter by hero/campaign if specified
+        if hero_id:
+            evals = [e for e in evals if e.hero_id == hero_id]
+        if campaign_id:
+            evals = [e for e in evals if e.campaign_id == campaign_id]
+
+        # Group by skill:level, keep latest
+        result: Dict[str, EvalRecord] = {}
+        for record in sorted(evals, key=lambda x: x.timestamp, reverse=True):
+            key = f"{record.skill}:{record.level}"
+            if key not in result:
+                result[key] = record
+
+        return result
+
+    def get_skill_trend(
+        self,
+        skill: str,
+        level: int,
+        hero_id: Optional[str] = None,
+        campaign_id: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[EvalRecord]:
+        """
+        Get eval history for a skill/level to show trend.
+
+        Returns list of records ordered by timestamp (oldest first).
+        """
+        evals = self.get_by_skill(skill, level)
+
+        if hero_id:
+            evals = [e for e in evals if e.hero_id == hero_id]
+        if campaign_id:
+            evals = [e for e in evals if e.campaign_id == campaign_id]
+
+        # Sort by timestamp oldest first (for trend chart)
+        evals = sorted(evals, key=lambda x: x.timestamp)
+        return evals[-limit:]  # Return most recent N
+
+    # =========================================================================
+    # DELETE OPERATIONS
+    # =========================================================================
+
+    def delete_for_checkpoint(self, checkpoint_step: int) -> int:
+        """
+        Delete all evaluation records for a given checkpoint.
+
+        Returns the number of records removed.
+        """
+        self._ensure_loaded()
+
+        with self._lock:
+            before = len(self._cache)
+            keys_to_remove = [
+                key for key, record in self._cache.items()
+                if record.checkpoint_step == checkpoint_step
+            ]
+
+            for key in keys_to_remove:
+                del self._cache[key]
+
+            removed = before - len(self._cache)
+
+            if removed > 0:
+                self._save()
+                self._update_checkpoint_sidecar(checkpoint_step)
+                logger.info(f"Deleted {removed} eval records for checkpoint {checkpoint_step}")
+
+            return removed
+
+    def delete_for_checkpoint_and_skill(
+        self,
+        checkpoint_step: int,
+        skill: Optional[str] = None,
+        level: Optional[int] = None,
+    ) -> int:
+        """
+        Delete evaluation records for a given checkpoint, optionally
+        filtered by skill and/or level.
+
+        Returns the number of records removed.
+        """
+        self._ensure_loaded()
+
+        with self._lock:
+            before = len(self._cache)
+
+            keys_to_remove = []
+            for key, record in self._cache.items():
+                if record.checkpoint_step != checkpoint_step:
+                    continue
+                if skill is not None and record.skill != skill:
+                    continue
+                if level is not None and record.level != level:
+                    continue
+                keys_to_remove.append(key)
+
+            for key in keys_to_remove:
+                del self._cache[key]
+
+            removed = before - len(self._cache)
+
+            if removed > 0:
+                self._save()
+                self._update_checkpoint_sidecar(checkpoint_step)
+                logger.info(
+                    f"Deleted {removed} eval records for checkpoint {checkpoint_step} "
+                    f"(skill={skill}, level={level})"
+                )
+
+            return removed
+
+    def _update_checkpoint_sidecar(self, checkpoint_step: int):
+        """Update the sidecar file for a checkpoint after deletions."""
+        try:
+            from core.checkpoint_ledger import get_ledger
+            ledger = get_ledger()
+            checkpoint_record = ledger.get(checkpoint_step)
+
+            if not checkpoint_record:
+                return
+
+            checkpoint_dir = Path(checkpoint_record.path)
+            if not checkpoint_dir.exists():
+                return
+
+            sidecar_file = checkpoint_dir / ".evals.json"
+
+            # Get remaining evals for this checkpoint
+            remaining = self.get_by_checkpoint(checkpoint_step)
+
+            if remaining:
+                sidecar_data = {
+                    "evaluations": [r.to_dict() for r in remaining],
+                    "updated_at": datetime.now().isoformat(),
+                }
+                with open(sidecar_file, "w") as f:
+                    json.dump(sidecar_data, f, indent=2)
+            else:
+                # No evals left - remove sidecar
+                if sidecar_file.exists():
+                    sidecar_file.unlink()
+
+        except Exception as e:
+            logger.warning(f"Failed to update checkpoint sidecar: {e}")
+
 
 def get_eval_ledger(base_dir: Optional[Path] = None) -> EvaluationLedger:
     """Get the singleton evaluation ledger instance."""
@@ -378,6 +651,32 @@ def record_evaluation(
     if recorded:
         _update_campaign_peak_accuracy(accuracy)
 
+        # Also record to curriculum manager for progression tracking
+        try:
+            from data_manager.curriculum_manager import CurriculumManager
+            from core.paths import get_base_dir as paths_get_base_dir
+
+            cm = CurriculumManager(paths_get_base_dir(), {})
+            # Map skill names (binary -> bin, syllo -> sy)
+            skill_map = {"binary": "bin", "bin": "bin", "syllo": "sy", "sy": "sy"}
+            skill_id = skill_map.get(skill, skill)
+
+            cm.record_accuracy(
+                skill=skill_id,
+                accuracy=accuracy,
+                step=checkpoint_step,
+                metadata={"level": level, "problems": total, "correct": correct}
+            )
+
+            # Check and trigger progression if ready
+            should_progress, reason = cm.should_progress(skill_id)
+            if should_progress:
+                result = cm.progress_to_next_level(skill_id)
+                logger.info(f"🎉 [{skill_id}] Progressed to level {result['new_level']}! {reason}")
+
+        except Exception as e:
+            logger.warning(f"Failed to sync eval to curriculum: {e}")
+
     return recorded
 
 
@@ -404,6 +703,122 @@ def _update_campaign_peak_accuracy(accuracy: float):
     except Exception as e:
         # Don't crash evaluation because peak tracking failed
         logger.warning(f"Failed to update peak accuracy: {e}")
+
+
+def record_job_eval(
+    job_id: str,
+    skill_id: str,
+    level: int,
+    accuracy: float,
+    correct: int,
+    total: int,
+    # Model identity
+    hero_id: str,
+    campaign_id: str,
+    checkpoint_step: int,
+    checkpoint_id: Optional[str] = None,
+    checkpoint_path: Optional[str] = None,
+    context_hash: Optional[str] = None,
+    # Job info
+    worker_id: Optional[str] = None,
+    started_at: Optional[float] = None,
+    ended_at: Optional[float] = None,
+    # Additional metrics
+    per_primitive: Optional[Dict[str, float]] = None,
+    problems: Optional[List[Dict]] = None,
+    error: Optional[str] = None,
+    base_dir: Optional[Path] = None,
+) -> bool:
+    """
+    Record an evaluation result from a job worker.
+
+    This is the primary entry point for eval_worker to write results.
+    Includes full model identity for job system integration.
+
+    Args:
+        job_id: Job ID from job store
+        skill_id: Skill that was evaluated
+        level: Skill level
+        accuracy: Overall accuracy (0.0 - 1.0)
+        correct: Number correct
+        total: Total problems
+        hero_id: Hero identifier
+        campaign_id: Campaign identifier
+        checkpoint_step: Step number
+        checkpoint_id: Checkpoint ID string (e.g., "checkpoint-175000")
+        checkpoint_path: Full path to checkpoint
+        context_hash: Hash for drift detection
+        worker_id: Worker that executed the eval
+        started_at: Unix timestamp when eval started
+        ended_at: Unix timestamp when eval ended
+        per_primitive: Per-primitive accuracy breakdown
+        problems: Individual problem results
+        error: Error message if failed
+
+    Returns:
+        True if recorded, False if already exists
+    """
+    ledger = get_eval_ledger(base_dir)
+
+    # Build metrics dict
+    metrics = {
+        "accuracy": accuracy,
+        "correct": correct,
+        "total": total,
+    }
+    if per_primitive:
+        metrics["per_primitive"] = per_primitive
+
+    record = EvalRecord(
+        checkpoint_step=checkpoint_step,
+        skill=skill_id,
+        level=level,
+        accuracy=accuracy,
+        correct=correct,
+        total=total,
+        timestamp=datetime.now().isoformat(),
+        validation_type="dynamic",  # Job-based evals are dynamic
+        eval_type="job",  # Mark as job-originated
+        problems=problems or [],
+        # Model identity
+        hero_id=hero_id,
+        campaign_id=campaign_id,
+        checkpoint_id=checkpoint_id or f"checkpoint-{checkpoint_step}",
+        checkpoint_path=checkpoint_path,
+        context_hash=context_hash,
+        # Job system
+        job_id=job_id,
+        worker_id=worker_id,
+        # Extended metrics
+        metrics=metrics,
+        started_at=started_at,
+        ended_at=ended_at,
+        error=error,
+    )
+
+    recorded = ledger.record(record)
+
+    # Update campaign peak metrics if recorded successfully
+    if recorded and not error:
+        _update_campaign_peak_accuracy(accuracy)
+
+    return recorded
+
+
+def extract_checkpoint_step(checkpoint_path: str) -> int:
+    """
+    Extract step number from checkpoint path.
+
+    Examples:
+        "checkpoint-175000" -> 175000
+        "campaigns/dio/campaign-001/checkpoints/checkpoint-175000-20251129-1430" -> 175000
+    """
+    import re
+    # Find checkpoint-XXXXX pattern
+    match = re.search(r'checkpoint-(\d+)', checkpoint_path)
+    if match:
+        return int(match.group(1))
+    return 0
 
 
 # Eval Queue for checkpoint saves
@@ -467,6 +882,20 @@ def queue_evaluation(
 
         # Persist queue to disk
         _save_eval_queue()
+
+        # Verbose logging
+        try:
+            from core.verbose_logger import VerboseLogger
+            task_id = f"eval-{checkpoint_step}-{skill}-{level or 'all'}"
+            VerboseLogger.task_queued("eval", task_id, {
+                "checkpoint_step": checkpoint_step,
+                "skill": skill,
+                "level": level,
+                "eval_type": eval_type,
+                "priority": priority
+            })
+        except:
+            pass  # Don't fail if verbose logging is unavailable
 
         return True
 
@@ -548,6 +977,18 @@ def pop_evaluation(eval_type: Optional[str] = None) -> Optional[EvalQueueEntry]:
             if eval_type is None or entry.eval_type == eval_type:
                 _eval_queue.pop(i)
                 _save_eval_queue()
+
+                # Verbose logging - task being picked up from queue
+                try:
+                    from core.verbose_logger import VerboseLogger
+                    task_id = f"eval-{entry.checkpoint_step}-{entry.skill}-{entry.level or 'all'}"
+                    VerboseLogger.task_progress("eval", task_id, "Dequeued for execution", {
+                        "priority": entry.priority,
+                        "eval_type": entry.eval_type
+                    })
+                except:
+                    pass
+
                 return entry
 
         return None

@@ -482,7 +482,9 @@ class TavernHandler(SimpleHTTPRequestHandler):
             skill_id = path.replace("/api/engine/skill/", "").replace("/state", "")
             skills_api.serve_skill_state(self, skill_id)
 
-        # Evals - Evaluation ledger queries
+        # Evals - Evaluation ledger page and API
+        elif path == "/evals" or path == "/evals.html":
+            self._serve_template("evals.html")
         elif path == "/api/evals":
             self._serve_evals_list(query)
         elif path == "/api/evals/summary":
@@ -598,6 +600,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Campaign - Hero/Campaign management
         elif path == "/campaign" or path == "/campaign.html":
             self._serve_template("campaign.html")
+        elif path == "/graph-test" or path == "/graph-test.html":
+            self._serve_template("graph_test.html")
         elif path == "/api/campaigns":
             heroes_api.serve_campaigns_data(self)
         elif path == "/api/campaigns/active":
@@ -634,7 +638,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # World State API - Single authoritative snapshot of the Realm
         elif path == "/api/world-state":
             self._serve_world_state()
-        elif path == "/api/realm":
+        elif path == "/api/realm" or path == "/api/realm-state":
             self._serve_realm_state()
         elif path == "/api/realm-mode":
             self._serve_realm_mode()
@@ -855,7 +859,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
     def _serve_realm_state(self):
         """
-        Serve unified realm state from realm_store.json file.
+        Serve unified realm state from RealmState service.
 
         This is the NEW single source of truth API. Combines:
         - Training state (step, loss, speed, etc.)
@@ -865,26 +869,18 @@ class TavernHandler(SimpleHTTPRequestHandler):
         - Recent events (battle log)
         - Mode state
 
-        Reads directly from file to ensure fresh data (producers write to file).
+        Reads from RealmState HTTP service (port 8866) instead of file.
         """
         try:
-            import json
-            from datetime import datetime
+            from core.realm_store import get_realm_state
+            data = get_realm_state()
 
-            # Read directly from file for fresh data (don't use singleton)
-            realm_file = BASE_DIR / "status" / "realm_store.json"
-
-            if realm_file.exists():
-                with open(realm_file) as f:
-                    data = json.load(f)
-
-                # Add response timestamp
-                data["timestamp"] = datetime.now().isoformat()
-
-                # Return file contents directly
+            if data and "state" in data:
+                # Return service data directly
                 self._send_json(data)
             else:
-                # Fall back to legacy sources
+                # Fall back to legacy sources if service unavailable
+                logger.warning("RealmState service returned no data, using legacy fallback")
                 self._serve_realm_state_legacy()
 
         except Exception as e:
@@ -1450,7 +1446,27 @@ class TavernHandler(SimpleHTTPRequestHandler):
             with open(val_file) as f:
                 validation = json.load(f)
 
-            problems = validation.get(level_key, [])
+            raw_problems = validation.get(level_key, [])
+
+            # Transform messages format to prompt/expected format for frontend
+            problems = []
+            for prob in raw_problems:
+                messages = prob.get("messages", [])
+                prompt = ""
+                expected = ""
+
+                # Extract user message (prompt) and assistant message (expected answer)
+                for msg in messages:
+                    if msg.get("role") == "user":
+                        prompt = msg.get("content", "")
+                    elif msg.get("role") == "assistant":
+                        expected = msg.get("content", "")
+
+                problems.append({
+                    "prompt": prompt,
+                    "expected": expected,
+                    "metadata": prob.get("metadata", {})
+                })
 
             self._send_json({
                 "skill": skill_id,
@@ -1466,11 +1482,11 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
     def _serve_eval_results(self, skill_id: str, level: Optional[str] = None):
         """
-        Serve eval results for a skill.
-
-        Returns latest eval and history from eval_results_history.json
+        Serve eval results for a skill from EvaluationLedger (single source of truth).
         """
         try:
+            from core.evaluation_ledger import get_eval_ledger
+
             # Map skill IDs
             id_mapping = {"sy": "syllo", "bin": "binary", "syllo": "syllo", "binary": "binary"}
             skill_name = id_mapping.get(skill_id, skill_id)
@@ -1483,49 +1499,65 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 "history": [],
             }
 
-            # Load current eval results
-            eval_file = BASE_DIR / "status" / "curriculum_eval.json"
-            if eval_file.exists():
-                with open(eval_file) as f:
-                    eval_data = json.load(f)
+            # Load from EvaluationLedger
+            ledger = get_eval_ledger(BASE_DIR)
 
-                last_eval = eval_data.get("last_eval", {})
-                if last_eval.get("skill") == skill_name:
-                    # Filter by level if specified
-                    if level is None or last_eval.get("level") == int(level):
-                        response["latest"] = {
-                            "level": last_eval.get("level"),
-                            "level_name": last_eval.get("level_name"),
-                            "accuracy": last_eval.get("accuracy"),
-                            "correct": last_eval.get("correct"),
-                            "total": last_eval.get("total"),
-                            "timestamp": last_eval.get("timestamp"),
-                            "step": last_eval.get("step"),
-                            "results": last_eval.get("results", []),
-                        }
+            # Force reload to get fresh data (fixes stale eval results)
+            ledger.reload()
 
-            # Load eval history (last 5 per level)
-            history_file = BASE_DIR / "status" / "eval_results_history.json"
-            if history_file.exists():
-                try:
-                    with open(history_file) as f:
-                        history_data = json.load(f)
+            # Get latest eval for this skill
+            latest_record = ledger.get_latest(skill_name)
 
-                    skill_history = history_data.get(skill_name, {})
-                    if level:
-                        # Get history for specific level
-                        level_key = str(level)
-                        response["history"] = skill_history.get(level_key, [])
-                    else:
-                        # Get all levels
-                        response["history_by_level"] = skill_history
-                except Exception as e:
-                    logger.warning(f"Failed to load eval history: {e}")
+            if latest_record:
+                # Filter by level if specified
+                if level is None or latest_record.level == int(level):
+                    # Convert problems to expected format
+                    results = []
+                    for prob in latest_record.problems:
+                        results.append({
+                            "problem_id": prob.get("problem_id") or f"problem-{prob.get('problem_idx', 0)}",
+                            "correct": prob.get("correct", False),
+                            "partial_score": prob.get("partial_score", 0.0),
+                            "expected": prob.get("expected", ""),
+                            "model_answer": prob.get("got", prob.get("model_answer", "")),
+                        })
+
+                    response["latest"] = {
+                        "level": latest_record.level,
+                        "level_name": None,  # TODO: Fetch from skill config if needed
+                        "accuracy": latest_record.accuracy,
+                        "correct": latest_record.correct,
+                        "total": latest_record.total,
+                        "timestamp": latest_record.timestamp,
+                        "step": latest_record.checkpoint_step,
+                        "results": results,
+                    }
+
+            # Get history (last 10 evals for this skill)
+            if level:
+                history_records = ledger.get_by_skill(skill_name, level=int(level))
+            else:
+                history_records = ledger.get_by_skill(skill_name)
+
+            # Convert to history format
+            history = []
+            for record in history_records[-10:]:  # Last 10
+                history.append({
+                    "level": record.level,
+                    "accuracy": record.accuracy,
+                    "correct": record.correct,
+                    "total": record.total,
+                    "timestamp": record.timestamp,
+                    "step": record.checkpoint_step,
+                })
+            response["history"] = history
 
             self._send_json(response)
 
         except Exception as e:
             logger.error(f"Eval results error: {e}")
+            import traceback
+            traceback.print_exc()
             self._send_json({"error": str(e)}, 500)
 
     def _serve_hero_info(self):

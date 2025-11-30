@@ -107,7 +107,7 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
         """Handle CORS preflight."""
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.end_headers()
 
@@ -217,6 +217,18 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             self._handle_jobs_get(job_id)
         else:
             self._send_error(f"Unknown endpoint: {path}", 404)
+
+    def do_DELETE(self):
+        """Handle DELETE requests."""
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
+
+        if path.startswith("/api/evals/checkpoint/"):
+            step_str = path.replace("/api/evals/checkpoint/", "")
+            self._handle_evals_delete(step_str, query)
+        else:
+            self._send_error(f"Unknown DELETE endpoint: {path}", 404)
 
     def do_POST(self):
         """Handle POST requests."""
@@ -979,6 +991,43 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
             self._send_error("Evaluation ledger module not available", 500)
         except Exception as e:
             logger.error(f"Evals best error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_evals_delete(self, step_str: str, query: Dict[str, list]):
+        """Delete evaluations for a checkpoint (optionally filtered by skill/level)."""
+        try:
+            from core.evaluation_ledger import get_eval_ledger
+
+            step = int(step_str)
+            skill = query.get("skill", [None])[0]
+            level_raw = query.get("level", [None])[0]
+            level = int(level_raw) if level_raw is not None else None
+
+            ledger = get_eval_ledger()
+
+            if skill is None and level is None:
+                removed = ledger.delete_for_checkpoint(step)
+            else:
+                removed = ledger.delete_for_checkpoint_and_skill(
+                    checkpoint_step=step,
+                    skill=skill,
+                    level=level,
+                )
+
+            self._send_json({
+                "ok": True,
+                "checkpoint_step": step,
+                "removed": removed,
+                "skill": skill,
+                "level": level,
+            })
+
+        except ValueError:
+            self._send_error(f"Invalid step: {step_str}", 400)
+        except ImportError:
+            self._send_error("Evaluation ledger module not available", 500)
+        except Exception as e:
+            logger.error(f"Evals delete error: {e}")
             self._send_error(str(e), 500)
 
     # =========================================================================

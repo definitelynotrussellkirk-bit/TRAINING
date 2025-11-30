@@ -642,6 +642,16 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._serve_realm_state()
         elif path == "/api/realm-mode":
             self._serve_realm_mode()
+
+        # Cluster State API - Host registry and cluster management
+        elif path == "/api/cluster":
+            self._serve_cluster_state()
+        elif path == "/api/cluster/summary":
+            self._serve_cluster_summary()
+        elif path.startswith("/api/cluster/host/"):
+            host_id = path.replace("/api/cluster/host/", "").strip("/")
+            self._serve_cluster_host(host_id)
+
         elif path == "/api/battle-log":
             self._serve_battle_log(query)
         elif path == "/api/battle_log":
@@ -855,6 +865,55 @@ class TavernHandler(SimpleHTTPRequestHandler):
             }, 503)
         except Exception as e:
             logger.error(f"World state error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    # =========================================================================
+    # CLUSTER STATE API
+    # =========================================================================
+
+    def _serve_cluster_state(self):
+        """Serve full cluster state (all hosts)."""
+        try:
+            from core.cluster_state import get_cluster_state
+            cluster = get_cluster_state()
+            self._send_json(cluster.to_dict())
+        except ImportError:
+            self._send_json({
+                "error": "Cluster state system not available",
+                "hosts": {},
+            }, 503)
+        except Exception as e:
+            logger.error(f"Cluster state error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_cluster_summary(self):
+        """Serve cluster summary (counts and overview)."""
+        try:
+            from core.cluster_state import get_cluster_summary
+            summary = get_cluster_summary()
+            self._send_json(summary)
+        except ImportError:
+            self._send_json({
+                "error": "Cluster state system not available",
+                "total_hosts": 0,
+            }, 503)
+        except Exception as e:
+            logger.error(f"Cluster summary error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _serve_cluster_host(self, host_id: str):
+        """Serve details for a specific host."""
+        try:
+            from core.cluster_state import get_host
+            host = get_host(host_id)
+            if host:
+                self._send_json(host.to_dict())
+            else:
+                self._send_json({"error": f"Host not found: {host_id}"}, 404)
+        except ImportError:
+            self._send_json({"error": "Cluster state system not available"}, 503)
+        except Exception as e:
+            logger.error(f"Cluster host error: {e}")
             self._send_json({"error": str(e)}, 500)
 
     def _serve_realm_state(self):

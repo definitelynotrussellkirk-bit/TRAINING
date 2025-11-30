@@ -220,6 +220,8 @@
         .channel-eval .log-channel-name { color: #81c784; }
         .channel-vault .log-channel-name { color: #ba68c8; }
         .channel-guild .log-channel-name { color: #ffd54f; }
+        .channel-data .log-channel-name { color: #4dd0e1; }
+        .channel-checkpoint .log-channel-name { color: #9575cd; }
         .channel-debug .log-channel-name { color: #666; }
 
         /* New events notification */
@@ -419,6 +421,16 @@
                     <span>Guild</span>
                     <span class="channel-count" id="count-guild">0</span>
                 </li>
+                <li class="channel-item active" data-channel="data">
+                    <span class="channel-icon">&#128190;</span>
+                    <span>Data</span>
+                    <span class="channel-count" id="count-data">0</span>
+                </li>
+                <li class="channel-item" data-channel="checkpoint">
+                    <span class="channel-icon">&#128190;</span>
+                    <span>Checkpoint</span>
+                    <span class="channel-count" id="count-checkpoint">0</span>
+                </li>
                 <li class="channel-item" data-channel="debug">
                     <span class="channel-icon">&#128295;</span>
                     <span>Debug</span>
@@ -470,7 +482,7 @@
 
     <script>
         // State
-        let activeChannels = new Set(['system', 'jobs', 'training', 'eval', 'vault', 'guild']);
+        let activeChannels = new Set(['system', 'jobs', 'training', 'eval', 'vault', 'guild', 'data']);
         let activeSeverity = 'all';
         let lastTimestamp = null;
         let events = [];
@@ -493,11 +505,11 @@
 
             if (channel === 'all') {
                 // Toggle all channels
-                const allActive = activeChannels.size === 7;
+                const allActive = activeChannels.size === 9;
                 if (allActive) {
                     activeChannels.clear();
                 } else {
-                    activeChannels = new Set(['system', 'jobs', 'training', 'eval', 'vault', 'guild', 'debug']);
+                    activeChannels = new Set(['system', 'jobs', 'training', 'eval', 'vault', 'guild', 'data', 'checkpoint', 'debug']);
                 }
             } else {
                 // Toggle single channel
@@ -527,7 +539,7 @@
             document.querySelectorAll('.channel-item').forEach(item => {
                 const channel = item.dataset.channel;
                 if (channel === 'all') {
-                    item.classList.toggle('active', activeChannels.size === 7);
+                    item.classList.toggle('active', activeChannels.size === 9);
                 } else {
                     item.classList.toggle('active', activeChannels.has(channel));
                 }
@@ -544,7 +556,7 @@
             } else if (preset === 'guild') {
                 activeChannels = new Set(['guild', 'eval', 'training']);
             } else {
-                activeChannels = new Set(['system', 'jobs', 'training', 'eval', 'vault', 'guild', 'debug']);
+                activeChannels = new Set(['system', 'jobs', 'training', 'eval', 'vault', 'guild', 'data', 'checkpoint', 'debug']);
             }
             updateChannelUI();
             saveChannelPrefs();
@@ -648,7 +660,7 @@
 
             // Update title
             const activeList = [...activeChannels];
-            if (activeList.length === 7) {
+            if (activeList.length === 9) {
                 document.getElementById('log-title').textContent = 'All Channels';
             } else if (activeList.length === 1) {
                 document.getElementById('log-title').textContent = capitalize(activeList[0]);

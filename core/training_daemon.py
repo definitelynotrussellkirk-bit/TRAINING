@@ -121,19 +121,29 @@ from job_logger import JobLogger
 sys.path.insert(0, str(Path(__file__).parent.parent / "data_manager"))
 from data_manager import DataManager
 
-# Events system (global announcements)
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Events system (SSE broadcaster for UI)
+# Simple emit wrapper that broadcasts events via SSE
 try:
-    from events import (
-        emit, announce, EventType, Severity,
-        queue_empty_event, data_need_event, training_started_event,
-        training_completed_event, daemon_heartbeat_event
-    )
+    from tavern.events_broadcaster import get_broadcaster
+    broadcaster = get_broadcaster()
+    def emit_sse_event(event_type, data):
+        """Emit event to SSE stream"""
+        try:
+            broadcaster.broadcast(event_type, data)
+        except Exception as e:
+            pass  # Silent fail if broadcaster not available
+    EVENTS_SSE_AVAILABLE = True
+except ImportError:
+    EVENTS_SSE_AVAILABLE = False
+    def emit_sse_event(*args, **kwargs): pass
+
+# Core events (for logging to status/events.jsonl)
+try:
+    from core.events import emit_event
     EVENTS_AVAILABLE = True
 except ImportError:
     EVENTS_AVAILABLE = False
-    def emit(*args, **kwargs): pass
-    def announce(*args, **kwargs): pass
+    def emit_event(*args, **kwargs): pass
 
 # World State integration (heartbeats, events, realm mode)
 try:
@@ -1339,6 +1349,16 @@ class TrainingDaemon:
                 loss=loss,
             )
 
+            # Emit SSE event for real-time UI updates (effort graph)
+            if EVENTS_SSE_AVAILABLE and status == "running" and loss is not None:
+                emit_sse_event("training.step", {
+                    "step": step,
+                    "loss": loss,
+                    "speed": it_per_sec,
+                    "total_steps": total_steps,
+                    "file": current_file,
+                })
+
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully"""
         sig_name = signal.Signals(signum).name
@@ -2039,18 +2059,7 @@ class TrainingDaemon:
             if total_queued >= min_queue_depth:
                 return  # Quest Board has enough items
 
-            # Emit queue low event
-            emit(queue_empty_event(total_queued, min_queue_depth))
-
             self.logger.info(f"📜 Quest Board low ({total_queued} < {min_queue_depth}), asking Quest Master for more...")
-
-            # Emit data need event before calling DataManager
-            count = auto_cfg.get("count", 5000)
-            emit(data_need_event(
-                skill=self.data_manager.get_active_skill() if hasattr(self.data_manager, 'get_active_skill') else "unknown",
-                count=count,
-                reason="queue_low"
-            ))
 
             # Data Manager handles all generation logic (and emits its own events)
             success = self.data_manager.generate_and_queue(force=False)

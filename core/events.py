@@ -1,210 +1,194 @@
 """
-Events System - Central event stream for the Realm.
+Events System - LEGACY COMPATIBILITY SHIM
 
-All significant events are logged to status/events.jsonl for:
-- Battle log display
-- Debugging
-- Audit trail
+⚠️  DEPRECATED: This module is retained for backward compatibility only.
+⚠️  New code should use core.event_bus instead.
 
-Usage:
-    from core.events import emit_event, get_recent_events
+This module now delegates all calls to core.event_bus. The JSONL storage
+has been retired in favor of dual-write to RealmState (live) and BattleLogger (persistent).
 
-    # Emit an event
-    emit_event("job_started", job_id="xyz", job_type="train", worker_id="training_daemon")
+Migration Guide:
+    OLD:
+        from core.events import emit_job_started
+        emit_job_started(job_id, job_type, worker_id)
 
-    # Read recent events
-    events = get_recent_events(limit=50)
-    for e in events:
-        print(f"[{e['ts']}] {e['kind']}: {e.get('job_id', '')}")
+    NEW:
+        from core.event_bus import job_started
+        job_started(job_id, job_type, worker_id)
 
-Event Kinds:
-    - job_submitted, job_started, job_completed, job_failed
-    - checkpoint_saved
-    - eval_suite_triggered, eval_completed
-    - mode_changed
-    - worker_started, worker_stopped, worker_stale
-    - reset_performed
-    - warning_raised
+For consumption:
+    OLD:
+        from core.events import get_recent_events
+        events = get_recent_events(limit=50)
+
+    NEW (live view):
+        from core.realm_store import get_events
+        events = get_events(limit=50)
+
+    NEW (historic view):
+        from core.battle_log import get_battle_logger
+        logger = get_battle_logger()
+        events = logger.get_events(limit=100)
 """
 
-import json
-import logging
-import os
-from datetime import datetime, timedelta
-from pathlib import Path
-from threading import Lock
-from typing import Any, Dict, List, Optional, Iterator
+import warnings
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
-
-_events_lock = Lock()
-
-
-def _get_events_file() -> Path:
-    """Get path to events file."""
-    try:
-        from core.paths import get_base_dir
-        base_dir = get_base_dir()
-    except ImportError:
-        base_dir = Path(__file__).parent.parent
-    return base_dir / "status" / "events.jsonl"
+# Emit deprecation warning on import
+warnings.warn(
+    "core.events is deprecated. Use core.event_bus for emission "
+    "and core.realm_store or core.battle_log for consumption. "
+    "JSONL storage has been retired.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 # =============================================================================
-# EVENT EMISSION
+# EVENT EMISSION (delegates to event_bus)
 # =============================================================================
 
 def emit_event(kind: str, **fields) -> Dict[str, Any]:
     """
-    Emit an event to the central event stream.
+    Emit an event (legacy interface).
 
-    Args:
-        kind: Event kind (e.g., "job_started", "checkpoint_saved")
-        **fields: Additional event fields
+    ⚠️ DEPRECATED: Use core.event_bus.emit_realm_event() instead.
 
-    Returns:
-        The event dict that was written
-
-    Common event kinds:
-        job_submitted: job_id, job_type, payload
-        job_started: job_id, job_type, worker_id
-        job_completed: job_id, job_type, worker_id, result
-        job_failed: job_id, job_type, worker_id, error
-        checkpoint_saved: hero_id, campaign_id, step, path
-        eval_suite_triggered: suite_id, run_id, jobs_count
-        eval_completed: suite_id, skill_id, level, accuracy
-        mode_changed: from_mode, to_mode, changed_by, reason
-        worker_started: worker_id, role, device
-        worker_stopped: worker_id, role
-        worker_stale: worker_id, role, last_seen
-        reset_performed: jobs_cancelled, reason
-        warning_raised: warning_type, message, details
+    This function now delegates to the unified event bus.
     """
-    event = {
-        "ts": datetime.now().isoformat(),
-        "kind": kind,
+    from core.event_bus import emit_realm_event
+
+    # Extract optional channel/severity if provided
+    channel = fields.pop("channel", None)
+    severity = fields.pop("severity", None)
+
+    # Build human-readable message from kind and fields
+    message = _format_message_from_fields(kind, fields)
+
+    return emit_realm_event(
+        kind=kind,
+        message=message,
+        channel=channel,
+        severity=severity,
+        details=fields,
+    )
+
+
+def _format_message_from_fields(kind: str, fields: Dict) -> str:
+    """Format a message from legacy event fields."""
+    import json
+
+    formatters = {
+        "job_submitted": lambda f: f"Job {f.get('job_type', '?')} submitted: {f.get('job_id', '?')[:8]}",
+        "job_started": lambda f: f"Job {f.get('job_type', '?')} started on {f.get('worker_id', '?')}",
+        "job_completed": lambda f: f"Job {f.get('job_type', '?')} completed: {f.get('job_id', '?')[:8]}",
+        "job_failed": lambda f: f"Job {f.get('job_type', '?')} FAILED: {f.get('job_id', '?')[:8]} - {f.get('error', '?')[:50]}",
+        "training_started": lambda f: f"Training started: {f.get('job_name', '?')} ({f.get('total_steps', '?')} steps)",
+        "training_completed": lambda f: f"Training completed: {f.get('job_name', '?')} (step {f.get('final_step', '?')}, loss {f.get('final_loss', '?')})",
+        "checkpoint_saved": lambda f: f"Checkpoint {f.get('step', '?'):,} saved",
+        "eval_suite_triggered": lambda f: f"Eval suite {f.get('suite_id', '?')} triggered ({f.get('jobs_count', '?')} jobs)",
+        "eval_completed": lambda f: f"Eval {f.get('skill_id', '?')} L{f.get('level', '?')}: {f.get('accuracy', 0)*100:.1f}%",
+        "mode_changed": lambda f: f"Mode changed: {f.get('from_mode', '?')} → {f.get('to_mode', '?')}",
+        "worker_started": lambda f: f"Worker {f.get('worker_id', '?')} started ({f.get('role', '?')})",
+        "worker_stopped": lambda f: f"Worker {f.get('worker_id', '?')} stopped",
+        "worker_stale": lambda f: f"Worker {f.get('worker_id', '?')} STALE (last seen {f.get('last_seen', '?')})",
+        "reset_performed": lambda f: f"Reset performed: {f.get('jobs_cancelled', 0)} jobs cancelled",
+        "warning_raised": lambda f: f"Warning: {f.get('warning_type', '?')} - {f.get('message', '?')}",
     }
-    event.update(fields)
 
-    events_file = _get_events_file()
-
-    try:
-        with _events_lock:
-            events_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(events_file, "a") as f:
-                f.write(json.dumps(event) + "\n")
-    except Exception as e:
-        logger.error(f"Failed to emit event {kind}: {e}")
-
-    return event
+    formatter = formatters.get(kind, lambda f: f"{kind}: {json.dumps(f)[:60]}")
+    return formatter(fields)
 
 
 # =============================================================================
-# CONVENIENCE EMITTERS
+# TYPED EMITTERS (delegate to event_bus typed helpers)
 # =============================================================================
 
 def emit_job_submitted(job_id: str, job_type: str, payload: Optional[Dict] = None):
-    """Emit job_submitted event."""
-    emit_event("job_submitted", job_id=job_id, job_type=job_type, payload=payload or {})
+    """⚠️ DEPRECATED: Use core.event_bus.job_submitted()"""
+    from core.event_bus import job_submitted
+    return job_submitted(job_id, job_type, payload)
 
 
 def emit_job_started(job_id: str, job_type: str, worker_id: str):
-    """Emit job_started event."""
-    emit_event("job_started", job_id=job_id, job_type=job_type, worker_id=worker_id)
+    """⚠️ DEPRECATED: Use core.event_bus.job_started()"""
+    from core.event_bus import job_started
+    return job_started(job_id, job_type, worker_id)
 
 
 def emit_job_completed(job_id: str, job_type: str, worker_id: str, result: Optional[Dict] = None):
-    """Emit job_completed event."""
-    emit_event("job_completed", job_id=job_id, job_type=job_type, worker_id=worker_id, result=result or {})
+    """⚠️ DEPRECATED: Use core.event_bus.job_completed()"""
+    from core.event_bus import job_completed
+    # Note: event_bus.job_completed expects duration_sec, not result
+    # For compat, we'll use emit_realm_event directly
+    from core.event_bus import emit_realm_event
+    return emit_realm_event(
+        kind="job_completed",
+        message=f"Job {job_type} completed",
+        details={"job_id": job_id, "job_type": job_type, "worker_id": worker_id, "result": result or {}},
+    )
 
 
 def emit_job_failed(job_id: str, job_type: str, worker_id: str, error: str):
-    """Emit job_failed event."""
-    emit_event("job_failed", job_id=job_id, job_type=job_type, worker_id=worker_id, error=error)
+    """⚠️ DEPRECATED: Use core.event_bus.job_failed()"""
+    from core.event_bus import job_failed
+    return job_failed(job_id, job_type, error, worker_id)
 
 
 def emit_checkpoint_saved(hero_id: str, campaign_id: str, step: int, path: str):
-    """Emit checkpoint_saved event."""
-    emit_event("checkpoint_saved", hero_id=hero_id, campaign_id=campaign_id, step=step, path=path)
+    """⚠️ DEPRECATED: Use core.event_bus.checkpoint_saved()"""
+    from core.event_bus import checkpoint_saved
+    # Note: event_bus.checkpoint_saved requires loss, which we don't have here
+    # Use emit_realm_event with full details
+    from core.event_bus import emit_realm_event
+    return emit_realm_event(
+        kind="checkpoint_saved",
+        message=f"Checkpoint {step:,} saved",
+        hero_id=hero_id,
+        campaign_id=campaign_id,
+        details={"step": step, "path": path},
+    )
 
 
 def emit_training_started(job_id: str, job_name: str, total_steps: int):
-    """Emit training_started event."""
-    emit_event("training_started", job_id=job_id, job_name=job_name, total_steps=total_steps)
+    """⚠️ DEPRECATED: Use core.event_bus.training_started()"""
+    from core.event_bus import training_started
+    return training_started(job_id, job_name, total_steps)
 
 
 def emit_training_completed(job_id: str, job_name: str, final_step: int, final_loss: Optional[float] = None):
-    """Emit training_completed event."""
-    emit_event("training_completed", job_id=job_id, job_name=job_name, final_step=final_step, final_loss=final_loss)
+    """⚠️ DEPRECATED: Use core.event_bus.training_completed()"""
+    from core.event_bus import training_completed
+    return training_completed(job_id, job_name, final_step, final_loss or 0.0)
 
 
 def emit_eval_suite_triggered(suite_id: str, run_id: str, jobs_count: int):
-    """Emit eval_suite_triggered event."""
-    emit_event("eval_suite_triggered", suite_id=suite_id, run_id=run_id, jobs_count=jobs_count)
+    """⚠️ DEPRECATED: Use core.event_bus.emit_realm_event()"""
+    from core.event_bus import emit_realm_event
+    return emit_realm_event(
+        kind="eval_suite_triggered",
+        message=f"Eval suite {suite_id} triggered ({jobs_count} jobs)",
+        details={"suite_id": suite_id, "run_id": run_id, "jobs_count": jobs_count},
+    )
 
 
 def emit_eval_completed(suite_id: str, skill_id: str, level: int, accuracy: float):
-    """Emit eval_completed event."""
-    emit_event("eval_completed", suite_id=suite_id, skill_id=skill_id, level=level, accuracy=accuracy)
+    """⚠️ DEPRECATED: Use core.event_bus.eval_completed()"""
+    from core.event_bus import eval_completed
+    # Note: event_bus.eval_completed has different signature (skill, not suite_id)
+    return eval_completed(skill_id, level, accuracy)
 
 
 def emit_warning(warning_type: str, message: str, details: Optional[Dict] = None):
-    """Emit warning_raised event."""
-    emit_event("warning_raised", warning_type=warning_type, message=message, details=details or {})
+    """⚠️ DEPRECATED: Use core.event_bus.warning_raised()"""
+    from core.event_bus import warning_raised
+    return warning_raised(warning_type, message, details)
 
 
 # =============================================================================
-# EVENT READING
+# EVENT READING (delegates to realm_store or battle_log)
 # =============================================================================
-
-def iter_events(
-    since: Optional[datetime] = None,
-    kinds: Optional[List[str]] = None,
-) -> Iterator[Dict[str, Any]]:
-    """
-    Iterate over events from the event file.
-
-    Args:
-        since: Only return events after this timestamp
-        kinds: Only return events of these kinds
-
-    Yields:
-        Event dicts
-    """
-    events_file = _get_events_file()
-
-    if not events_file.exists():
-        return
-
-    try:
-        with open(events_file, "r") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-
-                try:
-                    event = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-                # Filter by timestamp
-                if since:
-                    try:
-                        event_ts = datetime.fromisoformat(event.get("ts", ""))
-                        if event_ts < since:
-                            continue
-                    except (ValueError, TypeError):
-                        continue
-
-                # Filter by kind
-                if kinds and event.get("kind") not in kinds:
-                    continue
-
-                yield event
-    except Exception as e:
-        logger.error(f"Failed to read events: {e}")
-
 
 def get_recent_events(
     limit: int = 50,
@@ -212,187 +196,161 @@ def get_recent_events(
     kinds: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Get recent events, newest first.
+    Get recent events (legacy interface).
 
-    Args:
-        limit: Maximum number of events to return
-        since: Only return events after this timestamp
-        kinds: Only return events of these kinds
+    ⚠️ DEPRECATED: Use core.realm_store.get_events() for live view
+                  or core.battle_log for historic queries.
 
-    Returns:
-        List of event dicts, newest first
+    This now reads from RealmState (last N events, in-memory).
+    For historic queries with filtering, use BattleLogger directly.
     """
-    events_file = _get_events_file()
+    from core.realm_store import get_events
 
-    if not events_file.exists():
-        return []
+    # RealmState doesn't support since/kinds filtering, so we filter post-fetch
+    events = get_events(limit=limit * 2)  # Fetch more to account for filtering
 
-    # Read all matching events, then take the last N
-    all_events = list(iter_events(since=since, kinds=kinds))
-    return list(reversed(all_events[-limit:]))
+    filtered = []
+    for event in events:
+        # Filter by timestamp if provided
+        if since:
+            try:
+                event_ts = datetime.fromisoformat(event.get("timestamp", ""))
+                if event_ts < since:
+                    continue
+            except (ValueError, TypeError):
+                continue
+
+        # Filter by kind if provided
+        if kinds and event.get("kind") not in kinds:
+            continue
+
+        filtered.append({
+            "ts": event.get("timestamp", ""),
+            "kind": event.get("kind", ""),
+            **event.get("details", {}),
+        })
+
+        if len(filtered) >= limit:
+            break
+
+    return filtered
 
 
 def get_events_since(timestamp: datetime) -> List[Dict[str, Any]]:
-    """Get all events since a timestamp."""
-    return list(iter_events(since=timestamp))
+    """⚠️ DEPRECATED: Use core.realm_store.get_events()"""
+    return get_recent_events(limit=1000, since=timestamp)
 
 
 def get_events_last_n_minutes(minutes: int = 30) -> List[Dict[str, Any]]:
-    """Get events from the last N minutes."""
+    """⚠️ DEPRECATED: Use core.battle_log for time-based queries"""
+    from datetime import timedelta
     since = datetime.now() - timedelta(minutes=minutes)
     return get_recent_events(limit=1000, since=since)
 
 
 # =============================================================================
-# EVENT FILE MANAGEMENT
+# LEGACY JSONL FUNCTIONS (no-ops or raise errors)
 # =============================================================================
 
 def get_event_count() -> int:
-    """Get total number of events in the file."""
-    events_file = _get_events_file()
-    if not events_file.exists():
-        return 0
+    """
+    ⚠️ DEPRECATED: JSONL storage removed. Use BattleLogger for counts.
 
-    try:
-        with open(events_file, "r") as f:
-            return sum(1 for line in f if line.strip())
-    except Exception:
-        return 0
+    Returns 0 for backward compatibility.
+    """
+    warnings.warn("JSONL storage removed. Use core.battle_log for event counts.", DeprecationWarning)
+    return 0
 
 
 def rotate_events(max_events: int = 10000):
     """
-    Rotate events file if it gets too large.
-
-    Keeps the most recent max_events events.
+    ⚠️ DEPRECATED: JSONL storage removed. No-op.
     """
-    events_file = _get_events_file()
-
-    if not events_file.exists():
-        return
-
-    count = get_event_count()
-    if count <= max_events:
-        return
-
-    logger.info(f"Rotating events file ({count} events -> {max_events})")
-
-    # Read all events
-    all_events = list(iter_events())
-
-    # Keep only the most recent
-    keep_events = all_events[-max_events:]
-
-    # Write back
-    with _events_lock:
-        # Backup old file
-        backup_file = events_file.with_suffix(".jsonl.bak")
-        if backup_file.exists():
-            backup_file.unlink()
-        events_file.rename(backup_file)
-
-        # Write new file
-        with open(events_file, "w") as f:
-            for event in keep_events:
-                f.write(json.dumps(event) + "\n")
-
-    logger.info(f"Events file rotated: {len(keep_events)} events kept")
+    warnings.warn("JSONL storage removed. This is a no-op.", DeprecationWarning)
+    pass
 
 
 def clear_events():
-    """Clear all events (use with caution)."""
-    events_file = _get_events_file()
-    with _events_lock:
-        if events_file.exists():
-            events_file.unlink()
+    """
+    ⚠️ DEPRECATED: JSONL storage removed. No-op.
+    """
+    warnings.warn("JSONL storage removed. This is a no-op.", DeprecationWarning)
+    pass
+
+
+def iter_events(*args, **kwargs):
+    """
+    ⚠️ DEPRECATED: JSONL storage removed. Use BattleLogger.get_events().
+    """
+    raise DeprecationWarning(
+        "iter_events() removed with JSONL storage. "
+        "Use core.battle_log.BattleLogger.get_events() for historic queries."
+    )
 
 
 # =============================================================================
-# BATTLE LOG FORMATTING
+# BATTLE LOG FORMATTING (moved to event_bus)
 # =============================================================================
 
 def format_event_for_battle_log(event: Dict[str, Any]) -> str:
     """
-    Format an event for display in the battle log.
+    ⚠️ DEPRECATED: Formatting now handled by event_bus.
 
-    Returns a human-readable string.
+    Returns a simple formatted string for backward compat.
     """
     kind = event.get("kind", "unknown")
-    ts = event.get("ts", "")[:19]  # Trim to seconds
-
-    formatters = {
-        "job_submitted": lambda e: f"Job submitted: {e.get('job_type', '?')} {e.get('job_id', '?')[:8]}",
-        "job_started": lambda e: f"Job started: {e.get('job_type', '?')} {e.get('job_id', '?')[:8]} on {e.get('worker_id', '?')}",
-        "job_completed": lambda e: f"Job completed: {e.get('job_type', '?')} {e.get('job_id', '?')[:8]}",
-        "job_failed": lambda e: f"Job FAILED: {e.get('job_type', '?')} {e.get('job_id', '?')[:8]} - {e.get('error', '?')[:50]}",
-        "training_started": lambda e: f"Training started: {e.get('job_name', '?')} ({e.get('total_steps', '?')} steps)",
-        "training_completed": lambda e: f"Training completed: {e.get('job_name', '?')} (step {e.get('final_step', '?')}, loss {e.get('final_loss', '?')})",
-        "checkpoint_saved": lambda e: f"Checkpoint saved: step {e.get('step', '?')}",
-        "eval_suite_triggered": lambda e: f"Eval suite triggered: {e.get('suite_id', '?')} ({e.get('jobs_count', '?')} jobs)",
-        "eval_completed": lambda e: f"Eval completed: {e.get('skill_id', '?')} L{e.get('level', '?')} = {e.get('accuracy', 0)*100:.1f}%",
-        "mode_changed": lambda e: f"Mode changed: {e.get('from_mode', '?')} -> {e.get('to_mode', '?')} ({e.get('reason', '')})",
-        "worker_started": lambda e: f"Worker started: {e.get('worker_id', '?')} ({e.get('role', '?')})",
-        "worker_stopped": lambda e: f"Worker stopped: {e.get('worker_id', '?')}",
-        "worker_stale": lambda e: f"Worker STALE: {e.get('worker_id', '?')} (last seen {e.get('last_seen', '?')})",
-        "reset_performed": lambda e: f"Reset performed: {e.get('jobs_cancelled', 0)} jobs cancelled",
-        "warning_raised": lambda e: f"Warning: {e.get('warning_type', '?')} - {e.get('message', '?')}",
-    }
-
-    formatter = formatters.get(kind, lambda e: f"{kind}: {json.dumps(e)[:60]}")
-    return f"[{ts}] {formatter(event)}"
+    ts = event.get("ts", event.get("timestamp", ""))[:19]
+    message = event.get("message", _format_message_from_fields(kind, event))
+    return f"[{ts}] {message}"
 
 
 def get_battle_log(limit: int = 50, since_minutes: Optional[int] = None) -> List[str]:
     """
-    Get formatted battle log entries.
+    ⚠️ DEPRECATED: Use core.battle_log directly.
 
-    Args:
-        limit: Maximum entries
-        since_minutes: Only show events from last N minutes
-
-    Returns:
-        List of formatted strings for display
+    Returns formatted battle log entries from BattleLogger.
     """
+    from core.battle_log import get_battle_logger
+    from datetime import timedelta
+
+    logger = get_battle_logger()
+
     since = None
     if since_minutes:
-        since = datetime.now() - timedelta(minutes=since_minutes)
+        from datetime import datetime
+        since = (datetime.utcnow() - timedelta(minutes=since_minutes)).isoformat() + "Z"
 
-    events = get_recent_events(limit=limit, since=since)
-    return [format_event_for_battle_log(e) for e in events]
+    events = logger.get_events(since=since, limit=limit)
+
+    return [
+        f"[{e.timestamp[:19]}] {e.icon} [{e.channel}] {e.message}"
+        for e in reversed(events)
+    ]
 
 
 # =============================================================================
-# CLI
+# CLI (minimal - redirect to event_bus)
 # =============================================================================
 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Events System")
+    parser = argparse.ArgumentParser(description="Events System (Legacy Shim)")
     parser.add_argument("--list", action="store_true", help="List recent events")
     parser.add_argument("--battle-log", action="store_true", help="Show formatted battle log")
-    parser.add_argument("--count", action="store_true", help="Show event count")
-    parser.add_argument("--rotate", action="store_true", help="Rotate events file")
     parser.add_argument("--emit", type=str, help="Emit a test event of given kind")
     parser.add_argument("--limit", type=int, default=20, help="Number of events to show")
-    parser.add_argument("--since-minutes", type=int, help="Only show events from last N minutes")
 
     args = parser.parse_args()
 
+    print("⚠️  WARNING: core.events is deprecated. Use core.event_bus or core.battle_log instead.\n")
+
     if args.emit:
         event = emit_event(args.emit, test=True, message="Test event from CLI")
-        print(f"Emitted: {json.dumps(event)}")
-
-    elif args.count:
-        count = get_event_count()
-        print(f"Total events: {count}")
-
-    elif args.rotate:
-        rotate_events()
-        print("Events rotated")
+        print(f"Emitted: {event}")
 
     elif args.battle_log:
-        log = get_battle_log(limit=args.limit, since_minutes=args.since_minutes)
+        log = get_battle_log(limit=args.limit)
         if not log:
             print("No events")
         else:

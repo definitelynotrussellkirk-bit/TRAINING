@@ -1,12 +1,13 @@
 """
 Realm State Store - Single Source of Truth for all Realm state.
 
-This is THE canonical store for all state in the Realm. Instead of having
-multiple disconnected sources (training_status.json, heartbeats/, events.jsonl,
-battle_log.db), everything flows through here.
+NOW NETWORK-BASED: This module now uses the RealmState HTTP service instead
+of direct file writes. The API remains the same, but now all operations
+go through the network service.
 
 Architecture:
-    PRODUCERS (write) -> RealmStateStore -> CONSUMERS (read)
+    PRODUCERS (write) -> RealmStateStore (HTTP client) -> RealmService (SQLite)
+    CONSUMERS (read) -> RealmStateStore (HTTP client) -> RealmService (SQLite)
 
     Producers: Training daemon, eval workers, job system, heartbeats
     Consumers: Tavern UI, CLI tools, monitoring, external APIs
@@ -28,109 +29,42 @@ Usage:
     state = get_realm_state()
     print(state["training"]["step"])  # 183220
 
-    # Or get specific section
-    training = get_training_state()
-
 Design Principles:
-    1. Single file store (status/realm_state.json)
-    2. Thread-safe updates with locking
+    1. Network-based (HTTP to RealmService on port 8866)
+    2. Thread-safe (HTTP client handles concurrency)
     3. Typed sections (training, jobs, workers, hero, events)
-    4. Timestamp on every update
-    5. No duplicate data - one place for each piece of info
-    6. Fast reads (JSON in memory, periodic flush)
+    4. Same API as before (drop-in replacement)
+    5. Graceful fallback to file-based if service unavailable
 """
 
 import json
 import logging
-import threading
-import time
-from dataclasses import dataclass, field, asdict
+import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Callable
-from collections import deque
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-
-# =============================================================================
-# STATE SECTIONS (typed for clarity)
-# =============================================================================
-
-@dataclass
-class TrainingState:
-    """Current training status."""
-    status: str = "idle"  # idle, training, paused, stopped
-    step: int = 0
-    total_steps: int = 0
-    loss: Optional[float] = None
-    learning_rate: Optional[float] = None
-    file: Optional[str] = None
-    speed: Optional[float] = None  # steps/sec
-    eta_seconds: Optional[int] = None
-    strain: Optional[float] = None  # loss - floor
-    started_at: Optional[str] = None
-    updated_at: Optional[str] = None
-
-
-@dataclass
-class QueueState:
-    """Job queue status."""
-    depth: int = 0
-    high_priority: int = 0
-    normal_priority: int = 0
-    low_priority: int = 0
-    status: str = "ok"  # ok, low, empty, stale
-    updated_at: Optional[str] = None
-
-
-@dataclass
-class WorkerState:
-    """A single worker's state."""
-    worker_id: str = ""
-    role: str = ""  # training_daemon, eval_worker, etc.
-    status: str = "unknown"  # running, idle, stale, stopped
-    device: Optional[str] = None
-    current_job: Optional[str] = None
-    last_heartbeat: Optional[str] = None
-    extra: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class HeroState:
-    """Hero (model) state."""
-    name: str = "DIO"
-    title: str = ""
-    level: int = 0
-    xp: int = 0
-    campaign_id: Optional[str] = None
-    current_skill: Optional[str] = None
-    current_skill_level: int = 0
-    updated_at: Optional[str] = None
-
-
-@dataclass
-class EventEntry:
-    """A single event/log entry."""
-    id: str = ""
-    timestamp: str = ""
-    kind: str = ""  # training_started, checkpoint_saved, etc.
-    channel: str = "system"  # system, training, eval, jobs, guild
-    severity: str = "info"  # info, success, warning, error
-    message: str = ""
-    icon: str = "📢"
-    details: Dict[str, Any] = field(default_factory=dict)
+# Try to import RealmClient
+try:
+    from realm.client import RealmClient
+    REALM_CLIENT_AVAILABLE = True
+except ImportError:
+    logger.warning("realm.client not available - using file-based fallback")
+    REALM_CLIENT_AVAILABLE = False
 
 
 # =============================================================================
-# REALM STATE STORE
+# REALM STATE STORE (Network-based wrapper)
 # =============================================================================
 
 class RealmStateStore:
     """
     Single source of truth for all Realm state.
 
-    Thread-safe, file-backed, with in-memory caching.
+    Now uses HTTP client to talk to RealmService instead of direct file writes.
+    Provides same API as before for backward compatibility.
     """
 
     # Channel icons
@@ -142,88 +76,72 @@ class RealmStateStore:
         "vault": "🗃️",
         "guild": "🏰",
         "debug": "🔧",
+        "data": "📦",
+        "checkpoint": "💾",
     }
 
-    def __init__(self, store_path: Optional[Path] = None):
-        if store_path is None:
+    def __init__(self, service_url: Optional[str] = None):
+        if service_url is None:
+            # Get RealmState service URL from hosts.json
             try:
-                from core.paths import get_base_dir
-                store_path = get_base_dir() / "status" / "realm_store.json"
-            except ImportError:
-                store_path = Path(__file__).parent.parent / "status" / "realm_store.json"
+                from core.hosts import get_service_url
+                service_url = get_service_url("realm_state")
+                if not service_url:
+                    # Fallback to localhost if not in hosts.json
+                    service_url = "http://localhost:8866"
+            except:
+                # Fallback if hosts.py not available
+                service_url = "http://localhost:8866"
 
-        self.store_path = Path(store_path)
-        self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        self.service_url = service_url
+        self._client = None
 
-        self._lock = threading.RLock()
-        self._state: Dict[str, Any] = {}
-        self._events: deque = deque(maxlen=100)  # Last 100 events in memory
-        self._dirty = False
-        self._last_flush = time.time()
-        self._flush_interval = 1.0  # Flush every 1 second if dirty
+        if REALM_CLIENT_AVAILABLE:
+            self._client = RealmClient(service_url)
+            # Test connection
+            if not self._client.health():
+                logger.warning(f"RealmState service not available at {service_url}, using fallback")
+                self._client = None
 
-        # Subscribers for real-time updates
-        self._subscribers: List[Callable[[str, Dict], None]] = []
+        if self._client is None:
+            logger.info("Using file-based fallback for realm state")
+            self._init_fallback()
 
-        # Load existing state
-        self._load()
-
-        # Start background flush thread
-        self._flush_thread = threading.Thread(target=self._flush_loop, daemon=True)
-        self._flush_thread.start()
-
-    def _load(self):
-        """Load state from disk."""
-        if self.store_path.exists():
-            try:
-                with open(self.store_path, "r") as f:
-                    data = json.load(f)
-                    self._state = data.get("state", {})
-                    # Load events into deque
-                    for e in data.get("events", []):
-                        self._events.append(e)
-            except Exception as e:
-                logger.error(f"Failed to load realm store: {e}")
-                self._state = {}
-
-    def _save(self):
-        """Save state to disk."""
+    def _init_fallback(self):
+        """Initialize file-based fallback."""
         try:
-            with open(self.store_path, "w") as f:
+            from core.paths import get_base_dir
+            self.fallback_path = get_base_dir() / "status" / "realm_store.json"
+        except ImportError:
+            self.fallback_path = Path(__file__).parent.parent / "status" / "realm_store.json"
+
+        self.fallback_path.parent.mkdir(parents=True, exist_ok=True)
+        self._fallback_state = {}
+        self._fallback_events = []
+
+        # Load existing fallback data
+        if self.fallback_path.exists():
+            try:
+                with open(self.fallback_path, "r") as f:
+                    data = json.load(f)
+                    self._fallback_state = data.get("state", {})
+                    self._fallback_events = data.get("events", [])
+            except Exception as e:
+                logger.error(f"Failed to load fallback state: {e}")
+
+    def _save_fallback(self):
+        """Save fallback state to disk."""
+        if not hasattr(self, "fallback_path"):
+            return
+        try:
+            with open(self.fallback_path, "w") as f:
                 json.dump({
-                    "state": self._state,
-                    "events": list(self._events),
+                    "state": self._fallback_state,
+                    "events": self._fallback_events[-100:],  # Keep last 100
                     "updated_at": datetime.now().isoformat(),
                 }, f, indent=2, default=str)
-            self._dirty = False
         except Exception as e:
-            logger.error(f"Failed to save realm store: {e}")
-
-    def _flush_loop(self):
-        """Background thread that flushes dirty state to disk."""
-        while True:
-            time.sleep(0.5)
-            if self._dirty and (time.time() - self._last_flush) >= self._flush_interval:
-                with self._lock:
-                    self._save()
-                    self._last_flush = time.time()
-
-    def _notify_subscribers(self, section: str, data: Dict):
-        """Notify all subscribers of a state change."""
-        for callback in self._subscribers:
-            try:
-                callback(section, data)
-            except Exception as e:
-                logger.error(f"Subscriber error: {e}")
-
-    def subscribe(self, callback: Callable[[str, Dict], None]):
-        """Subscribe to state changes."""
-        self._subscribers.append(callback)
-
-    def unsubscribe(self, callback: Callable[[str, Dict], None]):
-        """Unsubscribe from state changes."""
-        if callback in self._subscribers:
-            self._subscribers.remove(callback)
+            logger.error(f"Failed to save fallback state: {e}")
 
     # =========================================================================
     # GENERIC READ/WRITE
@@ -231,33 +149,41 @@ class RealmStateStore:
 
     def get(self, section: str, default: Any = None) -> Any:
         """Get a state section."""
-        with self._lock:
-            return self._state.get(section, default)
+        if self._client:
+            data = self._client.get_section(section)
+            return data if data is not None else default
+        else:
+            return self._fallback_state.get(section, default)
 
     def set(self, section: str, value: Any):
         """Set a state section."""
-        with self._lock:
-            self._state[section] = value
-            self._state[f"{section}_updated_at"] = datetime.now().isoformat()
-            self._dirty = True
-        self._notify_subscribers(section, value)
+        if self._client:
+            self._client.update(section, **value)
+        else:
+            self._fallback_state[section] = value
+            self._fallback_state[f"{section}_updated_at"] = datetime.now().isoformat()
+            self._save_fallback()
 
     def update(self, section: str, **kwargs):
         """Update fields in a state section."""
-        with self._lock:
-            if section not in self._state:
-                self._state[section] = {}
-            self._state[section].update(kwargs)
-            self._state[section]["updated_at"] = datetime.now().isoformat()
-            self._dirty = True
-        self._notify_subscribers(section, self._state[section])
+        if self._client:
+            self._client.update(section, **kwargs)
+        else:
+            if section not in self._fallback_state:
+                self._fallback_state[section] = {}
+            self._fallback_state[section].update(kwargs)
+            self._fallback_state[section]["updated_at"] = datetime.now().isoformat()
+            self._save_fallback()
 
     def get_all(self) -> Dict[str, Any]:
         """Get the entire state."""
-        with self._lock:
+        if self._client:
+            data = self._client.get_state()
+            return data if data else {"state": {}, "events": [], "timestamp": datetime.now().isoformat()}
+        else:
             return {
-                "state": dict(self._state),
-                "events": list(self._events)[-50:],  # Last 50 events
+                "state": dict(self._fallback_state),
+                "events": self._fallback_events[-50:],
                 "timestamp": datetime.now().isoformat(),
             }
 
@@ -279,19 +205,26 @@ class RealmStateStore:
         **extra
     ):
         """Update training state."""
-        updates = {}
-        if status is not None: updates["status"] = status
-        if step is not None: updates["step"] = step
-        if total_steps is not None: updates["total_steps"] = total_steps
-        if loss is not None: updates["loss"] = loss
-        if learning_rate is not None: updates["learning_rate"] = learning_rate
-        if file is not None: updates["file"] = file
-        if speed is not None: updates["speed"] = speed
-        if eta_seconds is not None: updates["eta_seconds"] = eta_seconds
-        if strain is not None: updates["strain"] = strain
-        updates.update(extra)
-
-        self.update("training", **updates)
+        if self._client:
+            self._client.update_training(
+                status=status, step=step, total_steps=total_steps,
+                loss=loss, learning_rate=learning_rate, file=file,
+                speed=speed, eta_seconds=eta_seconds, strain=strain,
+                **extra
+            )
+        else:
+            updates = {}
+            if status is not None: updates["status"] = status
+            if step is not None: updates["step"] = step
+            if total_steps is not None: updates["total_steps"] = total_steps
+            if loss is not None: updates["loss"] = loss
+            if learning_rate is not None: updates["learning_rate"] = learning_rate
+            if file is not None: updates["file"] = file
+            if speed is not None: updates["speed"] = speed
+            if eta_seconds is not None: updates["eta_seconds"] = eta_seconds
+            if strain is not None: updates["strain"] = strain
+            updates.update(extra)
+            self.update("training", **updates)
 
     def get_training(self) -> Dict[str, Any]:
         """Get training state."""
@@ -310,14 +243,20 @@ class RealmStateStore:
         status: Optional[str] = None,
     ):
         """Update queue state."""
-        updates = {}
-        if depth is not None: updates["depth"] = depth
-        if high_priority is not None: updates["high_priority"] = high_priority
-        if normal_priority is not None: updates["normal_priority"] = normal_priority
-        if low_priority is not None: updates["low_priority"] = low_priority
-        if status is not None: updates["status"] = status
-
-        self.update("queue", **updates)
+        if self._client:
+            self._client.update_queue(
+                depth=depth, high_priority=high_priority,
+                normal_priority=normal_priority, low_priority=low_priority,
+                status=status
+            )
+        else:
+            updates = {}
+            if depth is not None: updates["depth"] = depth
+            if high_priority is not None: updates["high_priority"] = high_priority
+            if normal_priority is not None: updates["normal_priority"] = normal_priority
+            if low_priority is not None: updates["low_priority"] = low_priority
+            if status is not None: updates["status"] = status
+            self.update("queue", **updates)
 
     def get_queue(self) -> Dict[str, Any]:
         """Get queue state."""
@@ -337,24 +276,26 @@ class RealmStateStore:
         **extra
     ):
         """Update a worker's state."""
-        with self._lock:
-            if "workers" not in self._state:
-                self._state["workers"] = {}
+        if self._client:
+            self._client.update_worker(
+                worker_id=worker_id, role=role, status=status,
+                device=device, current_job=current_job, **extra
+            )
+        else:
+            if "workers" not in self._fallback_state:
+                self._fallback_state["workers"] = {}
 
-            if worker_id not in self._state["workers"]:
-                self._state["workers"][worker_id] = {"worker_id": worker_id}
+            if worker_id not in self._fallback_state["workers"]:
+                self._fallback_state["workers"][worker_id] = {"worker_id": worker_id}
 
-            worker = self._state["workers"][worker_id]
+            worker = self._fallback_state["workers"][worker_id]
             if role is not None: worker["role"] = role
             if status is not None: worker["status"] = status
             if device is not None: worker["device"] = device
             if current_job is not None: worker["current_job"] = current_job
             worker["last_heartbeat"] = datetime.now().isoformat()
             worker.update(extra)
-
-            self._dirty = True
-
-        self._notify_subscribers("workers", self._state["workers"])
+            self._save_fallback()
 
     def get_workers(self) -> Dict[str, Dict]:
         """Get all workers' state."""
@@ -381,17 +322,23 @@ class RealmStateStore:
         **extra
     ):
         """Update hero state."""
-        updates = {}
-        if name is not None: updates["name"] = name
-        if title is not None: updates["title"] = title
-        if level is not None: updates["level"] = level
-        if xp is not None: updates["xp"] = xp
-        if campaign_id is not None: updates["campaign_id"] = campaign_id
-        if current_skill is not None: updates["current_skill"] = current_skill
-        if current_skill_level is not None: updates["current_skill_level"] = current_skill_level
-        updates.update(extra)
-
-        self.update("hero", **updates)
+        if self._client:
+            self._client.update_hero(
+                name=name, title=title, level=level, xp=xp,
+                campaign_id=campaign_id, current_skill=current_skill,
+                current_skill_level=current_skill_level, **extra
+            )
+        else:
+            updates = {}
+            if name is not None: updates["name"] = name
+            if title is not None: updates["title"] = title
+            if level is not None: updates["level"] = level
+            if xp is not None: updates["xp"] = xp
+            if campaign_id is not None: updates["campaign_id"] = campaign_id
+            if current_skill is not None: updates["current_skill"] = current_skill
+            if current_skill_level is not None: updates["current_skill_level"] = current_skill_level
+            updates.update(extra)
+            self.update("hero", **updates)
 
     def get_hero(self) -> Dict[str, Any]:
         """Get hero state."""
@@ -409,19 +356,7 @@ class RealmStateStore:
         severity: str = "info",
         details: Optional[Dict] = None,
     ) -> Dict[str, Any]:
-        """
-        Emit an event to the battle log.
-
-        Args:
-            kind: Event kind (training_started, checkpoint_saved, etc.)
-            message: Human-readable message
-            channel: Channel (system, training, eval, jobs, vault, guild)
-            severity: Severity (info, success, warning, error)
-            details: Additional details dict
-
-        Returns:
-            The event dict
-        """
+        """Emit an event to the battle log."""
         event = {
             "id": f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{kind}",
             "timestamp": datetime.now().isoformat(),
@@ -433,18 +368,23 @@ class RealmStateStore:
             "details": details or {},
         }
 
-        with self._lock:
-            self._events.append(event)
-            self._dirty = True
+        if self._client:
+            self._client.emit_event(kind, message, channel, severity, details)
+        else:
+            self._fallback_events.append(event)
+            if len(self._fallback_events) > 100:
+                self._fallback_events = self._fallback_events[-100:]
+            self._save_fallback()
 
-        self._notify_subscribers("events", event)
         return event
 
     def get_events(self, limit: int = 50) -> List[Dict]:
         """Get recent events, newest first."""
-        with self._lock:
-            events = list(self._events)
-        return list(reversed(events[-limit:]))
+        if self._client:
+            events = self._client.get_events(limit)
+            return list(reversed(events))  # Newest first
+        else:
+            return list(reversed(self._fallback_events[-limit:]))
 
     # =========================================================================
     # MODE
@@ -452,34 +392,39 @@ class RealmStateStore:
 
     def set_mode(self, mode: str, reason: str = ""):
         """Set realm mode (training, idle)."""
-        with self._lock:
-            old_mode = self._state.get("mode", "idle")
-            self._state["mode"] = mode
-            self._state["mode_changed_at"] = datetime.now().isoformat()
-            self._state["mode_reason"] = reason
-            self._dirty = True
+        if self._client:
+            self._client.set_mode(mode, reason)
+        else:
+            old_mode = self._fallback_state.get("mode", "idle")
+            self._fallback_state["mode"] = mode
+            self._fallback_state["mode_changed_at"] = datetime.now().isoformat()
+            self._fallback_state["mode_reason"] = reason
+            self._save_fallback()
 
-        if old_mode != mode:
-            self.emit_event(
-                "mode_changed",
-                f"Mode changed: {old_mode} → {mode}" + (f" ({reason})" if reason else ""),
-                channel="system",
-                severity="info",
-                details={"from": old_mode, "to": mode, "reason": reason},
-            )
+            if old_mode != mode:
+                self.emit_event(
+                    "mode_changed",
+                    f"Mode changed: {old_mode} → {mode}" + (f" ({reason})" if reason else ""),
+                    channel="system",
+                    severity="info",
+                    details={"from": old_mode, "to": mode, "reason": reason},
+                )
 
     def get_mode(self) -> str:
         """Get current realm mode."""
-        return self.get("mode", "idle")
+        if self._client:
+            return self._client.get_mode()
+        else:
+            return self._fallback_state.get("mode", "idle")
 
     # =========================================================================
-    # FORCE FLUSH
+    # COMPATIBILITY METHODS
     # =========================================================================
 
     def flush(self):
-        """Force flush state to disk."""
-        with self._lock:
-            self._save()
+        """Flush state (no-op for network client, saves for fallback)."""
+        if not self._client:
+            self._save_fallback()
 
 
 # =============================================================================
@@ -487,16 +432,13 @@ class RealmStateStore:
 # =============================================================================
 
 _store: Optional[RealmStateStore] = None
-_store_lock = threading.Lock()
 
 
 def get_store() -> RealmStateStore:
     """Get the singleton RealmStateStore instance."""
     global _store
     if _store is None:
-        with _store_lock:
-            if _store is None:
-                _store = RealmStateStore()
+        _store = RealmStateStore()
     return _store
 
 
@@ -577,17 +519,21 @@ if __name__ == "__main__":
     parser.add_argument("--show", action="store_true", help="Show current state")
     parser.add_argument("--events", action="store_true", help="Show recent events")
     parser.add_argument("--test", action="store_true", help="Run test updates")
+    parser.add_argument("--service-url", help="RealmState service URL")
 
     args = parser.parse_args()
 
-    store = get_store()
+    if args.service_url:
+        store = RealmStateStore(args.service_url)
+    else:
+        store = get_store()
 
     if args.test:
         print("Running test updates...")
         store.update_training(status="training", step=100, loss=0.5)
         store.emit_event("test", "Test event from CLI", channel="debug")
         store.flush()
-        print("Done. Check status/realm_store.json")
+        print("Done.")
 
     elif args.events:
         events = store.get_events(20)

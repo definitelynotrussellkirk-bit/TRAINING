@@ -5,13 +5,15 @@ The Battle Log is your lab's global event bus. Every significant action
 gets logged here, creating a real-time narrative of what the system is doing.
 
 Channels (like MMO chat):
-    system   - Server start/stop, config reload, errors affecting the whole system
-    jobs     - Job claimed/started/completed/failed, retries, queue warnings
-    training - Checkpoints, LR changes, campaign milestones
-    eval     - Evaluation results, regressions, thresholds
-    vault    - Archive/retention/sync operations (hot->warm, etc.)
-    guild    - Titles, lore events, hero progression, fun stuff
-    debug    - Internal assertions, edge-case logs (dev only)
+    system     - Server start/stop, config reload, errors affecting the whole system
+    jobs       - Job claimed/started/completed/failed, retries, queue warnings
+    training   - Training progress, LR changes, campaign milestones
+    eval       - Evaluation results, regressions, thresholds
+    vault      - Archive/retention/sync operations (hot->warm, etc.)
+    guild      - Titles, lore events, hero progression, fun stuff
+    debug      - Internal assertions, edge-case logs (dev only)
+    data       - Dataset generation, curriculum updates, Forge operations
+    checkpoint - Checkpoint saves, ledger updates, promotions
 
 Usage:
     from core.battle_log import log_event, get_battle_logger
@@ -56,13 +58,15 @@ logger = logging.getLogger("battle_log")
 
 class BattleChannel(str, Enum):
     """MMO-style chat channels."""
-    SYSTEM = "system"      # Server-level events
-    JOBS = "jobs"          # Job lifecycle
-    TRAINING = "training"  # Training progress
-    EVAL = "eval"          # Evaluation results
-    VAULT = "vault"        # Storage operations
-    GUILD = "guild"        # Titles, lore, fun stuff
-    DEBUG = "debug"        # Developer-only
+    SYSTEM = "system"          # Server-level events
+    JOBS = "jobs"              # Job lifecycle
+    TRAINING = "training"      # Training progress
+    EVAL = "eval"              # Evaluation results
+    VAULT = "vault"            # Storage operations
+    GUILD = "guild"            # Titles, lore, fun stuff
+    DEBUG = "debug"            # Developer-only
+    DATA = "data"              # Dataset/curriculum operations
+    CHECKPOINT = "checkpoint"  # Checkpoint saves/promotions
 
 
 class BattleSeverity(str, Enum):
@@ -82,6 +86,8 @@ CHANNEL_ICONS = {
     "vault": "🗃️",
     "guild": "🏰",
     "debug": "🔧",
+    "data": "📦",
+    "checkpoint": "💾",
 }
 
 # Severity colors (for UI)
@@ -399,6 +405,15 @@ def log_event(
 
     See BattleLogger.log() for full documentation.
     """
+    # Auto-detect and add device info to source
+    try:
+        from core.hosts import get_local_host
+        local = get_local_host()
+        if local and source != "unknown":
+            source = f"{source}@{local.host_id}"
+    except Exception:
+        pass  # Silently fall back to original source
+
     return get_battle_logger().log(
         channel=channel,
         message=message,
@@ -465,11 +480,14 @@ def format_job_failed(job_type: str, job_id: str, error_code: str) -> str:
     return f"Job {job_type} failed [{error_code}]"
 
 
-def format_checkpoint_saved(step: int, loss: Optional[float] = None) -> str:
+def format_checkpoint_saved(step: int, loss: Optional[float] = None, device: Optional[str] = None) -> str:
     """Format a checkpoint saved message."""
+    base = f"Checkpoint {step:,} saved"
     if loss:
-        return f"Checkpoint {step:,} saved (loss: {loss:.4f})"
-    return f"Checkpoint {step:,} saved"
+        base += f" (loss: {loss:.4f})"
+    if device:
+        base += f" @{device}"
+    return base
 
 
 def format_eval_result(skill: str, level: int, accuracy: float, delta: Optional[float] = None) -> str:

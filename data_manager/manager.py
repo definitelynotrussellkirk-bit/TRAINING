@@ -206,10 +206,10 @@ class DataManager:
 
             # Convert to training format based on skill
             training_data = []
-            if active_skill == "syllo":
+            if active_skill == "syllo" or active_skill == "sy":
                 for puzzle in response.get("puzzles", []):
                     training_data.append(syllo_to_training_format(puzzle))
-            elif active_skill == "binary":
+            elif active_skill == "binary" or active_skill == "bin":
                 from data_manager.skill_api_client import binary_to_training_format
                 level_info_dict = response.get("level_info", {})
                 for sample in response.get("samples", []):

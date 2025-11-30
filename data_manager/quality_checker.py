@@ -83,6 +83,15 @@ def get_skill_profile(skill: str) -> SkillProfile:
     """
     if not skill:
         raise ValueError("skill parameter is required - no fallbacks allowed")
+
+    # Normalize skill name (bin → binary, sy → syllo)
+    try:
+        from data_manager.skill_api_client import normalize_skill_name
+        skill = normalize_skill_name(skill)
+    except Exception:
+        # Fallback if import fails - just use as-is
+        pass
+
     if skill not in SKILL_PROFILES:
         raise UnknownSkillError(
             f"No validation profile for skill '{skill}'. "

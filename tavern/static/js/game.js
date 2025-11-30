@@ -328,11 +328,12 @@ function renderLossChart(lossHistory) {
     ctx.fillStyle = '#0a0c10';
     ctx.fillRect(0, 0, width, height);
 
-    // Extract loss values
-    const losses = lossHistory.map(h => h.loss || 0);
-    const minLoss = Math.min(...losses);
-    const maxLoss = Math.max(...losses);
-    const range = maxLoss - minLoss || 1;
+    // Extract effort values (cumulative strain)
+    // If effort field doesn't exist (old data), fall back to loss
+    const efforts = lossHistory.map(h => h.effort !== undefined ? h.effort : (h.loss || 0));
+    const minEffort = Math.min(...efforts);
+    const maxEffort = Math.max(...efforts);
+    const range = maxEffort - minEffort || 1;
 
     // Update footer stats
     const minEl = document.getElementById('lossMin');
@@ -340,62 +341,59 @@ function renderLossChart(lossHistory) {
     const trendEl = document.getElementById('lossTrend');
     const rangeEl = document.getElementById('lossGraphRange');
 
-    if (minEl) minEl.textContent = `Min: ${minLoss.toFixed(3)}`;
-    if (maxEl) maxEl.textContent = `Max: ${maxLoss.toFixed(3)}`;
-    if (rangeEl) rangeEl.textContent = `Last ${losses.length} updates`;
+    if (minEl) minEl.textContent = `Min: ${minEffort.toFixed(1)}`;
+    if (maxEl) maxEl.textContent = `Max: ${maxEffort.toFixed(1)}`;
+    if (rangeEl) rangeEl.textContent = `Last ${efforts.length} steps`;
 
-    // Calculate trend (compare first half vs second half average)
-    if (losses.length >= 4) {
-        const halfIdx = Math.floor(losses.length / 2);
-        const firstHalfAvg = losses.slice(0, halfIdx).reduce((a, b) => a + b, 0) / halfIdx;
-        const secondHalfAvg = losses.slice(halfIdx).reduce((a, b) => a + b, 0) / (losses.length - halfIdx);
-        const diff = secondHalfAvg - firstHalfAvg;
+    // Calculate trend (effort rate: compare first half vs second half slope)
+    // Effort should be increasing (it's cumulative), but we want to know if the RATE is increasing or decreasing
+    if (efforts.length >= 4) {
+        const halfIdx = Math.floor(efforts.length / 2);
+        const firstHalfRate = (efforts[halfIdx] - efforts[0]) / halfIdx;  // Effort per step in first half
+        const secondHalfRate = (efforts[efforts.length - 1] - efforts[halfIdx]) / (efforts.length - halfIdx);  // Effort per step in second half
+        const rateDiff = secondHalfRate - firstHalfRate;
 
         if (trendEl) {
             trendEl.classList.remove('improving', 'degrading', 'stable');
-            if (diff < -0.05) {
-                trendEl.textContent = '↓ Improving';
+            // Lower effort rate = learning easier = improving
+            if (rateDiff < -0.05) {
+                trendEl.textContent = '↓ Learning Easier';
                 trendEl.classList.add('improving');
-            } else if (diff > 0.05) {
-                trendEl.textContent = '↑ Degrading';
+            } else if (rateDiff > 0.05) {
+                trendEl.textContent = '↑ Struggling More';
                 trendEl.classList.add('degrading');
             } else {
-                trendEl.textContent = '→ Stable';
+                trendEl.textContent = '→ Steady';
                 trendEl.classList.add('stable');
             }
         }
     }
 
-    // Draw threshold line at loss=1.0 (good target)
-    const thresholdY = height - padding - ((1.0 - minLoss) / range) * (height - 2 * padding);
-    if (thresholdY > padding && thresholdY < height - padding) {
-        ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(padding, thresholdY);
-        ctx.lineTo(width - padding, thresholdY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-    }
+    // No threshold line for effort (it's cumulative, always increasing)
 
-    // Draw loss line
-    ctx.strokeStyle = '#ef4444';  // Red for high loss
+    // Draw effort line (cumulative, always increasing)
+    ctx.strokeStyle = '#3b82f6';  // Blue for effort
     ctx.lineWidth = 1.5;
     ctx.beginPath();
 
-    const stepX = (width - 2 * padding) / (losses.length - 1 || 1);
-    losses.forEach((loss, i) => {
+    const stepX = (width - 2 * padding) / (efforts.length - 1 || 1);
+    efforts.forEach((effort, i) => {
         const x = padding + i * stepX;
-        const y = height - padding - ((loss - minLoss) / range) * (height - 2 * padding);
+        const y = height - padding - ((effort - minEffort) / range) * (height - 2 * padding);
 
-        // Color based on loss value
-        if (loss < 1.0) {
-            ctx.strokeStyle = '#22c55e';  // Green for low loss
-        } else if (loss < 2.0) {
-            ctx.strokeStyle = '#f59e0b';  // Yellow for medium
-        } else {
-            ctx.strokeStyle = '#ef4444';  // Red for high
+        // Color based on effort rate (slope)
+        if (i > 0) {
+            const prevEffort = efforts[i - 1];
+            const effortRate = effort - prevEffort;  // Effort added this step
+
+            // Color: green = low effort rate, yellow = medium, red = high
+            if (effortRate < 0.3) {
+                ctx.strokeStyle = '#22c55e';  // Green - learning easily
+            } else if (effortRate < 0.6) {
+                ctx.strokeStyle = '#f59e0b';  // Yellow - moderate effort
+            } else {
+                ctx.strokeStyle = '#ef4444';  // Red - high effort (struggling)
+            }
         }
 
         if (i === 0) {
@@ -407,12 +405,14 @@ function renderLossChart(lossHistory) {
     ctx.stroke();
 
     // Draw current value marker (last point)
-    if (losses.length > 0) {
-        const lastLoss = losses[losses.length - 1];
+    if (efforts.length > 0) {
+        const lastEffort = efforts[efforts.length - 1];
         const lastX = width - padding;
-        const lastY = height - padding - ((lastLoss - minLoss) / range) * (height - 2 * padding);
+        const lastY = height - padding - ((lastEffort - minEffort) / range) * (height - 2 * padding);
 
-        ctx.fillStyle = lastLoss < 1.0 ? '#22c55e' : lastLoss < 2.0 ? '#f59e0b' : '#ef4444';
+        // Color marker based on recent effort rate
+        const recentEffortRate = efforts.length > 1 ? (lastEffort - efforts[efforts.length - 2]) : 0;
+        ctx.fillStyle = recentEffortRate < 0.3 ? '#22c55e' : recentEffortRate < 0.6 ? '#f59e0b' : '#ef4444';
         ctx.beginPath();
         ctx.arc(lastX, lastY, 3, 0, Math.PI * 2);
         ctx.fill();
@@ -867,11 +867,9 @@ function processGameData(data) {
         GameState.stepsPerSecond = training.steps_per_second || 0;
         GameState.etaSeconds = training.eta_seconds || 0;
         GameState.learningRate = training.learning_rate || 0;
-        // Loss history for graph
-        if (training.train_loss_history) {
-            GameState.lossHistory = training.train_loss_history;
-            renderLossChart(GameState.lossHistory);
-        }
+        // Loss history for graph - DO NOT USE train_loss_history (always empty)
+        // Instead, we build it from real-time events (training.step)
+        // This prevents duplicate injection and jumping graphs
     }
 
     // GPU stats
@@ -1800,9 +1798,26 @@ function registerTrainingEventHandlers() {
                     GameState.vramUsed = data.vram_gb;
                 }
 
-                // Add to loss history for graph
+                // Add to effort history for graph
+                // Effort = cumulative strain (sum of (loss - floor) over time)
                 if (data.loss && data.step) {
-                    GameState.lossHistory.push({ step: data.step, loss: data.loss });
+                    const floor = 0.5;  // Comfort zone loss (could come from config)
+                    const strain = Math.max(0, data.loss - floor);  // Strain = loss - floor, min 0
+
+                    // Calculate cumulative effort
+                    let effort = strain;
+                    if (GameState.lossHistory.length > 0) {
+                        const lastEntry = GameState.lossHistory[GameState.lossHistory.length - 1];
+                        effort = (lastEntry.effort || lastEntry.loss) + strain;  // Cumulative
+                    }
+
+                    GameState.lossHistory.push({
+                        step: data.step,
+                        loss: data.loss,  // Keep raw loss for reference
+                        strain: strain,   // Instantaneous strain
+                        effort: effort    // Cumulative effort
+                    });
+
                     // Keep last 200 entries
                     if (GameState.lossHistory.length > 200) {
                         GameState.lossHistory = GameState.lossHistory.slice(-200);

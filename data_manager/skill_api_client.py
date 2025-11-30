@@ -27,6 +27,21 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
+# Skill name normalization - maps short names to API names
+SKILL_NAME_MAP = {
+    "bin": "binary",
+    "binary": "binary",
+    "sy": "syllo",
+    "syllo": "syllo"
+}
+
+def normalize_skill_name(skill: str) -> str:
+    """Normalize skill name from short form to API form."""
+    normalized = SKILL_NAME_MAP.get(skill.lower())
+    if normalized is None:
+        raise ValueError(f"Unknown skill: {skill}. Available: {list(set(SKILL_NAME_MAP.keys()))}")
+    return normalized
+
 # Skill API configuration
 def _get_skill_apis():
     """Get skill API configuration with dynamic base_dir detection."""
@@ -71,6 +86,9 @@ class SkillAPIClient:
     """Client for skill API servers."""
 
     def __init__(self, skill: str, base_url: Optional[str] = None):
+        # Normalize skill name (bin → binary, sy → syllo)
+        skill = normalize_skill_name(skill)
+
         if skill not in SKILL_APIS:
             raise ValueError(f"Unknown skill: {skill}. Available: {list(SKILL_APIS.keys())}")
 

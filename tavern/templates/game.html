@@ -151,7 +151,7 @@
                 <!-- LOSS GRAPH -->
                 <div class="loss-graph-container">
                     <div class="loss-graph-header">
-                        <span class="loss-graph-title">Strain History</span>
+                        <span class="loss-graph-title">Effort History (Cumulative Strain)</span>
                         <span class="loss-graph-range" id="lossGraphRange">Last 200 steps</span>
                     </div>
                     <canvas id="lossChart" width="280" height="80"></canvas>
@@ -280,8 +280,9 @@
     <script src="/static/js/training_client.js?v=1"></script>
     <script src="/static/js/polling.js?v=1"></script>
     <script src="/static/js/training_controls.js?v=1"></script>
+    <!-- Unified Realm State (single source of truth) -->
+    <script src="/static/js/realm-state.js?v=1"></script>
     <!-- Main game logic -->
-    <script src="/static/js/game.js?v=16"></script>
-    <script src="/static/js/world-state.js?v=1"></script>
+    <script src="/static/js/game.js?v=17"></script>
 </body>
 </html>

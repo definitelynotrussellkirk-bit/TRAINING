@@ -300,6 +300,489 @@ LORE: Dict[str, Dict[str, Any]] = {
         ),
         "technical": "Threshold-based label from configs/titles.yaml",
     },
+
+    # =========================================================================
+    # STRAIN & EFFORT (Materials Science Metaphor)
+    # =========================================================================
+    "strain": {
+        "label": "Strain",
+        "short": "Instantaneous difficulty",
+        "tooltip": (
+            "How hard the hero is being pushed right now. "
+            "Strain = loss minus floor (the comfortable baseline). "
+            "High strain means challenging material; zero strain means coasting."
+        ),
+        "technical": "loss - floor (baseline loss)",
+        "icon": "💪",
+    },
+    "strain.zone": {
+        "label": "Training Zone",
+        "short": "Current intensity",
+        "tooltip": (
+            "Like heart rate zones for exercise. "
+            "RECOVERY (too easy), PRODUCTIVE (optimal), STRETCH (challenging), "
+            "OVERLOAD (too hard). Stay in Productive/Stretch for best learning."
+        ),
+        "technical": "StrainZone enum based on strain thresholds",
+        "icon": "🎯",
+    },
+    "effort": {
+        "label": "Effort",
+        "short": "Cumulative strain",
+        "tooltip": (
+            "Total work the hero has put in. "
+            "Effort is the area under the strain curve over time. "
+            "More effort doesn't always mean more learning - quality matters."
+        ),
+        "technical": "Sum of strain over training steps",
+        "icon": "🏋️",
+    },
+    "experience": {
+        "label": "Experience",
+        "short": "Validated effort",
+        "tooltip": (
+            "Effort that actually counted - blessed by the Temple. "
+            "Not all training produces learning. Experience = effort × quality_factor. "
+            "Cursed training (bad data, broken evals) produces effort but not experience."
+        ),
+        "technical": "effort × blessing.quality_factor",
+        "icon": "✨",
+    },
+    "plastic_gain": {
+        "label": "Plastic Gain",
+        "short": "Permanent improvement",
+        "tooltip": (
+            "How much the hero actually improved (loss before - loss after). "
+            "Like plastic deformation in materials - permanent change. "
+            "High plastic gain with low effort = efficient learning."
+        ),
+        "technical": "start_loss - end_loss",
+        "icon": "📈",
+    },
+    "efficiency": {
+        "label": "Learning Efficiency",
+        "short": "Improvement per effort",
+        "tooltip": (
+            "How efficiently the hero is learning. "
+            "Efficiency = plastic_gain / effort. "
+            "High efficiency means fast progress; low means spinning wheels."
+        ),
+        "technical": "plastic_gain / effort_spent",
+        "icon": "⚡",
+    },
+
+    # =========================================================================
+    # SCHOOLS (Job Processing Families)
+    # =========================================================================
+    "school.inference": {
+        "label": "School of Inference",
+        "short": "Oracle's Sanctum",
+        "tooltip": (
+            "Jobs requiring model interaction - evaluation, sparring, queries. "
+            "Workers of this school commune with the Oracle to test the Hero. "
+            "Needs inference server access."
+        ),
+        "technical": "JobTypes: EVAL, SPARRING, INFERENCE",
+        "icon": "🔮",
+    },
+    "school.forge": {
+        "label": "School of the Forge",
+        "short": "Data Forge",
+        "tooltip": (
+            "Data creation and transformation jobs. "
+            "Workers of this school craft the raw materials for training. "
+            "CPU-bound, no GPU needed."
+        ),
+        "technical": "JobTypes: DATA_GEN, DATA_FILTER, DATA_CONVERT",
+        "icon": "🔥",
+    },
+    "school.vault": {
+        "label": "School of the Vault",
+        "short": "Vault Keepers",
+        "tooltip": (
+            "Storage and archival operations. "
+            "Workers of this school preserve checkpoints across time. "
+            "I/O-bound, prefers storage nodes."
+        ),
+        "technical": "JobTypes: ARCHIVE, RETENTION, SYNC",
+        "icon": "🏛️",
+    },
+    "school.analytics": {
+        "label": "School of Analytics",
+        "short": "The Scriveners",
+        "tooltip": (
+            "Reporting and metrics computation. "
+            "Workers of this school chronicle progress and system state. "
+            "Quick jobs, can run anywhere."
+        ),
+        "technical": "JobTypes: ANALYTICS, REPORT, HEALTH_CHECK",
+        "icon": "📊",
+    },
+    "school.archaeology": {
+        "label": "School of Archaeology",
+        "short": "The Seers",
+        "tooltip": (
+            "Model interpretability and introspection. "
+            "Workers of this school peer into the Hero's mind. "
+            "May need GPU for activation analysis."
+        ),
+        "technical": "JobTypes: LAYER_STATS, LAYER_DRIFT",
+        "icon": "🔬",
+    },
+
+    # =========================================================================
+    # DOMAINS (Training Worlds)
+    # =========================================================================
+    "domain": {
+        "label": "Domain",
+        "short": "Training world",
+        "tooltip": (
+            "A world where the Hero trains - defines tasks, data, and evaluation. "
+            "Like WoW zones or OASIS planets. "
+            "Heroes can specialize in one domain or master many."
+        ),
+        "technical": "Dataset + tasks + eval sets configuration",
+        "icon": "🌍",
+    },
+    "domain.reasoning": {
+        "label": "Domain of Reasoning",
+        "short": "The Logic Spire",
+        "tooltip": (
+            "Structured reasoning and problem-solving tasks. "
+            "Includes Syllacrostics and Binary Arithmetic. "
+            "Foundation for more complex domains."
+        ),
+        "technical": "configs/domains/reasoning.yaml",
+        "icon": "🧠",
+    },
+
+    # =========================================================================
+    # PHYSICS & TECHNIQUE (Training Methods)
+    # =========================================================================
+    "physics": {
+        "label": "Physics",
+        "short": "Training rules",
+        "tooltip": (
+            "The laws governing training - optimizer, precision, schedules. "
+            "Different physics create different training dynamics. "
+            "Same Hero can train under different Physics in different Campaigns."
+        ),
+        "technical": "Optimizer + precision + gradient handling config",
+        "icon": "⚛️",
+    },
+    "technique": {
+        "label": "Technique",
+        "short": "Training method",
+        "tooltip": (
+            "A named training stack - Muon, AdamW, etc. "
+            "Techniques wrap Physics configurations into reusable recipes. "
+            "Choose based on model size, task type, and stability needs."
+        ),
+        "technical": "Named physics configuration from configs/physics/",
+        "icon": "🔧",
+    },
+    "technique.muon": {
+        "label": "Muon Technique",
+        "short": "The Orthogonal Way",
+        "tooltip": (
+            "Momentum orthogonalized by Newton-Schulz iterations. "
+            "Experimental optimizer with different dynamics than AdamW. "
+            "May work well for small-medium models."
+        ),
+        "technical": "trainer/optimizers/muon.py",
+        "icon": "⚛️",
+    },
+    "technique.adamw": {
+        "label": "AdamW Technique",
+        "short": "The Classical Path",
+        "tooltip": (
+            "Adam with decoupled weight decay. "
+            "The standard choice - well-understood, stable, widely tested. "
+            "Safe default for any model size."
+        ),
+        "technical": "torch.optim.AdamW",
+        "icon": "📐",
+    },
+
+    # =========================================================================
+    # TEMPLE & ORDERS (Diagnostics)
+    # =========================================================================
+    "temple": {
+        "label": "Temple",
+        "short": "Diagnostics hub",
+        "tooltip": (
+            "The place where all system diagnostics happen. "
+            "The Cleric runs Rituals here to check system health. "
+            "Returns to Temple for judgment after training."
+        ),
+        "technical": "temple/ module, /api/temple endpoints",
+        "icon": "🏛️",
+    },
+    "temple.cleric": {
+        "label": "Cleric",
+        "short": "Ritual orchestrator",
+        "tooltip": (
+            "The service that runs Temple rituals and computes Blessings. "
+            "Decides whether training effort becomes experience. "
+            "Consults the Nine Orders for judgment."
+        ),
+        "technical": "temple/cleric.py",
+        "icon": "⛪",
+    },
+    "temple.ritual": {
+        "label": "Ritual",
+        "short": "Diagnostic check",
+        "tooltip": (
+            "A single diagnostic check within the Temple. "
+            "Rituals are grouped into Orders by domain. "
+            "Returns ok/warn/fail status."
+        ),
+        "technical": "temple/rituals/*.py",
+        "icon": "🔮",
+    },
+    "temple.ceremony": {
+        "label": "Ceremony",
+        "short": "Multiple rituals",
+        "tooltip": (
+            "Running multiple rituals together with dependency ordering. "
+            "Full ceremony consults all Nine Orders. "
+            "Results determine Blessing quality."
+        ),
+        "technical": "temple.cleric.run_ceremony()",
+        "icon": "🎭",
+    },
+    "temple.blessing": {
+        "label": "Blessing",
+        "short": "Temple verdict",
+        "tooltip": (
+            "The Temple's judgment on training validity. "
+            "Converts Effort into Experience via quality_factor. "
+            "Cursed training (quality=0) produces no experience."
+        ),
+        "technical": "temple/schemas.py Blessing class",
+        "icon": "✨",
+    },
+    "temple.order.forge": {
+        "label": "Order of the Forge",
+        "short": "GPU/hardware checks",
+        "tooltip": (
+            "Checks GPU, CUDA, builds, environment. "
+            "Critical order - failure blocks training. "
+            "If the Forge fails, nothing can be trained."
+        ),
+        "technical": "temple/rituals/forge.py",
+        "icon": "🔥",
+    },
+    "temple.order.oracle": {
+        "label": "Order of the Oracle",
+        "short": "Inference checks",
+        "tooltip": (
+            "Checks inference server, eval harness, scoring. "
+            "Critical order - failure means flying blind on quality. "
+            "Oracle sees the future (projected performance)."
+        ),
+        "technical": "temple/rituals/oracle.py",
+        "icon": "🔮",
+    },
+    "temple.order.champion": {
+        "label": "Order of the Champion",
+        "short": "Model health checks",
+        "tooltip": (
+            "Checks model/checkpoint health, regression tests. "
+            "Critical order - guards the best checkpoint. "
+            "Champions are crowned here."
+        ),
+        "technical": "temple/rituals/champion.py",
+        "icon": "🏆",
+    },
+    "temple.order.scribe": {
+        "label": "Order of the Scribe",
+        "short": "Logging/eval checks",
+        "tooltip": (
+            "Checks logging pipeline, metrics, ledger. "
+            "If Scribe fails, history is unreliable. "
+            "Chronicles every adventure."
+        ),
+        "technical": "temple/rituals/scribe.py",
+        "icon": "📜",
+    },
+    "temple.order.weaver": {
+        "label": "Order of the Weaver",
+        "short": "Daemon/process checks",
+        "tooltip": (
+            "Checks daemon health, process state. "
+            "Weaves the threads of running services. "
+            "If Weaver fails, daemons may be unhealthy."
+        ),
+        "technical": "temple/rituals/weaver.py",
+        "icon": "🕸️",
+    },
+    "temple.order.guild": {
+        "label": "Order of the Guild",
+        "short": "Skills/curriculum checks",
+        "tooltip": (
+            "Checks skill servers, curriculum state. "
+            "Guild manages skills and progression. "
+            "If Guild fails, skill tracking is unreliable."
+        ),
+        "technical": "temple/rituals/guild.py",
+        "icon": "⚔️",
+    },
+
+    # =========================================================================
+    # CAMPAIGN & PATH
+    # =========================================================================
+    "campaign": {
+        "label": "Campaign",
+        "short": "Training playthrough",
+        "tooltip": (
+            "One attempt to push a Hero to maximum potential. "
+            "Like an RPG playthrough - discover the level cap. "
+            "Multiple campaigns = multiple attempts with same Hero."
+        ),
+        "technical": "guild/campaigns/types.py Campaign class",
+        "icon": "🗺️",
+    },
+    "path": {
+        "label": "Path",
+        "short": "Training recipe",
+        "tooltip": (
+            "A complete training configuration: Domain + Physics + Technique. "
+            "Campaigns follow a Path. "
+            "Example: 'Muon Technique in the Domain of Reasoning'"
+        ),
+        "technical": "Combined domain + physics + technique config",
+        "icon": "🛤️",
+    },
+    "milestone": {
+        "label": "Milestone",
+        "short": "Notable event",
+        "tooltip": (
+            "A significant achievement in a Campaign's history. "
+            "First level-up, new personal best, skill unlock. "
+            "Milestones are recorded in the Ledger."
+        ),
+        "technical": "guild/campaigns/types.py Milestone class",
+        "icon": "🏁",
+    },
+    "ledger": {
+        "label": "Ledger",
+        "short": "Historical record",
+        "tooltip": (
+            "The canonical record of all training history. "
+            "Checkpoints, campaigns, rituals, blessings. "
+            "The Scribe maintains the Ledger."
+        ),
+        "technical": "core/checkpoint_ledger.py",
+        "icon": "📖",
+    },
+
+    # =========================================================================
+    # FORWARD PROGRESS (Momentum Engine)
+    # =========================================================================
+    "forward_momentum": {
+        "label": "Forward Momentum",
+        "short": "Progress state",
+        "tooltip": (
+            "Is the system making progress or stuck? "
+            "Status: GO (ready to train), BLOCKED (needs action), IDLE (nothing pending). "
+            "When blocked, the system suggests how to fix it."
+        ),
+        "technical": "core/momentum.py MomentumState",
+        "icon": "🚀",
+    },
+    "blocker": {
+        "label": "Blocker",
+        "short": "Progress obstacle",
+        "tooltip": (
+            "Something preventing forward progress. "
+            "Blockers include: what was attempted, why it failed, how to fix. "
+            "The UI surfaces blockers prominently with suggested actions."
+        ),
+        "technical": "core/momentum.py Blocker dataclass",
+        "icon": "🚧",
+    },
+
+    # =========================================================================
+    # TRAINING SCHOOLS (How Learning Happens)
+    # =========================================================================
+    "training_school": {
+        "label": "Training School",
+        "short": "Learning paradigm",
+        "tooltip": (
+            "A fundamental approach to how the Hero learns. "
+            "Different schools use different data formats and objectives. "
+            "The Six Schools: Scribe, Mirror, Judge, Champion, Whisper, Oracle."
+        ),
+        "technical": "guild/training_schools.py TrainingSchool enum",
+        "icon": "🎓",
+    },
+    "school.scribe": {
+        "label": "School of the Scribe",
+        "short": "SFT - Imitation",
+        "tooltip": (
+            "\"Copy the master's form until it becomes your own.\" "
+            "Learn by directly imitating correct examples. "
+            "Foundation of all training - simple, stable, effective."
+        ),
+        "technical": "Supervised Fine-Tuning (SFT)",
+        "icon": "📜",
+    },
+    "school.mirror": {
+        "label": "School of the Mirror",
+        "short": "Sparring - Self-correction",
+        "tooltip": (
+            "\"See your flaws reflected, then correct them.\" "
+            "Learn by identifying and correcting your own mistakes. "
+            "Teaches judgment: Is this right? How do I fix it?"
+        ),
+        "technical": "guild/sparring.py - Error mining + correction",
+        "icon": "🪞",
+    },
+    "school.judge": {
+        "label": "School of the Judge",
+        "short": "DPO - Preferences",
+        "tooltip": (
+            "\"Between two paths, always choose the better.\" "
+            "Learn by comparing options and choosing the superior one. "
+            "Develops nuanced quality judgment, not just right/wrong."
+        ),
+        "technical": "Direct Preference Optimization (DPO)",
+        "icon": "⚖️",
+    },
+    "school.champion": {
+        "label": "School of the Champion",
+        "short": "RLHF - Rewards",
+        "tooltip": (
+            "\"Seek the reward, master the arena.\" "
+            "Learn by maximizing reward signals from a judge. "
+            "Most powerful but complex - for alignment and behavior shaping."
+        ),
+        "technical": "Reinforcement Learning from Human Feedback",
+        "icon": "🏆",
+    },
+    "school.whisper": {
+        "label": "School of the Whisper",
+        "short": "Distillation",
+        "tooltip": (
+            "\"The wisdom of giants flows to those who listen.\" "
+            "Learn from a larger, more capable model. "
+            "Small hero gains big model capabilities through transfer."
+        ),
+        "technical": "Knowledge Distillation",
+        "icon": "👻",
+    },
+    "school.oracle": {
+        "label": "School of the Oracle",
+        "short": "Fortune Teller - Surprise",
+        "tooltip": (
+            "\"Focus where uncertainty dwells; ignore what is already known.\" "
+            "Weight gradients by surprise - focus on what's uncertain. "
+            "Enhances other schools with automatic curriculum learning."
+        ),
+        "technical": "trainer/losses/fortune_teller.py",
+        "icon": "🔮",
+    },
 }
 
 

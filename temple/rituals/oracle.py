@@ -35,15 +35,19 @@ def _get_inference_url() -> str:
         hosts_file = get_base_dir() / "config" / "hosts.json"
         if hosts_file.exists():
             with open(hosts_file) as f:
-                hosts = json.load(f)
-            inference = hosts.get("services", {}).get("inference", {})
-            host = inference.get("host", "localhost")
-            port = inference.get("port", 8765)
+                hosts_config = json.load(f)
+            # Get default inference host ID
+            default_inference = hosts_config.get("default_inference", "3090")
+            # Look up that host's inference service
+            host_entry = hosts_config.get("hosts", {}).get(default_inference, {})
+            host = host_entry.get("host", "localhost")
+            inference_service = host_entry.get("services", {}).get("inference", {})
+            port = inference_service.get("port", 8765)
             return f"http://{host}:{port}"
     except:
         pass
-    # Fallback
-    host = os.environ.get("INFERENCE_HOST", "192.168.x.x")
+    # Fallback - use localhost or INFERENCE_HOST env var
+    host = os.environ.get("INFERENCE_HOST", "localhost")
     port = os.environ.get("INFERENCE_PORT", "8765")
     return f"http://{host}:{port}"
 

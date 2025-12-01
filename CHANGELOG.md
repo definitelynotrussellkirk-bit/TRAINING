@@ -4,6 +4,63 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-12-01 - Vocabulary Canonicalization
+
+### The Problem
+Multiple naming systems for similar concepts, inconsistent terminology across modules, no formal vocabulary for training paradigms.
+
+### The Solution
+
+**Six Training Schools** - How the Hero learns:
+- 📜 **Scribe**: "Copy the master's form until it becomes your own." (SFT)
+- 🪞 **Mirror**: "See your flaws reflected, then correct them." (Sparring)
+- ⚖️ **Judge**: "Between two paths, always choose the better." (DPO)
+- 🏆 **Champion**: "Seek the reward, master the arena." (RLHF)
+- 👻 **Whisper**: "The wisdom of giants flows to those who listen." (Distillation)
+- 🔮 **Oracle**: "Focus where uncertainty dwells; ignore what is already known." (Fortune Teller)
+
+**Five Job Schools** - How work is dispatched:
+- 🔮 **Inference**: eval_worker → EVAL, SPARRING, INFERENCE
+- 🔥 **Forge**: data_forge → DATA_GEN, DATA_FILTER, DATA_CONVERT
+- 🏛️ **Vault**: vault_worker → ARCHIVE, RETENTION, SYNC
+- 📊 **Analytics**: analytics → ANALYTICS, REPORT, HEALTH_CHECK
+- 🔬 **Archaeology**: analytics → LAYER_STATS, LAYER_DRIFT
+
+**Temple Blessing System**:
+- Effort (cumulative strain) → Temple validation → Experience (validated effort)
+- `experience_gain = effort × quality_factor`
+- Quality factor from ritual results (0.0 = cursed, 1.0 = blessed)
+
+**Domain/Physics/Technique/Path**:
+- Domain: Where (datasets, tasks, evals)
+- Physics: Rules (optimizer, precision, gradients)
+- Technique: Named physics config (Muon, AdamW)
+- Path: Complete recipe (Domain + Physics + Technique)
+
+### Files Created
+- `guild/training_schools.py` - TrainingSchool enum + philosophies + data formats
+- `configs/training_schools.yaml` - Canonical school definitions
+- `configs/schools.yaml` - Job school definitions
+- `configs/domains/reasoning.yaml` - Domain of Reasoning
+- `configs/physics/muon.yaml` - Muon physics config
+- `configs/physics/adamw.yaml` - AdamW physics config
+- `trainer/techniques.py` - Technique loader
+
+### Files Modified
+- `guild/job_types.py` - Added `School` enum and `JobType.school` property
+- `temple/schemas.py` - Added `Blessing` dataclass
+- `tavern/lore.py` - 75+ canonical vocabulary entries (was 50)
+- `CLAUDE.md` - Complete vocabulary documentation
+- `README.md` - Training Schools overview
+- `ARCHITECTURE.md` - School systems documentation
+
+### The Canonical Story
+> A **Hero** follows a **Path** through a **Domain**, under a chosen **Physics** and **Technique**.
+> Each step produces **Strain**; accumulated **Effort**, when **Blessed** by the **Temple's**
+> **Cleric** and the **Nine Orders**, becomes **Experience**, which is recorded in the **Ledger**.
+
+---
+
 ## 2025-12-01 - Groundskeeper & Service Registry
 
 ### Problem

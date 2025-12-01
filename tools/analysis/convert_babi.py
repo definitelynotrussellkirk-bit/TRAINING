@@ -123,7 +123,7 @@ Answer with just the answer word(s), nothing else."""
 def main():
     parser = argparse.ArgumentParser(description="Convert bAbI to validation format")
     parser.add_argument("babi_dir", help="Path to bAbI en/ directory")
-    parser.add_argument("--output", default="/path/to/training/data/validation/benchmarks",
+    parser.add_argument("--output", default=str(Path(__file__).parent.parent.parent / "data/validation/benchmarks"),
                         help="Output directory")
     parser.add_argument("--max-examples", type=int, default=100, help="Max examples per task")
     parser.add_argument("--tasks", nargs="+", help="Specific tasks to convert (e.g., qa1 qa7)")

@@ -20,7 +20,9 @@ import subprocess
 import hashlib
 
 class StateTracker:
-    def __init__(self, base_dir="/path/to/training"):
+    def __init__(self, base_dir=None):
+        if base_dir is None:
+            base_dir = Path(__file__).parent.parent.parent
         self.base_dir = Path(base_dir)
         self.state_file = self.base_dir / ".system_state.json"
         

@@ -102,3 +102,34 @@ status/quests/
 # Consistency reports (generated)
 status/world_consistency_report.md
 status/lore_suggestions.md
+
+# Temporary planning/completion docs (working documents)
+PLAN_*.md
+*_COMPLETE.md
+*_ANALYSIS*.md
+*_SUMMARY.md
+*_RESULTS.md
+*_INVENTORY.md
+*_GUIDE.md
+*_QUICKSTART.md
+*_BACKGROUND.md
+
+# Campaign data (large, user-specific)
+campaigns/*/checkpoints/
+campaigns/*/data/
+
+# Realm state database (runtime)
+data/realm_state.db
+
+# Old/backup validation files
+data/validation/**/*.old
+data/validation/binary/
+
+# Scratch/planning directory (working documents)
+scratch/
+
+# Config.json (may have personal IPs - use config.defaults.json)
+config.json
+
+# Data evolution snapshots (large, generated)
+data/evolution_snapshots/

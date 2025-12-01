@@ -312,22 +312,50 @@ class EvalRunner:
         if success:
             logger.info(f"Recorded: {skill} L{level} = {accuracy:.1%} ({correct}/{total})")
 
+            # Check for suspicious eval: 0% accuracy but low training loss
+            # This is a canary for broken eval system (format mismatch, etc.)
+            suspicious_eval = False
+            checkpoint_loss = None
+            try:
+                from core.checkpoint_ledger import get_ledger
+                ckpt_ledger = get_ledger()
+                ckpt_record = ckpt_ledger.get(checkpoint_step)
+                if ckpt_record and ckpt_record.train_loss is not None:
+                    checkpoint_loss = ckpt_record.train_loss
+                    # Flag: 0% accuracy but loss < 0.05 is suspicious
+                    if accuracy == 0 and checkpoint_loss < 0.05:
+                        suspicious_eval = True
+                        logger.error(
+                            f"🚨 SUSPICIOUS EVAL: {skill} L{level} = 0% accuracy "
+                            f"but checkpoint loss={checkpoint_loss:.4f} < 0.05. "
+                            f"Eval system may be broken!"
+                        )
+            except Exception as e:
+                logger.debug(f"Could not check for suspicious eval: {e}")
+
             # Log to realm state for UI visibility
             try:
                 from core.realm_store import emit_event
 
                 # Determine severity based on accuracy
-                if accuracy >= 0.8:
+                if suspicious_eval:
+                    severity = "error"  # Suspicious eval gets error severity
+                elif accuracy >= 0.8:
                     severity = "success"
                 elif accuracy >= 0.5:
                     severity = "info"
                 else:
                     severity = "warning"
 
+                # Build message - add warning if suspicious
+                base_msg = f"Checkpoint {checkpoint_step}: {skill} L{level} = {accuracy:.1%} ({correct}/{total})"
+                if suspicious_eval:
+                    base_msg = f"🚨 SUSPICIOUS: {base_msg} (loss={checkpoint_loss:.4f})"
+
                 emit_event(
                     kind="eval_result",
                     channel="eval",
-                    message=f"Checkpoint {checkpoint_step}: {skill} L{level} = {accuracy:.1%} ({correct}/{total})",
+                    message=base_msg,
                     severity=severity,
                     details={
                         "checkpoint_step": checkpoint_step,
@@ -336,7 +364,9 @@ class EvalRunner:
                         "accuracy": accuracy,
                         "correct": correct,
                         "total": total,
-                        "eval_type": eval_type
+                        "eval_type": eval_type,
+                        "suspicious_eval": suspicious_eval,
+                        "checkpoint_loss": checkpoint_loss,
                     }
                 )
             except Exception as e:
@@ -345,6 +375,8 @@ class EvalRunner:
             # Log to battle log for UI visibility
             try:
                 message = format_eval_result(skill, level, accuracy)
+                if suspicious_eval:
+                    message = f"🚨 SUSPICIOUS: {message} (loss={checkpoint_loss:.4f})"
                 log_eval(
                     message,
                     severity=severity,
@@ -355,7 +387,9 @@ class EvalRunner:
                         "accuracy": accuracy,
                         "correct": correct,
                         "total": total,
-                        "eval_type": eval_type
+                        "eval_type": eval_type,
+                        "suspicious_eval": suspicious_eval,
+                        "checkpoint_loss": checkpoint_loss,
                     }
                 )
             except Exception as e:
@@ -610,12 +644,16 @@ class EvalRunner:
                 return False
 
             local_path = record.path
+            # Handle relative paths from ledger (recent entries use relative paths)
+            if not Path(local_path).is_absolute():
+                local_path = str(self.base_dir / local_path)
+
             if not Path(local_path).exists():
                 logger.error(f"Checkpoint path from ledger doesn't exist: {local_path}")
                 self._missing_checkpoints.add(checkpoint_step)
                 return False
 
-            logger.info(f"Loading {record.canonical_name} from ledger")
+            logger.info(f"Loading {record.canonical_name} from ledger (path: {local_path})")
 
         except ImportError:
             # Fallback to glob if ledger not available
@@ -686,6 +724,16 @@ class EvalRunner:
             if response.status_code == 200:
                 self._current_model_id = checkpoint_name
                 logger.info(f"Loaded checkpoint-{checkpoint_step}")
+
+                # Record usage for retention tracking
+                try:
+                    # Record usage on inference server (where model was loaded)
+                    inference_device_id = inference_host.device_id if inference_host else "inference3090"
+                    ledger.record_usage(checkpoint_step, inference_device_id)
+                    logger.debug(f"Recorded usage: checkpoint {checkpoint_step} on {inference_device_id}")
+                except Exception as e:
+                    logger.debug(f"Failed to record usage: {e}")
+
                 return True
             else:
                 logger.error(f"Failed to load checkpoint: {response.text}")

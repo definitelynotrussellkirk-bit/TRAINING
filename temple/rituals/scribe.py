@@ -51,7 +51,7 @@ def _get_inference_host() -> dict:
             return hosts.get("hosts", {}).get("3090", {})
     except:
         pass
-    return {"host": "192.168.x.x", "ssh_user": "user"}
+    return {"host": "localhost", "ssh_user": os.environ.get("USER", "user")}
 
 
 def _check_eval_runner_daemon() -> RitualCheckResult:
@@ -142,8 +142,8 @@ def _check_ssh_connectivity() -> RitualCheckResult:
     """Check SSH connectivity to inference host."""
     start = datetime.utcnow()
     host_info = _get_inference_host()
-    host = host_info.get("host", "192.168.x.x")
-    user = host_info.get("ssh_user", "user")
+    host = host_info.get("host", "localhost")
+    user = host_info.get("ssh_user", os.environ.get("USER", "user"))
     ssh_target = f"{user}@{host}" if user else host
 
     details = {"host": host, "user": user}
@@ -214,8 +214,8 @@ def _check_remote_checkpoint_dir() -> RitualCheckResult:
     """Check access to remote checkpoint directory."""
     start = datetime.utcnow()
     host_info = _get_inference_host()
-    host = host_info.get("host", "192.168.x.x")
-    user = host_info.get("ssh_user", "user")
+    host = host_info.get("host", "localhost")
+    user = host_info.get("ssh_user", os.environ.get("USER", "user"))
     models_dir = host_info.get("models_dir", "~/llm/models")
     ssh_target = f"{user}@{host}" if user else host
 

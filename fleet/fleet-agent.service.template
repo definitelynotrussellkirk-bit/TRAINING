@@ -1,0 +1,31 @@
+# Fleet Agent systemd service template
+#
+# To install:
+#   1. Copy to /etc/systemd/system/fleet-agent.service
+#   2. Edit variables (USER, WORKING_DIR, etc.)
+#   3. systemctl daemon-reload
+#   4. systemctl enable fleet-agent
+#   5. systemctl start fleet-agent
+#
+# Or use: ./scripts/install_fleet_service.sh
+
+[Unit]
+Description=Fleet Node Agent - Realm of Training
+After=network.target
+
+[Service]
+Type=simple
+User=${USER}
+Group=${USER}
+WorkingDirectory=${WORKING_DIR}
+ExecStart=/usr/bin/python3 ${WORKING_DIR}/fleet/agent.py --config ${WORKING_DIR}/fleet_agent.json
+Restart=always
+RestartSec=10
+StandardOutput=append:${WORKING_DIR}/logs/fleet_agent.log
+StandardError=append:${WORKING_DIR}/logs/fleet_agent.log
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target

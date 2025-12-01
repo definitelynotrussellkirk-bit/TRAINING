@@ -1,0 +1,207 @@
+# =============================================================================
+# THE FIVE SCHOOLS - Job Processing Families
+# =============================================================================
+#
+# Schools are the organizational families of job types. Each School represents
+# a distinct discipline of work with its own worker roles, resource requirements,
+# and processing patterns.
+#
+# Just as a Hero follows a Path through a Domain under a Technique,
+# Jobs are processed by Workers trained in a School's methods.
+#
+# =============================================================================
+
+version: "1.0.0"
+
+schools:
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF INFERENCE
+  # ---------------------------------------------------------------------------
+  # Jobs that require interaction with the model (Oracle) for evaluation,
+  # self-correction, or direct inference. These jobs test the Hero's knowledge.
+  #
+  inference:
+    id: inference
+    name: "School of Inference"
+    rpg_name: "The Oracle's Sanctum"
+    description: >
+      Jobs requiring model inference - evaluation, sparring, and direct queries.
+      Workers of this school commune with the Oracle to test the Hero's knowledge.
+    icon: "🔮"
+    color: "#8B5CF6"  # Purple
+    worker_role: eval_worker
+
+    # Job types belonging to this school
+    job_types:
+      - eval
+      - sparring
+      - inference
+
+    # Resource characteristics
+    requires_inference: true
+    requires_gpu: false  # Uses remote inference server
+    typical_timeout_range: "60s - 30min"
+
+    # Processing patterns
+    patterns:
+      - "Generate batch → Run inference → Score answers"
+      - "Identify errors → Generate corrections → Verify"
+      - "Direct model queries"
+
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF THE FORGE
+  # ---------------------------------------------------------------------------
+  # Data creation and transformation jobs. Workers of this school craft the
+  # training materials that fuel the Hero's growth.
+  #
+  forge:
+    id: forge
+    name: "School of the Forge"
+    rpg_name: "The Data Forge"
+    description: >
+      CPU-bound data processing - generation, filtering, conversion, validation.
+      Workers of this school craft the raw materials for training.
+    icon: "🔥"
+    color: "#EF4444"  # Red/Orange
+    worker_role: data_forge
+
+    job_types:
+      - data_gen
+      - data_filter
+      - data_convert
+      - data_validate
+      - data_profile
+
+    requires_inference: false
+    requires_gpu: false
+    typical_timeout_range: "5min - 10min"
+
+    patterns:
+      - "Generate → Validate → Format → Output JSONL"
+      - "Load → Filter → Deduplicate → Save"
+      - "Parse → Transform → Schema-check → Write"
+
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF THE VAULT
+  # ---------------------------------------------------------------------------
+  # Storage and archival operations. Workers of this school preserve the
+  # Hero's checkpoints and manage the lifecycle of saved states.
+  #
+  vault:
+    id: vault
+    name: "School of the Vault"
+    rpg_name: "The Vault Keepers"
+    description: >
+      I/O-bound storage operations - archival, retention, synchronization.
+      Workers of this school guard the Hero's saved states across time.
+    icon: "🏛️"
+    color: "#F59E0B"  # Amber/Gold
+    worker_role: vault_worker
+
+    job_types:
+      - archive
+      - retention
+      - sync
+
+    requires_inference: false
+    requires_gpu: false
+    prefers_storage_node: true  # R730xd with large disks
+    typical_timeout_range: "10min - 1hour"
+
+    patterns:
+      - "Hot → Warm migration"
+      - "Apply retention policy → Prune old checkpoints"
+      - "Source zone → Target zone sync"
+
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF ANALYTICS
+  # ---------------------------------------------------------------------------
+  # Reporting and metrics computation. Workers of this school extract
+  # knowledge from the Hero's journey for decision-making.
+  #
+  analytics:
+    id: analytics
+    name: "School of Analytics"
+    rpg_name: "The Scriveners"
+    description: >
+      Metrics calculation, report generation, and system health monitoring.
+      Workers of this school chronicle the Hero's progress and system state.
+    icon: "📊"
+    color: "#10B981"  # Emerald/Green
+    worker_role: analytics
+
+    job_types:
+      - analytics
+      - report
+      - health_check
+
+    requires_inference: false
+    requires_gpu: false
+    typical_timeout_range: "1min - 5min"
+
+    patterns:
+      - "Query metrics → Aggregate → Format report"
+      - "Check endpoints → Collect status → Report health"
+      - "Calculate statistics → Generate dashboard data"
+
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF ARCHAEOLOGY
+  # ---------------------------------------------------------------------------
+  # Model interpretability and introspection. Workers of this school peer
+  # into the Hero's internal structure to understand how they learn.
+  #
+  archaeology:
+    id: archaeology
+    name: "School of Archaeology"
+    rpg_name: "The Seers"
+    description: >
+      Model interpretability - layer statistics, weight drift analysis.
+      Workers of this school peer into the Hero's mind to understand learning.
+    icon: "🔬"
+    color: "#6366F1"  # Indigo
+    worker_role: analytics
+
+    job_types:
+      - layer_stats
+      - layer_drift
+
+    requires_inference: false
+    requires_gpu: true  # layer_stats needs GPU for activations
+    typical_timeout_range: "10min - 30min"
+
+    patterns:
+      - "Load model → Compute per-layer stats → Report"
+      - "Load checkpoints A,B → Compare weights → Measure drift"
+      - "Forward pass → Capture activations → Analyze distributions"
+
+# =============================================================================
+# SCHOOL RELATIONSHIPS
+# =============================================================================
+#
+# Schools interact in the training lifecycle:
+#
+#   FORGE creates data → INFERENCE tests learning → VAULT preserves checkpoints
+#                                  ↓
+#                            ANALYTICS tracks progress
+#                                  ↓
+#                         ARCHAEOLOGY explains changes
+#
+# A typical training cycle:
+#   1. Forge School generates training data
+#   2. Hero trains on the data (not a job - direct training)
+#   3. Inference School runs evaluations
+#   4. Vault School archives successful checkpoints
+#   5. Analytics School reports progress
+#   6. Archaeology School analyzes what changed in the model
+#
+
+# =============================================================================
+# FUTURE SCHOOLS (Reserved)
+# =============================================================================
+# These may be added as the system grows:
+#
+# - School of Synthesis: RLHF/DPO reward modeling
+# - School of Distillation: Knowledge transfer between Heroes
+# - School of Augmentation: Data augmentation pipelines
+# - School of Adversarial: Red-teaming and robustness testing
+#

@@ -1084,7 +1084,7 @@ def main():
     gen_parser.add_argument("--skill", help="Skill to generate (or 'all')")
     gen_parser.add_argument("--all", action="store_true", help="Generate all skills")
     gen_parser.add_argument("--count", type=int, default=50, help="Examples per difficulty")
-    gen_parser.add_argument("--base-dir", default="/path/to/training")
+    gen_parser.add_argument("--base-dir", default=str(Path(__file__).parent.parent.parent))
     gen_parser.add_argument("--category", help="Generate all skills in category")
 
     # Test command (single example)

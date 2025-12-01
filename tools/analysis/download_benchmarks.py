@@ -520,7 +520,7 @@ def main():
     parser.add_argument("--bbh", action="store_true", help="Download BIG-Bench Hard")
     parser.add_argument("--list", action="store_true", help="List available tasks")
     parser.add_argument("--max-examples", type=int, default=200, help="Max examples per task")
-    parser.add_argument("--base-dir", default="/path/to/training")
+    parser.add_argument("--base-dir", default=str(Path(__file__).parent.parent.parent))
     parser.add_argument("--task", help="Download specific task only")
 
     args = parser.parse_args()

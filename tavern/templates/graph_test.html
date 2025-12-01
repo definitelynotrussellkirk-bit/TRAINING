@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Effort Graph Test - Debugging Playground</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0c10;
+            color: #e0e0e0;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4a9eff;
+            border-bottom: 2px solid #2a4a6a;
+            padding-bottom: 10px;
+        }
+        .section {
+            background: #1a1c20;
+            border: 1px solid #2a4a6a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .graph-container {
+            background: #0f1114;
+            border: 1px solid #3a5a7a;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        canvas {
+            border: 1px solid #4a6a8a;
+            background: #0a0c10;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-label {
+            color: #8a9aaa;
+            font-size: 10px;
+        }
+        .stat-value {
+            color: #4a9eff;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        button {
+            background: #2a4a6a;
+            color: #e0e0e0;
+            border: 1px solid #4a6a8a;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background: #3a5a7a;
+        }
+        button:active {
+            background: #1a3a5a;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .log {
+            background: #0a0c10;
+            border: 1px solid #2a4a6a;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 5px;
+        }
+        .log-info { color: #4a9eff; }
+        .log-success { color: #4aff9e; }
+        .log-warning { color: #ffa04a; }
+        .log-error { color: #ff4a4a; }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+        .test-pass {
+            background: #1a3a2a;
+            border-color: #4aff9e;
+            color: #4aff9e;
+        }
+        .test-fail {
+            background: #3a1a1a;
+            border-color: #ff4a4a;
+            color: #ff4a4a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Effort History Graph - Debug Playground</h1>
+
+        <div class="section">
+            <h2>Graph Rendering Test</h2>
+            <div class="graph-container">
+                <canvas id="lossChart" width="800" height="200"></canvas>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-label">MIN</div>
+                        <div class="stat-value" id="lossMin">--</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">MAX</div>
+                        <div class="stat-value" id="lossMax">--</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">TREND</div>
+                        <div class="stat-value" id="lossTrend">--</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">RANGE</div>
+                        <div class="stat-value" id="lossGraphRange">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Controls</h2>
+            <div class="controls">
+                <button onclick="testStaticData()">Test: Static Data (20 points)</button>
+                <button onclick="testRealTimeUpdates()">Test: Real-time Updates</button>
+                <button onclick="testEmptyData()">Test: Empty Data</button>
+                <button onclick="testSinglePoint()">Test: Single Point</button>
+                <button onclick="fetchLiveData()">Fetch: Live Realm Data</button>
+                <button onclick="clearGraph()">Clear Graph</button>
+                <button onclick="runAllTests()">🧪 Run All Tests</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Test Results</h2>
+            <div id="testResults"></div>
+        </div>
+
+        <div class="section">
+            <h2>Debug Log</h2>
+            <div class="log" id="debugLog"></div>
+        </div>
+
+        <div class="section">
+            <h2>Data Inspector</h2>
+            <pre id="dataInspector" style="background: #0a0c10; padding: 10px; border-radius: 4px; font-size: 11px; overflow-x: auto;"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Debug logger
+        function log(message, level = 'info') {
+            const logEl = document.getElementById('debugLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${level}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logEl.insertBefore(entry, logEl.firstChild);
+            console.log(`[${level.toUpperCase()}] ${message}`);
+        }
+
+        function addTestResult(name, passed, message) {
+            const resultsEl = document.getElementById('testResults');
+            const result = document.createElement('div');
+            result.className = `test-result test-${passed ? 'pass' : 'fail'}`;
+            result.innerHTML = `<strong>${passed ? '✓' : '✗'} ${name}</strong><br>${message}`;
+            resultsEl.appendChild(result);
+        }
+
+        function updateDataInspector(data) {
+            document.getElementById('dataInspector').textContent = JSON.stringify(data, null, 2);
+        }
+
+        // COPIED FROM game.js - Exact rendering function
+        function renderLossChart(lossHistory) {
+            log(`renderLossChart called with ${lossHistory ? lossHistory.length : 0} data points`);
+
+            const canvas = document.getElementById('lossChart');
+            if (!canvas) {
+                log('Canvas element not found!', 'error');
+                return;
+            }
+
+            if (!lossHistory || lossHistory.length === 0) {
+                log('No loss history data', 'warning');
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const padding = 4;
+
+            log(`Canvas: ${width}x${height}, Data points: ${lossHistory.length}`);
+
+            // Clear canvas
+            ctx.fillStyle = '#0a0c10';
+            ctx.fillRect(0, 0, width, height);
+
+            // Extract effort values (cumulative strain)
+            const efforts = lossHistory.map(h => h.effort !== undefined ? h.effort : (h.loss || 0));
+            const minEffort = Math.min(...efforts);
+            const maxEffort = Math.max(...efforts);
+            const range = maxEffort - minEffort || 1;
+
+            log(`Effort range: ${minEffort.toFixed(4)} - ${maxEffort.toFixed(4)} (Δ${range.toFixed(4)})`);
+
+            // Update footer stats
+            const minEl = document.getElementById('lossMin');
+            const maxEl = document.getElementById('lossMax');
+            const trendEl = document.getElementById('lossTrend');
+            const rangeEl = document.getElementById('lossGraphRange');
+
+            if (minEl) minEl.textContent = minEffort.toFixed(4);
+            if (maxEl) maxEl.textContent = maxEffort.toFixed(4);
+            if (rangeEl) rangeEl.textContent = `${lossHistory.length} pts`;
+
+            // Calculate trend
+            if (lossHistory.length >= 2) {
+                const firstEffort = efforts[0];
+                const lastEffort = efforts[efforts.length - 1];
+                const trend = lastEffort - firstEffort;
+                if (trendEl) {
+                    trendEl.textContent = trend >= 0 ? `+${trend.toFixed(4)}` : trend.toFixed(4);
+                    trendEl.style.color = trend < 0 ? '#4aff9e' : '#ffa04a';
+                }
+                log(`Trend: ${trend.toFixed(4)} (${trend < 0 ? 'improving' : 'degrading'})`);
+            }
+
+            // Draw grid lines
+            ctx.strokeStyle = '#1a2a3a';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= 4; i++) {
+                const y = padding + (height - 2 * padding) * (i / 4);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(width - padding, y);
+                ctx.stroke();
+            }
+
+            // Draw effort line
+            ctx.strokeStyle = '#4a9eff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            let drawnPoints = 0;
+            for (let i = 0; i < lossHistory.length; i++) {
+                const x = padding + ((width - 2 * padding) * i) / (lossHistory.length - 1 || 1);
+                const normalizedEffort = (efforts[i] - minEffort) / range;
+                const y = height - padding - (height - 2 * padding) * normalizedEffort;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+                drawnPoints++;
+            }
+            ctx.stroke();
+
+            log(`Successfully rendered ${drawnPoints} points`, 'success');
+        }
+
+        // Test functions
+        function testStaticData() {
+            log('=== Testing with static data ===');
+            const testData = [];
+            const floor = 0.5;
+            let cumulativeEffort = 0;
+
+            for (let i = 0; i < 20; i++) {
+                const loss = 0.8 - (i * 0.01) + Math.random() * 0.05;
+                const strain = Math.max(0, loss - floor);
+                cumulativeEffort += strain;
+
+                testData.push({
+                    step: 1000 + i * 100,
+                    loss: loss,
+                    strain: strain,
+                    effort: cumulativeEffort
+                });
+            }
+
+            updateDataInspector({ test: 'static', data: testData.slice(0, 5) });
+            renderLossChart(testData);
+            addTestResult('Static Data', true, `Generated and rendered ${testData.length} test points`);
+        }
+
+        function testRealTimeUpdates() {
+            log('=== Testing real-time updates ===');
+            const testData = [];
+            const floor = 0.5;
+            let cumulativeEffort = 0;
+            let step = 0;
+
+            const interval = setInterval(() => {
+                const loss = 0.7 - (step * 0.005) + Math.random() * 0.03;
+                const strain = Math.max(0, loss - floor);
+                cumulativeEffort += strain;
+
+                testData.push({
+                    step: 1000 + step * 100,
+                    loss: loss,
+                    strain: strain,
+                    effort: cumulativeEffort
+                });
+
+                // Keep last 50 points
+                if (testData.length > 50) {
+                    testData.shift();
+                }
+
+                renderLossChart(testData);
+                log(`Real-time update ${step + 1}: effort=${cumulativeEffort.toFixed(4)}`);
+
+                step++;
+                if (step >= 30) {
+                    clearInterval(interval);
+                    log('Real-time test complete', 'success');
+                    addTestResult('Real-time Updates', true, `Streamed ${step} updates successfully`);
+                }
+            }, 200);
+        }
+
+        function testEmptyData() {
+            log('=== Testing with empty data ===');
+            renderLossChart([]);
+            addTestResult('Empty Data', true, 'Handled empty data without errors');
+        }
+
+        function testSinglePoint() {
+            log('=== Testing with single point ===');
+            const testData = [{
+                step: 1000,
+                loss: 0.75,
+                strain: 0.25,
+                effort: 0.25
+            }];
+            updateDataInspector({ test: 'single', data: testData });
+            renderLossChart(testData);
+            addTestResult('Single Point', true, 'Rendered single data point');
+        }
+
+        async function fetchLiveData() {
+            log('=== Fetching live realm data ===');
+            try {
+                const response = await fetch('/api/realm-state');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                log(`Fetched realm state: ${JSON.stringify(data).substring(0, 100)}...`);
+
+                // Check for training data (it's nested under data.state.training)
+                const training = data.state?.training || data.training;
+                if (training) {
+                    log(`Training status: ${training.status}, Step: ${training.step}, Loss: ${training.loss}`);
+                }
+
+                // Try to construct effort history from current state
+                if (training && training.step && training.loss) {
+                    const floor = 0.5;
+                    const loss = training.loss;
+                    const strain = Math.max(0, loss - floor);
+
+                    log(`Current training: step=${training.step}, loss=${loss}, strain=${strain}`, 'success');
+
+                    // Create a single-point graph from current state
+                    const testData = [{
+                        step: training.step,
+                        loss: loss,
+                        strain: strain,
+                        effort: strain
+                    }];
+                    renderLossChart(testData);
+                    addTestResult('Live Data Fetch', true, `Successfully fetched and rendered live training data (step ${training.step}, loss ${loss.toFixed(4)})`);
+                } else {
+                    log('No active training data in realm state', 'warning');
+                    log(`Data structure: ${JSON.stringify(data).substring(0, 200)}...`, 'info');
+                    addTestResult('Live Data Fetch', false, 'No training data available');
+                }
+
+                updateDataInspector(data);
+
+            } catch (error) {
+                log(`Failed to fetch live data: ${error.message}`, 'error');
+                addTestResult('Live Data Fetch', false, error.message);
+            }
+        }
+
+        function clearGraph() {
+            const canvas = document.getElementById('lossChart');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#0a0c10';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                log('Graph cleared');
+            }
+
+            // Reset stats
+            ['lossMin', 'lossMax', 'lossTrend', 'lossGraphRange'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = '--';
+            });
+        }
+
+        function runAllTests() {
+            log('=== Running all tests ===', 'info');
+            document.getElementById('testResults').innerHTML = '';
+
+            setTimeout(() => testEmptyData(), 100);
+            setTimeout(() => testSinglePoint(), 1000);
+            setTimeout(() => testStaticData(), 2000);
+            setTimeout(() => fetchLiveData(), 3000);
+            setTimeout(() => {
+                log('All synchronous tests complete. Starting real-time test...', 'success');
+                testRealTimeUpdates();
+            }, 4000);
+        }
+
+        // Auto-run basic test on load
+        window.addEventListener('load', () => {
+            log('Graph test page loaded', 'success');
+            log('Canvas element found: ' + (document.getElementById('lossChart') ? 'YES' : 'NO'));
+            setTimeout(() => testStaticData(), 500);
+        });
+    </script>
+</body>
+</html>

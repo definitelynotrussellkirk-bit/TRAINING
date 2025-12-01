@@ -1,0 +1,117 @@
+# =============================================================================
+# DOMAIN: REASONING
+# =============================================================================
+#
+# A Domain is a world where the Hero trains - it defines what tasks exist,
+# what data is available, and how mastery is measured.
+#
+# Think of Domains like WoW zones or Ready Player One planets:
+# - Each has its own challenges and rewards
+# - Heroes can specialize in one or visit many
+# - Some are prerequisites for others
+#
+# =============================================================================
+
+id: reasoning
+name: "Domain of Reasoning"
+rpg_name: "The Logic Spire"
+version: "1.0.0"
+
+description: >
+  Structured reasoning and problem-solving tasks. Heroes in this domain
+  learn to manipulate symbols, follow procedures, and solve constrained
+  puzzles with precise rules.
+
+# Display
+icon: "🧠"
+color: "#8B5CF6"  # Purple
+
+# =============================================================================
+# SKILLS IN THIS DOMAIN
+# =============================================================================
+# Skills are the specific disciplines within the domain.
+# Each skill has its own server, levels, and primitives.
+
+skills:
+  - id: sy
+    name: "Syllacrostics"
+    rpg_name: "Word Weaving"
+    description: "Assemble words from syllable tiles using clues"
+    api_port: 8080
+    max_level: 50
+    category: linguistic_reasoning
+
+  - id: bin
+    name: "Binary Arithmetic"
+    rpg_name: "Number Alchemy"
+    description: "Perform arithmetic in binary with circled notation"
+    api_port: 8090
+    max_level: 30
+    category: mathematical_reasoning
+
+# =============================================================================
+# DOMAIN CHARACTERISTICS
+# =============================================================================
+
+characteristics:
+  # What makes this domain unique
+  core_competencies:
+    - "Rule following"
+    - "Constraint satisfaction"
+    - "Symbolic manipulation"
+    - "Multi-step reasoning"
+
+  # Typical strain patterns in this domain
+  strain_profile:
+    floor_range: [0.3, 1.5]  # Typical loss floor at mastery
+    productive_strain: [0.1, 0.4]  # Sweet spot for learning
+
+  # Evaluation style
+  evaluation:
+    type: "exact_match"  # Answers are exactly right or wrong
+    aggregation: "per_primitive"  # Track accuracy per primitive skill
+
+# =============================================================================
+# PROGRESSION REQUIREMENTS
+# =============================================================================
+
+progression:
+  # What counts as "mastery" in this domain
+  mastery_threshold: 0.80  # 80% accuracy to level up
+  consecutive_passes: 3     # Must pass N evals in a row
+
+  # Prerequisites (other domains that should be mastered first)
+  prerequisites: []  # Reasoning is a foundational domain
+
+  # Unlocks (domains that become accessible after mastering this)
+  unlocks:
+    - "code"        # Code generation requires reasoning
+    - "mathematics" # Advanced math builds on reasoning
+
+# =============================================================================
+# DATA SOURCES
+# =============================================================================
+
+data:
+  # Where training data comes from
+  sources:
+    - type: "generated"
+      generator: "skill_server"
+      description: "Procedurally generated via skill API servers"
+
+  # Data generation config
+  generation:
+    batch_size: 100
+    difficulty_scaling: true  # Harder problems at higher levels
+    primitive_targeting: true # Can target weak primitives
+
+# =============================================================================
+# FUTURE SKILLS (Reserved)
+# =============================================================================
+# Skills that may be added to this domain:
+#
+# - logic: Propositional and predicate logic
+# - puzzles: Sudoku, grid puzzles, constraint satisfaction
+# - sequences: Pattern completion, series prediction
+# - spatial: Mental rotation, spatial reasoning
+#

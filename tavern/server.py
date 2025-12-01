@@ -61,6 +61,7 @@ from tavern.api import generate as generate_api
 from tavern.api import setup as setup_api
 from tavern.api import run_context as run_context_api
 from tavern.api import temple as temple_api
+from tavern.api import fleet as fleet_api
 
 # Import events system
 try:
@@ -210,7 +211,7 @@ def get_vault_assets():
                 assets["total_size_gb"] += assets["base_model"]["size_gb"]
 
         # Scan for checkpoints
-        current_model_dir = BASE_DIR / "current_model"
+        current_model_dir = BASE_DIR / "models" / "current_model"
         if current_model_dir.exists():
             for item in sorted(current_model_dir.iterdir(), reverse=True):
                 if item.is_dir() and item.name.startswith("checkpoint-"):
@@ -618,6 +619,15 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/temple/rituals":
             temple_api.serve_rituals(self)
 
+        # Fleet - Node management and monitoring
+        elif path == "/api/fleet/status":
+            fleet_api.serve_fleet_status(self)
+        elif path == "/api/fleet/local":
+            fleet_api.serve_local_agent_status(self)
+        elif path.startswith("/api/fleet/node/"):
+            host_id = path.split("/")[-1]
+            fleet_api.serve_node_status(self, host_id)
+
         # Campaign - Hero/Campaign management
         elif path == "/campaign" or path == "/campaign.html":
             self._serve_template("campaign.html")
@@ -780,6 +790,12 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Temple API - Run diagnostic rituals
         elif path == "/api/temple/run":
             temple_api.serve_run_ritual(self)
+        # Fleet API - Trigger retention
+        elif path == "/api/fleet/retention/all":
+            fleet_api.serve_trigger_retention_all(self)
+        elif path.startswith("/api/fleet/retention/"):
+            host_id = path.split("/")[-1]
+            fleet_api.serve_trigger_retention(self, host_id)
         # Reset API - Clear stale state
         elif path == "/api/reset":
             self._handle_reset()
@@ -3382,7 +3398,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
                                     assets["total_size_gb"] += cp["size_gb"]
 
             # Also scan legacy current_model/ directory (for DIO's old checkpoints)
-            current_model_dir = BASE_DIR / "current_model"
+            current_model_dir = BASE_DIR / "models" / "current_model"
             if current_model_dir.exists():
                 # Assume current_model belongs to DIO unless we know otherwise
                 legacy_hero = "dio-qwen3-0.6b"

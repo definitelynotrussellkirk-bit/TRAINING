@@ -223,7 +223,42 @@ def _check_checkpoint_ledger() -> RitualCheckResult:
     start = datetime.utcnow()
     try:
         from core.paths import get_base_dir
-        ledger_file = get_base_dir() / "data" / "checkpoint_ledger.json"
+        base_dir = get_base_dir()
+
+        # Get active campaign to find ledger location
+        campaign_file = base_dir / "control" / "active_campaign.json"
+        if not campaign_file.exists():
+            return RitualCheckResult(
+                id="checkpoint_ledger",
+                name="Checkpoint Ledger",
+                description="Verify checkpoint ledger exists and is consistent",
+                status="skip",
+                category="model",
+                details={"error": "No active campaign configured"},
+                started_at=start,
+                finished_at=datetime.utcnow(),
+            )
+
+        with open(campaign_file) as f:
+            campaign = json.load(f)
+
+        hero_id = campaign.get("hero_id")
+        campaign_id = campaign.get("campaign_id")
+
+        if not hero_id or not campaign_id:
+            return RitualCheckResult(
+                id="checkpoint_ledger",
+                name="Checkpoint Ledger",
+                description="Verify checkpoint ledger exists and is consistent",
+                status="warn",
+                category="model",
+                details={"error": "Invalid active campaign configuration"},
+                started_at=start,
+                finished_at=datetime.utcnow(),
+            )
+
+        # Ledger is in campaign status directory
+        ledger_file = base_dir / "campaigns" / hero_id / campaign_id / "status" / "checkpoint_ledger.json"
 
         if not ledger_file.exists():
             return RitualCheckResult(
@@ -232,7 +267,10 @@ def _check_checkpoint_ledger() -> RitualCheckResult:
                 description="Verify checkpoint ledger exists and is consistent",
                 status="warn",
                 category="model",
-                details={"error": "No checkpoint_ledger.json found"},
+                details={
+                    "error": "No checkpoint_ledger.json found",
+                    "expected_path": str(ledger_file),
+                },
                 remediation="Ledger will be created on next checkpoint save",
                 started_at=start,
                 finished_at=datetime.utcnow(),
@@ -252,6 +290,7 @@ def _check_checkpoint_ledger() -> RitualCheckResult:
             details={
                 "entry_count": len(entries),
                 "ledger_path": str(ledger_file),
+                "campaign": f"{hero_id}/{campaign_id}",
             },
             started_at=start,
             finished_at=datetime.utcnow(),

@@ -1,6 +1,6 @@
 # System Architecture
 
-**Last Updated:** 2025-11-28
+**Last Updated:** 2025-12-01
 
 ## System Split
 
@@ -365,6 +365,88 @@ vault.submit_job(job)
 **Key Difference:**
 - `core/job.py` = File-based training lifecycle (daemon, hero loop)
 - `guild/job_types.py` = Distributed task execution (workers, VaultKeeper)
+
+### Job Schools (Worker Organization)
+
+Jobs are organized into **Schools** - families of processing with shared worker roles:
+
+| School | Worker Role | Job Types | Characteristics |
+|--------|-------------|-----------|-----------------|
+| **Inference** 🔮 | `eval_worker` | EVAL, SPARRING, INFERENCE | Needs inference server |
+| **Forge** 🔥 | `data_forge` | DATA_GEN, DATA_FILTER, DATA_CONVERT | CPU-bound |
+| **Vault** 🏛️ | `vault_worker` | ARCHIVE, RETENTION, SYNC | I/O-bound |
+| **Analytics** 📊 | `analytics` | ANALYTICS, REPORT, HEALTH_CHECK | Quick jobs |
+| **Archaeology** 🔬 | `analytics` | LAYER_STATS, LAYER_DRIFT | Model introspection |
+
+```python
+from guild.job_types import JobType, School
+
+# Every job knows its school
+job = JobType.EVAL
+print(job.school)  # School.INFERENCE
+print(job.school.worker_role)  # "eval_worker"
+```
+
+Key files: `guild/job_types.py`, `configs/schools.yaml`
+
+### Training Schools (Learning Paradigms)
+
+Orthogonal to Job Schools, **Training Schools** define HOW the Hero learns:
+
+| School | Method | Data Format | Status |
+|--------|--------|-------------|--------|
+| **Scribe** 📜 | SFT (imitation) | `messages` | ✓ Implemented |
+| **Mirror** 🪞 | Sparring (self-correction) | `sparring_*` types | ✓ Implemented |
+| **Judge** ⚖️ | DPO (preference) | `preference_pair` | Future |
+| **Champion** 🏆 | RLHF (reward) | `reward_signal` | Future |
+| **Whisper** 👻 | Distillation | `messages` + teacher | Future |
+| **Oracle** 🔮 | Fortune Teller (surprise-weighted) | Enhances any format | ✓ Implemented |
+
+**School of the Mirror** example (sparring data):
+```python
+# Three reflections per mistake:
+{"type": "sparring_identify_incorrect", "messages": [...]}  # "Is this correct?" → "It is incorrect."
+{"type": "sparring_correction", "messages": [...]}          # "Fix this." → [correct answer]
+{"type": "sparring_confirm_correct", "messages": [...]}     # "Is this correct?" → "It is correct."
+```
+
+**School of the Oracle** (enhancer):
+```python
+from trainer.losses import FortuneTellerLoss
+
+# Weights gradients by surprise - focus on uncertain predictions
+loss_fn = FortuneTellerLoss(surprise_metric="entropy")
+loss, details = loss_fn(logits, labels, return_details=True)
+print(f"Avg surprise: {details['avg_surprise']}")
+```
+
+Key files: `guild/training_schools.py`, `guild/sparring.py`, `trainer/losses/fortune_teller.py`
+
+### Temple System (Validation)
+
+The Temple transforms **Effort** into **Experience** through **Blessings**:
+
+```
+Strain (per step) → Effort (cumulative) → [Temple Blessing] → Experience (validated)
+```
+
+**The Nine Orders** run Rituals to validate training:
+- **Critical**: Forge (GPU), Oracle (inference), Champion (model)
+- **Supporting**: Quick, API, Weaver, Guild, Scribe, Deep
+
+**Blessing Quality Factor**:
+- `1.0` = All orders pass → Full experience
+- `0.7-0.9` = Warnings → Partial experience
+- `0.0` = Critical failure → Cursed (no experience)
+
+```python
+from temple.schemas import Blessing
+
+blessing = Blessing.from_ceremony(ritual_results, effort=100.0)
+print(f"Experience gained: {blessing.experience_awarded}")  # effort × quality_factor
+```
+
+Key files: `temple/cleric.py`, `temple/schemas.py`, `temple/rituals/*.py`
 
 ### Daemon Services (Extracted)
 | Module | Location | Responsibility |

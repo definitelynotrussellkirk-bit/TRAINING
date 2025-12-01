@@ -1,0 +1,48 @@
+{
+  "_comment": "Example config.json snippet for enabling Fortune Teller",
+  "_usage": "Add the 'fortune_teller' section to your config.json",
+
+  "fortune_teller": {
+    "enabled": true,
+    "surprise_metric": "entropy",
+    "min_surprise": 0.1,
+    "max_surprise": 10.0,
+    "normalize_batch": true,
+    "temperature": 1.0,
+    "save_history": true,
+    "history_path": null
+  },
+
+  "_experiments": {
+    "_comment": "Try these variations to find what works best",
+
+    "conservative": {
+      "surprise_metric": "confidence",
+      "min_surprise": 0.3,
+      "temperature": 2.0,
+      "_note": "Gentler weighting, closer to standard training"
+    },
+
+    "aggressive": {
+      "surprise_metric": "entropy",
+      "min_surprise": 0.05,
+      "temperature": 0.5,
+      "_note": "Sharp focus on high-surprise tokens"
+    },
+
+    "perplexity_based": {
+      "surprise_metric": "perplexity",
+      "min_surprise": 1.0,
+      "max_surprise": 100.0,
+      "normalize_batch": true,
+      "_note": "Focus on truly unexpected correct tokens"
+    },
+
+    "margin_based": {
+      "surprise_metric": "margin",
+      "min_surprise": 0.1,
+      "temperature": 1.0,
+      "_note": "Weight by competition between top choices"
+    }
+  }
+}

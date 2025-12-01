@@ -278,7 +278,8 @@ class DailyReporter:
 
 def main():
     parser = argparse.ArgumentParser(description="Generate daily training report")
-    parser.add_argument('--base-dir', default='/path/to/training', help='Base training directory')
+    default_base = str(Path(__file__).parent.parent.parent)
+    parser.add_argument('--base-dir', default=default_base, help='Base training directory')
     parser.add_argument('--print', action='store_true', help='Print to console')
     parser.add_argument('--email', help='Email address to send report to (optional)')
 

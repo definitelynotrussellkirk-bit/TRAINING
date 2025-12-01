@@ -1,0 +1,148 @@
+# =============================================================================
+# PHYSICS: MUON
+# =============================================================================
+#
+# Physics defines the rules of training - how gradient updates happen,
+# what precision is used, how learning progresses.
+#
+# Think of Physics like the laws of nature in a game world:
+# - Different physics create different training dynamics
+# - Some physics are better suited for certain Domains
+# - The same Hero may train under different Physics in different Campaigns
+#
+# Muon = MomentUm Orthogonalized by Newton-schulz
+# A modern optimizer that orthogonalizes momentum using Newton-Schulz iterations.
+#
+# =============================================================================
+
+id: muon
+name: "Muon Physics"
+rpg_name: "The Orthogonal Way"
+version: "1.0.0"
+
+description: >
+  Momentum orthogonalized by Newton-Schulz iterations. Muon applies
+  orthogonalization to momentum updates, potentially improving training
+  dynamics on certain architectures.
+
+# Display
+icon: "⚛️"
+color: "#3B82F6"  # Blue
+
+# =============================================================================
+# OPTIMIZER CONFIGURATION
+# =============================================================================
+
+optimizer:
+  type: muon
+
+  # Muon-specific parameters
+  muon:
+    # Learning rate for hidden (non-embedding) layers
+    hidden_lr: 0.02
+
+    # Learning rate for auxiliary parameters (embeddings, LM head)
+    # These use AdamW internally
+    aux_lr: 0.0003
+
+    # Newton-Schulz iterations for orthogonalization
+    ns_iterations: 5
+
+    # Momentum coefficient
+    momentum: 0.95
+
+  # Auxiliary optimizer (for embeddings, LM head)
+  aux_optimizer:
+    type: adamw
+    betas: [0.9, 0.95]
+    weight_decay: 0.1
+    eps: 1.0e-8
+
+# =============================================================================
+# PRECISION & NUMERICS
+# =============================================================================
+
+precision:
+  # Training precision
+  compute_dtype: bf16
+
+  # Whether to use mixed precision
+  mixed_precision: true
+
+  # Gradient scaling (for fp16, less needed for bf16)
+  grad_scaling: false
+
+# =============================================================================
+# GRADIENT HANDLING
+# =============================================================================
+
+gradients:
+  # Maximum gradient norm (0 = no clipping)
+  max_grad_norm: 1.0
+
+  # Gradient accumulation steps
+  accumulation_steps: 1
+
+  # Gradient checkpointing (trades compute for memory)
+  checkpointing: false
+
+# =============================================================================
+# LEARNING RATE SCHEDULE
+# =============================================================================
+
+schedule:
+  # Type: constant, cosine, linear, warmup_cosine
+  type: warmup_cosine
+
+  # Warmup steps/ratio
+  warmup_steps: 100
+
+  # Minimum LR at end of schedule (as ratio of initial)
+  min_lr_ratio: 0.1
+
+# =============================================================================
+# STABILITY SETTINGS
+# =============================================================================
+
+stability:
+  # Whether to use gradient clipping per-parameter
+  per_param_clip: false
+
+  # NaN/Inf detection
+  detect_anomaly: false
+
+  # Loss scaling for stability
+  loss_scale: 1.0
+
+# =============================================================================
+# RECOMMENDED USE CASES
+# =============================================================================
+
+recommendations:
+  # Best suited for:
+  suited_for:
+    - "Small to medium models (< 7B parameters)"
+    - "Single-GPU training"
+    - "Fine-tuning on structured tasks"
+
+  # Not recommended for:
+  not_recommended:
+    - "Very large models (may need tuning)"
+    - "Extremely long training runs (untested)"
+
+  # Suggested domains
+  domains:
+    - reasoning
+    - code
+
+# =============================================================================
+# NOTES
+# =============================================================================
+#
+# Muon is an experimental optimizer. Key differences from AdamW:
+# - Uses orthogonalized momentum updates for hidden layers
+# - Separate treatment of embedding/LM head parameters
+# - May require different LR ranges than AdamW
+#
+# Paper reference: https://kellerjordan.github.io/posts/muon/
+#

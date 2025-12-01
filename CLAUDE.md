@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-12-01
+**Last Updated:** 2025-12-01 (Vocabulary Canonicalization Update)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 **Philosophy:** This repo is the method, not the results (see META section)
 
@@ -298,6 +298,188 @@ print(f"Action: {hint.action.value}")  # continue
 
 ---
 
+## 🎓 THE SIX TRAINING SCHOOLS
+
+**Training Schools define HOW the Hero learns** - the fundamental approach to knowledge acquisition.
+
+| School | Icon | Motto | Status |
+|--------|------|-------|--------|
+| **Scribe** | 📜 | "Copy the master's form until it becomes your own." | ✓ SFT |
+| **Mirror** | 🪞 | "See your flaws reflected, then correct them." | ✓ Sparring |
+| **Judge** | ⚖️ | "Between two paths, always choose the better." | Future (DPO) |
+| **Champion** | 🏆 | "Seek the reward, master the arena." | Future (RLHF) |
+| **Whisper** | 👻 | "The wisdom of giants flows to those who listen." | Future (Distill) |
+| **Oracle** | 🔮 | "Focus where uncertainty dwells; ignore what is already known." | ✓ Fortune Teller |
+
+### School Details
+
+**📜 School of the Scribe (SFT)**
+- Learn by directly imitating correct examples
+- Foundation of all training - simple, stable, effective
+- Data: `messages` format with user/assistant pairs
+
+**🪞 School of the Mirror (Sparring)**
+- Learn by identifying and correcting your own mistakes
+- Three reflections: Identify wrong → Correct it → Confirm right
+- Implementation: `guild/sparring.py`
+- Data: `sparring_identify_incorrect`, `sparring_correction`, `sparring_confirm_correct`
+
+**🔮 School of the Oracle (Fortune Teller)**
+- ENHANCER: Works with any base school
+- Weight gradients by surprise - focus on what's uncertain
+- Automatic curriculum: hard parts get more gradient budget
+- Implementation: `trainer/losses/fortune_teller.py`
+
+```python
+from guild.training_schools import TrainingSchool, get_school
+
+# Get school info
+mirror = get_school(TrainingSchool.MIRROR)
+print(mirror.motto)  # "See your flaws reflected, then correct them."
+
+# Check if a school is an enhancer
+if TrainingSchool.ORACLE.is_enhancer:
+    print("Oracle enhances other schools!")
+```
+
+Key files: `guild/training_schools.py`, `configs/training_schools.yaml`
+
+---
+
+## 🏫 THE FIVE JOB SCHOOLS
+
+**Job Schools define HOW work is dispatched** - the worker roles and processing patterns.
+
+| School | Icon | Worker Role | Job Types |
+|--------|------|-------------|-----------|
+| **Inference** | 🔮 | eval_worker | EVAL, SPARRING, INFERENCE |
+| **Forge** | 🔥 | data_forge | DATA_GEN, DATA_FILTER, DATA_CONVERT |
+| **Vault** | 🏛️ | vault_worker | ARCHIVE, RETENTION, SYNC |
+| **Analytics** | 📊 | analytics | ANALYTICS, REPORT, HEALTH_CHECK |
+| **Archaeology** | 🔬 | analytics | LAYER_STATS, LAYER_DRIFT |
+
+```python
+from guild.job_types import JobType, School
+
+# Every job knows its school
+job = JobType.EVAL
+print(f"{job.value} → {job.school.display_name}")  # eval → School of Inference
+
+# School properties
+school = School.FORGE
+print(school.icon)        # 🔥
+print(school.worker_role) # data_forge
+```
+
+Key files: `guild/job_types.py`, `configs/schools.yaml`
+
+---
+
+## 🏛️ THE TEMPLE SYSTEM
+
+**The Temple validates training** - transforms Effort into Experience through Blessings.
+
+### The Nine Orders (Ritual Groups)
+
+| Order | Icon | Domain | Critical? |
+|-------|------|--------|-----------|
+| Quick | ⚡ | Fast sanity checks | No |
+| API | 🌐 | HTTP API validation | No |
+| **Forge** | 🔥 | GPU/hardware | **YES** |
+| Weaver | 🕸️ | Daemons/processes | No |
+| **Champion** | 🏆 | Model/checkpoint | **YES** |
+| **Oracle** | 🔮 | Inference server | **YES** |
+| Guild | ⚔️ | Skills/curriculum | No |
+| Scribe | 📜 | Evaluation/logging | No |
+| Deep | 🌊 | Comprehensive/meta | No |
+
+### Blessing System
+
+When a Campaign returns to Temple, the Cleric runs Rituals and computes a **Blessing**:
+
+```
+experience_gain = effort × quality_factor
+```
+
+- **Blessed** (quality ≥ 0.8): Full experience awarded
+- **Partial** (quality 0.3-0.8): Reduced experience
+- **Cursed** (quality = 0): No experience (bad data, broken evals)
+
+```python
+from temple.schemas import Blessing, RitualResult
+
+# Grant a blessing
+blessing = Blessing.grant(
+    quality=0.9,
+    orders=["forge", "oracle", "champion"],
+    reason="All critical orders passed",
+    effort=100.0,
+)
+print(f"Experience gained: {blessing.experience_awarded}")  # 90.0
+```
+
+Key files: `temple/cleric.py`, `temple/schemas.py`, `temple/rituals/*.py`
+
+---
+
+## 🛤️ PATH, DOMAIN, PHYSICS, TECHNIQUE
+
+**The complete training recipe** is a Path through a Domain under a Physics using a Technique.
+
+### Domain (Where/What)
+The world where the Hero trains - datasets, tasks, evaluation.
+```yaml
+# configs/domains/reasoning.yaml
+id: reasoning
+name: "Domain of Reasoning"
+skills: [sy, bin]
+```
+
+### Physics (The Rules)
+Optimizer configuration, precision, gradient handling.
+```yaml
+# configs/physics/muon.yaml
+id: muon
+name: "Muon Physics"
+optimizer:
+  type: muon
+  hidden_lr: 0.02
+precision: bf16
+```
+
+### Technique (Named Method)
+A Physics configuration wrapped with a name and recommendations.
+```python
+from trainer.techniques import get_technique
+
+muon = get_technique("muon")
+print(f"{muon.icon} {muon.rpg_name}")  # ⚛️ The Orthogonal Way
+```
+
+### Path (Full Recipe)
+Domain + Physics + Technique + Temple Profile
+```
+Path: "Muon Technique in the Domain of Reasoning"
+```
+
+Key files: `configs/domains/`, `configs/physics/`, `trainer/techniques.py`
+
+---
+
+## 📖 THE CANONICAL STORY
+
+> A **Hero** follows a **Path** through a **Domain**, under a chosen **Physics** and **Technique**.
+> Each step produces **Strain**; accumulated **Effort**, when **Blessed** by the **Temple's**
+> **Cleric** and the **Nine Orders**, becomes **Experience**, which is recorded in the **Ledger**.
+>
+> The Hero learns through **Training Schools**: the **Scribe** teaches imitation, the **Mirror**
+> teaches self-correction, the **Oracle** focuses attention on uncertainty.
+>
+> Jobs are processed by Workers trained in **Job Schools**: **Inference** tests the Hero,
+> the **Forge** crafts data, the **Vault** preserves checkpoints.
+
+---
+
 ## 🎯 GAME ROADMAP (What's Missing)
 
 ### Phase 1: Actions from the Game
@@ -336,7 +518,15 @@ print(f"Action: {hint.action.value}")  # continue
 
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
-Latest (2025-12-01):
+Latest (2025-12-01) - **VOCABULARY CANONICALIZATION**:
+- **Six Training Schools** - Scribe, Mirror, Judge, Champion, Whisper, Oracle (`guild/training_schools.py`)
+- **Five Job Schools** - Inference, Forge, Vault, Analytics, Archaeology (`guild/job_types.py`)
+- **Temple Blessing System** - Effort → Experience via quality_factor (`temple/schemas.py`)
+- **Domain/Physics/Technique/Path** - Complete training recipe vocabulary
+- **75+ Lore Entries** - Canonical tooltips and descriptions (`tavern/lore.py`)
+- **Config Files** - `configs/schools.yaml`, `configs/training_schools.yaml`, `configs/domains/`, `configs/physics/`
+
+Previous (2025-12-01):
 - **Unified Service Management** - Service Registry and Weaver now share `configs/services.json` as single source of truth
 - **Declarative Config** - Services defined in JSON with health checks, dependencies, startup config
 - **Groundskeeper** - Unified cleanup daemon for all resource leaks (`core/groundskeeper.py`)
@@ -565,6 +755,100 @@ Services (from `configs/services.json`):
 - `skill_sy` (8080), `skill_bin` (8090) → Skill servers (optional)
 
 Key files: `core/service_registry.py`, `configs/services.json`
+
+### Training Schools
+
+The Six Schools of Training - how the Hero learns.
+
+```python
+from guild.training_schools import TrainingSchool, get_school, SCHOOL_PHILOSOPHIES
+
+# List all schools
+for school in TrainingSchool:
+    print(f"{school.icon} {school.display_name}: {school.motto}")
+
+# Get philosophy details
+mirror = SCHOOL_PHILOSOPHIES[TrainingSchool.MIRROR]
+print(mirror.teaches)  # ["Error recognition", "Self-correction", ...]
+```
+
+Key files: `guild/training_schools.py`, `configs/training_schools.yaml`
+
+### Job Schools
+
+The Five Job Schools - how work is dispatched.
+
+```python
+from guild.job_types import JobType, School
+
+# Job → School mapping
+for jt in JobType:
+    print(f"{jt.value} → {jt.school.display_name}")
+
+# School properties
+school = School.INFERENCE
+print(f"{school.icon} {school.rpg_name}")  # 🔮 The Oracle's Sanctum
+```
+
+Key files: `guild/job_types.py`, `configs/schools.yaml`
+
+### Temple & Blessing
+
+Transform Effort into Experience through Temple validation.
+
+```python
+from temple.schemas import Blessing
+from temple.cleric import run_ceremony
+
+# Run a ceremony
+results = run_ceremony(["forge", "oracle", "champion"])
+
+# Compute blessing from results
+blessing = Blessing.from_ceremony(results, effort=100.0)
+print(f"Quality: {blessing.quality_factor}")
+print(f"Experience: {blessing.experience_awarded}")
+```
+
+Key files: `temple/cleric.py`, `temple/schemas.py`
+
+### Techniques
+
+Named training physics configurations.
+
+```python
+from trainer.techniques import get_technique, list_techniques
+
+# List available techniques
+for tech in list_techniques():
+    print(f"{tech.icon} {tech.id}: {tech.rpg_name}")
+
+# Get specific technique
+muon = get_technique("muon")
+print(muon.optimizer_config)
+```
+
+Key files: `trainer/techniques.py`, `configs/physics/*.yaml`
+
+### Lore Dictionary
+
+Canonical vocabulary with tooltips for UI.
+
+```python
+from tavern.lore import get_lore, get_tooltip, get_icon, list_keys
+
+# Get lore entry
+entry = get_lore("strain")
+print(f"{entry['icon']} {entry['label']}: {entry['tooltip']}")
+
+# Just get tooltip for a key
+tooltip = get_tooltip("school.mirror")
+
+# Export for JavaScript
+from tavern.lore import export_for_js
+js_lore = export_for_js()  # Dict ready for JSON
+```
+
+Key files: `tavern/lore.py`
 
 ---
 

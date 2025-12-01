@@ -119,7 +119,7 @@ def consolidate_model(base_dir: Path):
 
 def main():
     parser = argparse.ArgumentParser(description='Consolidate LoRA adapter into base model')
-    parser.add_argument('--base-dir', type=Path, required=True, help='Base directory (e.g., /path/to/training)')
+    parser.add_argument('--base-dir', type=Path, required=True, help='Base directory (e.g., /path/to/TRAINING)')
     args = parser.parse_args()
 
     if not args.base_dir.exists():

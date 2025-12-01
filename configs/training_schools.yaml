@@ -1,0 +1,256 @@
+# =============================================================================
+# THE SIX SCHOOLS OF TRAINING
+# =============================================================================
+#
+# Training Schools define HOW the Hero learns - the fundamental approach to
+# knowledge acquisition. Each school has its own philosophy, data format,
+# and training objective.
+#
+# The Six Schools:
+#   1. SCRIBE  - SFT, imitation learning
+#   2. MIRROR  - Self-correction, sparring
+#   3. JUDGE   - DPO, preference learning
+#   4. CHAMPION - RLHF, reward optimization
+#   5. WHISPER - Distillation, knowledge transfer
+#   6. ORACLE  - Fortune Teller, surprise-weighted (enhancer)
+#
+# Code: guild/training_schools.py
+# =============================================================================
+
+version: "1.0.0"
+
+schools:
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF THE SCRIBE
+  # ---------------------------------------------------------------------------
+  scribe:
+    id: scribe
+    name: "School of the Scribe"
+    icon: "📜"
+    color: "#3B82F6"
+    motto: "Copy the master's form until it becomes your own."
+    technical: "Supervised Fine-Tuning (SFT)"
+    implemented: true
+
+    description: |
+      The foundation of all training. Learn by directly imitating correct
+      examples - seeing the right answer and learning to reproduce it.
+      Every great warrior begins by copying the forms of their teachers.
+
+    teaches:
+      - "Basic task completion"
+      - "Format adherence"
+      - "Pattern matching"
+      - "Vocabulary and style"
+
+    data_format:
+      primary: messages
+      example_types:
+        - sft
+        - instruction
+        - completion
+      required_fields:
+        - messages
+
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF THE MIRROR
+  # ---------------------------------------------------------------------------
+  mirror:
+    id: mirror
+    name: "School of the Mirror"
+    icon: "🪞"
+    color: "#8B5CF6"
+    motto: "See your flaws reflected, then correct them."
+    technical: "Self-Correction / Sparring"
+    implemented: true
+
+    description: |
+      Learn through self-reflection. The Hero attempts problems, and when
+      they fail, they study their failures. The three reflections:
+      1. IDENTIFY: "Is this correct?" → "It is incorrect."
+      2. CORRECT: "Fix this mistake." → [correct answer]
+      3. CONFIRM: "Is this correct?" → "It is correct."
+
+    teaches:
+      - "Error recognition"
+      - "Self-correction"
+      - "Answer verification"
+      - "Judgment and discernment"
+
+    data_format:
+      primary: messages
+      example_types:
+        - sparring_identify_incorrect
+        - sparring_correction
+        - sparring_confirm_correct
+      required_fields:
+        - messages
+        - type
+      generator: guild/sparring.py
+
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF THE JUDGE
+  # ---------------------------------------------------------------------------
+  judge:
+    id: judge
+    name: "School of the Judge"
+    icon: "⚖️"
+    color: "#F59E0B"
+    motto: "Between two paths, always choose the better."
+    technical: "Direct Preference Optimization (DPO)"
+    implemented: false
+
+    description: |
+      Learn comparison and preference. Instead of showing one correct answer,
+      the Hero sees two options and learns which is better. Develops nuanced
+      judgment - not just "right vs wrong" but "better vs worse".
+
+    teaches:
+      - "Preference and ranking"
+      - "Quality gradients"
+      - "Nuanced judgment"
+      - "Comparison reasoning"
+
+    data_format:
+      primary: preference_pair
+      example_types:
+        - dpo_pair
+        - preference
+        - ranking
+      required_fields:
+        - prompt
+        - chosen
+        - rejected
+
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF THE CHAMPION
+  # ---------------------------------------------------------------------------
+  champion:
+    id: champion
+    name: "School of the Champion"
+    icon: "🏆"
+    color: "#EF4444"
+    motto: "Seek the reward, master the arena."
+    technical: "RLHF / Reward Learning"
+    implemented: false
+
+    description: |
+      Learn through reinforcement - actions that lead to reward are
+      strengthened. A reward model provides the signal. The Hero learns
+      to maximize reward while staying close to base capabilities.
+
+    teaches:
+      - "Reward optimization"
+      - "Exploration and exploitation"
+      - "Complex objectives"
+      - "Behavioral alignment"
+
+    data_format:
+      primary: reward_signal
+      example_types:
+        - rlhf_episode
+        - reward_example
+      required_fields:
+        - prompt
+        - response
+        - reward
+
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF THE WHISPER
+  # ---------------------------------------------------------------------------
+  whisper:
+    id: whisper
+    name: "School of the Whisper"
+    icon: "👻"
+    color: "#6B7280"
+    motto: "The wisdom of giants flows to those who listen."
+    technical: "Knowledge Distillation"
+    implemented: false
+
+    description: |
+      Learn from a larger, more capable model (the Elder). The smaller Hero
+      learns to match the Elder's outputs. This allows a small Hero to punch
+      above their weight by learning compressed knowledge from a giant.
+
+    teaches:
+      - "Compressed knowledge from larger models"
+      - "Reasoning patterns"
+      - "Style and capabilities beyond training data"
+      - "Efficient knowledge transfer"
+
+    data_format:
+      primary: messages
+      example_types:
+        - distillation
+        - teacher_response
+        - cot_distill
+      required_fields:
+        - messages
+      optional_fields:
+        - teacher_model
+        - teacher_logits
+        - temperature
+
+  # ---------------------------------------------------------------------------
+  # SCHOOL OF THE ORACLE
+  # ---------------------------------------------------------------------------
+  oracle:
+    id: oracle
+    name: "School of the Oracle"
+    icon: "🔮"
+    color: "#10B981"
+    motto: "Focus where uncertainty dwells; ignore what is already known."
+    technical: "Surprise-Weighted Learning (Fortune Teller)"
+    implemented: true
+    is_enhancer: true  # Enhances other schools, not standalone
+
+    description: |
+      Unique among schools: defines WHERE to focus, not WHAT to learn.
+      The Oracle (Fortune Teller) predicts what will challenge the Hero
+      most and concentrates gradient updates there. Surprise = information.
+
+      The Oracle enhances other schools:
+      - Scribe + Oracle = Focus SFT on hard parts
+      - Mirror + Oracle = Focus self-correction on uncertain judgments
+      - Judge + Oracle = Weight preference pairs by difficulty
+
+    teaches:
+      - "Automatic curriculum learning"
+      - "Efficient gradient allocation"
+      - "Focus on uncertainty"
+      - "Reduced forgetting of mastered skills"
+
+    surprise_metrics:
+      - entropy      # How uncertain is the distribution?
+      - confidence   # How low is the max probability?
+      - perplexity   # How unexpected was the correct token?
+      - margin       # How close is the runner-up?
+
+    config:
+      enabled: true
+      surprise_metric: entropy
+      min_surprise: 0.1
+      max_surprise: 10.0
+      normalize_batch: true
+      temperature: 1.0
+
+    implementation: trainer/losses/fortune_teller.py
+
+# =============================================================================
+# SCHOOL RELATIONSHIPS
+# =============================================================================
+#
+# Typical progression:
+#   1. Start with SCRIBE (SFT) - build basic competence
+#   2. Add MIRROR (Sparring) - develop self-correction
+#   3. Optionally add ORACLE - enhance with surprise weighting
+#   4. Later: JUDGE (DPO) for preference learning
+#   5. Advanced: CHAMPION (RLHF) for alignment
+#   6. Optional: WHISPER (Distillation) for knowledge transfer
+#
+# Combinations:
+#   - Scribe + Oracle = Efficient SFT (focus on hard parts)
+#   - Mirror + Oracle = Adaptive self-correction
+#   - Scribe → Mirror = Build foundation, then add judgment
+#   - Scribe → Judge = Build foundation, then refine preferences
+#

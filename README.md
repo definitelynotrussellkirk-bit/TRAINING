@@ -14,6 +14,9 @@
 
 **Your hero DIO** (a Qwen3 model) battles through **quests** (training data), learning **skills** (SY, BIN), and growing stronger. You watch from the **Tavern** (http://localhost:8888) as DIO fights, levels up, and becomes a champion.
 
+![The Tavern - Main Game UI](docs/images/tavern-screenshot.png)
+*The Tavern: Watch your hero train, track skills, manage the vault, and monitor GPU status in real-time.*
+
 | RPG Term | Boring ML Term |
 |----------|----------------|
 | Hero (DIO) | The model being trained |
@@ -25,6 +28,21 @@
 | Tavern | Web UI dashboard |
 | Vault | Checkpoint storage |
 | Oracle | Inference server (chat with the model) |
+| Training School | Learning paradigm (SFT, Sparring, DPO, etc.) |
+| Blessing | Temple validation (Effort → Experience) |
+
+### The Six Training Schools
+
+How the Hero learns - each school has its own motto and philosophy:
+
+| School | Icon | Motto | Method |
+|--------|------|-------|--------|
+| **Scribe** | 📜 | "Copy the master's form until it becomes your own." | SFT |
+| **Mirror** | 🪞 | "See your flaws reflected, then correct them." | Sparring |
+| **Judge** | ⚖️ | "Between two paths, always choose the better." | DPO |
+| **Champion** | 🏆 | "Seek the reward, master the arena." | RLHF |
+| **Whisper** | 👻 | "The wisdom of giants flows to those who listen." | Distill |
+| **Oracle** | 🔮 | "Focus where uncertainty dwells; ignore what is already known." | Fortune Teller |
 
 *The author notes with some amusement that these mappings emerged with surprising ease—the conceptual distance between "training a model" and "raising a hero" proved remarkably small. Contributions of additional isomorphisms are welcomed; perhaps your mental model prefers different metaphors. PRs accepted.*
 

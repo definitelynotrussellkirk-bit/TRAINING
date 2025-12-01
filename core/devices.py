@@ -29,7 +29,7 @@ Configuration:
     {
       "devices": {
         "trainer4090": {
-          "hostname": "192.168.x.x",
+          "hostname": "trainer.local",
           "roles": ["trainer", "eval_worker", "storage_hot"],
           "gpus": [{"name": "RTX 4090", "count": 1, "vram_gb": 24}],
           "cpu": {"cores": 16, "threads": 32},

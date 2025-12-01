@@ -195,10 +195,8 @@ function initRealmStateSync() {
         GameState.stepsPerSecond = training.speed || 0;
         GameState.etaSeconds = training.etaSeconds || 0;
 
-        // Calculate quest progress
-        if (GameState.totalSteps > 0) {
-            GameState.questProgress = Math.round((GameState.currentStep / GameState.totalSteps) * 100);
-        }
+        // Quest progress comes from progress_percent (batch progress)
+        // NOT from currentStep/totalSteps (campaign steps - meaningless for continuous training)
 
         // Update UI
         updateBattleStatus();

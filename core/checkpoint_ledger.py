@@ -91,6 +91,10 @@ class CheckpointRecord:
     size_bytes: Optional[int] = None
     has_optimizer: bool = True
 
+    # Usage tracking (for per-device retention)
+    last_used: Optional[str] = None  # ISO timestamp of last use (inference, eval, etc.)
+    locations: List[str] = field(default_factory=list)  # device_ids where this checkpoint exists
+
     # Metadata
     created_by: str = "training_daemon"
     ledger_version: str = "1.0.0"
@@ -232,6 +236,31 @@ class CheckpointLedger:
 
         self._load_index()
 
+    def _get_local_device_id(self) -> Optional[str]:
+        """Get the device_id for the local machine (cached)."""
+        if not hasattr(self, '_local_device_id'):
+            self._local_device_id = None
+            try:
+                from core.hosts import get_local_host
+                local = get_local_host()
+                if local and local.device_id:
+                    self._local_device_id = local.device_id
+            except Exception:
+                pass
+
+            # Fallback: try to detect from hostname
+            if not self._local_device_id:
+                import socket
+                hostname = socket.gethostname().lower()
+                if "4090" in hostname or "trainer" in hostname:
+                    self._local_device_id = "trainer4090"
+                elif "3090" in hostname or "inference" in hostname:
+                    self._local_device_id = "inference3090"
+                else:
+                    self._local_device_id = "trainer4090"  # Default
+
+        return self._local_device_id
+
     def _load_index(self, force: bool = False):
         """Load the central index."""
         if not self.index_path.exists():
@@ -268,21 +297,72 @@ class CheckpointLedger:
         self._load_index(force=False)
 
     def _save_index(self):
-        """Save the central index."""
+        """
+        Save the central index atomically.
+
+        Uses file locking and atomic write to prevent race conditions
+        when multiple processes update the ledger.
+        """
+        import fcntl
+        import tempfile
+
         self.status_dir.mkdir(parents=True, exist_ok=True)
+        lock_file = self.index_path.with_suffix(".lock")
 
-        data = {
-            "version": "1.0.0",
-            "updated_at": datetime.now().isoformat(),
-            "checkpoint_count": len(self._index),
-            "checkpoints": {
-                str(step): record.to_dict()
-                for step, record in sorted(self._index.items())
-            },
-        }
+        # Acquire file lock for atomic read-modify-write
+        with open(lock_file, "w") as lock_fd:
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+            try:
+                # Re-read the file to merge any changes from other processes
+                if self.index_path.exists():
+                    try:
+                        with open(self.index_path) as f:
+                            disk_data = json.load(f)
+                        # Merge disk data with our changes
+                        for step_str, record_data in disk_data.get("checkpoints", {}).items():
+                            step = int(step_str)
+                            if step not in self._index:
+                                # New record from disk that we don't have
+                                try:
+                                    self._index[step] = CheckpointRecord.from_dict(record_data)
+                                except Exception:
+                                    pass
+                            else:
+                                # Merge locations from disk with our locations
+                                disk_locations = set(record_data.get("locations", []))
+                                our_locations = set(self._index[step].locations)
+                                merged = list(disk_locations | our_locations)
+                                self._index[step].locations = merged
+                    except Exception as e:
+                        logger.warning(f"Could not merge from disk: {e}")
 
-        with open(self.index_path, "w") as f:
-            json.dump(data, f, indent=2)
+                # Prepare data
+                data = {
+                    "version": "1.0.0",
+                    "updated_at": datetime.now().isoformat(),
+                    "checkpoint_count": len(self._index),
+                    "checkpoints": {
+                        str(step): record.to_dict()
+                        for step, record in sorted(self._index.items())
+                    },
+                }
+
+                # Atomic write: write to temp file then rename
+                fd, temp_path = tempfile.mkstemp(
+                    dir=self.status_dir,
+                    prefix="ledger_",
+                    suffix=".tmp"
+                )
+                try:
+                    with os.fdopen(fd, "w") as f:
+                        json.dump(data, f, indent=2)
+                    os.replace(temp_path, self.index_path)
+                    self._index_mtime = self.index_path.stat().st_mtime
+                except Exception:
+                    os.unlink(temp_path)
+                    raise
+            finally:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
 
     def _write_sidecar(self, checkpoint_dir: Path, record: CheckpointRecord):
         """Write sidecar file to checkpoint directory."""
@@ -351,6 +431,10 @@ class CheckpointLedger:
         canonical_name = generate_canonical_name(step, timestamp)
 
         checkpoint_path = Path(path)
+        # Always store absolute paths in the ledger
+        if not checkpoint_path.is_absolute():
+            checkpoint_path = self.base_dir / checkpoint_path
+        checkpoint_path = checkpoint_path.resolve()
 
         # Calculate size
         size_bytes = None
@@ -361,6 +445,9 @@ class CheckpointLedger:
 
         # Check for optimizer
         has_optimizer = (checkpoint_path / "optimizer.pt").exists()
+
+        # Get local device ID for location tracking
+        local_device_id = self._get_local_device_id()
 
         record = CheckpointRecord(
             step=step,
@@ -379,6 +466,8 @@ class CheckpointLedger:
             total_examples_trained=total_examples_trained,
             size_bytes=size_bytes,
             has_optimizer=has_optimizer,
+            last_used=timestamp.isoformat(),
+            locations=[local_device_id] if local_device_id else [],
         )
 
         with self._lock:
@@ -497,6 +586,125 @@ class CheckpointLedger:
             r for r in self._index.values()
             if r.skill_name == skill_name
         ]
+
+    def record_usage(self, step: int, device_id: str) -> bool:
+        """
+        Record that a checkpoint was used on a device.
+
+        Updates last_used timestamp and adds device to locations list.
+        Called when checkpoint is loaded for inference, eval, etc.
+
+        Args:
+            step: Checkpoint step number
+            device_id: Device ID (e.g., "trainer4090", "inference3090")
+
+        Returns:
+            True if updated, False if checkpoint not found
+        """
+        self._ensure_fresh()
+
+        with self._lock:
+            record = self._index.get(step)
+            if not record:
+                logger.warning(f"Cannot record usage: checkpoint {step} not in ledger")
+                return False
+
+            # Update last_used
+            record.last_used = datetime.now().isoformat()
+
+            # Add device to locations if not present
+            if device_id not in record.locations:
+                record.locations.append(device_id)
+
+            self._save_index()
+            logger.debug(f"Recorded usage: checkpoint {step} on {device_id}")
+            return True
+
+    def remove_location(self, step: int, device_id: str) -> bool:
+        """
+        Remove a device from a checkpoint's locations.
+
+        Called when a checkpoint is deleted from a device.
+
+        Args:
+            step: Checkpoint step number
+            device_id: Device ID to remove
+
+        Returns:
+            True if updated, False if checkpoint not found
+        """
+        self._ensure_fresh()
+
+        with self._lock:
+            record = self._index.get(step)
+            if not record:
+                return False
+
+            if device_id in record.locations:
+                record.locations.remove(device_id)
+                self._save_index()
+                logger.debug(f"Removed location: checkpoint {step} from {device_id}")
+            return True
+
+    def list_by_device(self, device_id: str, sort_by_usage: bool = True) -> List[CheckpointRecord]:
+        """
+        List checkpoints that exist on a specific device.
+
+        Args:
+            device_id: Device ID to filter by
+            sort_by_usage: If True, sort by last_used (most recent first)
+
+        Returns:
+            List of checkpoint records on this device
+        """
+        self._ensure_fresh()
+        records = [r for r in self._index.values() if device_id in r.locations]
+
+        if sort_by_usage:
+            # Sort by last_used, with None values last
+            records.sort(
+                key=lambda r: r.last_used or "1970-01-01T00:00:00",
+                reverse=True
+            )
+        else:
+            records.sort(key=lambda r: r.step, reverse=True)
+
+        return records
+
+    def get_retention_candidates(
+        self,
+        device_id: str,
+        keep_count: int,
+    ) -> List[CheckpointRecord]:
+        """
+        Get checkpoints that should be deleted from a device.
+
+        Returns checkpoints beyond the keep_count, sorted by least recently used.
+        Never returns checkpoints that are the only copy (is_vault locations).
+
+        Args:
+            device_id: Device to check
+            keep_count: Number of checkpoints to keep
+
+        Returns:
+            List of checkpoint records that can be deleted
+        """
+        records = self.list_by_device(device_id, sort_by_usage=True)
+
+        if len(records) <= keep_count:
+            return []
+
+        # The most recently used are kept, older ones are candidates
+        candidates = records[keep_count:]
+
+        # Filter out checkpoints that only exist on this device (safety)
+        # NAS device_id is "synology_data" per hosts.json
+        safe_candidates = [
+            r for r in candidates
+            if len(r.locations) > 1 or "synology_data" in r.locations
+        ]
+
+        return safe_candidates
 
     def scan_orphans(self) -> List[Path]:
         """

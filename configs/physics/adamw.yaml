@@ -1,0 +1,104 @@
+# =============================================================================
+# PHYSICS: ADAMW
+# =============================================================================
+#
+# The classic adaptive optimizer with decoupled weight decay.
+# Well-understood, stable, widely tested on all model sizes.
+#
+# =============================================================================
+
+id: adamw
+name: "AdamW Physics"
+rpg_name: "The Classical Path"
+version: "1.0.0"
+
+description: >
+  Adam with decoupled weight decay. The standard choice for most
+  transformer training - well-understood dynamics, extensive literature,
+  and robust defaults.
+
+# Display
+icon: "📐"
+color: "#10B981"  # Green
+
+# =============================================================================
+# OPTIMIZER CONFIGURATION
+# =============================================================================
+
+optimizer:
+  type: adamw
+
+  adamw:
+    # Learning rate
+    lr: 5.0e-5
+
+    # Beta coefficients for moment estimation
+    betas: [0.9, 0.95]
+
+    # Weight decay coefficient
+    weight_decay: 0.1
+
+    # Epsilon for numerical stability
+    eps: 1.0e-8
+
+# =============================================================================
+# PRECISION & NUMERICS
+# =============================================================================
+
+precision:
+  compute_dtype: bf16
+  mixed_precision: true
+  grad_scaling: false
+
+# =============================================================================
+# GRADIENT HANDLING
+# =============================================================================
+
+gradients:
+  max_grad_norm: 1.0
+  accumulation_steps: 1
+  checkpointing: false
+
+# =============================================================================
+# LEARNING RATE SCHEDULE
+# =============================================================================
+
+schedule:
+  type: warmup_cosine
+  warmup_steps: 100
+  min_lr_ratio: 0.1
+
+# =============================================================================
+# STABILITY SETTINGS
+# =============================================================================
+
+stability:
+  per_param_clip: false
+  detect_anomaly: false
+  loss_scale: 1.0
+
+# =============================================================================
+# RECOMMENDED USE CASES
+# =============================================================================
+
+recommendations:
+  suited_for:
+    - "Any model size"
+    - "Production training"
+    - "When stability is paramount"
+    - "Distributed training"
+
+  domains:
+    - reasoning
+    - code
+    - discourse
+
+# =============================================================================
+# NOTES
+# =============================================================================
+#
+# AdamW is the safe default. Use it when:
+# - You want predictable training dynamics
+# - You're scaling up and need stability
+# - You're doing ablation studies
+#

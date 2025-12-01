@@ -24,38 +24,104 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 
+class School(str, Enum):
+    """
+    The Five Schools - Job processing families.
+
+    Schools are organizational groupings of job types, each representing
+    a distinct discipline with its own worker roles and resource patterns.
+
+    Just as a Hero follows a Path through a Domain under a Technique,
+    Jobs are processed by Workers trained in a School's methods.
+    """
+    INFERENCE = "inference"      # Oracle's Sanctum - model interaction
+    FORGE = "forge"              # Data Forge - data processing
+    VAULT = "vault"              # Vault Keepers - storage ops
+    ANALYTICS = "analytics"      # Scriveners - metrics & reports
+    ARCHAEOLOGY = "archaeology"  # Seers - model interpretability
+
+    @property
+    def display_name(self) -> str:
+        """Human-friendly school name."""
+        names = {
+            School.INFERENCE: "School of Inference",
+            School.FORGE: "School of the Forge",
+            School.VAULT: "School of the Vault",
+            School.ANALYTICS: "School of Analytics",
+            School.ARCHAEOLOGY: "School of Archaeology",
+        }
+        return names.get(self, self.value)
+
+    @property
+    def rpg_name(self) -> str:
+        """RPG/lore name for the school."""
+        names = {
+            School.INFERENCE: "The Oracle's Sanctum",
+            School.FORGE: "The Data Forge",
+            School.VAULT: "The Vault Keepers",
+            School.ANALYTICS: "The Scriveners",
+            School.ARCHAEOLOGY: "The Seers",
+        }
+        return names.get(self, self.value)
+
+    @property
+    def icon(self) -> str:
+        """Icon for the school."""
+        icons = {
+            School.INFERENCE: "🔮",
+            School.FORGE: "🔥",
+            School.VAULT: "🏛️",
+            School.ANALYTICS: "📊",
+            School.ARCHAEOLOGY: "🔬",
+        }
+        return icons.get(self, "📦")
+
+    @property
+    def worker_role(self) -> str:
+        """Primary worker role for this school."""
+        roles = {
+            School.INFERENCE: "eval_worker",
+            School.FORGE: "data_forge",
+            School.VAULT: "vault_worker",
+            School.ANALYTICS: "analytics",
+            School.ARCHAEOLOGY: "analytics",
+        }
+        return roles.get(self, "worker")
+
+
 class JobType(str, Enum):
     """
     Types of jobs that can be dispatched.
 
-    Each job type maps to worker roles that can handle it:
-    - EVAL → EVAL_WORKER role
-    - DATA_GEN → DATA_FORGE role
-    - SPARRING → EVAL_WORKER + INFERENCE (needs both)
-    - ARCHIVE → VAULT_WORKER role
-    - ANALYTICS → ANALYTICS role
+    Each job type belongs to a School and maps to worker roles:
+    - EVAL → School of Inference → EVAL_WORKER role
+    - DATA_GEN → School of the Forge → DATA_FORGE role
+    - SPARRING → School of Inference → EVAL_WORKER role
+    - ARCHIVE → School of the Vault → VAULT_WORKER role
+    - ANALYTICS → School of Analytics → ANALYTICS role
+    - LAYER_STATS → School of Archaeology → ANALYTICS role
     """
-    # Inference-requiring jobs
+    # School of Inference - Oracle's Sanctum
     EVAL = "eval"                  # Skill evaluation (needs inference)
     SPARRING = "sparring"          # Self-correction sparring (needs inference)
     INFERENCE = "inference"        # Direct inference request
 
-    # Data generation jobs (CPU-bound)
+    # School of the Forge - Data Forge
     DATA_GEN = "data_gen"          # Generate training data
     DATA_FILTER = "data_filter"    # Filter/validate data
     DATA_CONVERT = "data_convert"  # Convert data formats
 
-    # Storage/archival jobs
+    # Storage/archival jobs - Vault Keepers
     ARCHIVE = "archive"            # Archive checkpoints
     RETENTION = "retention"        # Apply retention policies
     SYNC = "sync"                  # Sync between zones
 
-    # Reporting/analytics jobs
+    # School of Analytics - Scriveners
     ANALYTICS = "analytics"        # Run analytics/metrics
     REPORT = "report"              # Generate reports
     HEALTH_CHECK = "health_check"  # System health check
 
-    # Model Archaeology jobs (interpretability)
+    # School of Archaeology - Seers
     LAYER_STATS = "layer_stats"    # Per-layer weight/activation stats
     LAYER_DRIFT = "layer_drift"    # Compare weight drift between checkpoints
 
@@ -98,6 +164,32 @@ class JobType(str, Enum):
             JobType.LAYER_DRIFT: 600,    # 10 min (CPU-only)
         }
         return timeouts.get(self, 300)
+
+    @property
+    def school(self) -> School:
+        """The School this job type belongs to."""
+        mapping = {
+            # School of Inference - Oracle's Sanctum
+            JobType.EVAL: School.INFERENCE,
+            JobType.SPARRING: School.INFERENCE,
+            JobType.INFERENCE: School.INFERENCE,
+            # School of the Forge - Data Forge
+            JobType.DATA_GEN: School.FORGE,
+            JobType.DATA_FILTER: School.FORGE,
+            JobType.DATA_CONVERT: School.FORGE,
+            # School of the Vault - Vault Keepers
+            JobType.ARCHIVE: School.VAULT,
+            JobType.RETENTION: School.VAULT,
+            JobType.SYNC: School.VAULT,
+            # School of Analytics - Scriveners
+            JobType.ANALYTICS: School.ANALYTICS,
+            JobType.REPORT: School.ANALYTICS,
+            JobType.HEALTH_CHECK: School.ANALYTICS,
+            # School of Archaeology - Seers
+            JobType.LAYER_STATS: School.ARCHAEOLOGY,
+            JobType.LAYER_DRIFT: School.ARCHAEOLOGY,
+        }
+        return mapping.get(self, School.ANALYTICS)
 
 
 class JobStatus(str, Enum):

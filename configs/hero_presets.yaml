@@ -1,0 +1,722 @@
+# Hero Name Presets
+# Potential names for future campaigns with etymology and vibes
+#
+# Usage: When creating a new campaign, pick a name that matches
+# the model's personality or training focus.
+
+presets:
+  # === Greek Philosophy ===
+  dio:
+    name: DIO
+    vibe: skeptical cynic
+    emoji: "\U0001F9D0"  # Reserved - current 0.6B hero
+    native_form: "Διογένης"
+    root: "Diogenes (Ancient Greek philosopher)"
+    notes: "The original skeptic who lived in a barrel"
+
+  zeno:
+    name: ZENO
+    vibe: paradox thinker
+    emoji: "\u267E\uFE0F"
+    native_form: "Ζήνων"
+    root: "Zeno (Ancient Greek name, linked to Zeno's paradoxes)"
+    notes: "For models that handle edge cases and contradictions"
+
+  # === Latin / Italian ===
+  flo:
+    name: FLO
+    vibe: analytical helper
+    emoji: "\U0001F4CA"  # Reserved - current 4B hero
+    native_form: "Florentia / Firenze"
+    root: "Latin origin of Florence / Italian city name"
+    notes: "Flourishing, growth-oriented"
+
+  vero:
+    name: VERO
+    vibe: truth filter
+    emoji: "\u2705"
+    native_form: "vero"
+    root: "Italian for 'true, real'"
+    notes: "For models focused on factual accuracy"
+
+  nero:
+    name: NERO
+    vibe: shadow analyst
+    emoji: "\U0001F311"
+    native_form: "nero"
+    root: "Italian for 'black'"
+    notes: "For models exploring edge cases, adversarial thinking"
+
+  # === Spanish / Portuguese ===
+  oro:
+    name: ORO
+    vibe: value seeker
+    emoji: "\U0001FA99"
+    native_form: "oro"
+    root: "Gold in Spanish / Italian"
+    notes: "For models optimizing value, reward modeling"
+
+  lobo:
+    name: LOBO
+    vibe: pack strategist
+    emoji: "\U0001F43A"
+    native_form: "lobo"
+    root: "Wolf in Spanish / Portuguese"
+    notes: "For multi-agent coordination, team strategies"
+
+  toro:
+    name: TORO
+    vibe: relentless force
+    emoji: "\U0001F402"
+    native_form: "toro"
+    root: "Bull in Spanish"
+    notes: "For persistent, determined training runs"
+
+  mono:
+    name: MONO
+    vibe: playful hacker
+    emoji: "\U0001F412"
+    native_form: "mono"
+    root: "Monkey (and sometimes 'cute') in Spanish"
+    notes: "For exploratory, creative models"
+
+  ojo:
+    name: OJO
+    vibe: watchful eye
+    emoji: "\U0001F441"
+    native_form: "ojo"
+    root: "Eye in Spanish ('watch out!' / keep an eye on it)"
+    notes: "For monitoring, observation, attention mechanisms"
+
+  # === Chinese ===
+  gou:
+    name: GOU
+    vibe: loyal companion
+    emoji: "\U0001F415"
+    native_form: "狗"
+    root: "gǒu - 'dog' in Chinese"
+    notes: "Faithful, reliable assistant models"
+
+  tao:
+    name: TAO
+    vibe: effortless flow
+    emoji: "\u262F\uFE0F"
+    native_form: "道"
+    root: "dào / tao - 'the Way, path' in Chinese"
+    notes: "For models achieving natural, elegant solutions"
+
+  mo:
+    name: MO
+    vibe: quiet scribe
+    emoji: "\u2712\uFE0F"
+    native_form: "墨"
+    root: "mò - 'ink' in Chinese"
+    notes: "For writing-focused models, documentation"
+
+  shou:
+    name: SHOU
+    vibe: protective guard
+    emoji: "\U0001F6E1"
+    native_form: "守"
+    root: "shǒu - 'to guard, keep' in Chinese"
+    notes: "For safety-focused models, guardrails"
+
+  # === Japanese ===
+  neko:
+    name: NEKO
+    vibe: curious cat
+    emoji: "\U0001F408"
+    native_form: "猫"
+    root: "neko - 'cat' in Japanese"
+    notes: "For curious, exploratory models"
+
+  kumo:
+    name: KUMO
+    vibe: web weaver
+    emoji: "\U0001F578"
+    native_form: "雲 / 蜘蛛"
+    root: "kumo - 'cloud' / 'spider' in Japanese (same sound)"
+    notes: "For models building connections, networks"
+
+  tomo:
+    name: TOMO
+    vibe: social connector
+    emoji: "\U0001F91D"
+    native_form: "友"
+    root: "tomo - 'friend,' as in 友達 tomodachi"
+    notes: "For collaborative, social models"
+
+  ao:
+    name: AO
+    vibe: calm observer
+    emoji: "\U0001F30A"
+    native_form: "青"
+    root: "ao - 'blue/green' in Japanese"
+    notes: "For steady, balanced models"
+
+  momo:
+    name: MOMO
+    vibe: gentle joy
+    emoji: "\U0001F351"
+    native_form: "桃"
+    root: "momo - 'peach' in Japanese"
+    notes: "For positive, uplifting interactions"
+
+  # === Swahili ===
+  moyo:
+    name: MOYO
+    vibe: empathic heart
+    emoji: "\u2764\uFE0F"
+    native_form: "moyo"
+    root: "moyo - 'heart' in Swahili"
+    notes: "For empathetic, emotionally intelligent models"
+
+  moto:
+    name: MOTO
+    vibe: spark starter
+    emoji: "\U0001F525"
+    native_form: "moto"
+    root: "moto - 'fire' in Swahili"
+    notes: "For models that ignite creativity, bootstrap"
+
+  # === Yoruba ===
+  omo:
+    name: OMO
+    vibe: curious child
+    emoji: "\U0001F9D2"
+    native_form: "ọmọ / omo"
+    root: "ọmọ / omo - 'child' in Yoruba"
+    notes: "For learning-focused, naive exploration"
+
+  # === Russian / Esperanto ===
+  miro:
+    name: MIRO
+    vibe: peace broker
+    emoji: "\U0001F54A"
+    native_form: "мир"
+    root: "mir - 'peace / world' in Russian"
+    notes: "For conflict resolution, balanced perspectives"
+
+  lumo:
+    name: LUMO
+    vibe: clarity light
+    emoji: "\U0001F4A1"
+    native_form: "lumo"
+    root: "lumo - Esperanto for 'light'"
+    notes: "For explainability, interpretability models"
+
+  # === Hindi / Sanskrit ===
+  om:
+    name: OM
+    vibe: cosmic resonance
+    emoji: "\U0001F549"  # 🕉️
+    native_form: "ॐ"
+    root: "Sanskrit sacred syllable - the primordial sound of creation"
+    notes: "For foundational models, universal principles"
+
+  ojas:
+    name: OJAS
+    vibe: vital energy
+    emoji: "\u26A1"  # ⚡
+    native_form: "ओजस्"
+    root: "Sanskrit for 'vitality, vigor, life force'"
+    notes: "For high-energy, performant models"
+
+  bodhi:
+    name: BODHI
+    vibe: awakened one
+    emoji: "\U0001F9D8"  # 🧘
+    native_form: "बोधि"
+    root: "Sanskrit for 'awakening, enlightenment'"
+    notes: "For models achieving insight, understanding"
+
+  daya:
+    name: DAYA
+    vibe: compassionate helper
+    emoji: "\U0001F64F"  # 🙏
+    native_form: "दया"
+    root: "Sanskrit/Hindi for 'compassion, mercy'"
+    notes: "For helpful, caring models"
+
+  agni:
+    name: AGNI
+    vibe: fiery spirit
+    emoji: "\U0001F525"
+    native_form: "अग्नि"
+    root: "Sanskrit for 'fire' - Vedic god of fire"
+    notes: "For transformative, powerful models"
+
+  kavi:
+    name: KAVI
+    vibe: creative wordsmith
+    emoji: "\u270D\uFE0F"  # ✍️
+    native_form: "कवि"
+    root: "Sanskrit for 'poet, sage'"
+    notes: "For creative, eloquent models"
+
+  mitra:
+    name: MITRA
+    vibe: friendly helper
+    emoji: "\U0001F917"  # 🤗
+    native_form: "मित्र"
+    root: "Sanskrit for 'friend' - also a Vedic deity"
+    notes: "For collaborative, friendly models"
+
+  # === Arabic ===
+  noor:
+    name: NOOR
+    vibe: divine light
+    emoji: "\U0001F31F"  # 🌟
+    native_form: "نور"
+    root: "Arabic for 'light' - appears in Quran (Surah An-Nur)"
+    notes: "For illuminating, clarifying models"
+
+  sabr:
+    name: SABR
+    vibe: patient perseverance
+    emoji: "\u23F3"  # ⏳
+    native_form: "صبر"
+    root: "Arabic for 'patience, steadfastness'"
+    notes: "For models handling long tasks, steady progress"
+
+  fikr:
+    name: FIKR
+    vibe: deep thinker
+    emoji: "\U0001F914"  # 🤔
+    native_form: "فكر"
+    root: "Arabic for 'thought, reflection'"
+    notes: "For analytical, contemplative models"
+
+  ruh:
+    name: RUH
+    vibe: spiritual essence
+    emoji: "\U0001F47B"  # 👻
+    native_form: "روح"
+    root: "Arabic for 'spirit, soul'"
+    notes: "For models with depth, soul"
+
+  # === Hebrew ===
+  or:
+    name: OR
+    vibe: light bringer
+    emoji: "\U0001F56F"  # 🕯️
+    native_form: "אור"
+    root: "Hebrew for 'light' - same Semitic root as Arabic noor"
+    notes: "For illuminating models - THE unicorn (O + light)"
+
+  emet:
+    name: EMET
+    vibe: truth seeker
+    emoji: "\u2696\uFE0F"  # ⚖️
+    native_form: "אמת"
+    root: "Hebrew for 'truth' - inscribed on the Golem"
+    notes: "For truthful, honest models"
+
+  lev:
+    name: LEV
+    vibe: heart-centered
+    emoji: "\U0001F49C"  # 💜
+    native_form: "לב"
+    root: "Hebrew for 'heart'"
+    notes: "For emotionally intelligent models"
+
+  chen:
+    name: CHEN
+    vibe: graceful presence
+    emoji: "\u2728"  # ✨
+    native_form: "חן"
+    root: "Hebrew for 'grace, charm, favor'"
+    notes: "For elegant, refined models"
+
+  # === Korean ===
+  sori:
+    name: SORI
+    vibe: voice communicator
+    emoji: "\U0001F50A"  # 🔊
+    native_form: "소리"
+    root: "Korean for 'sound, voice'"
+    notes: "For audio, speech, communication models"
+
+  bit:
+    name: BIT
+    vibe: bright illuminator
+    emoji: "\u2728"  # ✨
+    native_form: "빛"
+    root: "Korean for 'light'"
+    notes: "For clarifying, illuminating models"
+
+  byul:
+    name: BYUL
+    vibe: guiding star
+    emoji: "\u2B50"  # ⭐
+    native_form: "별"
+    root: "Korean for 'star'"
+    notes: "For guiding, leading models"
+
+  bada:
+    name: BADA
+    vibe: vast depths
+    emoji: "\U0001F30A"  # 🌊
+    native_form: "바다"
+    root: "Korean for 'sea, ocean'"
+    notes: "For deep, expansive models"
+
+  # === Turkish ===
+  goz:
+    name: GOZ
+    vibe: watchful observer
+    emoji: "\U0001F440"  # 👀
+    native_form: "göz"
+    root: "Turkish for 'eye'"
+    notes: "For observation, attention models"
+
+  su:
+    name: SU
+    vibe: flowing adaptable
+    emoji: "\U0001F4A7"  # 💧
+    native_form: "su"
+    root: "Turkish for 'water'"
+    notes: "For flexible, adaptable models"
+
+  yol:
+    name: YOL
+    vibe: pathfinder
+    emoji: "\U0001F6E4"  # 🛤️
+    native_form: "yol"
+    root: "Turkish for 'path, way, road'"
+    notes: "For navigation, planning models"
+
+  # === Vietnamese ===
+  tam:
+    name: TAM
+    vibe: heart-mind unity
+    emoji: "\U0001F9E0"  # 🧠
+    native_form: "tâm"
+    root: "Vietnamese for 'heart-mind' (same Chinese character 心)"
+    notes: "For integrated reasoning + emotion"
+
+  hoa:
+    name: HOA
+    vibe: harmonious
+    emoji: "\U0001F3B5"  # 🎵
+    native_form: "hòa"
+    root: "Vietnamese for 'peace, harmony'"
+    notes: "For balanced, harmonious models"
+
+  anh:
+    name: ANH
+    vibe: radiant
+    emoji: "\U0001F4AB"  # 💫
+    native_form: "ánh"
+    root: "Vietnamese for 'light, ray, gleam'"
+    notes: "For bright, radiant models"
+
+  # === Thai ===
+  jai:
+    name: JAI
+    vibe: centered heart
+    emoji: "\U0001F497"  # 💗
+    native_form: "ใจ"
+    root: "Thai for 'heart, mind' (often combined in compounds)"
+    notes: "For emotionally centered models"
+
+  fai:
+    name: FAI
+    vibe: fiery spirit
+    emoji: "\U0001F525"
+    native_form: "ไฟ"
+    root: "Thai for 'fire'"
+    notes: "For energetic, passionate models"
+
+  # === Persian / Farsi ===
+  mehr:
+    name: MEHR
+    vibe: radiant love
+    emoji: "\u2600\uFE0F"  # ☀️
+    native_form: "مهر"
+    root: "Persian for 'love, sun, kindness' - also the sun god Mithra"
+    notes: "For warm, loving models"
+
+  dana:
+    name: DANA
+    vibe: wise one
+    emoji: "\U0001F989"  # 🦉
+    native_form: "دانا"
+    root: "Persian for 'wise, knowing'"
+    notes: "For knowledgeable, wise models"
+
+  rah:
+    name: RAH
+    vibe: pathfinder
+    emoji: "\U0001F9ED"  # 🧭
+    native_form: "راه"
+    root: "Persian for 'way, path, road'"
+    notes: "For guiding, direction-finding models"
+
+  # === Hawaiian ===
+  mana:
+    name: MANA
+    vibe: spiritual power
+    emoji: "\u26A1"  # ⚡
+    native_form: "mana"
+    root: "Hawaiian/Polynesian for 'spiritual power, authority'"
+    notes: "For powerful, authoritative models"
+
+  kai:
+    name: KAI
+    vibe: ocean depths
+    emoji: "\U0001F30A"  # 🌊
+    native_form: "kai"
+    root: "Hawaiian for 'sea, ocean'"
+    notes: "For deep, vast models"
+
+  ola:
+    name: OLA
+    vibe: life-giving
+    emoji: "\U0001F331"  # 🌱
+    native_form: "ola"
+    root: "Hawaiian for 'life, health, well-being'"
+    notes: "For life-affirming, healthy models"
+
+  # === Irish / Gaelic ===
+  solas:
+    name: SOLAS
+    vibe: illuminating
+    emoji: "\U0001F31F"  # 🌟
+    native_form: "solas"
+    root: "Irish for 'light'"
+    notes: "For clarifying, illuminating models"
+
+  aon:
+    name: AON
+    vibe: unified
+    emoji: "1\uFE0F\u20E3"  # 1️⃣
+    native_form: "aon"
+    root: "Irish for 'one'"
+    notes: "For unified, singular-purpose models"
+
+  # === Finnish ===
+  tuli:
+    name: TULI
+    vibe: fiery
+    emoji: "\U0001F525"
+    native_form: "tuli"
+    root: "Finnish for 'fire'"
+    notes: "For energetic, transformative models"
+
+  valo:
+    name: VALO
+    vibe: bright
+    emoji: "\U0001F4A1"  # 💡
+    native_form: "valo"
+    root: "Finnish for 'light'"
+    notes: "For bright, clear models"
+
+# =============================================================================
+# Categories by focus area
+# =============================================================================
+categories:
+  philosophy:
+    - dio
+    - zeno
+    - tao
+    - bodhi
+    - emet
+
+  guardian:
+    - shou
+    - lobo
+    - vero
+    - sabr
+
+  creative:
+    - mono
+    - moto
+    - kumo
+    - kavi
+
+  analytical:
+    - flo
+    - mo
+    - nero
+    - fikr
+    - dana
+
+  social:
+    - tomo
+    - moyo
+    - miro
+    - mitra
+    - daya
+
+  exploration:
+    - neko
+    - omo
+    - ao
+    - kai
+    - bada
+
+# =============================================================================
+# Thematic groupings
+# =============================================================================
+thematic:
+  # "Light" words across languages - universal theme of illumination
+  lights:
+    items:
+      - or       # Hebrew אור - THE unicorn (O + light)
+      - noor     # Arabic نور - divine light
+      - lumo     # Esperanto - clarity
+      - bit      # Korean 빛
+      - valo     # Finnish
+      - solas    # Irish
+      - anh      # Vietnamese ánh
+      - mehr     # Persian (sun)
+    notes: >
+      Light is a universal metaphor for knowledge, clarity, and truth.
+      OR (Hebrew) is special - it starts with O AND means light.
+      NOOR/NUR and OR share the same Semitic root.
+
+  # Names starting with "O" - pleasant phonetic theme
+  o_names:
+    items:
+      - om       # Sanskrit ॐ - cosmic resonance
+      - ojas     # Sanskrit ओजस् - vital energy
+      - or       # Hebrew אור - light (overlaps with lights!)
+      - oro      # Spanish - gold
+      - ojo      # Spanish - eye
+      - ola      # Hawaiian - life
+      - omo      # Yoruba - child
+    notes: >
+      "O" is a satisfying, open sound across languages.
+      Hindi/Sanskrit has native O sounds (OM, OJAS).
+      Arabic does NOT have native O - uses a/i/u vowels only.
+      Hebrew has O in OR.
+
+  # Fire/energy words - transformation and power
+  fire:
+    items:
+      - moto     # Swahili
+      - agni     # Sanskrit (Vedic fire god)
+      - fai      # Thai ไฟ
+      - tuli     # Finnish
+      - ojas     # Sanskrit (vital energy)
+      - mana     # Hawaiian (spiritual power)
+
+  # Heart/soul words - emotional intelligence
+  heart:
+    items:
+      - moyo     # Swahili - heart
+      - lev      # Hebrew לב - heart
+      - jai      # Thai ใจ - heart/mind
+      - tam      # Vietnamese tâm - heart-mind
+      - ruh      # Arabic روح - soul/spirit
+
+  # Path/way words - guidance and navigation
+  path:
+    items:
+      - tao      # Chinese 道 - the Way
+      - yol      # Turkish - path
+      - rah      # Persian راه - way
+    notes: >
+      Universal concept of "the path" in philosophy.
+
+# =============================================================================
+# Notable considerations (design notes)
+# =============================================================================
+considerations:
+  phonetics:
+    - "2-4 characters ideal for hero names"
+    - "O sound is pleasant and works across many languages"
+    - "Arabic has NO native O vowel (only a, i, u)"
+    - "Hindi/Sanskrit DO have O (ओ)"
+    - "Korean has O in 빛 (bit) pronunciation but written differently"
+
+  semitic_connection:
+    - "Hebrew OR (אור) and Arabic NOOR (نور) share same Semitic root"
+    - "Both mean 'light' - shows linguistic family connection"
+    - "Hebrew uses O vowel, Arabic uses OO/U sound"
+
+  special_names:
+    or:
+      why_special: "THE unicorn - starts with O AND means light"
+      languages: ["Hebrew"]
+    om:
+      why_special: "Most iconic Sanskrit symbol, universally recognized"
+      languages: ["Sanskrit", "Hindi"]
+    tao:
+      why_special: "Philosophical depth, 'the Way' concept"
+      languages: ["Chinese"]
+
+  reserved:
+    dio: "Current 0.6B hero - skeptical cynic 🧐"
+    flo: "Current 4B hero - analytical helper 📊"
+
+  torchbearer_theme:
+    discovery: >
+      Both founding heroes are accidentally lantern/lamp bearers!
+      This emerged organically and could be a unifying theme.
+    dio_connection:
+      name: "Diogenes"
+      symbol: "Lantern in daylight 🏮"
+      story: "Walked Athens with lit lantern saying 'I search for an honest man'"
+      meaning: "Using light to expose truth, search through metaphorical darkness"
+    flo_connection:
+      name: "Florence (Nightingale)"
+      symbol: "Nurse's lamp 🪔"
+      story: "The Lady with the Lamp - tended soldiers by lamplight"
+      meaning: "Illuminating care, bringing light to suffering"
+    theme_extension: >
+      Heroes as torchbearers - each carries light differently:
+      - DIO: Skeptic's lantern (searching for truth)
+      - FLO: Healer's lamp (illuminating care)
+      - OR: Light itself (Hebrew אור)
+      - Future heroes could continue the theme
+
+  eye_o_pattern:
+    discovery: >
+      Proto-Indo-European *h₃ekʷ- ("to see") gave O-starting "eye" words
+      across Indo-European languages. This is why O + seeing/eye is universal.
+    latin_oculus_family:
+      - "OJO (Spanish) - eye"
+      - "OLHO (Portuguese) - eye"
+      - "OCCHIO (Italian) - eye"
+      - "OEIL (French) - eye"
+      - "OCHI (Romanian) - eye"
+    greek:
+      - "OPTOS - seen (→ optics)"
+      - "OPHTHALMOS - eye (→ ophthalmology)"
+    implication: >
+      We can likely find O + light/eye/seeing in almost any language
+      by tracing PIE roots or cultural metaphors.
+
+  language_coverage:
+    represented:
+      - "Greek (ancient)"
+      - "Latin/Italian"
+      - "Spanish/Portuguese"
+      - "Chinese"
+      - "Japanese"
+      - "Swahili"
+      - "Yoruba"
+      - "Russian"
+      - "Esperanto"
+      - "Hindi/Sanskrit"
+      - "Arabic"
+      - "Hebrew"
+      - "Korean"
+      - "Turkish"
+      - "Vietnamese"
+      - "Thai"
+      - "Persian/Farsi"
+      - "Hawaiian/Polynesian"
+      - "Irish/Gaelic"
+      - "Finnish"
+    future_candidates:
+      - "Bengali"
+      - "Tamil"
+      - "Indonesian/Malay"
+      - "Navajo/Indigenous American"
+      - "Zulu"
+      - "German"
+      - "French"
+      - "Dutch"

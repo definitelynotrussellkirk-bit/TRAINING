@@ -33,10 +33,10 @@ Integration with Weaver:
     The Weaver can call Groundskeeper.sweep() periodically.
 """
 
+import errno
 import json
 import logging
 import os
-import shutil
 import signal
 import sqlite3
 import sys
@@ -44,7 +44,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -59,11 +59,25 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CleanupPolicy:
-    """Retention policy for a resource type."""
+    """
+    Retention policy for a resource type.
+
+    Not all fields apply to all task types:
+    - jsonl: uses max_age_days, max_size_mb, max_lines, keep_fraction, keep_lines_cap
+    - queue: uses max_age_days, max_files (backstop for file count limit)
+    - battle_log: uses max_age_days only
+    - logs: uses max_age_days only (max_size_mb reserved for future total footprint bound)
+    - pids: ignores all - cleanup is purely liveness-based (dead process = delete)
+    - vacuum: uses max_age_days as interval between VACUUMs
+    - workers: uses max_age_days
+    - job_events: uses max_age_days
+    """
     max_age_days: int = 7
     max_size_mb: float = 50.0
     max_lines: int = 10000
-    max_files: int = 100
+    max_files: int = 100  # Reserved for future use (queue file count cap)
+    keep_fraction: float = 0.5  # Fraction of max_lines to keep after rotation
+    keep_lines_cap: int = 25000  # Hard cap on kept lines regardless of fraction
     enabled: bool = True
 
 
@@ -124,8 +138,8 @@ class Groundskeeper:
             try:
                 data = json.loads(state_file.read_text())
                 return datetime.fromisoformat(data.get("last_vacuum", "2000-01-01"))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to load groundskeeper state: {e}")
         return datetime(2000, 1, 1)
 
     def _save_state(self):
@@ -174,8 +188,11 @@ class Groundskeeper:
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                         lines = f.readlines()
 
-                    # Keep last N lines in main file
-                    keep_lines = min(policy.max_lines // 2, 25000)
+                    # Keep last N lines in main file (configurable via policy)
+                    keep_lines = min(
+                        int(policy.max_lines * policy.keep_fraction),
+                        policy.keep_lines_cap
+                    )
 
                     if len(lines) > keep_lines:
                         # Archive old lines
@@ -197,8 +214,12 @@ class Groundskeeper:
                         result.bytes_freed = len(''.join(old_lines).encode('utf-8'))
                         logger.info(f"Archived {len(old_lines)} lines to {archive_name}")
                 else:
-                    result.items_cleaned = max(0, line_count - policy.max_lines // 2)
-                    result.bytes_freed = int(file_size * 0.5)  # Estimate 50% reduction
+                    keep_lines = min(
+                        int(policy.max_lines * policy.keep_fraction),
+                        policy.keep_lines_cap
+                    )
+                    result.items_cleaned = max(0, line_count - keep_lines)
+                    result.bytes_freed = int(file_size * (1 - policy.keep_fraction))
 
             # Clean old archives
             cutoff = datetime.now() - timedelta(days=policy.max_age_days)
@@ -253,7 +274,9 @@ class Groundskeeper:
         """
         Clean up queue/recently_completed/ directory.
 
-        Delete files older than max_age_days.
+        Strategy:
+        1. Delete files older than max_age_days
+        2. If still over max_files, delete oldest until under limit (backstop)
         """
         result = CleanupResult(task="queue:recently_completed", dry_run=dry_run)
         policy = self.policies["queue"]
@@ -271,6 +294,7 @@ class Groundskeeper:
         try:
             files = list(completed_dir.glob("*.jsonl"))
 
+            # Phase 1: Age-based cleanup
             for file_path in files:
                 try:
                     mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
@@ -284,8 +308,25 @@ class Groundskeeper:
                 except Exception as e:
                     result.errors.append(f"Failed to delete {file_path.name}: {e}")
 
+            # Phase 2: max_files backstop (in case of clock issues or burst of files)
+            remaining_files = [f for f in completed_dir.glob("*.jsonl") if f.exists()]
+            if len(remaining_files) > policy.max_files:
+                # Sort by mtime (oldest first) and delete extras
+                remaining_files.sort(key=lambda p: p.stat().st_mtime)
+                excess = remaining_files[:-policy.max_files]  # Keep newest max_files
+                for file_path in excess:
+                    try:
+                        size = file_path.stat().st_size
+                        if not dry_run:
+                            file_path.unlink()
+                        result.items_cleaned += 1
+                        result.bytes_freed += size
+                        logger.debug(f"Deleted excess queue file: {file_path.name} (max_files backstop)")
+                    except Exception as e:
+                        result.errors.append(f"Failed to delete {file_path.name}: {e}")
+
             if result.items_cleaned > 0:
-                logger.info(f"Cleaned {result.items_cleaned} old queue files ({result.mb_freed:.2f}MB)")
+                logger.info(f"Cleaned {result.items_cleaned} queue files ({result.mb_freed:.2f}MB)")
 
         except Exception as e:
             result.errors.append(str(e))
@@ -372,6 +413,9 @@ class Groundskeeper:
 
             # Also check for dated log files like daemon_20251128.log
             for log_file in logs_dir.glob("*_????????.log"):
+                # Skip if already deleted by first loop (patterns can overlap)
+                if not log_file.exists():
+                    continue
                 try:
                     mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
                     if mtime < cutoff:
@@ -417,23 +461,39 @@ class Groundskeeper:
             try:
                 pid = int(pid_file.read_text().strip())
 
-                # Check if process is alive
+                # Check if process is alive using os.kill(pid, 0)
                 try:
                     os.kill(pid, 0)
                     # Process exists, leave it alone
-                except (OSError, ProcessLookupError):
-                    # Process is dead, clean up PID file
-                    if not dry_run:
-                        pid_file.unlink()
-                    result.items_cleaned += 1
-                    logger.info(f"Removed stale PID file: {pid_file.name} (PID {pid} dead)")
+                except OSError as e:
+                    if e.errno == errno.ESRCH:
+                        # ESRCH: No such process - definitely dead, clean up
+                        if not dry_run:
+                            pid_file.unlink()
+                        result.items_cleaned += 1
+                        logger.info(f"Removed stale PID file: {pid_file.name} (PID {pid} dead)")
+                    elif e.errno == errno.EPERM:
+                        # EPERM: Process exists but we lack permission - leave it alone
+                        logger.debug(f"PID {pid} exists but no permission to signal (leaving {pid_file.name})")
+                    else:
+                        # Other OS error - log and skip
+                        logger.warning(f"Unexpected error checking PID {pid}: {e}")
 
-            except (ValueError, OSError) as e:
-                # Invalid PID file, remove it
+            except ValueError:
+                # Invalid PID in file (not a number), remove it
                 if not dry_run:
                     pid_file.unlink()
                 result.items_cleaned += 1
-                logger.info(f"Removed invalid PID file: {pid_file.name}")
+                logger.info(f"Removed invalid PID file: {pid_file.name} (not a valid PID)")
+            except OSError as e:
+                # Can't read file, remove it
+                if not dry_run:
+                    try:
+                        pid_file.unlink()
+                    except OSError:
+                        pass
+                result.items_cleaned += 1
+                logger.info(f"Removed unreadable PID file: {pid_file.name}")
 
         return result
 
@@ -650,6 +710,20 @@ class Groundskeeper:
         Args:
             interval: Seconds between sweeps (default: 3600 = 1 hour)
         """
+        pid_file = self.base_dir / ".pids" / "groundskeeper.pid"
+        pid_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Single-instance guard: check if already running
+        if pid_file.exists():
+            try:
+                existing_pid = int(pid_file.read_text().strip())
+                os.kill(existing_pid, 0)  # Check if process exists
+                logger.error(f"Groundskeeper daemon already running (PID {existing_pid})")
+                sys.exit(1)
+            except (OSError, ProcessLookupError, ValueError):
+                # Process dead or invalid PID, safe to continue
+                pass
+
         logger.info(f"Groundskeeper daemon starting (interval={interval}s)")
 
         self.running = True
@@ -657,14 +731,17 @@ class Groundskeeper:
         signal.signal(signal.SIGINT, self._handle_signal)
 
         # Write PID
-        pid_file = self.base_dir / ".pids" / "groundskeeper.pid"
-        pid_file.parent.mkdir(parents=True, exist_ok=True)
         pid_file.write_text(str(os.getpid()))
 
         try:
             while self.running:
+                start = time.time()
                 self.sweep()
-                time.sleep(interval)
+                elapsed = time.time() - start
+                # Sleep for remaining interval time (don't drift if sweep takes long)
+                sleep_for = max(0, interval - elapsed)
+                if sleep_for > 0:
+                    time.sleep(sleep_for)
         finally:
             logger.info("Groundskeeper daemon stopping")
             pid_file.unlink(missing_ok=True)
@@ -687,6 +764,15 @@ def main():
     parser.add_argument("--base-dir", type=str, help="Base directory (auto-detected if not provided)")
 
     args = parser.parse_args()
+
+    # Validate incompatible flag combinations
+    if args.daemon:
+        if args.dry_run:
+            parser.error("--daemon and --dry-run are incompatible (daemon always runs real sweeps)")
+        if args.tasks:
+            parser.error("--daemon and --task are incompatible (daemon always runs all tasks)")
+        if args.force_vacuum:
+            parser.error("--daemon and --force-vacuum are incompatible (use single run for force-vacuum)")
 
     base_dir = Path(args.base_dir) if args.base_dir else None
     gk = Groundskeeper(base_dir=base_dir)
@@ -715,6 +801,10 @@ def main():
         total_mb = sum(r.bytes_freed for r in results.values()) / (1024 * 1024)
         print(f"Total: {total_mb:.2f}MB {'would be freed' if args.dry_run else 'freed'}")
         print("=" * 60)
+
+        # Exit with non-zero code if any task had errors
+        had_errors = any(r.errors for r in results.values())
+        sys.exit(1 if had_errors else 0)
 
 
 if __name__ == "__main__":

@@ -337,10 +337,10 @@ print(f"Action: {hint.action.value}")  # continue
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
 Latest (2025-12-01):
+- **Unified Service Management** - Service Registry and Weaver now share `configs/services.json` as single source of truth
+- **Declarative Config** - Services defined in JSON with health checks, dependencies, startup config
 - **Groundskeeper** - Unified cleanup daemon for all resource leaks (`core/groundskeeper.py`)
-- **Service Registry** - Dependency graph and auto-start for services (`core/service_registry.py`)
-- **Weaver Integration** - Groundskeeper sweeps run hourly via Weaver
-- **Freed 2.7GB** - Old queue files cleaned on first run
+- **Weaver Slimmed** - Removed 300+ lines of duplicate code, now consumes Service Registry
 
 Previous (2025-11-29):
 - **Strain/Effort Metrics** - Materials science metaphor for training (`guild/metrics/strain.py`)
@@ -539,7 +539,7 @@ Key files: `core/groundskeeper.py`
 
 ### Service Registry
 
-Service dependency graph and auto-start.
+Unified service management. Loads definitions from `configs/services.json`.
 
 ```bash
 python3 core/service_registry.py status           # Show all services
@@ -547,18 +547,24 @@ python3 core/service_registry.py start training   # Start with deps
 python3 core/service_registry.py stop training    # Stop gracefully
 python3 core/service_registry.py deps training    # Ensure deps only
 python3 core/service_registry.py order            # Print startup order
+python3 core/service_registry.py list             # Show all config details
+python3 core/service_registry.py reload           # Reload from JSON
+python3 core/service_registry.py realm-up         # Start all required services
+python3 core/service_registry.py realm-down       # Stop all services
 ```
 
-Dependency graph:
-- `vault` → (none)
-- `tavern` → vault
-- `training` → vault, tavern
-- `eval_runner` → vault
-- `groundskeeper` → (none)
-- `realm_state` → vault
-- `weaver` → (none)
+Services (from `configs/services.json`):
+- `vault` (8767) → VaultKeeper - asset registry
+- `tavern` (8888) → Game UI [deps: vault]
+- `training` → Training daemon [deps: vault, tavern]
+- `realm_state` (8866) → RealmState service [deps: vault]
+- `eval_runner` → Eval processor [deps: vault] (optional)
+- `groundskeeper` → Cleanup daemon (optional)
+- `weaver` → Daemon orchestrator (optional)
+- `data_flow` → Queue feeder [task]
+- `skill_sy` (8080), `skill_bin` (8090) → Skill servers (optional)
 
-Key files: `core/service_registry.py`
+Key files: `core/service_registry.py`, `configs/services.json`
 
 ---
 

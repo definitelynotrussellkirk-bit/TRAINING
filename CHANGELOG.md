@@ -4,6 +4,57 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-12-01 - Groundskeeper & Service Registry
+
+### Problem
+Resource leak audit found 6 critical leaks where resources accumulated without cleanup:
+- `queue/recently_completed/` - 2.7GB of old files never deleted
+- `events.jsonl`, `job_history.jsonl`, `data_file_impact.jsonl` - unbounded growth
+- `battle_log` table - `cleanup_old()` existed but was never called
+- SQLite databases - never VACUUMed
+- Log files - never deleted
+- Stale PID files - persisted after crashes
+
+### Solution
+
+**Groundskeeper** (`core/groundskeeper.py`) - Unified cleanup daemon:
+- JSONL rotation (50MB/50k lines, 7-day archive retention)
+- Queue file cleanup (7-day retention)
+- Battle log cleanup (7-day retention)
+- Log file cleanup (30-day retention)
+- Stale PID cleanup
+- SQLite VACUUM (monthly)
+- Worker/job events cleanup
+
+**Service Registry** (`core/service_registry.py`) - Dependency management:
+- Defines service dependency graph
+- Auto-starts dependencies when a service starts
+- Principle: "if ONE system is online, relevant OTHER systems are online too"
+
+### Integration
+- Weaver runs Groundskeeper sweep every hour automatically
+- Each daemon can call `ensure_dependencies()` on startup
+
+### Usage
+```bash
+# Manual cleanup
+python3 core/groundskeeper.py
+
+# Dry run
+python3 core/groundskeeper.py --dry-run
+
+# Service status
+python3 core/service_registry.py status
+
+# Start service with deps
+python3 core/service_registry.py start training
+```
+
+### Immediate Impact
+- Freed 2.7GB from queue/recently_completed on first run
+
+---
+
 ## 2025-11-28 - Engine-First Refactor
 
 ### What

@@ -505,15 +505,25 @@ class Weaver:
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_signal)
 
+        # Groundskeeper integration
+        last_groundskeeper_run = 0
+        groundskeeper_interval = 3600  # Run cleanup every hour
+
         try:
             while self.running:
-                # Check and mend
+                # Check and mend threads
                 results = self.mend()
 
                 # Log summary
                 healthy = sum(1 for r in results.values() if r == "healthy")
                 total = len(results)
                 logger.info(f"Tapestry check: {healthy}/{total} threads healthy")
+
+                # Run Groundskeeper cleanup (hourly)
+                now = time.time()
+                if now - last_groundskeeper_run > groundskeeper_interval:
+                    self._run_groundskeeper()
+                    last_groundskeeper_run = now
 
                 # Sleep
                 time.sleep(self.check_interval)
@@ -527,6 +537,24 @@ class Weaver:
         """Handle shutdown signals"""
         logger.info(f"Received signal {signum}, shutting down...")
         self.running = False
+
+    def _run_groundskeeper(self):
+        """Run Groundskeeper cleanup sweep."""
+        try:
+            from core.groundskeeper import Groundskeeper
+            gk = Groundskeeper(base_dir=self.base_dir)
+            results = gk.sweep(dry_run=False)
+
+            total_items = sum(r.items_cleaned for r in results.values())
+            total_mb = sum(r.bytes_freed for r in results.values()) / (1024 * 1024)
+
+            if total_items > 0:
+                logger.info(f"Groundskeeper: cleaned {total_items} items, freed {total_mb:.2f}MB")
+            else:
+                logger.debug("Groundskeeper: nothing to clean")
+
+        except Exception as e:
+            logger.warning(f"Groundskeeper sweep failed: {e}")
 
     def status(self) -> str:
         """Get formatted status string"""

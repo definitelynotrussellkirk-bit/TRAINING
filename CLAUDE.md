@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-11-29
+**Last Updated:** 2025-12-01
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 **Philosophy:** This repo is the method, not the results (see META section)
 
@@ -336,7 +336,13 @@ print(f"Action: {hint.action.value}")  # continue
 
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
-Latest (2025-11-29):
+Latest (2025-12-01):
+- **Groundskeeper** - Unified cleanup daemon for all resource leaks (`core/groundskeeper.py`)
+- **Service Registry** - Dependency graph and auto-start for services (`core/service_registry.py`)
+- **Weaver Integration** - Groundskeeper sweeps run hourly via Weaver
+- **Freed 2.7GB** - Old queue files cleaned on first run
+
+Previous (2025-11-29):
 - **Strain/Effort Metrics** - Materials science metaphor for training (`guild/metrics/strain.py`)
 - **Campaign Peak Tracking** - `peak_skill_levels`, `peak_metrics`, effort tracking per skill
 - **Curriculum Hints** - Strain zones (Recovery/Productive/Stretch/Overload) for difficulty guidance
@@ -510,6 +516,38 @@ Alternative to AdamW. Enable in `config.json`:
 ```json
 {"optimizer": {"type": "muon", "muon": {"hidden_lr": 0.02, "aux_lr": 0.0003}}}
 ```
+
+### Groundskeeper
+
+Unified cleanup daemon for all resource leaks.
+
+```bash
+python3 core/groundskeeper.py              # Run cleanup
+python3 core/groundskeeper.py --dry-run    # See what would be cleaned
+python3 core/groundskeeper.py --daemon     # Run as daemon (hourly)
+```
+
+Handles: JSONL rotation, queue cleanup, battle_log, logs, PIDs, SQLite VACUUM, workers.
+
+Key files: `core/groundskeeper.py`
+
+### Service Registry
+
+Service dependency graph and auto-start.
+
+```bash
+python3 core/service_registry.py status           # Show all services
+python3 core/service_registry.py start training   # Start with deps
+python3 core/service_registry.py deps training    # Ensure deps only
+```
+
+Dependency graph:
+- `vault` → (none)
+- `tavern` → vault
+- `training` → vault, tavern
+- `eval_runner` → vault
+
+Key files: `core/service_registry.py`
 
 ---
 

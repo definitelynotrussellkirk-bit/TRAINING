@@ -13,6 +13,8 @@ from pathlib import Path
 from datetime import datetime
 import requests
 
+from core.paths import get_base_dir, get_external_tool_path
+
 # ANSI colors
 GREEN = '\033[92m'
 RED = '\033[91m'
@@ -27,7 +29,7 @@ class EndpointTester:
             'failed': [],
             'warnings': []
         }
-        self.base_dir = Path('{BASE_DIR}')
+        self.base_dir = get_base_dir()
 
     def test(self, name, func):
         """Run a test and record result"""
@@ -97,22 +99,24 @@ def main():
     # ==================== LOCAL STATUS FILES (4090) ====================
     print(f"\n{BLUE}[1] LOCAL STATUS FILES (4090){RESET}")
 
+    base = tester.base_dir
+
     tester.test("training_status.json", lambda: test_json_file(
-        Path('{BASE_DIR}/status/training_status.json'),
+        base / "status/training_status.json",
         required_fields=['status', 'current_step', 'total_steps', 'loss']
     ))
 
     tester.test("latest_preview.json", lambda: test_json_file(
-        Path('{BASE_DIR}/status/latest_preview.json'),
+        base / "status/latest_preview.json",
         required_fields=['step']
     ))
 
     tester.test("curriculum_state.json", lambda: test_json_file(
-        Path('{BASE_DIR}/status/curriculum_state.json')
+        base / "status/curriculum_state.json"
     ))
 
     tester.test("3090_watchdog_status.json", lambda: test_json_file(
-        Path('{BASE_DIR}/status/3090_watchdog_status.json')
+        base / "status/3090_watchdog_status.json"
     ))
 
     # ==================== REMOTE STATUS FILES (3090) ====================
@@ -351,7 +355,8 @@ def test_remote_processes():
 def test_queue_access():
     """Test queue directory access"""
     try:
-        queue_dir = Path('{BASE_DIR}/queue')
+        from core.paths import get_queue_dir
+        queue_dir = get_queue_dir()
         if not queue_dir.exists():
             return {'status': 'fail', 'error': 'Queue directory not found'}
 
@@ -367,7 +372,7 @@ def test_queue_access():
 def test_skill_folders():
     """Test skill folder access"""
     try:
-        skill_dir = Path('/path/to/skills')
+        skill_dir = get_external_tool_path("singleSKILL")
         if not skill_dir.exists():
             return {'status': 'fail', 'error': 'Skill directory not found'}
 
@@ -375,6 +380,9 @@ def test_skill_folders():
                  if d.is_dir() and d.name.startswith('skill_')]
 
         return {'status': 'pass', 'data': f'{len(skills)} skills found'}
+    except RuntimeError as e:
+        # External tool not configured - skip gracefully
+        return {'status': 'warn', 'message': f'singleSKILL not configured: {e}'}
     except Exception as e:
         return {'status': 'fail', 'error': str(e)}
 

@@ -4,17 +4,15 @@
 # Start a Branch Officer daemon on a remote zone
 #
 # Usage:
-#   branch_officer 3090    # Start on 3090 with defaults
-#   branch_officer nas     # Start on NAS with defaults
+#   branch_officer 3090    # Start on 3090 with config from hosts.json
+#   branch_officer nas     # Start on NAS with config from hosts.json
 #   branch_officer --help  # Show help
+
+set -e
 
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT="$BASE_DIR/vault/branch_officer.py"
-
-# Zone configurations
-declare -A ZONE_CONFIGS
-ZONE_CONFIGS["3090"]="--zone 3090 --port 8768 --base-dir /path/to/models"
-ZONE_CONFIGS["nas"]="--zone nas --port 8768 --base-dir /volume1/data/llm_training"
+HOSTS_CONFIG="$BASE_DIR/config/hosts.json"
 
 show_help() {
     echo "Branch Officer Launcher"
@@ -24,9 +22,7 @@ show_help() {
     echo "  branch_officer <zone> --daemon  Run in background"
     echo "  branch_officer --help           Show this help"
     echo ""
-    echo "Zones:"
-    echo "  3090   RTX 3090 inference server (192.168.x.x)"
-    echo "  nas    Synology NAS storage (192.168.x.x)"
+    echo "Zones are configured in config/hosts.json"
     echo ""
     echo "Examples:"
     echo "  # Start on 3090 (run this ON the 3090):"
@@ -34,9 +30,6 @@ show_help() {
     echo ""
     echo "  # Start on 3090 in background:"
     echo "  branch_officer 3090 --daemon"
-    echo ""
-    echo "  # SSH and start on 3090 from 4090:"
-    echo "  ssh user@xxx.xxx.88.149 'python3 /path/to/training/vault/branch_officer.py --zone 3090 --port 8768 --base-dir /path/to/models'"
     echo ""
     echo "Endpoints (once running):"
     echo "  GET  /status       Zone health and status"
@@ -61,13 +54,43 @@ fi
 ZONE="$1"
 DAEMON="$2"
 
-if [ -z "${ZONE_CONFIGS[$ZONE]}" ]; then
-    echo "Error: Unknown zone '$ZONE'"
-    echo "Valid zones: 3090, nas"
+# Check if hosts.json exists
+if [ ! -f "$HOSTS_CONFIG" ]; then
+    echo "Error: config/hosts.json not found"
+    echo "Copy config/hosts.example.json to config/hosts.json and customize"
     exit 1
 fi
 
-CONFIG="${ZONE_CONFIGS[$ZONE]}"
+# Extract zone config from hosts.json using Python
+CONFIG=$(python3 -c "
+import json
+import sys
+with open('$HOSTS_CONFIG') as f:
+    config = json.load(f)
+hosts = config.get('hosts', {})
+zone = hosts.get('$ZONE')
+if not zone:
+    print('ERROR: Zone not found', file=sys.stderr)
+    sys.exit(1)
+models_dir = zone.get('models_dir', '~/models')
+# Expand ~ if present
+import os
+models_dir = os.path.expanduser(models_dir)
+print(f'--zone $ZONE --port 8768 --base-dir {models_dir}')
+" 2>&1)
+
+if echo "$CONFIG" | grep -q "ERROR:"; then
+    echo "Error: Zone '$ZONE' not found in config/hosts.json"
+    echo "Available zones:"
+    python3 -c "
+import json
+with open('$HOSTS_CONFIG') as f:
+    config = json.load(f)
+for zone_id in config.get('hosts', {}).keys():
+    print(f'  {zone_id}')
+"
+    exit 1
+fi
 
 if [ "$DAEMON" == "--daemon" ]; then
     LOG_DIR="$BASE_DIR/logs"

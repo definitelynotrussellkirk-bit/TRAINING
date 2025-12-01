@@ -213,12 +213,15 @@ function renderEvals(evals) {
  */
 function renderEmpty(message) {
     const tbody = document.getElementById('eval-rows');
+    const hint = message === 'No evaluations found'
+        ? '<br><small style="opacity: 0.7">Train a checkpoint and run evaluations from the Guild page to see results here.</small>'
+        : '';
     tbody.innerHTML = `
         <tr>
             <td colspan="8">
                 <div class="empty-state">
                     <div class="icon">📊</div>
-                    <div>${message}</div>
+                    <div>${message}${hint}</div>
                 </div>
             </td>
         </tr>

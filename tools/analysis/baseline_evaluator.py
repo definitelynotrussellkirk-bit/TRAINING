@@ -39,10 +39,16 @@ class BaselineEvaluator:
 
     def __init__(
         self,
-        base_dir: str = "/path/to/training",
-        api_url: str = "http://192.168.x.x:8765",
+        base_dir: str = None,
+        api_url: str = None,
         results_dir: str = None
     ):
+        if base_dir is None:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
+        if api_url is None:
+            from core.paths import get_remote_api_url
+            api_url = get_remote_api_url()
         self.base_dir = Path(base_dir)
         self.api_url = api_url
         self.results_dir = Path(results_dir or self.base_dir / "status" / "baselines")
@@ -351,8 +357,8 @@ class BaselineEvaluator:
 
 def main():
     parser = argparse.ArgumentParser(description="Baseline Model Evaluator")
-    parser.add_argument("--base-dir", default="/path/to/training")
-    parser.add_argument("--api-url", default="http://192.168.x.x:8765")
+    parser.add_argument("--base-dir", default=None, help="Base directory (default: auto-detect)")
+    parser.add_argument("--api-url", default=None, help="Inference API URL (default: from hosts.json)")
     parser.add_argument("--tag", help="Tag for this evaluation run")
     parser.add_argument("--model-path", help="Path to model (for reference)")
     parser.add_argument("--max-per-difficulty", type=int, default=50)

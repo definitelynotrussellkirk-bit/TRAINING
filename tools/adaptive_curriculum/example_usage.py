@@ -9,6 +9,7 @@ This demonstrates how to:
 """
 from pathlib import Path
 
+from core.paths import get_base_dir
 from tools.adaptive_curriculum.controller import DifficultyController, DifficultyConfig
 from tools.adaptive_curriculum.orchestrator import (
     AdaptiveCurriculumOrchestrator,
@@ -18,13 +19,18 @@ from tools.adaptive_curriculum.registry import create_syllo_generator
 from tools.adaptive_curriculum.stats import StatsManager
 
 
+def _get_base() -> Path:
+    """Get base directory for examples."""
+    return get_base_dir()
+
+
 def example_basic_usage():
     """Basic usage: generate one batch."""
     print("=" * 60)
     print("EXAMPLE 1: Basic Usage")
     print("=" * 60)
 
-    base_dir = Path("/path/to/training")
+    base_dir = _get_base()
 
     # Create config
     config = OrchestratorConfig(
@@ -58,7 +64,7 @@ def example_stats_tracking():
     print("EXAMPLE 2: Stats Tracking")
     print("=" * 60)
 
-    base_dir = Path("/path/to/training")
+    base_dir = _get_base()
     stats_file = base_dir / "status" / "curriculum_stats.json"
 
     # Create stats manager
@@ -119,7 +125,7 @@ def example_difficulty_control():
     controller = DifficultyController(config)
 
     # Create stats manager
-    base_dir = Path("/path/to/training")
+    base_dir = _get_base()
     stats_file = base_dir / "status" / "curriculum_stats_example.json"
     stats_manager = StatsManager(storage_path=stats_file)
 
@@ -157,7 +163,7 @@ def example_full_workflow():
     print("EXAMPLE 4: Full Workflow")
     print("=" * 60)
 
-    base_dir = Path("/path/to/training")
+    base_dir = _get_base()
 
     config = OrchestratorConfig(
         base_dir=base_dir,

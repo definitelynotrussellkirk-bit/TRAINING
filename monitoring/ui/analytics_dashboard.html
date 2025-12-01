@@ -360,10 +360,11 @@
     <button class="refresh-btn" onclick="refreshData()">Refresh</button>
 
     <script>
+        // Note: SCHEDULER_URL should come from config/hosts.json via API in production
         const SCHEDULER_URL = 'http://inference.local:8766';
-        const STATUS_BASE = '/path/to/training/status';
+        // STATUS_BASE removed - dashboard fetches data via API, not direct file access
 
-        // Mock data for local file access (in production, use an API)
+        // Mock data for demo (in production, fetch from API endpoints)
         let dashboardData = {
             hardExampleAccuracy: 0.2,
             correctCount: 2,

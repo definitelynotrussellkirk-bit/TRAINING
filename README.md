@@ -30,6 +30,31 @@
 
 ---
 
+## Who This Is For
+
+- **ML practitioners** who want a more engaging way to run training experiments
+- **Developers with GPU access** (24GB VRAM recommended)
+- **People comfortable** editing config files and reading logs
+- **Anyone curious** about gamifying the training feedback loop
+
+## What This Is Not
+
+- **Not a one-click fine-tuning tool** — you'll configure campaigns, skills, and data pipelines
+- **Not production-hardened** — this is research tooling, expect rough edges
+- **Not a hosted service** — runs locally on your hardware
+- **Not model weights** — bring your own base model (Qwen3-0.6B, Qwen3-4B, etc.)
+
+## Current Status
+
+**Work in Progress.** The system is functional but under active development. Expect:
+- Breaking changes between versions
+- Config file format evolution
+- Incomplete documentation in some areas
+
+See [`SHARING.md`](SHARING.md) for current sharing guidelines and [`CHANGELOG.md`](CHANGELOG.md) for recent updates.
+
+---
+
 ## The Hero Loop
 
 Heroes are autonomous. They never sleep—always training or seeking new adventures.
@@ -252,3 +277,9 @@ See `ARCHITECTURE.md` for deep dive into system design.
 ### Troubleshooting
 
 See `TROUBLESHOOTING.md` for common issues and solutions.
+
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.

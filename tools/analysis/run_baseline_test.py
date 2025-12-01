@@ -10,7 +10,7 @@ Supports:
 
 Usage:
     # Test via API (uses currently loaded model)
-    python3 run_baseline_test.py --tag trained_model --api-url http://192.168.x.x:8765
+    python3 run_baseline_test.py --tag trained_model --api-url http://192.168.x.x:8765  # TODO: Use core.hosts.get_service_url("inference")
 
     # Test local model directly (requires GPU)
     python3 run_baseline_test.py --tag base_model --model-path /path/to/Qwen3-0.6B --local
@@ -437,7 +437,8 @@ def run_evaluation(
 def list_skills(base_dir: Path = None):
     """Print all available skills."""
     if base_dir is None:
-        base_dir = Path("/path/to/training")
+        from core.paths import get_base_dir
+        base_dir = get_base_dir()
 
     print("\n=== AVAILABLE SKILLS ===\n")
     print("TRAINED SKILLS (what we train on):")
@@ -493,8 +494,8 @@ def main():
     parser = argparse.ArgumentParser(description="Run baseline tests")
     parser.add_argument("--tag", help="Tag for this run")
     parser.add_argument("--skill", default="all", help="Skill to test (see --list-skills)")
-    parser.add_argument("--base-dir", default="/path/to/training")
-    parser.add_argument("--api-url", default="http://192.168.x.x:8765")
+    parser.add_argument("--base-dir", default=None, help="Base directory (default: auto-detect)")
+    parser.add_argument("--api-url", default=None, help="Inference API URL (default: from hosts.json)")
     parser.add_argument("--model-path", help="Path to model for local testing")
     parser.add_argument("--local", action="store_true", help="Load model locally instead of API")
     parser.add_argument("--max-per-difficulty", type=int, default=50)
@@ -504,7 +505,11 @@ def main():
 
     args = parser.parse_args()
 
-    base_dir = Path(args.base_dir)
+    if args.base_dir:
+        base_dir = Path(args.base_dir)
+    else:
+        from core.paths import get_base_dir
+        base_dir = get_base_dir()
 
     # Handle list-skills
     if args.list_skills:

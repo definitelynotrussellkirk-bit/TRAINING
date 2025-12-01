@@ -12,9 +12,25 @@ from .orchestrator import AdaptiveCurriculumOrchestrator, OrchestratorConfig
 from .registry import create_syllo_generator
 
 
+def _get_base_dir(args: argparse.Namespace) -> Path:
+    """Get base directory from args or auto-detect."""
+    if args.base_dir:
+        return Path(args.base_dir).resolve()
+    from core.paths import get_base_dir
+    return get_base_dir()
+
+
+def _get_inference_url(args: argparse.Namespace) -> str:
+    """Get inference URL from args or config."""
+    if args.inference_url:
+        return args.inference_url
+    from core.paths import get_remote_api_url
+    return f"{get_remote_api_url()}/generate"
+
+
 def cmd_start(args: argparse.Namespace) -> int:
     """Start the adaptive curriculum orchestrator."""
-    base_dir = Path(args.base_dir).resolve()
+    base_dir = _get_base_dir(args)
 
     # Create config
     config = OrchestratorConfig(
@@ -27,7 +43,7 @@ def cmd_start(args: argparse.Namespace) -> int:
         accuracy_band=args.accuracy_band,
         window_size=args.window_size,
         min_samples=args.min_samples,
-        inference_url=args.inference_url
+        inference_url=_get_inference_url(args)
     )
 
     # Create orchestrator
@@ -55,7 +71,7 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     """Show current status."""
-    base_dir = Path(args.base_dir).resolve()
+    base_dir = _get_base_dir(args)
 
     config = OrchestratorConfig(base_dir=base_dir)
     orchestrator = AdaptiveCurriculumOrchestrator(config)
@@ -79,12 +95,12 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_generate(args: argparse.Namespace) -> int:
     """Generate a single batch."""
-    base_dir = Path(args.base_dir).resolve()
+    base_dir = _get_base_dir(args)
 
     config = OrchestratorConfig(
         base_dir=base_dir,
         batch_size=args.count,
-        inference_url=args.inference_url
+        inference_url=_get_inference_url(args)
     )
     orchestrator = AdaptiveCurriculumOrchestrator(config)
 
@@ -110,11 +126,11 @@ def cmd_generate(args: argparse.Namespace) -> int:
 
 def cmd_evaluate(args: argparse.Namespace) -> int:
     """Run evaluations."""
-    base_dir = Path(args.base_dir).resolve()
+    base_dir = _get_base_dir(args)
 
     config = OrchestratorConfig(
         base_dir=base_dir,
-        inference_url=args.inference_url
+        inference_url=_get_inference_url(args)
     )
     orchestrator = AdaptiveCurriculumOrchestrator(config)
 
@@ -188,8 +204,8 @@ Examples:
     # Global options
     parser.add_argument(
         "--base-dir",
-        default="/path/to/training",
-        help="Training system base directory"
+        default=None,
+        help="Training system base directory (default: auto-detect via TRAINING_BASE_DIR env or CLAUDE.md)"
     )
     parser.add_argument(
         "--generators",
@@ -197,8 +213,8 @@ Examples:
     )
     parser.add_argument(
         "--inference-url",
-        default="http://192.168.x.x:8000/generate",
-        help="Inference API URL"
+        default=None,
+        help="Inference API URL (default: from config/hosts.json)"
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Command to run")

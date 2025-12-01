@@ -101,7 +101,23 @@
         .ritual-list {
             display: flex;
             flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .ritual-group {
+            display: flex;
+            flex-direction: column;
             gap: 0.5rem;
+        }
+
+        .ritual-group-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            padding: 0.25rem 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 0.25rem;
         }
 
         .ritual-btn {
@@ -486,11 +502,22 @@
             'api': '🌐',
             'forge': '🔥',
             'weaver': '🕸️',
-            'champion': '👑',
+            'champion': '🏆',
             'oracle': '🔮',
-            'guild': '🏰',
-            'deep': '🧿'
+            'guild': '⚔️',
+            'scribe': '📜',
+            'deep': '🌊'
         };
+
+        const KIND_LABELS = {
+            'healthcheck': '🩺 Health Checks',
+            'eval': '📊 Evaluation',
+            'training': '🎯 Training',
+            'infra': '🔧 Infrastructure',
+            'meta': '✨ Meta'
+        };
+
+        const KIND_ORDER = ['healthcheck', 'eval', 'training', 'infra', 'meta'];
 
         const CATEGORY_ICONS = {
             'network': '🌐',
@@ -570,24 +597,44 @@
                     return;
                 }
 
-                // Sort: deep last, quick first
-                const sorted = Object.values(rituals).sort((a, b) => {
-                    if (a.id === 'deep') return 1;
-                    if (b.id === 'deep') return -1;
-                    if (a.id === 'quick') return -1;
-                    if (b.id === 'quick') return 1;
-                    return a.name.localeCompare(b.name);
+                // Group by kind
+                const byKind = {};
+                Object.values(rituals).forEach(r => {
+                    const kind = r.kind || 'healthcheck';
+                    if (!byKind[kind]) byKind[kind] = [];
+                    byKind[kind].push(r);
                 });
 
-                listEl.innerHTML = sorted.map(r => `
-                    <button class="ritual-btn" data-ritual="${r.id}" onclick="runRitual('${r.id}')">
-                        <span class="ritual-icon">${RITUAL_ICONS[r.id] || '🔮'}</span>
-                        <div class="ritual-info">
-                            <div class="ritual-name">${r.name}</div>
-                            <div class="ritual-desc">${r.description}</div>
-                        </div>
-                    </button>
-                `).join('');
+                // Build HTML with groups
+                let html = '';
+                KIND_ORDER.forEach(kind => {
+                    if (!byKind[kind] || byKind[kind].length === 0) return;
+
+                    const kindLabel = KIND_LABELS[kind] || kind;
+                    const ritualList = byKind[kind].sort((a, b) => {
+                        // Quick first, deep last within kind
+                        if (a.id === 'quick') return -1;
+                        if (b.id === 'quick') return 1;
+                        if (a.id === 'deep') return 1;
+                        if (b.id === 'deep') return -1;
+                        return a.name.localeCompare(b.name);
+                    });
+
+                    html += `<div class="ritual-group">
+                        <div class="ritual-group-label">${kindLabel}</div>
+                        ${ritualList.map(r => `
+                            <button class="ritual-btn" data-ritual="${r.id}" onclick="runRitual('${r.id}')">
+                                <span class="ritual-icon">${r.icon || RITUAL_ICONS[r.id] || '🔮'}</span>
+                                <div class="ritual-info">
+                                    <div class="ritual-name">${r.name}</div>
+                                    <div class="ritual-desc">${r.description}</div>
+                                </div>
+                            </button>
+                        `).join('')}
+                    </div>`;
+                });
+
+                listEl.innerHTML = html;
 
             } catch (err) {
                 console.error('Failed to load rituals:', err);

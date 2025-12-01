@@ -393,6 +393,87 @@ class EvaluationLedger:
         }
 
     # =========================================================================
+    # CANONICAL INTERFACE - Use these for stable, documented access
+    # =========================================================================
+
+    def get_eval_count(
+        self,
+        skill: Optional[str] = None,
+        level: Optional[int] = None,
+        run_id: Optional[str] = None,
+    ) -> int:
+        """
+        Get canonical evaluation count.
+
+        This is THE single source of truth for eval counts.
+        All UI elements should use this method.
+
+        Definition:
+            eval_count = number of unique (checkpoint_step, skill, level) tuples
+            successfully evaluated and recorded in the ledger.
+
+        Args:
+            skill: Filter by skill ID (e.g., "bin", "sy")
+            level: Filter by level (requires skill)
+            run_id: Filter by campaign run_id (not yet implemented)
+
+        Returns:
+            Integer count of matching evaluations
+        """
+        self._ensure_loaded()
+
+        records = list(self._cache.values())
+
+        if skill is not None:
+            records = [r for r in records if r.skill == skill]
+        if level is not None:
+            records = [r for r in records if r.level == level]
+        # run_id filtering would go here when implemented
+
+        return len(records)
+
+    def get_eval_breakdown(
+        self,
+        run_id: Optional[str] = None,
+    ) -> Dict[str, int]:
+        """
+        Get evaluation count breakdown by skill.
+
+        Args:
+            run_id: Filter by campaign run_id (not yet implemented)
+
+        Returns:
+            Dict mapping skill_id to count
+        """
+        self._ensure_loaded()
+
+        breakdown: Dict[str, int] = {}
+        for record in self._cache.values():
+            breakdown[record.skill] = breakdown.get(record.skill, 0) + 1
+
+        return breakdown
+
+    def get_unique_key(self, checkpoint_step: int, skill: str, level: int) -> str:
+        """
+        Get the unique key for an evaluation.
+
+        This is the canonical uniqueness definition:
+            key = f"{checkpoint_step}:{skill}:{level}"
+
+        Two evaluations with the same key are considered the same evaluation.
+        """
+        return f"{checkpoint_step}:{skill}:{level}"
+
+    def is_idempotent_write(self, checkpoint_step: int, skill: str, level: int) -> bool:
+        """
+        Check if writing this evaluation would be idempotent.
+
+        Returns True if the evaluation already exists (write would be a no-op).
+        This is useful for verifying ledger consistency.
+        """
+        return self.has_evaluation(checkpoint_step, skill, level)
+
+    # =========================================================================
     # JOB SYSTEM INTEGRATION - Query by job/hero/campaign identity
     # =========================================================================
 

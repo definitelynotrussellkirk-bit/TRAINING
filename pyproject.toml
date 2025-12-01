@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Russ", email = "user@example.com"}
+    {name = "Your Name", email = "you@example.com"}
 ]
 keywords = ["llm", "training", "fine-tuning", "transformers"]
 classifiers = [
@@ -70,8 +70,8 @@ llm-controller = "core.training_controller:main"
 realm = "training.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/user/llm-training"
-Repository = "https://github.com/user/llm-training"
+Homepage = "https://github.com/definitelynotuserellkirk-bit/TRAINING"
+Repository = "https://github.com/definitelynotuserellkirk-bit/TRAINING"
 
 [tool.setuptools]
 include-package-data = true

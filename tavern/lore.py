@@ -348,6 +348,18 @@ LORE: Dict[str, Dict[str, Any]] = {
         "technical": "effort × blessing.quality_factor",
         "icon": "✨",
     },
+    "blessing": {
+        "label": "Blessing",
+        "short": "Temple verdict",
+        "tooltip": (
+            "The Temple's judgment on training quality. "
+            "After a Campaign completes, the Cleric runs Rituals and computes a Blessing. "
+            "Blessed effort becomes Experience; Cursed effort is wasted. "
+            "Quality factor ranges from 0.0 (cursed) to 1.0 (fully blessed)."
+        ),
+        "technical": "Blessing dataclass with quality_factor, verdict, experience_awarded",
+        "icon": "🙏",
+    },
     "plastic_gain": {
         "label": "Plastic Gain",
         "short": "Permanent improvement",

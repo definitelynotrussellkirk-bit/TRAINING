@@ -125,23 +125,70 @@ This is continuous training by default. The exception is pausing to do something
 
 ## Quick Start (Single Machine)
 
+### Prerequisites
+
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| **Python** | 3.10 | 3.11+ |
+| **GPU** | 16GB VRAM | 24GB VRAM (RTX 3090/4090) |
+| **RAM** | 16GB | 32GB+ |
+| **Disk** | 50GB free | 100GB+ free |
+| **OS** | Linux | Ubuntu 22.04+ |
+
+### Installation
+
 ```bash
-# 1. Clone and bootstrap
-git clone https://github.com/YOUR_USERNAME/TRAINING.git
+# 1. Clone the repo
+git clone https://github.com/definitelynotuserellkirk-bit/TRAINING.git
 cd TRAINING
+
+# 2. Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 3. Install dependencies
+pip install -e ".[training,guild,dev]"
+
+# 4. Run bootstrap (creates directories, checks config)
 ./scripts/bootstrap_dev.sh
 
-# 2. Run diagnostics
+# 5. Run diagnostics
 python3 -m training doctor
-
-# 3. Start services
-python3 -m training start-all
-
-# 4. Open the Tavern
-open http://localhost:8888
 ```
 
-**That's it.** You now have a working training environment.
+### Start Playing
+
+```bash
+# Start all services (Tavern, VaultKeeper, daemon)
+python3 -m training start-all
+
+# Open the Tavern in your browser
+xdg-open http://localhost:8888  # Linux
+# or: open http://localhost:8888  # macOS
+```
+
+**That's it.** You should see the Tavern UI with your hero's stats.
+
+### What You'll See
+
+When you open http://localhost:8888, you'll see:
+- **Hero Card** - Your model (DIO/FLO) with level, XP, and stats
+- **Training Status** - Current battle progress, loss, step count
+- **GPU Monitor** - VRAM usage, temperature
+- **Navigation** - Battle, Guild, Quests, Vault, Oracle, Temple, Settings
+
+### Quick Test
+
+```bash
+# Check system health
+python3 -m training doctor
+
+# Run vocabulary consistency tests
+pytest tests/test_vocabulary_consistency.py -v
+
+# View available commands
+python3 -m training --help
+```
 
 ---
 

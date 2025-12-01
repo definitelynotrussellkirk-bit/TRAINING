@@ -665,12 +665,59 @@ class RetentionManager:
                 logger.debug(f"Protected snapshot: {snap.date}")
 
     def _find_old_checkpoints(self, max_age_hours: float) -> List[CheckpointMetadata]:
-        """Find checkpoints older than max_age_hours that are not protected"""
+        """Find checkpoints older than max_age_hours that are not protected
+
+        SAFETY: Checkpoints with pending evals are protected - eval data must never vanish.
+        Minimum evals per checkpoint before deletion: 2 (quick eval for each active skill)
+        """
+        MIN_EVALS_REQUIRED = 2  # At least 2 evals completed before checkpoint can be deleted
+
         old_checkpoints = []
         for cp in self.index.checkpoints:
-            if not cp.protected and cp.age_hours > max_age_hours:
-                old_checkpoints.append(cp)
+            if cp.protected or cp.age_hours <= max_age_hours:
+                continue
+
+            # SAFETY CHECK: Verify checkpoint has completed minimum evals before deletion
+            # This prevents loss of eval data when checkpoints are deleted before evals can run
+            step_num = cp.step
+            eval_count = self._count_completed_evals(step_num)
+
+            if eval_count < MIN_EVALS_REQUIRED:
+                logger.debug(f"Protecting checkpoint-{step_num}: only {eval_count} evals completed (min: {MIN_EVALS_REQUIRED})")
+                continue
+
+            old_checkpoints.append(cp)
         return old_checkpoints
+
+    def _count_completed_evals(self, checkpoint_step: int) -> int:
+        """Count number of completed evals for a checkpoint step.
+
+        Checks the checkpoint's sidecar .evals.json file for completed eval records.
+        Returns 0 if file doesn't exist (eval data hasn't been recorded yet).
+        """
+        # Try to find the checkpoint directory for this step
+        checkpoint_name = f"checkpoint-{checkpoint_step}"
+        matching_dirs = list(self.output_dir.glob(f"{checkpoint_name}*"))
+
+        if not matching_dirs:
+            return 0
+
+        # Check the sidecar .evals.json file
+        eval_sidecar = matching_dirs[0] / ".evals.json"
+        if not eval_sidecar.exists():
+            return 0
+
+        try:
+            import json
+            with open(eval_sidecar) as f:
+                evals_data = json.load(f)
+
+            # Count completed evals (evals with accuracy recorded)
+            completed = sum(1 for e in evals_data if e.get("accuracy") is not None)
+            return completed
+        except Exception as e:
+            logger.warning(f"Failed to read evals for checkpoint-{checkpoint_step}: {e}")
+            return 0
 
     def get_status(self) -> Dict:
         """Get current retention status"""

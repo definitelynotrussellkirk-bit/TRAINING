@@ -42,7 +42,7 @@ class OrchestratorConfig:
     min_samples: int = 20
 
     # Inference API
-    inference_url: str = "http://192.168.x.x:8000/generate"
+    inference_url: str = "http://192.168.x.x:8000  # TODO: Use core.hosts.get_service_url("inference")/generate"
 
     def __post_init__(self):
         """Set default paths if not provided."""

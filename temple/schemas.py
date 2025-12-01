@@ -23,6 +23,8 @@ class RitualCheckResult:
     details: Dict[str, Any] = field(default_factory=dict)
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+    remediation: Optional[str] = None  # How to fix if failed
+    category: Optional[str] = None     # Group: "network", "storage", "training", etc.
 
     def duration_ms(self) -> Optional[float]:
         """Get check duration in milliseconds."""

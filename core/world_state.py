@@ -334,6 +334,21 @@ def _assess_health(state: Dict[str, Any]) -> tuple[str, List[str]]:
     has_error = False
     has_warning = False
 
+    # Check for stale training status (callback wiring bug)
+    try:
+        from core.status_monitor import check_status_staleness
+        staleness = check_status_staleness(max_stale_seconds=120.0)
+        if staleness.is_stale:
+            warnings.append(
+                f"Training status stale for {staleness.stale_seconds:.0f}s "
+                f"(step stuck at {staleness.current_step}) - callbacks may be broken"
+            )
+            has_error = True
+            state["training"]["status_stale"] = True
+            state["training"]["status_stale_seconds"] = staleness.stale_seconds
+    except Exception as e:
+        logger.debug(f"Staleness check failed: {e}")
+
     # Check realm mode vs actual state
     mode = state.get("realm_mode", "idle")
     training_status = state.get("training", {}).get("status", "idle")

@@ -241,6 +241,31 @@ class EnvironmentConfig:
 
 
 @dataclass
+class FortuneTellerConfig:
+    """
+    Fortune Teller loss configuration.
+
+    Surprise-weighted training that focuses gradients on uncertain predictions.
+    """
+
+    # Enable/disable
+    enabled: bool = False
+
+    # Surprise metric
+    surprise_metric: Literal["entropy", "confidence", "perplexity", "margin"] = "entropy"
+
+    # Weighting parameters
+    min_surprise: float = 0.1        # Minimum surprise weight (prevents vanishing gradients)
+    max_surprise: float = 10.0       # Maximum surprise weight (prevents explosion)
+    normalize_batch: bool = True     # Normalize surprises within each batch
+    temperature: float = 1.0         # Temperature for scaling (higher = more uniform)
+
+    # Tracking
+    save_history: bool = True        # Save surprise metrics to file
+    history_path: Optional[str] = None  # Path to save history (defaults to output_dir/fortune_teller_history.json)
+
+
+@dataclass
 class TrainerConfig:
     """
     Complete training configuration.
@@ -258,6 +283,7 @@ class TrainerConfig:
     model: ModelConfig
     output: OutputConfig
     environment: EnvironmentConfig
+    fortune_teller: FortuneTellerConfig = field(default_factory=FortuneTellerConfig)
 
     # Metadata
     config_version: str = "2.0"
@@ -294,6 +320,7 @@ class TrainerConfig:
         model = ModelConfig(**data.get('model', {}))
         output = OutputConfig(**data.get('output', {}))
         environment = EnvironmentConfig(**data.get('environment', {}))
+        fortune_teller = FortuneTellerConfig(**data.get('fortune_teller', {}))
 
         return cls(
             hyperparams=hyperparams,
@@ -304,6 +331,7 @@ class TrainerConfig:
             model=model,
             output=output,
             environment=environment,
+            fortune_teller=fortune_teller,
             config_version=data.get('config_version', '2.0'),
             description=data.get('description', '')
         )

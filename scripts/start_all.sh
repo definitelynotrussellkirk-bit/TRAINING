@@ -20,6 +20,12 @@ echo "║           REALM OF TRAINING - Startup                      ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
+# Kill any lingering training processes (cleanup from crashes)
+echo "🧹 Cleaning up lingering processes..."
+pkill -f "training_daemon.py" 2>/dev/null || true
+pkill -f "train.py.*--dataset" 2>/dev/null || true
+sleep 1
+
 # Check if Weaver is already running
 WEAVER_PID_FILE="$BASE_DIR/.pids/weaver.pid"
 if [ -f "$WEAVER_PID_FILE" ]; then
@@ -31,6 +37,21 @@ if [ -f "$WEAVER_PID_FILE" ]; then
     else
         echo "🧹 Cleaning stale PID file..."
         rm -f "$WEAVER_PID_FILE"
+    fi
+fi
+
+# Verify GPU is available before starting
+if command -v nvidia-smi &>/dev/null; then
+    GPU_PROCS=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | wc -l)
+    if [ "$GPU_PROCS" -gt 0 ]; then
+        echo "⚠️  Warning: $GPU_PROCS process(es) using GPU - attempting cleanup..."
+        nvidia-smi --query-compute-apps=pid,name,used_memory --format=csv 2>/dev/null || true
+        # Try to kill orphaned processes
+        for PID in $(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null); do
+            echo "   Killing PID $PID..."
+            kill "$PID" 2>/dev/null || kill -9 "$PID" 2>/dev/null || true
+        done
+        sleep 3
     fi
 fi
 

@@ -66,6 +66,7 @@ def _check_world_state_api() -> RitualCheckResult:
             name="World State API",
             description="Check that /api/world-state returns valid data",
             status=status,
+            category="network",
             details={
                 "url": url,
                 "has_health": has_health,
@@ -82,7 +83,9 @@ def _check_world_state_api() -> RitualCheckResult:
             name="World State API",
             description="Check that /api/world-state returns valid data",
             status="fail",
+            category="network",
             details={"error": str(e.reason), "url": url},
+            remediation="Check Tavern server is running",
             started_at=start,
             finished_at=datetime.utcnow(),
         )
@@ -92,7 +95,9 @@ def _check_world_state_api() -> RitualCheckResult:
             name="World State API",
             description="Check that /api/world-state returns valid data",
             status="fail",
+            category="network",
             details={"error": str(e), "url": url},
+            remediation="Check Tavern server is running",
             started_at=start,
             finished_at=datetime.utcnow(),
         )

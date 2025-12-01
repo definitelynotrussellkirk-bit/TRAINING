@@ -47,6 +47,7 @@ def _check_realm_state() -> RitualCheckResult:
             name="Realm state readable",
             description="Check that Realm state can be read from the store",
             status="ok",
+            category="storage",
             details={
                 "mode": mode,
                 "training_status": training.get("status"),
@@ -61,7 +62,9 @@ def _check_realm_state() -> RitualCheckResult:
             name="Realm state readable",
             description="Check that Realm state can be read from the store",
             status="fail",
+            category="storage",
             details={"error": str(e)},
+            remediation="Check that data/realm_state.db exists and is accessible",
             started_at=start,
             finished_at=datetime.utcnow(),
         )
@@ -95,7 +98,9 @@ def _check_tavern_api() -> RitualCheckResult:
         name="Tavern API responsive",
         description="Check that the Tavern API responds to health checks",
         status=status,
+        category="network",
         details=details,
+        remediation="Start Tavern: python3 -m training start-all" if status == "fail" else None,
         started_at=start,
         finished_at=datetime.utcnow(),
     )
@@ -130,7 +135,9 @@ def _check_vault_api() -> RitualCheckResult:
         name="VaultKeeper health",
         description="Check that the VaultKeeper API can be reached",
         status=status,
+        category="network",
         details=details,
+        remediation="VaultKeeper starts with Weaver. Check logs/vault.log" if status != "ok" else None,
         started_at=start,
         finished_at=datetime.utcnow(),
     )
@@ -167,7 +174,9 @@ def _check_queue_depth() -> RitualCheckResult:
             name="Training queue populated",
             description="Check that training queue has data",
             status=status,
+            category="storage",
             details={"total": total, **counts},
+            remediation="Generate training data or check data pipeline" if status != "ok" else None,
             started_at=start,
             finished_at=datetime.utcnow(),
         )
@@ -177,7 +186,9 @@ def _check_queue_depth() -> RitualCheckResult:
             name="Training queue populated",
             description="Check that training queue has data",
             status="fail",
+            category="storage",
             details={"error": str(e)},
+            remediation="Check queue/ directory exists and is accessible",
             started_at=start,
             finished_at=datetime.utcnow(),
         )
@@ -196,7 +207,9 @@ def _check_active_campaign() -> RitualCheckResult:
                 name="Active campaign configured",
                 description="Check that an active campaign is set",
                 status="warn",
+                category="model",
                 details={"error": "No active_campaign.json found"},
+                remediation="Create a campaign via /campaign page or set control/active_campaign.json",
                 started_at=start,
                 finished_at=datetime.utcnow(),
             )
@@ -216,11 +229,13 @@ def _check_active_campaign() -> RitualCheckResult:
             name="Active campaign configured",
             description="Check that an active campaign is set",
             status="ok" if hero_id and campaign_exists else "warn",
+            category="model",
             details={
                 "hero_id": hero_id,
                 "campaign_id": campaign_id,
                 "campaign_exists": campaign_exists,
             },
+            remediation="Create or fix campaign configuration" if not (hero_id and campaign_exists) else None,
             started_at=start,
             finished_at=datetime.utcnow(),
         )
@@ -230,7 +245,9 @@ def _check_active_campaign() -> RitualCheckResult:
             name="Active campaign configured",
             description="Check that an active campaign is set",
             status="fail",
+            category="model",
             details={"error": str(e)},
+            remediation="Check control/active_campaign.json format",
             started_at=start,
             finished_at=datetime.utcnow(),
         )

@@ -164,6 +164,43 @@
             transition: width 0.3s ease;
         }
 
+        /* Multi-segment progress bar */
+        .level-bar-multi {
+            height: 24px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 15px 0 8px 0;
+            display: flex;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .level-segment {
+            height: 100%;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .level-segment.mastered {
+            background: linear-gradient(90deg, #4CAF50, #66BB6A);
+            box-shadow: inset 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .level-segment.training {
+            background: linear-gradient(90deg, #FF9800, #FFB74D);
+            animation: pulse 2s ease-in-out infinite;
+            box-shadow: inset 0 0 10px rgba(255, 152, 0, 0.5);
+        }
+
+        .level-segment.locked {
+            background: rgba(100, 100, 100, 0.3);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
         .level-markers {
             display: flex;
             justify-content: space-between;
@@ -202,19 +239,63 @@
 
         /* Accuracy history */
         .accuracy-chart {
-            height: 150px;
+            height: 200px;
             display: flex;
             align-items: flex-end;
-            gap: 4px;
+            gap: 6px;
             padding: 10px 0;
+            position: relative;
+            background: linear-gradient(to bottom,
+                transparent 0%,
+                transparent 19%,
+                rgba(76, 175, 80, 0.1) 19%,
+                rgba(76, 175, 80, 0.1) 20%,
+                transparent 20%);
+        }
+
+        .accuracy-chart::before {
+            content: '80% threshold';
+            position: absolute;
+            top: 20%;
+            left: 0;
+            font-size: 0.7em;
+            color: #4CAF50;
+            opacity: 0.6;
         }
 
         .accuracy-bar {
             flex: 1;
-            background: linear-gradient(to top, var(--skill-color, #8B5CF6), transparent);
             border-radius: 3px 3px 0 0;
-            min-width: 8px;
+            min-width: 10px;
             position: relative;
+            transition: all 0.2s;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .accuracy-bar.excellent {
+            background: linear-gradient(to top, #4CAF50, #66BB6A);
+        }
+
+        .accuracy-bar.good {
+            background: linear-gradient(to top, #FFA726, #FFB74D);
+        }
+
+        .accuracy-bar.poor {
+            background: linear-gradient(to top, #EF5350, #E57373);
+        }
+
+        .accuracy-bar-label {
+            font-size: 0.65em;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+            padding-bottom: 3px;
+        }
+
+        .accuracy-bar:hover {
+            opacity: 0.8;
+            transform: translateY(-2px);
         }
 
         .accuracy-bar:hover::after {
@@ -224,10 +305,11 @@
             left: 50%;
             transform: translateX(-50%);
             background: #000;
-            padding: 2px 6px;
+            padding: 4px 8px;
             border-radius: 4px;
             font-size: 0.75em;
             white-space: nowrap;
+            z-index: 10;
         }
 
         /* Tags */
@@ -602,16 +684,53 @@
                 <!-- Progression -->
                 <div class="skill-card">
                     <h3>📈 Progression</h3>
-                    <div class="level-bar">
-                        <div class="level-fill" id="levelFill" style="width: 0%;"></div>
+
+                    <!-- Level status cards -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
+                        <div style="background: rgba(76, 175, 80, 0.2); border-left: 3px solid #4CAF50; padding: 10px; border-radius: 6px;">
+                            <div style="font-size: 0.75em; color: #888; text-transform: uppercase;">Mastered</div>
+                            <div style="font-size: 1.5em; font-weight: 600; color: #4CAF50;" id="masteredLevelCard">L0</div>
+                        </div>
+                        <div style="background: rgba(255, 152, 0, 0.2); border-left: 3px solid #FF9800; padding: 10px; border-radius: 6px;">
+                            <div style="font-size: 0.75em; color: #888; text-transform: uppercase;">Training</div>
+                            <div style="font-size: 1.5em; font-weight: 600; color: #FF9800;" id="trainingLevelCard">L1</div>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.05); border-left: 3px solid #666; padding: 10px; border-radius: 6px;">
+                            <div style="font-size: 0.75em; color: #888; text-transform: uppercase;">Next</div>
+                            <div style="font-size: 1.5em; font-weight: 600; color: #666;" id="nextLevelCard">L2 🔒</div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-segment progress bar -->
+                    <div class="level-bar-multi" id="levelBarMulti">
+                        <div class="level-segment mastered" id="masteredSegment" style="width: 0%;"></div>
+                        <div class="level-segment training" id="trainingSegment" style="width: 0%;"></div>
+                        <div class="level-segment locked" id="lockedSegment" style="width: 100%;"></div>
                     </div>
                     <div class="level-markers">
                         <span>L1</span>
                         <span id="maxLevelMarker">L50</span>
                     </div>
-                    <p style="color: #888; font-size: 0.9em; margin-top: 15px;">
-                        <span id="evalCount">0</span> evals at current level
-                        (<span id="totalEvals">0</span> total)
+
+                    <!-- Level-up progress -->
+                    <div id="levelUpProgress" style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 0.85em; color: #888;">Level-up Progress</div>
+                                <div id="streakIndicator" style="font-size: 1.1em; margin-top: 5px;">⭕⭕⭕</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div id="progressText" style="color: #ccc; font-size: 0.9em;">0/3 streak</div>
+                            </div>
+                        </div>
+                        <div id="progressMessage" style="margin-top: 8px; font-size: 0.85em; color: #888; font-style: italic;">
+                            Need 3 consecutive evals at 80%+ to advance
+                        </div>
+                    </div>
+
+                    <p style="color: #666; font-size: 0.85em; margin-top: 12px; text-align: center;">
+                        <span id="evalCount">0</span> evals at L<span id="currentLevelNum">3</span> •
+                        <span id="totalEvals">0</span> total evals
                     </p>
                 </div>
 
@@ -789,11 +908,70 @@
             document.getElementById('skillDescription').textContent = config.description || '-';
             document.getElementById('rpgDescription').textContent = config.rpg_description || '-';
 
-            // Level progress bar
+            // Level progress - NEW multi-segment design
             const maxLevel = config.max_level || 50;
-            const progress = (state.mastered_level / maxLevel) * 100;
-            document.getElementById('levelFill').style.width = progress + '%';
+            const mastered = state.mastered_level;
+            const training = state.training_level;
+
+            // Update level cards
+            document.getElementById('masteredLevelCard').textContent = mastered > 0 ? `L${mastered}` : 'None';
+            document.getElementById('trainingLevelCard').textContent = `L${training}`;
+            document.getElementById('nextLevelCard').textContent = `L${training + 1} 🔒`;
+            document.getElementById('currentLevelNum').textContent = training;
+
+            // Multi-segment progress bar
+            const masteredPct = (mastered / maxLevel) * 100;
+            const trainingPct = (1 / maxLevel) * 100;  // Training level is always 1 level
+            const lockedPct = 100 - masteredPct - trainingPct;
+
+            document.getElementById('masteredSegment').style.width = masteredPct + '%';
+            document.getElementById('trainingSegment').style.width = trainingPct + '%';
+            document.getElementById('lockedSegment').style.width = Math.max(0, lockedPct) + '%';
             document.getElementById('maxLevelMarker').textContent = 'L' + maxLevel;
+
+            // Calculate 3-eval streak for level-up
+            const history = state.accuracy_history || [];
+            const atCurrentLevel = history.filter(h =>
+                (h.training_level || h.level) === training
+            );
+
+            // Last 3 evals at current level
+            const recent3 = atCurrentLevel.slice(-3);
+            let streak = 0;
+            let streakIndicator = '';
+
+            // Build from right to left, stop at first failure
+            for (let i = recent3.length - 1; i >= 0; i--) {
+                const acc = (recent3[i].accuracy || 0) * 100;
+                if (acc >= 80) {
+                    streak++;
+                    streakIndicator = '✅' + streakIndicator;
+                } else {
+                    streakIndicator = '❌' + streakIndicator;
+                    break;  // Streak broken
+                }
+            }
+
+            // Fill remaining with gray circles (not red!)
+            while (streakIndicator.length < 6) {  // 3 circles * 2 chars each
+                streakIndicator = '○' + streakIndicator;
+            }
+
+            document.getElementById('streakIndicator').textContent = streakIndicator;
+            document.getElementById('progressText').textContent = `${streak}/3 streak`;
+
+            // Progress message
+            const progressMsg = document.getElementById('progressMessage');
+            if (streak >= 3) {
+                progressMsg.innerHTML = '🎉 <strong style="color: #4CAF50;">Ready to advance!</strong> Level up pending.';
+                progressMsg.style.color = '#4CAF50';
+            } else if (streak > 0) {
+                progressMsg.innerHTML = `Keep going! ${3 - streak} more eval${3 - streak > 1 ? 's' : ''} at 80%+ needed.`;
+                progressMsg.style.color = '#FF9800';
+            } else {
+                progressMsg.innerHTML = 'Need 3 consecutive evals at 80%+ to advance';
+                progressMsg.style.color = '#888';
+            }
 
             // Populate level select dropdown
             populateLevelSelect(maxLevel);
@@ -809,9 +987,26 @@
                     const acc = (entry.accuracy || 0) * 100;
                     const bar = document.createElement('div');
                     bar.className = 'accuracy-bar';
+
+                    // Color-code based on accuracy
+                    if (acc >= 80) {
+                        bar.classList.add('excellent');
+                    } else if (acc >= 60) {
+                        bar.classList.add('good');
+                    } else {
+                        bar.classList.add('poor');
+                    }
+
                     bar.style.height = (acc / maxAcc * 100) + '%';
                     bar.setAttribute('data-value', acc.toFixed(1) + '% L' + (entry.training_level || entry.level || '?'));
                     bar.title = `${acc.toFixed(1)}% at L${entry.training_level || entry.level || '?'}`;
+
+                    // Add percentage label inside bar
+                    const label = document.createElement('div');
+                    label.className = 'accuracy-bar-label';
+                    label.textContent = acc.toFixed(0) + '%';
+                    bar.appendChild(label);
+
                     chartEl.appendChild(bar);
                 });
             }

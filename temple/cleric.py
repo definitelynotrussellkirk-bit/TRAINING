@@ -108,12 +108,20 @@ def _ensure_rituals_loaded():
     """Import ritual modules to ensure they're registered."""
     if not RITUALS:
         # Import ritual modules - they register themselves via decorator
-        try:
-            from temple.rituals import quick  # noqa: F401
-        except ImportError as e:
-            logger.warning(f"Failed to load quick ritual: {e}")
+        ritual_modules = [
+            "quick",      # Core service checks
+            "api",        # HTTP API validation
+            "forge",      # GPU/hardware diagnostics
+            "weaver",     # Daemon/process health
+            "champion",   # Model/checkpoint health
+            "oracle",     # Inference server
+            "guild",      # Skills/curriculum
+            "scribe",     # Evaluation system
+            "deep",       # Comprehensive (runs all)
+        ]
 
-        try:
-            from temple.rituals import api  # noqa: F401
-        except ImportError as e:
-            logger.warning(f"Failed to load api ritual: {e}")
+        for module_name in ritual_modules:
+            try:
+                __import__(f"temple.rituals.{module_name}", fromlist=[module_name])
+            except ImportError as e:
+                logger.warning(f"Failed to load {module_name} ritual: {e}")

@@ -112,6 +112,17 @@ def get_skills_data():
         engine = get_engine()
         skills = []
 
+        # Get eval counts from ledger (persisted truth) instead of engine state
+        eval_counts = {}
+        try:
+            from core.evaluation_ledger import get_eval_ledger
+            ledger = get_eval_ledger(BASE_DIR)
+            summary = ledger.summary()
+            for skill, info in summary.get("by_skill", {}).items():
+                eval_counts[skill] = info.get("count", 0)
+        except Exception as e:
+            logger.debug(f"Could not load eval counts from ledger: {e}")
+
         for skill_id in engine.list_skills():
             try:
                 config = load_skill_config(skill_id)
@@ -128,6 +139,9 @@ def get_skills_data():
                 if state.last_eval_accuracy is not None:
                     recent_acc = state.last_eval_accuracy * 100
 
+                # Use eval count from ledger (persisted) over engine state (in-memory)
+                ledger_count = eval_counts.get(skill_id, 0)
+
                 skills.append({
                     "id": config.id,
                     "name": config.name,
@@ -140,7 +154,7 @@ def get_skills_data():
                     "mastered_level": mastered,
                     "training_level": training,
                     "accuracy": round(recent_acc, 1),
-                    "eval_count": state.total_evals,
+                    "eval_count": ledger_count,
                     "category": config.category.value if hasattr(config.category, 'value') else str(config.category),
                     "description": config.description or "",
                 })

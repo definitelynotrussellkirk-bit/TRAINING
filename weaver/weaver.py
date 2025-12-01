@@ -7,6 +7,7 @@ Watches over:
 - Tavern server (the face)
 - VaultKeeper (the memory)
 - Data generation (the fuel)
+- Eval runner (the judge)
 
 Usage:
     python3 weaver/weaver.py              # Run once (check & fix)
@@ -99,7 +100,7 @@ class Weaver:
             required=True
         )
 
-        # Tavern Server - The Face
+        # Tavern Server - The Face (already binds to 0.0.0.0 internally)
         self.threads["tavern"] = Thread(
             name="Tavern Server",
             description="The face - game UI at port 8888",
@@ -112,7 +113,7 @@ class Weaver:
             required=True
         )
 
-        # VaultKeeper - The Memory
+        # VaultKeeper - The Memory (already binds to 0.0.0.0 internally)
         self.threads["vault"] = Thread(
             name="VaultKeeper",
             description="The memory - asset registry at port 8767",
@@ -122,6 +123,20 @@ class Weaver:
                 "--port", "8767"
             ],
             pid_file=str(self.base_dir / ".pids" / "vault.pid"),
+            required=True
+        )
+
+        # RealmState Service - The Truth
+        self.threads["realm_state"] = Thread(
+            name="RealmState Service",
+            description="The truth - single source of truth at port 8866",
+            health_check=self._check_realm_state,
+            start_cmd=[
+                "python3", "-m", "realm.server",
+                "--host", "0.0.0.0",
+                "--port", "8866"
+            ],
+            pid_file=str(self.base_dir / ".pids" / "realm_state.pid"),
             required=True
         )
 
@@ -137,6 +152,33 @@ class Weaver:
             required=True,
             restart_delay=10,
             max_restarts=100  # Can generate many times
+        )
+
+        # Eval Runner - The Judge
+        # Get inference config from hosts.json if available
+        inference_host = "192.168.x.x"
+        inference_port = "8765"
+        try:
+            from core.hosts import get_host
+            inference_host_obj = get_host("3090")
+            if inference_host_obj:
+                inference_host = inference_host_obj.host
+        except:
+            pass
+
+        self.threads["eval_runner"] = Thread(
+            name="Eval Runner",
+            description="The judge - processes evaluation queues",
+            health_check=self._check_eval_runner,
+            start_cmd=[
+                "python3", str(self.base_dir / "core" / "eval_runner.py"),
+                "--daemon",
+                "--inference-host", inference_host,
+                "--inference-port", inference_port,
+                "--interval", "60"
+            ],
+            pid_file=str(self.base_dir / ".pids" / "eval_runner.pid"),
+            required=False  # Optional - won't block startup if inference server unavailable
         )
 
     # ========== Health Checks ==========
@@ -171,6 +213,14 @@ class Weaver:
         except:
             return False
 
+    def _check_realm_state(self) -> bool:
+        """Check if RealmState service is responding"""
+        try:
+            resp = requests.get("http://localhost:8866/health", timeout=5)
+            return resp.status_code == 200
+        except:
+            return False
+
     def _check_data_flow(self) -> bool:
         """Check if queue has enough data (queued + processing)"""
         try:
@@ -185,6 +235,17 @@ class Weaver:
             logger.debug(f"Could not check data flow: {e}")
             return True  # Assume OK if can't check
 
+    def _check_eval_runner(self) -> bool:
+        """Check if eval runner daemon is alive"""
+        pid_file = self.base_dir / ".pids" / "eval_runner.pid"
+        if not pid_file.exists():
+            return False
+        try:
+            pid = int(pid_file.read_text().strip())
+            return self._pid_alive(pid)
+        except (ValueError, OSError):
+            return False
+
     def _pid_alive(self, pid: int) -> bool:
         """Check if a PID is running"""
         try:
@@ -192,6 +253,82 @@ class Weaver:
             return True
         except (OSError, ProcessLookupError):
             return False
+
+    # ========== POLICY 4: Level 2 & 3 Health Checks ==========
+
+    def _check_data_flow_health(self) -> bool:
+        """
+        Level 2: Check if RealmStore is being updated.
+
+        POLICY 4: Comprehensive Monitoring
+        Not just "is daemon alive?" but "is data flowing?"
+        """
+        try:
+            import sys
+            sys.path.insert(0, str(self.base_dir))
+            from core.realm_store import get_store
+            from datetime import datetime, timezone
+
+            store = get_store()
+            training = store.get_training()
+
+            if not training:
+                logger.debug("No training data in RealmStore")
+                return False
+
+            updated_at = training.get("updated_at")
+            if not updated_at:
+                logger.debug("No updated_at timestamp in training data")
+                return False
+
+            # Check freshness
+            try:
+                last_update = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+                now = datetime.now(timezone.utc)
+                if last_update.tzinfo is None:
+                    last_update = last_update.replace(tzinfo=timezone.utc)
+
+                age_seconds = (now - last_update).total_seconds()
+
+                # Consider healthy if updated within 2 minutes
+                is_fresh = age_seconds < 120
+
+                if not is_fresh:
+                    logger.warning(f"RealmStore data is stale ({age_seconds:.0f}s old)")
+
+                return is_fresh
+
+            except Exception as e:
+                logger.debug(f"Could not parse updated_at timestamp: {e}")
+                return False
+
+        except Exception as e:
+            logger.debug(f"Data flow check failed: {e}")
+            return False
+
+    def _check_performance_health(self) -> bool:
+        """
+        Level 3: Check if training performance is acceptable.
+
+        POLICY 4: Comprehensive Monitoring
+        Not just "is data flowing?" but "is it flowing at expected speed?"
+        """
+        try:
+            import sys
+            sys.path.insert(0, str(self.base_dir))
+            from core.status_monitor import check_performance_health
+
+            result = check_performance_health()
+
+            if result.is_degraded:
+                logger.warning(f"Performance degraded: {result.message}")
+
+            return not result.is_degraded
+
+        except Exception as e:
+            logger.debug(f"Performance check failed: {e}")
+            # Don't block on performance check failures - treat as OK
+            return True
 
     # ========== Thread Management ==========
 
@@ -240,18 +377,42 @@ class Weaver:
             return False
 
     def check_tapestry(self) -> Dict[str, dict]:
-        """Check status of all threads"""
+        """
+        Check status of all threads.
+
+        POLICY 4: Comprehensive Monitoring (3 levels)
+        - Level 1: Process alive (all threads)
+        - Level 2: Data flowing (training daemon)
+        - Level 3: Performance OK (training daemon)
+        """
         status = {}
 
         for name, thread in self.threads.items():
+            # Level 1: Process health
             alive = thread.health_check()
-            status[name] = {
+
+            thread_status = {
                 "name": thread.name,
                 "description": thread.description,
                 "alive": alive,
                 "required": thread.required,
                 "restarts": thread.restart_count
             }
+
+            # Level 2 & 3: Additional checks for training daemon
+            if name == "training" and alive:
+                # Level 2: Data flow health
+                data_flow_ok = self._check_data_flow_health()
+                thread_status["data_flow_ok"] = data_flow_ok
+
+                # Level 3: Performance health
+                performance_ok = self._check_performance_health()
+                thread_status["performance_ok"] = performance_ok
+
+                # Overall health (all 3 levels)
+                thread_status["fully_healthy"] = alive and data_flow_ok and performance_ok
+
+            status[name] = thread_status
 
         return status
 
@@ -424,10 +585,11 @@ def force_shutdown(base_dir: Path) -> bool:
     Order matters:
     1. Signal training to finish current batch (graceful)
     2. Stop weaver daemon (so it doesn't restart things)
-    3. Stop tavern (UI)
-    4. Stop vault (API)
-    5. Stop training daemon
-    6. Write shutdown marker
+    3. Stop eval runner
+    4. Stop tavern (UI)
+    5. Stop vault (API)
+    6. Stop training daemon
+    7. Write shutdown marker
 
     Returns:
         True if all services stopped cleanly
@@ -443,58 +605,72 @@ def force_shutdown(base_dir: Path) -> bool:
     if weaver_pid.exists():
         try:
             pid = int(weaver_pid.read_text().strip())
-            print(f"[1/5] Stopping Weaver daemon (PID {pid})...")
+            print(f"[1/6] Stopping Weaver daemon (PID {pid})...")
             os.kill(pid, signal.SIGTERM)
             time.sleep(1)
         except (ValueError, ProcessLookupError):
             pass
         weaver_pid.unlink(missing_ok=True)
     else:
-        print("[1/5] Weaver daemon not running")
+        print("[1/6] Weaver daemon not running")
 
     # 2. Signal training to pause (graceful)
     control_dir = base_dir / "control"
     pause_file = control_dir / ".pause"
-    print("[2/5] Signaling training to pause...")
+    print("[2/6] Signaling training to pause...")
     pause_file.touch()
     time.sleep(2)  # Give it time to finish current batch
 
-    # 3. Stop tavern
+    # 3. Stop eval runner
+    eval_pid = pids_dir / "eval_runner.pid"
+    if eval_pid.exists():
+        try:
+            pid = int(eval_pid.read_text().strip())
+            print(f"[3/6] Stopping Eval Runner (PID {pid})...")
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(1)
+        except (ValueError, ProcessLookupError):
+            pass
+        eval_pid.unlink(missing_ok=True)
+    else:
+        print("[3/6] Eval Runner not running")
+
+    # 4. Stop tavern
     tavern_pid = pids_dir / "tavern.pid"
     if tavern_pid.exists():
         try:
             pid = int(tavern_pid.read_text().strip())
-            print(f"[3/5] Stopping Tavern (PID {pid})...")
+            print(f"[4/6] Stopping Tavern (PID {pid})...")
             os.kill(pid, signal.SIGTERM)
             time.sleep(1)
         except (ValueError, ProcessLookupError):
             pass
         tavern_pid.unlink(missing_ok=True)
     else:
-        print("[3/5] Tavern not running (checking port)...")
+        print("[4/6] Tavern not running (checking port)...")
         subprocess.run(["fuser", "-k", "8888/tcp"], capture_output=True)
 
-    # 4. Stop vault
+    # 5. Stop vault
     vault_pid = pids_dir / "vault.pid"
     if vault_pid.exists():
         try:
             pid = int(vault_pid.read_text().strip())
-            print(f"[4/5] Stopping VaultKeeper (PID {pid})...")
+            print(f"[5/6] Stopping VaultKeeper (PID {pid})...")
             os.kill(pid, signal.SIGTERM)
             time.sleep(1)
         except (ValueError, ProcessLookupError):
             pass
         vault_pid.unlink(missing_ok=True)
     else:
-        print("[4/5] VaultKeeper not running (checking port)...")
+        print("[5/6] VaultKeeper not running (checking port)...")
         subprocess.run(["fuser", "-k", "8767/tcp"], capture_output=True)
 
-    # 5. Stop training daemon
+    # 6. Stop training daemon
     daemon_pid = base_dir / ".daemon.pid"
     if daemon_pid.exists():
         try:
             pid = int(daemon_pid.read_text().strip())
-            print(f"[5/5] Stopping Training Daemon (PID {pid})...")
+            print(f"[6/6] Stopping Training Daemon (PID {pid})...")
             os.kill(pid, signal.SIGTERM)
             # Wait for graceful shutdown
             for i in range(10):
@@ -510,7 +686,7 @@ def force_shutdown(base_dir: Path) -> bool:
             pass
         daemon_pid.unlink(missing_ok=True)
     else:
-        print("[5/5] Training daemon not running")
+        print("[6/6] Training daemon not running")
 
     # Remove pause file
     pause_file.unlink(missing_ok=True)
@@ -592,7 +768,7 @@ def main():
     parser.add_argument("--daemon", action="store_true", help="Run as daemon (continuous)")
     parser.add_argument("--status", action="store_true", help="Show tapestry status")
     parser.add_argument("--dry-run", action="store_true", help="Check but don't restart")
-    parser.add_argument("--restart", metavar="SERVICE", help="Restart a specific service (tavern, vault, training, data_flow)")
+    parser.add_argument("--restart", metavar="SERVICE", help="Restart a specific service (tavern, vault, training, data_flow, eval_runner)")
     parser.add_argument("--shutdown", action="store_true", help="Force shutdown all services cleanly")
     parser.add_argument("--start", action="store_true", help="Start all services fresh")
     parser.add_argument("--base-dir", default=None, help="Base directory (auto-detected if not provided)")

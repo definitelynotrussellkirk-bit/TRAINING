@@ -61,6 +61,7 @@ const GameState = {
     vramUsed: 0,
     vramTotal: 24,
     gpuTemp: 0,
+    gpuUtil: 0,
 
     // Vault (real checkpoint data)
     checkpointCount: 0,
@@ -1027,6 +1028,7 @@ function processGameData(data) {
         GameState.vramUsed = gpu.vram_used_gb || 0;
         GameState.vramTotal = gpu.vram_total_gb || 24;
         GameState.gpuTemp = gpu.temperature_c || 0;
+        GameState.gpuUtil = gpu.utilization_pct || 0;
     }
 
     // Curriculum (skills)
@@ -2815,13 +2817,15 @@ const RPGFlair = {
     },
 
     /**
-     * Update HP/MP resource bars
+     * Update HP/MP/Stamina resource bars
      */
     updateResourceBars() {
         const hpFill = document.getElementById('hpBarFill');
         const hpText = document.getElementById('hpBarText');
         const mpFill = document.getElementById('mpBarFill');
         const mpText = document.getElementById('mpBarText');
+        const staminaFill = document.getElementById('staminaBarFill');
+        const staminaText = document.getElementById('staminaBarText');
 
         // VRAM as HP
         if (hpFill && GameState.vramTotal > 0) {
@@ -2839,6 +2843,14 @@ const RPGFlair = {
         }
         if (mpText) {
             mpText.textContent = '-- / -- GB';
+        }
+
+        // GPU Utilization as Stamina
+        if (staminaFill) {
+            staminaFill.style.width = `${GameState.gpuUtil}%`;
+        }
+        if (staminaText) {
+            staminaText.textContent = `${Math.round(GameState.gpuUtil)}%`;
         }
     },
 

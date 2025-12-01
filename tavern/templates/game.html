@@ -7,10 +7,27 @@
     <!-- Shared theme (design tokens, badges, components) -->
     <link rel="stylesheet" href="/static/css/theme.css?v=1">
     <!-- Main game styles -->
-    <link rel="stylesheet" href="/static/css/game.css?v=4">
+    <link rel="stylesheet" href="/static/css/game.css?v=7">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- 🔥 RPG FLAIR: Global Overlays -->
+    <div class="critical-hit-overlay" id="critOverlay">
+        <span class="critical-hit-text">CRITICAL!</span>
+    </div>
+    <div class="achievement-toast" id="achievementToast">
+        <span class="achievement-icon" id="achievementIcon">🏆</span>
+        <div class="achievement-text">
+            <div class="achievement-title">Achievement Unlocked</div>
+            <div class="achievement-name" id="achievementName">First Steps</div>
+        </div>
+    </div>
+    <div class="zone-discovery" id="zoneDiscovery">
+        <div class="zone-discovery-title" id="zoneName">Level 20</div>
+        <div class="zone-discovery-subtitle">Zone Discovered</div>
+    </div>
+    <div class="weather-overlay" id="weatherOverlay"></div>
+
     <!-- TITLE BAR -->
     <header class="game-header">
         <div class="header-left">
@@ -49,17 +66,60 @@
         </div>
     </header>
 
+    <!-- 🎮 MUD CONSOLE (toggle with ` backtick) -->
+    <div class="realm-console collapsed" id="realmConsole">
+        <div class="console-header">
+            <span class="console-title">⌨️ Realm Console</span>
+            <span class="console-hint">Press <kbd>`</kbd> to toggle • <kbd>↑↓</kbd> history</span>
+            <button class="console-close" onclick="RealmConsole.toggle()">×</button>
+        </div>
+        <div class="console-output" id="consoleOutput">
+            <div class="console-line console-system">You stand at the entrance to the Realm. Type <span class="cmd">help</span> to begin...</div>
+        </div>
+        <div class="console-input-row">
+            <span class="console-prompt" id="consolePrompt">&gt;</span>
+            <input type="text" id="consoleInput" autocomplete="off" spellcheck="false" placeholder="Enter command..." />
+        </div>
+    </div>
+
     <!-- MAIN GAME AREA -->
     <main class="game-main">
         <!-- LEFT: HERO PANEL -->
         <section class="hero-panel">
             <div class="hero-frame">
                 <div class="hero-portrait" id="heroPortrait">
-                    <!-- ASCII/SVG Hero will go here -->
+                    <!-- Hero with idle animation -->
                     <div class="hero-ascii">
-                        <div class="dio-icon">🧔🏽</div>
+                        <div class="dio-icon" id="heroSprite">🧔🏽</div>
                     </div>
+                    <!-- ✨ Sparkle overlay -->
+                    <span class="hero-sparkle">✨</span>
+                </div>
                 <div class="hero-glow"></div>
+
+                <!-- 🗺️ Mini-Map -->
+                <div class="realm-minimap" id="realmMinimap" title="The Realm">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- 💚💙💛 HP/MP/Stamina Resource Bars (WoW Style) -->
+            <div class="hero-resources">
+                <div class="resource-bar-wow hp" title="VRAM - Hero's health">
+                    <span class="bar-label">VRAM</span>
+                    <div class="bar-fill" id="hpBarFill" style="width: 50%"></div>
+                    <span class="bar-text" id="hpBarText">12 / 24 GB</span>
+                </div>
+                <div class="resource-bar-wow mp" title="RAM - Hero's mana">
+                    <span class="bar-label">RAM</span>
+                    <div class="bar-fill" id="mpBarFill" style="width: 50%"></div>
+                    <span class="bar-text" id="mpBarText">32 / 64 GB</span>
+                </div>
+                <div class="resource-bar-wow stamina" title="GPU Utilization - Hero's stamina">
+                    <span class="bar-label">STAM</span>
+                    <div class="bar-fill" id="staminaBarFill" style="width: 0%"></div>
+                    <span class="bar-text" id="staminaBarText">0%</span>
+                </div>
             </div>
 
             <div class="hero-info">
@@ -104,11 +164,25 @@
 
         <!-- CENTER: BATTLE/QUEST AREA -->
         <section class="battle-panel">
+            <!-- 📜 MUD ROOM DESCRIPTION -->
+            <div class="room-description" id="roomDescription">
+                You stand in the Training Grounds. The air crackles with gradients.
+                Distant echoes of loss curves rumble like thunder across the Realm.
+                <div class="room-exits">
+                    Obvious exits: <a href="/guild">Guild Hall</a>, <a href="/vault">Vault</a>, <a href="/oracle">Oracle</a>, <a href="/quests">Quest Board</a>, <a href="/temple">Temple</a>
+                </div>
+            </div>
+
             <!-- NEXT ACTION - The main call-to-action -->
             <div class="next-action-card" id="nextActionSection">
                 <h2 class="next-action-title" id="nextActionTitle">Loading...</h2>
                 <p class="next-action-body" id="nextActionBody"></p>
-                <button class="next-action-btn" id="nextActionButton">...</button>
+                <button class="next-action-btn btn-spellcast" id="nextActionButton">...</button>
+            </div>
+
+            <!-- POLICY 3: STALENESS WARNING BANNER -->
+            <div id="dataFreshnessWarning" class="warning-banner" style="display:none;">
+                ⚠️ <span id="freshnessMessage"></span>
             </div>
 
             <!-- BATTLE STATUS -->
@@ -222,7 +296,7 @@
             <!-- VAULT SUMMARY -->
             <div class="vault-card">
                 <div class="panel-header">
-                    <h3>🗃️ Vault</h3>
+                    <h3>🗝️ Vault</h3>
                 </div>
                 <div class="vault-stats">
                     <div class="vault-stat">
@@ -242,8 +316,10 @@
 
             <!-- FORGE STATUS -->
             <div class="forge-card">
-                <div class="panel-header">
-                    <h3>🔥 The Forge (4090)</h3>
+                <div class="panel-header forge-header">
+                    <span class="forge-torch forge-torch-left">🔥</span>
+                    <h3>⚒️ The Forge (4090)</h3>
+                    <span class="forge-torch forge-torch-right">🔥</span>
                 </div>
                 <div class="forge-stats">
                     <div class="forge-meter">
@@ -283,6 +359,6 @@
     <!-- Unified Realm State (single source of truth) -->
     <script src="/static/js/realm-state.js?v=1"></script>
     <!-- Main game logic -->
-    <script src="/static/js/game.js?v=17"></script>
+    <script src="/static/js/game.js?v=21"></script>
 </body>
 </html>

@@ -100,7 +100,7 @@ class EvalWorker(BaseWorker):
             # Log warning but continue - job payload has explicit identity
 
         if job_type == "eval":
-            return self._handle_eval(payload)
+            return self._handle_eval(payload, job_id)
         elif job_type == "sparring":
             return self._handle_sparring(payload)
         elif job_type == "inference":
@@ -139,7 +139,7 @@ class EvalWorker(BaseWorker):
 
         return None
 
-    def _handle_eval(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_eval(self, payload: Dict[str, Any], job_id: str) -> Dict[str, Any]:
         """
         Handle evaluation job.
 
@@ -147,12 +147,27 @@ class EvalWorker(BaseWorker):
             skill_id: Skill to evaluate
             level: Skill level
             batch_size: Number of problems
+            hero_id: Hero identifier (for ledger)
+            campaign_id: Campaign identifier (for ledger)
+            checkpoint_path: Checkpoint path (for ledger)
+            context_hash: Context hash (for verification)
         """
+        import time
+
         skill_id = payload.get("skill_id", "bin")
         level = payload.get("level", 1)
         batch_size = payload.get("batch_size", 100)
 
+        # Model identity from payload
+        hero_id = payload.get("hero_id", "unknown")
+        campaign_id = payload.get("campaign_id", "unknown")
+        checkpoint_path = payload.get("checkpoint_path", "")
+        checkpoint_id = payload.get("checkpoint_id", "")
+        context_hash = payload.get("context_hash", "")
+
         logger.info(f"Running eval: skill={skill_id}, level={level}, batch={batch_size}")
+
+        started_at = time.time()
 
         # Import skill engine
         try:
@@ -181,6 +196,36 @@ class EvalWorker(BaseWorker):
 
             # Score results
             result, state = engine.run_eval(skill_id, answers, level=level, count=batch_size)
+
+            ended_at = time.time()
+
+            # Record to evaluation ledger
+            try:
+                from core.evaluation_ledger import record_job_eval, extract_checkpoint_step
+
+                checkpoint_step = extract_checkpoint_step(checkpoint_path or checkpoint_id)
+
+                record_job_eval(
+                    job_id=job_id,
+                    skill_id=skill_id,
+                    level=level,
+                    accuracy=result.accuracy,
+                    correct=result.num_correct,
+                    total=result.num_examples,
+                    hero_id=hero_id,
+                    campaign_id=campaign_id,
+                    checkpoint_step=checkpoint_step,
+                    checkpoint_id=checkpoint_id,
+                    checkpoint_path=checkpoint_path,
+                    context_hash=context_hash,
+                    worker_id=self.config.device_id if self.config else None,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    per_primitive=result.per_primitive_accuracy,
+                )
+                logger.info(f"Recorded eval to ledger: {skill_id} L{level} = {result.accuracy:.1%}")
+            except Exception as e:
+                logger.warning(f"Failed to record eval to ledger: {e}")
 
             return {
                 "success": True,

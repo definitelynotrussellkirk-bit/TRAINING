@@ -331,14 +331,14 @@ class SkillStateManager:
     def check_progression(
         self,
         skill_id: str,
-        min_evals: int = 3,
+        min_evals: int = 1,
     ) -> tuple[bool, str]:
         """
         Check if skill should progress to next level.
 
         Args:
             skill_id: Skill identifier
-            min_evals: Minimum evaluations needed
+            min_evals: Minimum evaluations needed (default 1 = pass once and level up)
 
         Returns:
             (should_progress, reason)
@@ -360,24 +360,26 @@ class SkillStateManager:
         at_level = [r for r in history if r.level == current_level]
 
         if len(at_level) < min_evals:
-            return False, f"Need {min_evals} evals at level (have {len(at_level)})"
+            return False, f"Need {min_evals} eval(s) at level (have {len(at_level)})"
 
-        # Check last N evals
+        # Check last N evals (default N=1, so just the most recent)
         recent = at_level[-min_evals:]
         avg_accuracy = sum(r.accuracy for r in recent) / len(recent)
 
         if avg_accuracy >= threshold:
-            return True, f"Avg accuracy {avg_accuracy:.1%} >= threshold {threshold:.0%}"
+            return True, f"Accuracy {avg_accuracy:.1%} >= threshold {threshold:.0%}"
 
-        return False, f"Avg accuracy {avg_accuracy:.1%} < threshold {threshold:.0%}"
+        return False, f"Accuracy {avg_accuracy:.1%} < threshold {threshold:.0%}"
 
     def progress_if_ready(
         self,
         skill_id: str,
-        min_evals: int = 3,
+        min_evals: int = 1,
     ) -> tuple[bool, Optional[int]]:
         """
         Progress to next level if criteria are met.
+
+        When progression happens, automatically queues evaluation for next level.
 
         Returns:
             (progressed, new_level or None)
@@ -393,6 +395,20 @@ class SkillStateManager:
         new_level = old_level + 1
 
         self.record_progression(skill_id, old_level, new_level, "auto")
+
+        # Queue evaluation for next level immediately
+        try:
+            from core.evaluation_ledger import queue_evaluation
+            from core.checkpoint_ledger import get_ledger
+
+            ledger = get_ledger()
+            latest = ledger.get_latest()
+
+            if latest:
+                queue_evaluation(latest.step, skill_id, new_level)
+                logger.info(f"[{skill_id}] Queued eval for L{new_level} at checkpoint {latest.step}")
+        except Exception as e:
+            logger.warning(f"[{skill_id}] Failed to queue next level eval: {e}")
 
         return True, new_level
 

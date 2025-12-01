@@ -62,6 +62,26 @@ echo "🔌 Releasing ports..."
 fuser -k 8888/tcp 2>/dev/null || true
 fuser -k 8767/tcp 2>/dev/null || true
 
+# Kill any lingering training processes using GPU
+echo "🔫 Killing lingering training processes..."
+# Kill by name pattern - training_daemon specifically
+pkill -f "training_daemon.py" 2>/dev/null || true
+pkill -f "train.py.*--dataset" 2>/dev/null || true
+
+# Give GPU time to release
+sleep 2
+
+# Verify GPU is clear
+if command -v nvidia-smi &>/dev/null; then
+    GPU_PROCS=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | wc -l)
+    if [ "$GPU_PROCS" -gt 0 ]; then
+        echo "⚠️  Warning: $GPU_PROCS process(es) still using GPU"
+        nvidia-smi --query-compute-apps=pid,name,used_memory --format=csv 2>/dev/null || true
+    else
+        echo "✅ GPU is clear"
+    fi
+fi
+
 echo ""
 echo "✅ All services stopped."
 echo ""

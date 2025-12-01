@@ -33,7 +33,7 @@ class ModelEvaluator:
     Supports both local model inference and remote API calls.
     """
 
-    def __init__(self, inference_url: str = "http://192.168.x.x:8000/generate",
+    def __init__(self, inference_url: str = "http://192.168.x.x:8000  # TODO: Use core.hosts.get_service_url("inference")/generate",
                  timeout: int = 300):
         """Initialize evaluator.
 

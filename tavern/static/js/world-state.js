@@ -66,13 +66,14 @@ async function fetchWorldState() {
         WorldState.lastUpdate = new Date();
 
         // Training status
-        if (data.training) {
+        if (data.state?.training) {
+            const training = data.state.training;
             WorldState.training = {
-                status: data.training.status || 'idle',
-                currentJob: data.training.current_job_name || null,
-                step: data.training.progress?.step || 0,
-                totalSteps: data.training.progress?.total || 0,
-                itPerSec: data.training.progress?.it_per_sec || null,
+                status: training.status || 'idle',
+                currentJob: training.file || training.current_job_name || null,
+                step: training.step || training.progress?.step || 0,
+                totalSteps: training.total_steps || training.progress?.total || 0,
+                itPerSec: training.speed || training.progress?.it_per_sec || null,
             };
         }
 

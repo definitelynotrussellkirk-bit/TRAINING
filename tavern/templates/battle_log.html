@@ -179,6 +179,22 @@
             padding: 6px 20px;
         }
 
+        /* 🔥 RPG Flair: New event shimmer */
+        .log-entry.new-event {
+            animation: logShimmer 0.8s ease-out;
+        }
+
+        @keyframes logShimmer {
+            0% {
+                background: rgba(255, 215, 0, 0.3);
+                transform: translateX(4px);
+            }
+            100% {
+                background: transparent;
+                transform: translateX(0);
+            }
+        }
+
         .log-time {
             color: #444;
             font-size: 0.75rem;
@@ -368,7 +384,18 @@
     </style>
 </head>
 <body>
-    <header>
+    <header style="position: relative;">
+        <!-- 🔥 Flickering Torches -->
+        <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1.3rem; animation: fireFlicker 1.2s infinite; filter: drop-shadow(0 0 6px rgba(255, 140, 0, 0.8));">🔥</span>
+        <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 1.3rem; animation: fireFlicker 1.2s infinite; filter: drop-shadow(0 0 6px rgba(255, 140, 0, 0.8));">🔥</span>
+        <style>
+            @keyframes fireFlicker {
+                0%, 100% { transform: translateY(-50%) scale(1); opacity: 0.9; }
+                25% { transform: translateY(-52%) scale(1.05); opacity: 1; }
+                50% { transform: translateY(-48%) scale(0.98); opacity: 0.85; }
+                75% { transform: translateY(-51%) scale(1.02); opacity: 0.95; }
+            }
+        </style>
         <h1>
             <span class="status-dot" id="status-dot"></span>
             Battle Log
@@ -602,6 +629,17 @@
                     }
 
                     renderEvents();
+
+                    // 🔥 RPG Flair: Shimmer new events
+                    if (data.events.length > 0 && lastTimestamp) {
+                        const container = document.getElementById('log-scroll');
+                        const entries = container.querySelectorAll('.log-entry');
+                        // Shimmer last N entries (newest)
+                        for (let i = Math.max(0, entries.length - data.events.length); i < entries.length; i++) {
+                            entries[i].classList.add('new-event');
+                            setTimeout(() => entries[i].classList.remove('new-event'), 800);
+                        }
+                    }
 
                     // Show new events pill if not at bottom
                     if (!autoScroll && data.events.length > 0 && lastTimestamp) {

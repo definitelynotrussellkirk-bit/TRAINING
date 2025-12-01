@@ -322,8 +322,9 @@ def get_battle_log(limit: int = 50, since_minutes: Optional[int] = None) -> List
 
     events = logger.get_events(since=since, limit=limit)
 
+    from core.battle_log import CHANNEL_ICONS
     return [
-        f"[{e.timestamp[:19]}] {e.icon} [{e.channel}] {e.message}"
+        f"[{e.timestamp[:19]}] {CHANNEL_ICONS.get(e.channel, '📢')} [{e.channel}] {e.message}"
         for e in reversed(events)
     ]
 

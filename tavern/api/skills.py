@@ -25,29 +25,47 @@ logger = logging.getLogger(__name__)
 
 
 def _get_skills_data():
-    """Load skill data from SkillEngine (single source of truth)."""
+    """Load skill data from CurriculumManager (single source of truth)."""
     try:
-        from guild.skills import get_engine
         from guild.skills.loader import load_skill_config
+        from data_manager.curriculum_manager import CurriculumManager
 
-        engine = get_engine()
+        base_dir = paths.get_base_dir()
+        cm = CurriculumManager(base_dir, {})
+
+        # Get eval counts from ledger (persisted truth) - stable across restarts
+        eval_counts = {}
+        try:
+            from core.evaluation_ledger import get_eval_ledger
+            ledger = get_eval_ledger(base_dir)
+            summary = ledger.summary()
+            for skill, info in summary.get("by_skill", {}).items():
+                eval_counts[skill] = info.get("count", 0)
+        except Exception as e:
+            logger.debug(f"Could not load eval counts from ledger: {e}")
+
         skills = []
-
-        for skill_id in engine.list_skills():
+        # Iterate over skills in curriculum state
+        for skill_id in cm.state.get("skills", {}).keys():
             try:
                 config = load_skill_config(skill_id)
-                state = engine.get_state(skill_id)
 
-                # current_level = level being TRAINED on (not mastered)
-                # mastered = training - 1 (minimum 0)
-                training = state.level
-                training = min(training, config.max_level)
-                mastered = max(0, training - 1)
+                # Get curriculum state for this skill
+                mastered = cm.get_mastered_level(skill_id)
+                training = cm.get_training_level(skill_id)
 
-                # Get accuracy from state
+                # Get accuracy history
+                skill_state = cm.state["skills"][skill_id]
+                history = skill_state.get("accuracy_history", [])
+
+                # Calculate recent accuracy (last 3 evals)
                 recent_acc = 0
-                if state.last_eval_accuracy is not None:
-                    recent_acc = state.last_eval_accuracy * 100
+                if history:
+                    recent = history[-3:]
+                    recent_acc = (sum(r.get("accuracy", 0) for r in recent) / len(recent)) * 100
+
+                # Use ledger count for total evals (persisted, stable)
+                ledger_count = eval_counts.get(skill_id, 0)
 
                 skills.append({
                     "id": config.id,
@@ -61,7 +79,7 @@ def _get_skills_data():
                     "mastered_level": mastered,
                     "training_level": training,
                     "accuracy": round(recent_acc, 1),
-                    "eval_count": state.total_evals,
+                    "eval_count": ledger_count,
                     "category": config.category.value if hasattr(config.category, 'value') else str(config.category),
                     "description": config.description or "",
                 })
@@ -74,12 +92,12 @@ def _get_skills_data():
 
         return {
             "skills": skills,
-            "active_skill": "",  # TODO: Get from training status
+            "active_skill": cm.state.get("active_skill", ""),
             "total_mastered": sum(s["mastered_level"] for s in skills),
         }
 
     except Exception as e:
-        logger.error(f"Failed to load skills from engine: {e}")
+        logger.error(f"Failed to load skills from curriculum: {e}")
         return {"skills": [], "error": str(e)}
 
 
@@ -114,22 +132,16 @@ def serve_skill_data(handler: "TavernHandler", skill_id: str):
         with open(yaml_file) as f:
             config = yaml.safe_load(f)
 
-        # Load curriculum state
-        curriculum_file = base_dir / "data_manager" / "curriculum_state.json"
-        curriculum = {}
-        if curriculum_file.exists():
-            with open(curriculum_file) as f:
-                curriculum = json.load(f)
+        # Load curriculum state using CurriculumManager (single source of truth)
+        from data_manager.curriculum_manager import CurriculumManager
 
-        # Map skill ID to curriculum ID
-        id_mapping = {"sy": "syllo", "bin": "binary"}
-        curriculum_id = id_mapping.get(skill_id, skill_id)
-        skill_state = curriculum.get("skills", {}).get(curriculum_id, {})
+        cm = CurriculumManager(base_dir, {})
+        skill_state = cm.state.get("skills", {}).get(skill_id, {})
 
         # Build response
         max_level = config.get("max_level", 30)
-        mastered = skill_state.get("current_level", 0)
-        training = min(mastered + 1, max_level)
+        mastered = cm.get_mastered_level(skill_id)
+        training = cm.get_training_level(skill_id)
 
         # Fill in missing levels (extrapolate)
         level_prog = config.get("level_progression", {})
@@ -169,7 +181,7 @@ def serve_skill_data(handler: "TavernHandler", skill_id: str):
                 "total_evals": len(history),
                 "accuracy_history": history[-20:],
             },
-            "is_active": curriculum.get("active_skill") == curriculum_id,
+            "is_active": cm.state.get("active_skill") == skill_id,
         }
 
         handler._send_json(response)

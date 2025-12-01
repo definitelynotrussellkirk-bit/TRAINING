@@ -335,7 +335,7 @@
         <div class="header-center">
             <div class="resource-bar">
                 <div class="resource steps">
-                    <span class="resource-icon">🗃️</span>
+                    <span class="resource-icon">🏺</span>
                     <span class="resource-label">ASSETS</span>
                     <span class="resource-value" id="assetCount">0</span>
                 </div>
@@ -432,7 +432,7 @@
 
             <div class="asset-list" id="assetList">
                 <div class="empty-vault">
-                    <div class="empty-vault-icon">🗃️</div>
+                    <div class="empty-vault-icon">🏺</div>
                     <p>Loading vault contents...</p>
                 </div>
             </div>
@@ -453,6 +453,76 @@
         // ============================================
 
         let vaultData = null;
+
+        // Hero icon mapping
+        // - Active heroes from configs/heroes/*.yaml use display.emoji
+        // - Preset heroes from configs/hero_presets.yaml use their preset emoji
+        // - Add new heroes here as: 'NAME': 'emoji'
+        const HERO_ICONS = {
+            // === Active Heroes (from configs/heroes/*.yaml) ===
+            'DIO': '🧔🏽',      // dio-qwen3-0.6b - Diogenes the cynic
+            'FLO': '👩',       // flo-qwen3-4b
+
+            // === Preset Heroes (from configs/hero_presets.yaml) ===
+            // Greek Philosophy
+            'ZENO': '♾️',      // paradox thinker
+            // Latin / Italian
+            'VERO': '✅',      // truth filter
+            'NERO': '🌑',      // shadow analyst
+            // Spanish / Portuguese
+            'ORO': '🪙',       // value seeker
+            'LOBO': '🐺',      // pack strategist
+            'TORO': '🐂',      // relentless force
+            'MONO': '🐒',      // playful hacker
+            'OJO': '👁',       // watchful eye
+            // Chinese
+            'GOU': '🐕',       // loyal companion
+            'TAO': '☯️',       // effortless flow
+            'MO': '✒️',        // quiet scribe
+            'SHOU': '🛡',      // protective guard
+            // Japanese
+            'NEKO': '🐈',      // curious cat
+            'KUMO': '🕸',      // web weaver
+            'TOMO': '🤝',      // social connector
+            'AO': '🌊',        // calm observer
+            'MOMO': '🍑',      // gentle joy
+            // Swahili
+            'MOYO': '❤️',      // empathic heart
+            'MOTO': '🔥',      // spark starter
+            // Yoruba
+            'OMO': '🧒',       // curious child
+            // Russian / Esperanto
+            'MIRO': '🕊',      // peace broker
+            'LUMO': '💡',      // clarity light
+            // Hindi / Sanskrit
+            'OM': '🕉️',        // cosmic resonance
+            'OJAS': '⚡',      // vital energy
+            'BODHI': '🧘',     // awakened one
+            'DAYA': '🙏',      // compassionate helper
+            'AGNI': '🔥',      // fiery spirit
+            'KAVI': '✍️',      // creative wordsmith
+            'MITRA': '🤗',     // friendly helper
+            // Arabic
+            'NOOR': '🌟',      // divine light
+            'SABR': '⏳',      // patient perseverance
+            'FIKR': '🤔',      // deep thinker
+            'RUH': '👻',       // spiritual essence
+            // Hebrew
+            'OR': '🕯️',        // light bringer
+            'EMET': '⚖️',      // truth seeker
+            'LEV': '💜',       // heart-centered
+            'CHEN': '✨',      // graceful presence
+            // Hawaiian
+            'KAI': '🌊',       // ocean depths
+            'MANA': '⚡',      // spiritual power
+            'OLA': '🌱',       // life-giving
+        };
+
+        function getHeroIcon(heroName) {
+            if (!heroName) return '🏺';
+            const key = heroName.toUpperCase();
+            return HERO_ICONS[key] || '🏺';
+        }
 
         function $(sel) { return document.querySelector(sel); }
         function setText(sel, text) { const el = $(sel); if (el) el.textContent = text; }
@@ -584,9 +654,10 @@
                 `;
                 for (const model of data.base_models) {
                     const isActive = model.is_active;
+                    const heroIcon = getHeroIcon(model.hero_name);
                     html += `
                         <div class="asset-card ${isActive ? 'active-model' : ''}" style="${isActive ? '' : 'opacity: 0.5;'}">
-                            <div class="asset-icon">${isActive ? '🤖' : '💤'}</div>
+                            <div class="asset-icon">${isActive ? heroIcon : '💤'}</div>
                             <div class="asset-info">
                                 <div class="asset-name">${model.display_name || model.name}${isActive ? ' ★' : ''}</div>
                                 <div class="asset-meta">
@@ -605,12 +676,13 @@
                 }
             } else if (data.base_model) {
                 // Fallback for old format
+                const heroIcon = getHeroIcon(data.base_model.hero_name);
                 html += `
                     <div class="section-divider">
                         <h4>Base Model</h4>
                     </div>
                     <div class="asset-card">
-                        <div class="asset-icon">🤖</div>
+                        <div class="asset-icon">${heroIcon}</div>
                         <div class="asset-info">
                             <div class="asset-name">${data.base_model.display_name || data.base_model.name}</div>
                             <div class="asset-meta">
@@ -658,7 +730,7 @@
             } else {
                 html += `
                     <div class="empty-vault">
-                        <div class="empty-vault-icon">🗃️</div>
+                        <div class="empty-vault-icon">🏺</div>
                         <p>No checkpoints found</p>
                         <p style="font-size: 0.85rem; margin-top: 0.5rem;">
                             Train your hero to create checkpoints
@@ -673,7 +745,7 @@
                 if (cp.is_latest && cp.is_active_campaign) classes.push('latest');
                 if (isInactive) classes.push('inactive-campaign');
 
-                const icon = cp.is_champion ? '👑' : (cp.is_latest && cp.is_active_campaign ? '✨' : '💾');
+                const icon = cp.is_champion ? '👑' : (cp.is_latest && cp.is_active_campaign ? '✨' : '⚱️');
                 const heroLabel = cp.hero_id ? cp.hero_id.split('-')[0].toUpperCase() : '';
 
                 return `

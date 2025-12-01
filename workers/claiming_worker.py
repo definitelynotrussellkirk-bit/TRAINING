@@ -44,6 +44,13 @@ import requests
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from guild.job_types import JobError, JobErrorCode
+from core.cluster_state import (
+    register_host as cluster_register_host,
+    heartbeat as cluster_heartbeat,
+    probe_local_resources,
+    update_host_resources,
+    set_host_status,
+)
 
 logger = logging.getLogger("claiming_worker")
 
@@ -255,6 +262,7 @@ class ClaimingWorker:
 
         # Worker identity
         self.worker_id = f"{config.device_id}.claiming"
+        self.host_id = config.device_id  # ClusterState host ID
         self.allowed_job_types: List[str] = []
 
         self._running = False
@@ -262,6 +270,7 @@ class ClaimingWorker:
         self._start_time = 0
         self._consecutive_errors = 0
         self._last_heartbeat = 0
+        self._last_resource_update = 0
 
         # Statistics
         self._stats = {
@@ -286,6 +295,13 @@ class ClaimingWorker:
             logger.info(f"Releasing job {job_id}")
             self.client.release(job_id)
 
+        # Mark host as offline in ClusterState
+        try:
+            set_host_status(self.host_id, "offline", error="Worker shutdown")
+            logger.info(f"Marked {self.host_id} offline in ClusterState")
+        except Exception as e:
+            logger.warning(f"Failed to update ClusterState on shutdown: {e}")
+
     def run(self):
         """Run the worker loop."""
         self._running = True
@@ -307,10 +323,13 @@ class ClaimingWorker:
 
         logger.info("Connected to job server")
 
-        # Register with server
+        # Register with job server
         if not self._register():
             logger.error("Failed to register with server")
             return
+
+        # Register with ClusterState for cluster visibility
+        self._register_with_cluster()
 
         while self._running:
             try:
@@ -365,13 +384,73 @@ class ClaimingWorker:
             logger.error(f"Registration failed: {result.get('error')}")
             return False
 
+    def _register_with_cluster(self):
+        """Register this worker with ClusterState for cluster-wide visibility."""
+        try:
+            # Map worker roles to ClusterState roles
+            # ClusterState uses: trainer, oracle, forge, monitor, mixed
+            cluster_roles = []
+            if any(r in self.config.roles for r in ["eval_worker", "sparring"]):
+                cluster_roles.append("forge")
+            if "inference" in self.config.roles:
+                cluster_roles.append("oracle")
+            if "trainer" in self.config.roles:
+                cluster_roles.append("trainer")
+            if not cluster_roles:
+                cluster_roles = ["forge"]  # Default for job workers
+
+            # Get IP address
+            ip_address = None
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                ip_address = s.getsockname()[0]
+                s.close()
+            except Exception:
+                pass
+
+            cluster_register_host(
+                host_id=self.host_id,
+                name=f"Worker: {self.config.device_id}",
+                roles=cluster_roles,
+                ip_address=ip_address,
+            )
+            logger.info(f"Registered {self.host_id} with ClusterState (roles: {cluster_roles})")
+
+            # Initial resource update
+            self._update_cluster_resources()
+
+        except Exception as e:
+            logger.warning(f"Failed to register with ClusterState: {e}")
+
+    def _update_cluster_resources(self):
+        """Update resource metrics in ClusterState."""
+        try:
+            resources = probe_local_resources()
+            update_host_resources(self.host_id, resources)
+            self._last_resource_update = time.time()
+        except Exception as e:
+            logger.debug(f"Failed to update cluster resources: {e}")
+
     def _send_heartbeat(self):
-        """Send heartbeat to server."""
+        """Send heartbeat to job server and ClusterState."""
         active_jobs = 1 if self._current_job else 0
+
+        # Job server heartbeat
         if self.client.heartbeat(self.worker_id, active_jobs):
             self._last_heartbeat = time.time()
         else:
             logger.warning("Heartbeat failed - may need to re-register")
+
+        # ClusterState heartbeat
+        try:
+            cluster_heartbeat(self.host_id, extra={"running_jobs": active_jobs})
+        except Exception as e:
+            logger.debug(f"ClusterState heartbeat failed: {e}")
+
+        # Update resources every 5 minutes
+        if time.time() - self._last_resource_update > 300:
+            self._update_cluster_resources()
 
     def _execute_job(self, job: Dict):
         """Execute a claimed job."""

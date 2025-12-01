@@ -99,6 +99,16 @@ except ImportError:
     create_custom_optimizer = None
     get_param_group_summary = None
 
+# Optional: Fortune Teller loss
+try:
+    from trainer.core.fortune_teller_trainer import FortuneTellerTrainer
+    from trainer.losses import FortuneTellerTracker
+    FORTUNE_TELLER_AVAILABLE = True
+except ImportError:
+    FORTUNE_TELLER_AVAILABLE = False
+    FortuneTellerTrainer = None
+    FortuneTellerTracker = None
+
 # Optional: LiveMonitorCallback for full monitoring
 try:
     from trainer.monitoring.callbacks import LiveMonitorCallback
@@ -338,6 +348,18 @@ class TrainerEngine:
             train_result = trainer.train(resume_from_checkpoint=resume_checkpoint)
             self._log("=" * 80)
             self._log("   Training complete\n")
+
+            # 8.5. Save Fortune Teller history if enabled
+            if config.fortune_teller.enabled and hasattr(self, 'fortune_teller_tracker') and self.fortune_teller_tracker:
+                history_path = config.fortune_teller.history_path or str(Path(config.output.output_dir) / "fortune_teller_history.json")
+                self.fortune_teller_tracker.save(history_path)
+                self._log(f"   Saved Fortune Teller history to {history_path}")
+
+                # Log summary stats
+                stats = self.fortune_teller_tracker.get_stats()
+                if stats:
+                    self._log(f"   - Avg surprise: {stats.get('avg_surprise', 0):.3f}")
+                    self._log(f"   - Records: {stats.get('num_records', 0)}\n")
 
             # 9. Save final checkpoint
             self._log("Step 9: Saving final checkpoint")
@@ -924,7 +946,8 @@ class TrainerEngine:
         all_callbacks = list(callbacks or [])
 
         # Wire LiveMonitorCallback from MonitorContext (engine-first refactor)
-        if LIVE_MONITOR_AVAILABLE and monitors and monitors.live_monitor:
+        # NOTE: live_monitor can be None - callback still handles status/heartbeats
+        if LIVE_MONITOR_AVAILABLE and monitors:
             # Use provided status_writer or fall back to engine's
             status_writer = monitors.status_writer or self.status_writer
 
@@ -965,11 +988,43 @@ class TrainerEngine:
             )
             all_callbacks.append(monitor_cb)
             self._log("   LiveMonitorCallback enabled (full monitoring)")
-        elif monitors and monitors.live_monitor:
-            self._log("   Warning: LiveMonitorCallback not available, monitoring disabled")
+        elif monitors:
+            self._log("   Warning: LiveMonitorCallback not available, status updates disabled")
 
-        # Create trainer
-        trainer = Trainer(
+        # Create trainer (with optional Fortune Teller loss)
+        if config.fortune_teller.enabled:
+            if not FORTUNE_TELLER_AVAILABLE:
+                self._log("   WARNING: Fortune Teller requested but not available, using standard trainer")
+                trainer_cls = Trainer
+                trainer_kwargs = {}
+            else:
+                self._log(f"   Fortune Teller enabled (metric: {config.fortune_teller.surprise_metric})")
+                trainer_cls = FortuneTellerTrainer
+
+                # Create tracker
+                tracker = FortuneTellerTracker() if config.fortune_teller.save_history else None
+
+                # Prepare loss config
+                loss_config = {
+                    "surprise_metric": config.fortune_teller.surprise_metric,
+                    "min_surprise": config.fortune_teller.min_surprise,
+                    "max_surprise": config.fortune_teller.max_surprise,
+                    "normalize_batch": config.fortune_teller.normalize_batch,
+                    "temperature": config.fortune_teller.temperature,
+                }
+                trainer_kwargs = {
+                    "loss_config": loss_config,
+                    "tracker": tracker,
+                }
+                self._log(f"   - min_surprise: {config.fortune_teller.min_surprise}")
+                self._log(f"   - max_surprise: {config.fortune_teller.max_surprise}")
+                self._log(f"   - normalize_batch: {config.fortune_teller.normalize_batch}")
+                self._log(f"   - temperature: {config.fortune_teller.temperature}")
+        else:
+            trainer_cls = Trainer
+            trainer_kwargs = {}
+
+        trainer = trainer_cls(
             model=self.model,
             args=training_args,
             train_dataset=train_dataset,
@@ -977,7 +1032,12 @@ class TrainerEngine:
             data_collator=data_collator,
             callbacks=all_callbacks if all_callbacks else None,
             optimizers=(custom_optimizer, custom_scheduler) if custom_optimizer else (None, None),
+            **trainer_kwargs
         )
+
+        # Save tracker reference if using Fortune Teller
+        if config.fortune_teller.enabled and FORTUNE_TELLER_AVAILABLE:
+            self.fortune_teller_tracker = getattr(trainer, 'tracker', None)
 
         return trainer, data_collator
 
@@ -1163,7 +1223,7 @@ class TrainerEngine:
             tf32=True,  # Enable TF32 for speedup
             gradient_checkpointing=True,
             optim="adamw_torch_fused",  # Faster than default
-            dataloader_num_workers=16,
+            dataloader_num_workers=4,  # Reduced from 16 - too many workers causes I/O contention
             dataloader_pin_memory=True,
             logging_steps=config.environment.logging_steps,
             report_to=config.environment.report_to,

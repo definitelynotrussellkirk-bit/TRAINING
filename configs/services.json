@@ -1,87 +1,199 @@
 {
-  "$schema": "service_registry_v1",
-  "$comment": "Service registry for Weaver orchestrator. Defines all services with their startup commands, ports, and health checks.",
-
-  "training": {
-    "name": "Training Daemon",
-    "description": "Core training daemon that processes queue and trains models",
-    "command": ["python3", "core/training_daemon.py"],
-    "pid_file": ".daemon.pid",
-    "required": true,
-    "health_check": {
-      "type": "pid",
-      "interval_seconds": 30
-    },
-    "depends_on": []
-  },
-
-  "tavern": {
-    "name": "Tavern Server",
-    "description": "Game UI web server",
-    "command": ["python3", "tavern/server.py", "--port", "8888"],
-    "port": 8888,
-    "required": true,
-    "health_check": {
-      "type": "http",
-      "path": "/health",
-      "interval_seconds": 60
-    },
-    "depends_on": []
-  },
+  "$schema": "service_registry_v2",
+  "$comment": "Unified service definitions for Service Registry and Weaver. Single source of truth for all services.",
 
   "vault": {
     "name": "VaultKeeper",
-    "description": "Asset registry and job queue API",
+    "description": "Asset registry and job store - the memory",
     "command": ["python3", "vault/server.py", "--port", "8767"],
     "port": 8767,
+    "pid_file": ".pids/vault.pid",
     "required": true,
-    "health_check": {
-      "type": "http",
-      "path": "/api/health",
-      "interval_seconds": 60
-    },
-    "depends_on": []
-  },
-
-  "watchtower": {
-    "name": "Watchtower",
-    "description": "Monitoring dashboard",
-    "command": ["python3", "watchtower/server.py", "--port", "8081"],
-    "port": 8081,
-    "required": false,
+    "depends_on": [],
     "health_check": {
       "type": "http",
       "path": "/health",
-      "interval_seconds": 60
+      "timeout": 5.0
     },
-    "depends_on": ["training"]
+    "startup": {
+      "delay": 5.0,
+      "max_restarts": 3,
+      "restart_delay": 5
+    }
+  },
+
+  "tavern": {
+    "name": "Tavern",
+    "description": "Game UI web server - the face",
+    "command": ["python3", "tavern/server.py", "--port", "8888"],
+    "port": 8888,
+    "pid_file": ".pids/tavern.pid",
+    "required": true,
+    "depends_on": ["vault"],
+    "health_check": {
+      "type": "http",
+      "path": "/health",
+      "timeout": 5.0
+    },
+    "startup": {
+      "delay": 5.0,
+      "max_restarts": 3,
+      "restart_delay": 5
+    }
+  },
+
+  "training": {
+    "name": "Training Daemon",
+    "description": "Training orchestrator - the heart",
+    "command": ["python3", "core/training_daemon.py"],
+    "pid_file": ".daemon.pid",
+    "required": true,
+    "depends_on": ["vault", "tavern"],
+    "health_check": {
+      "type": "pid",
+      "timeout": 5.0
+    },
+    "startup": {
+      "delay": 5.0,
+      "max_restarts": 3,
+      "restart_delay": 5
+    },
+    "monitoring": {
+      "level2_check": "data_flow_health",
+      "level3_check": "performance_health"
+    }
+  },
+
+  "realm_state": {
+    "name": "RealmState",
+    "description": "State service - the truth",
+    "command": ["python3", "-m", "realm.server", "--host", "0.0.0.0", "--port", "8866"],
+    "port": 8866,
+    "pid_file": ".pids/realm_state.pid",
+    "required": true,
+    "depends_on": ["vault"],
+    "health_check": {
+      "type": "http",
+      "path": "/health",
+      "timeout": 5.0
+    },
+    "startup": {
+      "delay": 5.0,
+      "max_restarts": 3,
+      "restart_delay": 5
+    }
+  },
+
+  "eval_runner": {
+    "name": "Eval Runner",
+    "description": "Evaluation processor - the judge",
+    "command": ["python3", "core/eval_runner.py", "--daemon", "--interval", "60"],
+    "pid_file": ".pids/eval_runner.pid",
+    "required": false,
+    "depends_on": ["vault"],
+    "health_check": {
+      "type": "pid",
+      "timeout": 5.0
+    },
+    "startup": {
+      "delay": 5.0,
+      "max_restarts": 3,
+      "restart_delay": 5
+    }
+  },
+
+  "groundskeeper": {
+    "name": "Groundskeeper",
+    "description": "Cleanup daemon - the janitor",
+    "command": ["python3", "core/groundskeeper.py", "--daemon"],
+    "pid_file": ".pids/groundskeeper.pid",
+    "required": false,
+    "depends_on": [],
+    "health_check": {
+      "type": "pid",
+      "timeout": 5.0
+    },
+    "startup": {
+      "delay": 3.0,
+      "max_restarts": 3,
+      "restart_delay": 10
+    }
+  },
+
+  "weaver": {
+    "name": "Weaver",
+    "description": "Daemon orchestrator - the overseer",
+    "command": ["python3", "weaver/weaver.py", "--daemon"],
+    "pid_file": ".pids/weaver.pid",
+    "required": false,
+    "depends_on": [],
+    "health_check": {
+      "type": "pid",
+      "timeout": 5.0
+    },
+    "startup": {
+      "delay": 3.0,
+      "max_restarts": 3,
+      "restart_delay": 10
+    }
+  },
+
+  "data_flow": {
+    "name": "Data Flow",
+    "description": "Queue feeder - the fuel",
+    "command": ["python3", "data_manager/manager.py", "generate", "--force"],
+    "required": true,
+    "depends_on": [],
+    "is_task": true,
+    "health_check": {
+      "type": "queue_depth",
+      "min_depth": 2,
+      "timeout": 5.0
+    },
+    "startup": {
+      "delay": 10.0,
+      "max_restarts": 100,
+      "restart_delay": 10
+    }
   },
 
   "skill_sy": {
     "name": "Syllacrostic API",
-    "description": "SY skill API for generation and evaluation",
+    "description": "SY skill server",
     "command": ["python3", "guild/skills/servers/sy_server.py", "--port", "8080"],
     "port": 8080,
+    "pid_file": ".pids/skill_sy.pid",
     "required": false,
+    "depends_on": [],
     "health_check": {
       "type": "http",
       "path": "/health",
-      "interval_seconds": 120
+      "timeout": 5.0
     },
-    "depends_on": []
+    "startup": {
+      "delay": 5.0,
+      "max_restarts": 3,
+      "restart_delay": 5
+    }
   },
 
   "skill_bin": {
     "name": "Binary API",
-    "description": "BIN skill API for generation and evaluation",
+    "description": "BIN skill server",
     "command": ["python3", "guild/skills/servers/bin_server.py", "--port", "8090"],
     "port": 8090,
+    "pid_file": ".pids/skill_bin.pid",
     "required": false,
+    "depends_on": [],
     "health_check": {
       "type": "http",
       "path": "/health",
-      "interval_seconds": 120
+      "timeout": 5.0
     },
-    "depends_on": []
+    "startup": {
+      "delay": 5.0,
+      "max_restarts": 3,
+      "restart_delay": 5
+    }
   }
 }

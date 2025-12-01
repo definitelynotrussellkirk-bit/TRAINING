@@ -2,17 +2,24 @@
 """
 The Weaver - Daemon orchestrator that keeps all threads alive
 
-Watches over:
-- Training daemon (the heart)
-- Tavern server (the face)
-- VaultKeeper (the memory)
-- Data generation (the fuel)
-- Eval runner (the judge)
+Now uses Service Registry as the single source of truth for service definitions.
+Weaver adds continuous monitoring, restart throttling, and multi-level health checks.
+
+Watches over (from configs/services.json):
+- vault        - VaultKeeper (the memory)
+- tavern       - Game UI (the face)
+- training     - Training Daemon (the heart)
+- realm_state  - RealmState service (the truth)
+- data_flow    - Queue feeder (the fuel)
+- eval_runner  - Eval processor (the judge) [optional]
 
 Usage:
     python3 weaver/weaver.py              # Run once (check & fix)
     python3 weaver/weaver.py --daemon     # Run continuously
     python3 weaver/weaver.py --status     # Show tapestry status
+    python3 weaver/weaver.py --restart SERVICE  # Restart a service
+    python3 weaver/weaver.py --shutdown   # Force shutdown all
+    python3 weaver/weaver.py --start      # Start all fresh
 """
 
 import json
@@ -25,13 +32,28 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional
+
 import requests
 
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.paths import get_base_dir
+from core.service_registry import (
+    ServiceConfig,
+    HealthCheckKind,
+    get_service,
+    get_all_services,
+    get_service_status,
+    get_dependency_order,
+    is_service_running,
+    start_service as registry_start_service,
+    stop_service as registry_stop_service,
+    start_realm,
+    stop_realm,
+    reload_services,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,41 +63,38 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Thread:
-    """A thread in the tapestry (a daemon to watch)"""
-    name: str
-    description: str
-    health_check: Callable[[], bool]
-    start_cmd: List[str]
-    pid_file: Optional[str] = None
-    required: bool = True  # If False, won't auto-start
-    restart_delay: int = 5  # Seconds to wait before restart
-    max_restarts: int = 3   # Max restarts per hour
-    restart_count: int = field(default=0, repr=False)
-    last_restart: float = field(default=0.0, repr=False)
+class ThreadState:
+    """Runtime state for a service being monitored."""
+    service_id: str
+    restart_count: int = 0
+    last_restart: float = 0.0
 
 
 class Weaver:
     """
     The Weaver - Orchestrates all daemon threads
 
-    Responsibilities:
-    1. Monitor thread health
-    2. Restart dead threads
-    3. Maintain data flow (queue depth)
-    4. Report tapestry status
+    Uses Service Registry for service definitions, adds:
+    1. Continuous monitoring loop
+    2. Restart throttling (max_restarts per hour)
+    3. Multi-level health checks (Level 2: data flow, Level 3: performance)
+    4. Groundskeeper integration (hourly cleanup)
     """
 
     def __init__(self, base_dir: Optional[str] = None):
         self.base_dir = Path(base_dir) if base_dir else get_base_dir()
         self.config = self._load_config()
-        self.threads: Dict[str, Thread] = {}
         self.running = False
         self.check_interval = 30  # seconds
         self.pid_file = self.base_dir / ".pids" / "weaver.pid"
 
-        # Register all threads
-        self._register_threads()
+        # Runtime state per service (restart counts, etc.)
+        self.thread_states: Dict[str, ThreadState] = {}
+
+        # Services to watch (from service registry)
+        self._watched_services = [
+            "vault", "tavern", "training", "realm_state", "data_flow", "eval_runner"
+        ]
 
     def _load_config(self) -> dict:
         """Load main config"""
@@ -84,188 +103,25 @@ class Weaver:
             return json.loads(config_path.read_text())
         return {}
 
-    def _register_threads(self):
-        """Register all daemon threads to watch"""
-
-        # Training Daemon - The Heart
-        self.threads["training"] = Thread(
-            name="Training Daemon",
-            description="The heart - processes quests and trains DIO",
-            health_check=self._check_training_daemon,
-            start_cmd=[
-                "python3", str(self.base_dir / "core" / "training_daemon.py"),
-                "--base-dir", str(self.base_dir)
-            ],
-            pid_file=str(self.base_dir / ".daemon.pid"),
-            required=True
-        )
-
-        # Tavern Server - The Face (already binds to 0.0.0.0 internally)
-        self.threads["tavern"] = Thread(
-            name="Tavern Server",
-            description="The face - game UI at port 8888",
-            health_check=self._check_tavern,
-            start_cmd=[
-                "python3", str(self.base_dir / "tavern" / "server.py"),
-                "--port", "8888"
-            ],
-            pid_file=str(self.base_dir / ".pids" / "tavern.pid"),
-            required=True
-        )
-
-        # VaultKeeper - The Memory (already binds to 0.0.0.0 internally)
-        self.threads["vault"] = Thread(
-            name="VaultKeeper",
-            description="The memory - asset registry at port 8767",
-            health_check=self._check_vaultkeeper,
-            start_cmd=[
-                "python3", str(self.base_dir / "vault" / "server.py"),
-                "--port", "8767"
-            ],
-            pid_file=str(self.base_dir / ".pids" / "vault.pid"),
-            required=True
-        )
-
-        # RealmState Service - The Truth
-        self.threads["realm_state"] = Thread(
-            name="RealmState Service",
-            description="The truth - single source of truth at port 8866",
-            health_check=self._check_realm_state,
-            start_cmd=[
-                "python3", "-m", "realm.server",
-                "--host", "0.0.0.0",
-                "--port", "8866"
-            ],
-            pid_file=str(self.base_dir / ".pids" / "realm_state.pid"),
-            required=True
-        )
-
-        # Data Flow - The Fuel (special: not a daemon, but a task)
-        self.threads["data_flow"] = Thread(
-            name="Data Flow",
-            description="The fuel - keeps quest queue fed",
-            health_check=self._check_data_flow,
-            start_cmd=[
-                "python3", str(self.base_dir / "data_manager" / "manager.py"),
-                "generate", "--force"
-            ],
-            required=True,
-            restart_delay=10,
-            max_restarts=100  # Can generate many times
-        )
-
-        # Eval Runner - The Judge
-        # Get inference config from hosts.json if available
-        inference_host = "192.168.x.x"
-        inference_port = "8765"
-        try:
-            from core.hosts import get_host
-            inference_host_obj = get_host("3090")
-            if inference_host_obj:
-                inference_host = inference_host_obj.host
-        except:
-            pass
-
-        self.threads["eval_runner"] = Thread(
-            name="Eval Runner",
-            description="The judge - processes evaluation queues",
-            health_check=self._check_eval_runner,
-            start_cmd=[
-                "python3", str(self.base_dir / "core" / "eval_runner.py"),
-                "--daemon",
-                "--inference-host", inference_host,
-                "--inference-port", inference_port,
-                "--interval", "60"
-            ],
-            pid_file=str(self.base_dir / ".pids" / "eval_runner.pid"),
-            required=False  # Optional - won't block startup if inference server unavailable
-        )
+    def _get_thread_state(self, service_id: str) -> ThreadState:
+        """Get or create thread state for a service."""
+        if service_id not in self.thread_states:
+            self.thread_states[service_id] = ThreadState(service_id=service_id)
+        return self.thread_states[service_id]
 
     # ========== Health Checks ==========
 
-    def _check_training_daemon(self) -> bool:
-        """Check if training daemon is alive"""
-        try:
-            resp = requests.get("http://localhost:8888/api/daemon/status", timeout=5)
-            data = resp.json()
-            return data.get("daemon_running", False)
-        except:
-            # Check PID file as fallback
-            pid_file = self.base_dir / ".daemon.pid"
-            if pid_file.exists():
-                pid = int(pid_file.read_text().strip())
-                return self._pid_alive(pid)
-            return False
-
-    def _check_tavern(self) -> bool:
-        """Check if Tavern is responding"""
-        try:
-            resp = requests.get("http://localhost:8888/health", timeout=5)
-            return resp.status_code == 200
-        except:
-            return False
-
-    def _check_vaultkeeper(self) -> bool:
-        """Check if VaultKeeper is responding"""
-        try:
-            resp = requests.get("http://localhost:8767/health", timeout=5)
-            return resp.status_code == 200
-        except:
-            return False
-
-    def _check_realm_state(self) -> bool:
-        """Check if RealmState service is responding"""
-        try:
-            resp = requests.get("http://localhost:8866/health", timeout=5)
-            return resp.status_code == 200
-        except:
-            return False
-
-    def _check_data_flow(self) -> bool:
-        """Check if queue has enough data (queued + processing)"""
-        try:
-            # Check queue directly (more reliable than API)
-            from core.training_queue import TrainingQueue
-            queue = TrainingQueue(self.base_dir)
-            status = queue.get_queue_status()
-            available = status["total_queued"] + status.get("processing", 0)
-            min_depth = self.config.get("auto_generate", {}).get("min_queue_depth", 2)
-            return available >= min_depth
-        except Exception as e:
-            logger.debug(f"Could not check data flow: {e}")
-            return True  # Assume OK if can't check
-
-    def _check_eval_runner(self) -> bool:
-        """Check if eval runner daemon is alive"""
-        pid_file = self.base_dir / ".pids" / "eval_runner.pid"
-        if not pid_file.exists():
-            return False
-        try:
-            pid = int(pid_file.read_text().strip())
-            return self._pid_alive(pid)
-        except (ValueError, OSError):
-            return False
-
-    def _pid_alive(self, pid: int) -> bool:
-        """Check if a PID is running"""
-        try:
-            os.kill(pid, 0)
-            return True
-        except (OSError, ProcessLookupError):
-            return False
-
-    # ========== POLICY 4: Level 2 & 3 Health Checks ==========
+    def _check_service_health(self, service_id: str) -> bool:
+        """Check if a service is healthy using Service Registry."""
+        return is_service_running(service_id)
 
     def _check_data_flow_health(self) -> bool:
         """
         Level 2: Check if RealmStore is being updated.
 
-        POLICY 4: Comprehensive Monitoring
         Not just "is daemon alive?" but "is data flowing?"
         """
         try:
-            import sys
-            sys.path.insert(0, str(self.base_dir))
             from core.realm_store import get_store
             from datetime import datetime, timezone
 
@@ -281,7 +137,6 @@ class Weaver:
                 logger.debug("No updated_at timestamp in training data")
                 return False
 
-            # Check freshness
             try:
                 last_update = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
                 now = datetime.now(timezone.utc)
@@ -289,9 +144,7 @@ class Weaver:
                     last_update = last_update.replace(tzinfo=timezone.utc)
 
                 age_seconds = (now - last_update).total_seconds()
-
-                # Consider healthy if updated within 2 minutes
-                is_fresh = age_seconds < 120
+                is_fresh = age_seconds < 120  # 2 minutes
 
                 if not is_fresh:
                     logger.warning(f"RealmStore data is stale ({age_seconds:.0f}s old)")
@@ -310,12 +163,9 @@ class Weaver:
         """
         Level 3: Check if training performance is acceptable.
 
-        POLICY 4: Comprehensive Monitoring
         Not just "is data flowing?" but "is it flowing at expected speed?"
         """
         try:
-            import sys
-            sys.path.insert(0, str(self.base_dir))
             from core.status_monitor import check_performance_health
 
             result = check_performance_health()
@@ -327,173 +177,162 @@ class Weaver:
 
         except Exception as e:
             logger.debug(f"Performance check failed: {e}")
-            # Don't block on performance check failures - treat as OK
+            return True  # Don't block on check failures
+
+    def _pid_alive(self, pid: int) -> bool:
+        """Check if a PID is running"""
+        try:
+            os.kill(pid, 0)
             return True
+        except (OSError, ProcessLookupError):
+            return False
 
     # ========== Thread Management ==========
 
-    def _start_thread(self, thread: Thread) -> bool:
-        """Start a thread (daemon)"""
-        now = time.time()
-
-        # Check restart limits (reset counter after 1 hour)
-        if now - thread.last_restart > 3600:
-            thread.restart_count = 0
-
-        if thread.restart_count >= thread.max_restarts:
-            logger.error(f"Thread {thread.name} exceeded max restarts ({thread.max_restarts}/hr)")
+    def _start_thread(self, service_id: str) -> bool:
+        """Start a service with restart throttling."""
+        service = get_service(service_id)
+        if not service:
+            logger.error(f"Unknown service: {service_id}")
             return False
 
-        logger.info(f"Starting thread: {thread.name}")
-        logger.info(f"  Command: {' '.join(thread.start_cmd)}")
+        state = self._get_thread_state(service_id)
+        now = time.time()
+
+        # Reset restart count after 1 hour
+        if now - state.last_restart > 3600:
+            state.restart_count = 0
+
+        # Check restart limit
+        max_restarts = service.startup.max_restarts
+        if state.restart_count >= max_restarts:
+            logger.error(f"Service {service.name} exceeded max restarts ({max_restarts}/hr)")
+            return False
+
+        logger.info(f"Starting service: {service.name}")
+        logger.info(f"  Command: {' '.join(service.command)}")
 
         try:
-            # Start as background process
-            log_file = self.base_dir / "logs" / f"{thread.name.lower().replace(' ', '_')}.log"
-            with open(log_file, 'a') as log:
-                process = subprocess.Popen(
-                    thread.start_cmd,
-                    stdout=log,
-                    stderr=log,
-                    cwd=str(self.base_dir),
-                    start_new_session=True
-                )
+            # Use service registry to start
+            success = registry_start_service(service_id, ensure_deps=True)
 
-            thread.restart_count += 1
-            thread.last_restart = now
-
-            # Wait a moment and verify
-            time.sleep(thread.restart_delay)
-
-            if thread.health_check():
-                logger.info(f"  Thread {thread.name} started successfully")
-                return True
+            if success:
+                state.restart_count += 1
+                state.last_restart = now
+                logger.info(f"  Service {service.name} started successfully")
             else:
-                logger.warning(f"  Thread {thread.name} started but health check failed")
-                return False
+                logger.warning(f"  Service {service.name} failed to start")
+
+            return success
 
         except Exception as e:
-            logger.error(f"  Failed to start {thread.name}: {e}")
+            logger.error(f"  Failed to start {service.name}: {e}")
             return False
 
     def check_tapestry(self) -> Dict[str, dict]:
         """
-        Check status of all threads.
+        Check status of all watched services.
 
-        POLICY 4: Comprehensive Monitoring (3 levels)
-        - Level 1: Process alive (all threads)
+        Multi-level monitoring:
+        - Level 1: Process alive (all services)
         - Level 2: Data flowing (training daemon)
         - Level 3: Performance OK (training daemon)
         """
         status = {}
 
-        for name, thread in self.threads.items():
-            # Level 1: Process health
-            alive = thread.health_check()
+        for service_id in self._watched_services:
+            service = get_service(service_id)
+            if not service:
+                continue
+
+            alive = self._check_service_health(service_id)
+            state = self._get_thread_state(service_id)
 
             thread_status = {
-                "name": thread.name,
-                "description": thread.description,
+                "name": service.name,
+                "description": service.description,
                 "alive": alive,
-                "required": thread.required,
-                "restarts": thread.restart_count
+                "required": service.required,
+                "restarts": state.restart_count,
             }
 
             # Level 2 & 3: Additional checks for training daemon
-            if name == "training" and alive:
-                # Level 2: Data flow health
-                data_flow_ok = self._check_data_flow_health()
-                thread_status["data_flow_ok"] = data_flow_ok
+            if service_id == "training" and alive:
+                # Check if monitoring is configured
+                if service.monitoring.level2_check:
+                    data_flow_ok = self._check_data_flow_health()
+                    thread_status["data_flow_ok"] = data_flow_ok
+                else:
+                    data_flow_ok = True
 
-                # Level 3: Performance health
-                performance_ok = self._check_performance_health()
-                thread_status["performance_ok"] = performance_ok
+                if service.monitoring.level3_check:
+                    performance_ok = self._check_performance_health()
+                    thread_status["performance_ok"] = performance_ok
+                else:
+                    performance_ok = True
 
-                # Overall health (all 3 levels)
                 thread_status["fully_healthy"] = alive and data_flow_ok and performance_ok
 
-            status[name] = thread_status
+            status[service_id] = thread_status
 
         return status
 
-    def restart_thread(self, thread_name: str) -> bool:
+    def restart_thread(self, service_id: str) -> bool:
         """
-        Force restart a specific thread.
+        Force restart a specific service.
 
-        This is the canonical way to restart a service after code changes.
-        The thread will be killed (if running) and then restarted.
-
-        Args:
-            thread_name: Name of thread to restart (training, tavern, vault, data_flow)
-
-        Returns:
-            True if restart succeeded, False otherwise
+        Kills (if running) and restarts using service registry.
         """
-        if thread_name not in self.threads:
-            logger.error(f"Unknown thread: {thread_name}")
-            logger.info(f"Available threads: {list(self.threads.keys())}")
+        service = get_service(service_id)
+        if not service:
+            logger.error(f"Unknown service: {service_id}")
+            available = [s for s in self._watched_services if get_service(s)]
+            logger.info(f"Available services: {available}")
             return False
 
-        thread = self.threads[thread_name]
-        logger.info(f"Restarting thread: {thread.name}")
+        logger.info(f"Restarting service: {service.name}")
 
-        # Kill if running
-        if thread.pid_file:
-            pid_path = Path(thread.pid_file)
-            if pid_path.exists():
-                try:
-                    pid = int(pid_path.read_text().strip())
-                    if self._pid_alive(pid):
-                        logger.info(f"  Killing PID {pid}...")
-                        os.kill(pid, signal.SIGTERM)
-                        # Wait for graceful shutdown
-                        for _ in range(10):
-                            time.sleep(0.5)
-                            if not self._pid_alive(pid):
-                                break
-                        else:
-                            # Force kill if still running
-                            logger.warning(f"  Force killing PID {pid}...")
-                            os.kill(pid, signal.SIGKILL)
-                            time.sleep(0.5)
-                except (ValueError, ProcessLookupError):
-                    pass
-                pid_path.unlink(missing_ok=True)
+        # Stop if running
+        if is_service_running(service_id):
+            logger.info(f"  Stopping {service.name}...")
+            registry_stop_service(service_id)
+            time.sleep(1)
 
-        # Wait a moment for cleanup
-        time.sleep(1)
-
-        # Start the thread
-        logger.info(f"  Starting {thread.name}...")
-        return self._start_thread(thread)
+        # Start the service
+        logger.info(f"  Starting {service.name}...")
+        return self._start_thread(service_id)
 
     def mend(self, dry_run: bool = False) -> Dict[str, str]:
         """Mend broken threads (restart dead daemons)"""
         results = {}
 
-        for name, thread in self.threads.items():
-            if not thread.required:
-                results[name] = "skipped (not required)"
+        for service_id in self._watched_services:
+            service = get_service(service_id)
+            if not service:
                 continue
 
-            alive = thread.health_check()
+            if not service.required:
+                results[service_id] = "skipped (not required)"
+                continue
+
+            alive = self._check_service_health(service_id)
 
             if alive:
-                results[name] = "healthy"
+                results[service_id] = "healthy"
             else:
                 if dry_run:
-                    results[name] = "would restart"
+                    results[service_id] = "would restart"
                 else:
-                    logger.warning(f"Thread {thread.name} is dead, restarting...")
-                    success = self._start_thread(thread)
-                    results[name] = "restarted" if success else "restart failed"
+                    logger.warning(f"Service {service.name} is dead, restarting...")
+                    success = self._start_thread(service_id)
+                    results[service_id] = "restarted" if success else "restart failed"
 
         return results
 
     def weave(self):
         """Main daemon loop - continuously watch and mend"""
         logger.info("The Weaver awakens...")
-        logger.info(f"Watching {len(self.threads)} threads")
+        logger.info(f"Watching {len(self._watched_services)} services")
         logger.info(f"Check interval: {self.check_interval}s")
 
         # Write PID
@@ -511,13 +350,13 @@ class Weaver:
 
         try:
             while self.running:
-                # Check and mend threads
+                # Check and mend services
                 results = self.mend()
 
                 # Log summary
                 healthy = sum(1 for r in results.values() if r == "healthy")
                 total = len(results)
-                logger.info(f"Tapestry check: {healthy}/{total} threads healthy")
+                logger.info(f"Tapestry check: {healthy}/{total} services healthy")
 
                 # Run Groundskeeper cleanup (hourly)
                 now = time.time()
@@ -568,7 +407,7 @@ class Weaver:
             ""
         ]
 
-        for name, info in tapestry.items():
+        for service_id, info in tapestry.items():
             icon = "✅" if info["alive"] else "❌"
             req = "(required)" if info["required"] else "(optional)"
             restarts = f"[restarts: {info['restarts']}]" if info["restarts"] > 0 else ""
@@ -597,154 +436,44 @@ def is_weaver_running(base_dir: Path) -> tuple[bool, Optional[int]]:
 
     try:
         pid = int(pid_file.read_text().strip())
-        # Check if process is running
         os.kill(pid, 0)
         return True, pid
     except (ValueError, ProcessLookupError, OSError):
-        # PID file exists but process is dead - clean it up
         pid_file.unlink(missing_ok=True)
         return False, None
 
 
 def force_shutdown(base_dir: Path) -> bool:
     """
-    Force shutdown all services cleanly.
-
-    Order matters:
-    1. Signal training to finish current batch (graceful)
-    2. Stop weaver daemon (so it doesn't restart things)
-    3. Stop eval runner
-    4. Stop tavern (UI)
-    5. Stop vault (API)
-    6. Stop training daemon
-    7. Write shutdown marker
-
-    Returns:
-        True if all services stopped cleanly
+    Force shutdown all services cleanly using Service Registry.
     """
     print("\n" + "=" * 60)
     print("FORCE SHUTDOWN - Stopping all services")
     print("=" * 60 + "\n")
 
-    pids_dir = base_dir / ".pids"
+    # Use service registry to stop in correct order
+    success = stop_realm()
 
-    # 1. Stop weaver daemon first (so it doesn't restart things)
-    weaver_pid = pids_dir / "weaver.pid"
-    if weaver_pid.exists():
-        try:
-            pid = int(weaver_pid.read_text().strip())
-            print(f"[1/6] Stopping Weaver daemon (PID {pid})...")
-            os.kill(pid, signal.SIGTERM)
-            time.sleep(1)
-        except (ValueError, ProcessLookupError):
-            pass
-        weaver_pid.unlink(missing_ok=True)
-    else:
-        print("[1/6] Weaver daemon not running")
-
-    # 2. Signal training to pause (graceful)
+    # Clean up shutdown marker
     control_dir = base_dir / "control"
-    pause_file = control_dir / ".pause"
-    print("[2/6] Signaling training to pause...")
-    pause_file.touch()
-    time.sleep(2)  # Give it time to finish current batch
-
-    # 3. Stop eval runner
-    eval_pid = pids_dir / "eval_runner.pid"
-    if eval_pid.exists():
-        try:
-            pid = int(eval_pid.read_text().strip())
-            print(f"[3/6] Stopping Eval Runner (PID {pid})...")
-            os.kill(pid, signal.SIGTERM)
-            time.sleep(1)
-        except (ValueError, ProcessLookupError):
-            pass
-        eval_pid.unlink(missing_ok=True)
-    else:
-        print("[3/6] Eval Runner not running")
-
-    # 4. Stop tavern
-    tavern_pid = pids_dir / "tavern.pid"
-    if tavern_pid.exists():
-        try:
-            pid = int(tavern_pid.read_text().strip())
-            print(f"[4/6] Stopping Tavern (PID {pid})...")
-            os.kill(pid, signal.SIGTERM)
-            time.sleep(1)
-        except (ValueError, ProcessLookupError):
-            pass
-        tavern_pid.unlink(missing_ok=True)
-    else:
-        print("[4/6] Tavern not running (checking port)...")
-        subprocess.run(["fuser", "-k", "8888/tcp"], capture_output=True)
-
-    # 5. Stop vault
-    vault_pid = pids_dir / "vault.pid"
-    if vault_pid.exists():
-        try:
-            pid = int(vault_pid.read_text().strip())
-            print(f"[5/6] Stopping VaultKeeper (PID {pid})...")
-            os.kill(pid, signal.SIGTERM)
-            time.sleep(1)
-        except (ValueError, ProcessLookupError):
-            pass
-        vault_pid.unlink(missing_ok=True)
-    else:
-        print("[5/6] VaultKeeper not running (checking port)...")
-        subprocess.run(["fuser", "-k", "8767/tcp"], capture_output=True)
-
-    # 6. Stop training daemon
-    daemon_pid = base_dir / ".daemon.pid"
-    if daemon_pid.exists():
-        try:
-            pid = int(daemon_pid.read_text().strip())
-            print(f"[6/6] Stopping Training Daemon (PID {pid})...")
-            os.kill(pid, signal.SIGTERM)
-            # Wait for graceful shutdown
-            for i in range(10):
-                time.sleep(1)
-                try:
-                    os.kill(pid, 0)
-                except ProcessLookupError:
-                    break
-            else:
-                print("      Force killing training daemon...")
-                os.kill(pid, signal.SIGKILL)
-        except (ValueError, ProcessLookupError):
-            pass
-        daemon_pid.unlink(missing_ok=True)
-    else:
-        print("[6/6] Training daemon not running")
-
-    # Remove pause file
-    pause_file.unlink(missing_ok=True)
-
-    # Write shutdown marker
+    control_dir.mkdir(parents=True, exist_ok=True)
     shutdown_marker = control_dir / ".clean_shutdown"
     shutdown_marker.write_text(datetime.now().isoformat())
 
     print("\n" + "=" * 60)
-    print("✅ SHUTDOWN COMPLETE")
-    print("   All services stopped. Safe to make code changes.")
+    if success:
+        print("✅ SHUTDOWN COMPLETE")
+    else:
+        print("⚠  SHUTDOWN INCOMPLETE (some services may still be running)")
     print("   Restart with: python3 weaver/weaver.py --start")
     print("=" * 60 + "\n")
 
-    return True
+    return success
 
 
 def start_fresh(base_dir: Path) -> bool:
     """
-    Start all services from a clean state.
-
-    Order matters:
-    1. Check for clean shutdown marker
-    2. Start VaultKeeper (needed by others)
-    3. Start Tavern (UI)
-    4. Start Training Daemon
-    5. Optionally start Weaver daemon
-
-    Returns:
-        True if all services started
+    Start all services from a clean state using Service Registry.
     """
     print("\n" + "=" * 60)
     print("STARTING FRESH - Bringing up all services")
@@ -761,32 +490,21 @@ def start_fresh(base_dir: Path) -> bool:
     else:
         print("⚠ No clean shutdown marker - previous session may have crashed")
 
-    # Ensure dirs exist
-    (base_dir / ".pids").mkdir(parents=True, exist_ok=True)
-    (base_dir / "logs").mkdir(parents=True, exist_ok=True)
-
-    weaver = Weaver(str(base_dir))
-
-    # Start services in order
-    services = ["vault", "tavern", "training"]
-
-    for i, svc in enumerate(services, 1):
-        print(f"[{i}/{len(services)}] Starting {weaver.threads[svc].name}...")
-        success = weaver._start_thread(weaver.threads[svc])
-        if not success:
-            print(f"   ❌ Failed to start {svc}")
-            return False
-        print(f"   ✅ {svc} started")
+    # Use service registry to start in correct order
+    success = start_realm(include_optional=False)
 
     print("\n" + "=" * 60)
-    print("✅ ALL SERVICES RUNNING")
-    print("   Tavern:      http://localhost:8888")
-    print("   VaultKeeper: http://localhost:8767")
-    print("")
-    print("   To run Weaver daemon: python3 weaver/weaver.py --daemon")
+    if success:
+        print("✅ ALL SERVICES RUNNING")
+        print("   Tavern:      http://localhost:8888")
+        print("   VaultKeeper: http://localhost:8767")
+        print("")
+        print("   To run Weaver daemon: python3 weaver/weaver.py --daemon")
+    else:
+        print("❌ STARTUP FAILED - check logs for details")
     print("=" * 60 + "\n")
 
-    return True
+    return success
 
 
 def main():
@@ -796,10 +514,10 @@ def main():
     parser.add_argument("--daemon", action="store_true", help="Run as daemon (continuous)")
     parser.add_argument("--status", action="store_true", help="Show tapestry status")
     parser.add_argument("--dry-run", action="store_true", help="Check but don't restart")
-    parser.add_argument("--restart", metavar="SERVICE", help="Restart a specific service (tavern, vault, training, data_flow, eval_runner)")
+    parser.add_argument("--restart", metavar="SERVICE", help="Restart a specific service")
     parser.add_argument("--shutdown", action="store_true", help="Force shutdown all services cleanly")
     parser.add_argument("--start", action="store_true", help="Start all services fresh")
-    parser.add_argument("--base-dir", default=None, help="Base directory (auto-detected if not provided)")
+    parser.add_argument("--base-dir", default=None, help="Base directory")
 
     args = parser.parse_args()
     base_dir = Path(args.base_dir) if args.base_dir else get_base_dir()
@@ -823,7 +541,6 @@ def main():
     elif args.status:
         print(weaver.status())
     elif args.restart:
-        # Restart a specific service
         service = args.restart.lower()
         print(f"Restarting {service}...")
         success = weaver.restart_thread(service)

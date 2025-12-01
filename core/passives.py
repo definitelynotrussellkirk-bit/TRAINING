@@ -428,8 +428,9 @@ def get_pending_passives() -> List[Dict[str, Any]]:
 
 
 def pop_passive() -> Optional[Dict[str, Any]]:
-    """Pop next passive from queue (LITE first)."""
+    """Pop next passive from queue (LITE first), skipping already-recorded items."""
     _load_passive_queue()
+    ledger = get_passives_ledger()
 
     with _passive_queue_lock:
         if not _passive_queue:
@@ -437,9 +438,28 @@ def pop_passive() -> Optional[Dict[str, Any]]:
 
         # Sort: LITE before FULL
         _passive_queue.sort(key=lambda x: (0 if x["mode"] == "lite" else 1, x["queued_at"]))
-        item = _passive_queue.pop(0)
+
+        # Find first item that isn't already recorded
+        items_removed = 0
+        while _passive_queue:
+            item = _passive_queue[0]
+            # Check if already recorded
+            if ledger.has_result(item["checkpoint_step"], item["passive_id"], item["mode"]):
+                _passive_queue.pop(0)
+                items_removed += 1
+                continue
+            # Found an unrecorded item
+            _passive_queue.pop(0)
+            if items_removed > 0:
+                logger.info(f"Cleaned {items_removed} already-recorded items from passive queue")
+            _save_passive_queue()
+            return item
+
+        # All items were already recorded
+        if items_removed > 0:
+            logger.info(f"Cleaned {items_removed} already-recorded items from passive queue (queue now empty)")
         _save_passive_queue()
-        return item
+        return None
 
 
 def _get_passive_queue_file() -> Path:

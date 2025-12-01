@@ -228,28 +228,44 @@ class CheckpointLedger:
 
         self._lock = threading.Lock()
         self._index: Dict[int, CheckpointRecord] = {}
+        self._index_mtime: float = 0.0  # Track file modification time
 
         self._load_index()
 
-    def _load_index(self):
+    def _load_index(self, force: bool = False):
         """Load the central index."""
         if not self.index_path.exists():
+            return
+
+        # Check if file changed (skip reload if unchanged)
+        try:
+            current_mtime = self.index_path.stat().st_mtime
+            if not force and current_mtime == self._index_mtime:
+                return  # No changes
+        except OSError:
             return
 
         try:
             with open(self.index_path) as f:
                 data = json.load(f)
 
+            new_index: Dict[int, CheckpointRecord] = {}
             for step_str, record_data in data.get("checkpoints", {}).items():
                 try:
                     record = CheckpointRecord.from_dict(record_data)
-                    self._index[record.step] = record
+                    new_index[record.step] = record
                 except Exception as e:
                     logger.warning(f"Failed to load record for step {step_str}: {e}")
 
-            logger.info(f"Loaded {len(self._index)} checkpoint records from ledger")
+            self._index = new_index
+            self._index_mtime = current_mtime
+            logger.debug(f"Loaded {len(self._index)} checkpoint records from ledger")
         except Exception as e:
             logger.warning(f"Failed to load ledger index: {e}")
+
+    def _ensure_fresh(self):
+        """Reload index if file changed on disk. Call before reads."""
+        self._load_index(force=False)
 
     def _save_index(self):
         """Save the central index."""
@@ -431,10 +447,12 @@ class CheckpointLedger:
 
     def get(self, step: int) -> Optional[CheckpointRecord]:
         """Get record for a specific step."""
+        self._ensure_fresh()
         return self._index.get(step)
 
     def get_latest(self) -> Optional[CheckpointRecord]:
         """Get the most recent checkpoint record."""
+        self._ensure_fresh()
         if not self._index:
             return None
         max_step = max(self._index.keys())
@@ -451,6 +469,7 @@ class CheckpointLedger:
         Returns:
             Best checkpoint record or None
         """
+        self._ensure_fresh()
         candidates = []
         for record in self._index.values():
             value = getattr(record, metric, None)
@@ -465,6 +484,7 @@ class CheckpointLedger:
 
     def list_all(self, limit: Optional[int] = None) -> List[CheckpointRecord]:
         """List all checkpoint records, newest first."""
+        self._ensure_fresh()
         records = sorted(self._index.values(), key=lambda r: r.step, reverse=True)
         if limit:
             records = records[:limit]
@@ -472,6 +492,7 @@ class CheckpointLedger:
 
     def list_by_skill(self, skill_name: str) -> List[CheckpointRecord]:
         """List checkpoints for a specific skill."""
+        self._ensure_fresh()
         return [
             r for r in self._index.values()
             if r.skill_name == skill_name
@@ -548,6 +569,7 @@ class CheckpointLedger:
 
     def get_summary(self) -> Dict[str, Any]:
         """Get summary statistics."""
+        self._ensure_fresh()
         records = list(self._index.values())
 
         if not records:

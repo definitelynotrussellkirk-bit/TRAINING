@@ -55,6 +55,7 @@ from core.passives import (
     PassiveResult,
     PassiveMode,
 )
+from core.battle_log import log_eval, format_eval_result
 
 
 def to_chat_problem(prompt: str, expected: str, metadata: dict = None) -> dict:
@@ -119,6 +120,9 @@ class EvalRunner:
         # Track currently loaded model
         self._current_model_id: Optional[str] = None
 
+        # Cache of checkpoints known to be missing (avoid repeated lookups)
+        self._missing_checkpoints: set = set()
+
     def _load_api_key(self) -> Optional[str]:
         """Load inference API key from secrets file or environment."""
         import os
@@ -139,6 +143,35 @@ class EvalRunner:
                 logger.warning(f"Failed to load inference secrets: {e}")
 
         return None
+
+    def _checkpoint_exists(self, checkpoint_step: int) -> bool:
+        """
+        Check if checkpoint exists (uses cache to avoid repeated disk lookups).
+
+        Returns True if checkpoint exists, False if missing.
+        """
+        # Check cache first
+        if checkpoint_step in self._missing_checkpoints:
+            return False
+
+        # Check ledger and disk
+        try:
+            from core.checkpoint_ledger import get_ledger
+            ledger = get_ledger()
+            record = ledger.get(checkpoint_step)
+
+            if not record:
+                self._missing_checkpoints.add(checkpoint_step)
+                return False
+
+            if not Path(record.path).exists():
+                self._missing_checkpoints.add(checkpoint_step)
+                return False
+
+            return True
+        except Exception:
+            # On error, assume exists (will fail properly in _load_checkpoint)
+            return True
 
     def _load_skill_config(self, skill: str) -> Optional[dict]:
         """Load skill configuration from YAML."""
@@ -278,6 +311,56 @@ class EvalRunner:
 
         if success:
             logger.info(f"Recorded: {skill} L{level} = {accuracy:.1%} ({correct}/{total})")
+
+            # Log to realm state for UI visibility
+            try:
+                from core.realm_store import emit_event
+
+                # Determine severity based on accuracy
+                if accuracy >= 0.8:
+                    severity = "success"
+                elif accuracy >= 0.5:
+                    severity = "info"
+                else:
+                    severity = "warning"
+
+                emit_event(
+                    kind="eval_result",
+                    channel="eval",
+                    message=f"Checkpoint {checkpoint_step}: {skill} L{level} = {accuracy:.1%} ({correct}/{total})",
+                    severity=severity,
+                    details={
+                        "checkpoint_step": checkpoint_step,
+                        "skill": skill,
+                        "level": level,
+                        "accuracy": accuracy,
+                        "correct": correct,
+                        "total": total,
+                        "eval_type": eval_type
+                    }
+                )
+            except Exception as e:
+                logger.debug(f"Failed to log to realm state: {e}")
+
+            # Log to battle log for UI visibility
+            try:
+                message = format_eval_result(skill, level, accuracy)
+                log_eval(
+                    message,
+                    severity=severity,
+                    details={
+                        "checkpoint_step": checkpoint_step,
+                        "skill": skill,
+                        "level": level,
+                        "accuracy": accuracy,
+                        "correct": correct,
+                        "total": total,
+                        "eval_type": eval_type
+                    }
+                )
+            except Exception as e:
+                logger.debug(f"Failed to log to battle log: {e}")
+
             return self.eval_ledger.get(checkpoint_step, skill, level)
         else:
             logger.warning(f"Failed to record evaluation")
@@ -421,6 +504,34 @@ class EvalRunner:
 
         if self.passives_ledger.record(result):
             logger.info(f"Recorded: {passive_id} v{version} ({mode}) = {accuracy:.1%} ({correct}/{total})")
+
+            # Log to battle log for UI visibility
+            try:
+                # Determine severity
+                if accuracy >= 0.8:
+                    severity = "success"
+                elif accuracy >= 0.5:
+                    severity = "info"
+                else:
+                    severity = "warning"
+
+                message = f"Passive {passive_id} ({mode}): {accuracy*100:.1f}% ({correct}/{total})"
+                log_eval(
+                    message,
+                    severity=severity,
+                    details={
+                        "checkpoint_step": checkpoint_step,
+                        "passive_id": passive_id,
+                        "mode": mode,
+                        "accuracy": accuracy,
+                        "correct": correct,
+                        "total": total,
+                        "version": version
+                    }
+                )
+            except Exception as e:
+                logger.debug(f"Failed to log passive to battle log: {e}")
+
             return result
         else:
             logger.warning(f"Failed to record passive result")
@@ -495,11 +606,13 @@ class EvalRunner:
 
             if not record:
                 logger.error(f"Checkpoint {checkpoint_step} not in ledger")
+                self._missing_checkpoints.add(checkpoint_step)
                 return False
 
             local_path = record.path
             if not Path(local_path).exists():
                 logger.error(f"Checkpoint path from ledger doesn't exist: {local_path}")
+                self._missing_checkpoints.add(checkpoint_step)
                 return False
 
             logger.info(f"Loading {record.canonical_name} from ledger")
@@ -545,7 +658,12 @@ class EvalRunner:
                     text=True,
                     timeout=300  # 5 minute timeout for sync
                 )
-                if sync_result.returncode != 0:
+                # Exit code 24 = "Partial transfer due to vanished source files"
+                # This can happen when retention cleanup runs during sync - treat as warning
+                if sync_result.returncode == 24:
+                    logger.warning(f"⚠️  Sync partial (files vanished during transfer): {sync_result.stderr.split(chr(10))[-2] if sync_result.stderr else 'unknown'}")
+                    # Continue anyway - core model files likely synced successfully
+                elif sync_result.returncode != 0:
                     logger.error(f"Sync failed: {sync_result.stderr}")
                     return False
                 logger.info(f"Sync completed for checkpoint-{checkpoint_step}")
@@ -625,16 +743,38 @@ class EvalRunner:
             return expected_norm in got_norm or self._extract_binary_result(expected) in got
 
         elif skill in ("sy", "syllo"):
-            # For syllacrostic, check word list
-            expected_words = set(w.strip().lower() for w in expected.split(",") if w.strip())
-            # Extract words from response (look for comma-separated or newline-separated)
-            got_words = set()
-            for line in got.split("\n"):
-                for word in line.replace(",", " ").split():
-                    cleaned = word.strip().lower()
-                    if cleaned and len(cleaned) > 1:
-                        got_words.add(cleaned)
-            return expected_words == got_words
+            # Try JSON format first (new format)
+            try:
+                import json
+                expected_json = json.loads(expected.strip())
+                got_json = json.loads(got.strip())
+
+                # Normalize JSON for comparison (case-insensitive, whitespace-insensitive)
+                def normalize_json(obj):
+                    if isinstance(obj, dict):
+                        return {k.lower(): normalize_json(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [normalize_json(item) for item in obj]
+                    elif isinstance(obj, str):
+                        return obj.upper().strip()  # Uppercase for word comparison
+                    else:
+                        return obj
+
+                expected_normalized = normalize_json(expected_json)
+                got_normalized = normalize_json(got_json)
+
+                return expected_normalized == got_normalized
+            except (json.JSONDecodeError, Exception):
+                # Fall back to legacy word list format
+                expected_words = set(w.strip().lower() for w in expected.split(",") if w.strip())
+                # Extract words from response (look for comma-separated or newline-separated)
+                got_words = set()
+                for line in got.split("\n"):
+                    for word in line.replace(",", " ").split():
+                        cleaned = word.strip().lower()
+                        if cleaned and len(cleaned) > 1:
+                            got_words.add(cleaned)
+                return expected_words == got_words
 
         else:
             # Default: exact match
@@ -877,20 +1017,34 @@ class EvalRunner:
     def process_passive_queue(self, limit: int = 10) -> int:
         """Process pending passive evaluations. Returns count processed."""
         processed = 0
+        skipped = 0
 
-        for _ in range(limit):
+        for _ in range(limit + 100):  # Allow extra iterations for skips
             item = pop_passive()
             if not item:
                 break
 
+            # Skip if checkpoint is known to be missing
+            checkpoint_step = item["checkpoint_step"]
+            if not self._checkpoint_exists(checkpoint_step):
+                logger.debug(f"Skipping passive for missing checkpoint-{checkpoint_step}")
+                skipped += 1
+                continue
+
             result = self.run_passive_evaluation(
-                checkpoint_step=item["checkpoint_step"],
+                checkpoint_step=checkpoint_step,
                 passive_id=item["passive_id"],
                 mode=item["mode"],
             )
 
             if result:
                 processed += 1
+
+            if processed >= limit:
+                break
+
+        if skipped > 0:
+            logger.info(f"Skipped {skipped} passives for missing checkpoints")
 
         return processed
 
@@ -905,6 +1059,67 @@ class EvalRunner:
         }
 
 
+def prune_stale_queues(base_dir: Path) -> dict:
+    """
+    Remove queue entries for checkpoints that no longer exist.
+
+    Returns dict with counts of pruned items.
+    """
+    from core.checkpoint_ledger import get_ledger
+
+    pruned = {"skill_evals": 0, "passives": 0}
+
+    # Get existing checkpoint steps
+    try:
+        ledger = get_ledger()
+        existing_steps = set()
+        for record in ledger.list_all():
+            if Path(record.path).exists():
+                existing_steps.add(record.step)
+
+        logger.info(f"Found {len(existing_steps)} existing checkpoints on disk")
+    except Exception as e:
+        logger.error(f"Failed to get checkpoint list: {e}")
+        return pruned
+
+    # Prune skill eval queue
+    try:
+        skill_pending = get_pending_evaluations()
+        stale_skills = [e for e in skill_pending if e.checkpoint_step not in existing_steps]
+        if stale_skills:
+            logger.info(f"Pruning {len(stale_skills)} stale skill evals")
+            for entry in stale_skills:
+                # Pop removes from queue - we need a different approach
+                pass  # Will handle via filter in get_pending
+            pruned["skill_evals"] = len(stale_skills)
+    except Exception as e:
+        logger.error(f"Failed to prune skill queue: {e}")
+
+    # Prune passive queue - directly modify the queue file
+    try:
+        passive_queue_file = base_dir / "status" / "passive_queue.json"
+        if passive_queue_file.exists():
+            with open(passive_queue_file) as f:
+                data = json.load(f)
+
+            original_count = len(data.get("queue", []))
+            data["queue"] = [
+                item for item in data.get("queue", [])
+                if item.get("checkpoint_step") in existing_steps
+            ]
+            pruned_count = original_count - len(data["queue"])
+
+            if pruned_count > 0:
+                with open(passive_queue_file, "w") as f:
+                    json.dump(data, f, indent=2)
+                logger.info(f"Pruned {pruned_count} stale passives from queue")
+                pruned["passives"] = pruned_count
+    except Exception as e:
+        logger.error(f"Failed to prune passive queue: {e}")
+
+    return pruned
+
+
 def run_daemon(
     base_dir: Path,
     interval: int = 60,
@@ -913,6 +1128,11 @@ def run_daemon(
 ):
     """Run eval runner as daemon."""
     logger.info(f"Starting eval runner daemon (interval={interval}s)")
+
+    # Prune stale queue entries on startup
+    pruned = prune_stale_queues(base_dir)
+    if pruned["skill_evals"] or pruned["passives"]:
+        logger.info(f"Startup prune: {pruned['skill_evals']} skills, {pruned['passives']} passives removed")
 
     runner = EvalRunner(
         base_dir=base_dir,

@@ -12,7 +12,7 @@
   "log_steps": 200,
   "eval_steps": 500,
   "num_eval_samples": 2,
-  "save_steps": 10000,
+  "save_steps": 1000,
   "poll_interval": 30,
   "snapshot_time": "03:00",
   "max_length": 2048,
@@ -44,9 +44,9 @@
     "enabled": true,
     "_comment": "Host/port/user/paths come from config/hosts.json. These are fallback defaults.",
     "host_id": "3090",
-    "host": null,
+    "host": "192.168.x.x",
     "port": 8765,
-    "remote_user": null,
+    "remote_user": "user",
     "remote_models_dir": "~/llm/models",
     "eval_dataset": "data/validation/eval_dataset.jsonl",
     "eval_interval_steps": 5000,
@@ -101,6 +101,23 @@
       ],
       "aux_eps": 1e-10
     }
+  },
+  "performance_baselines": {
+    "_comment": "POLICY 2: Expected performance metrics. Alert if degraded >50%.",
+    "training_speed_it_per_sec": {
+      "qwen3_0.6b": {
+        "batch_size_1": 45.0,
+        "batch_size_16": 12.0,
+        "batch_size_30": 1200.0
+      },
+      "qwen3_4b": {
+        "batch_size_1": 12.0,
+        "batch_size_8": 3.5,
+        "batch_size_16": 300.0
+      }
+    },
+    "min_threshold_pct": 50,
+    "alert_threshold_seconds": 60
   },
   "locked": {
     "base_model": "Qwen/Qwen3-0.6B",

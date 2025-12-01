@@ -16,6 +16,15 @@ from urllib import request, error
 logger = logging.getLogger(__name__)
 
 
+def _get_api_key() -> str:
+    """Get the inference API key for remote server authentication."""
+    try:
+        from config.secrets_loader import get_inference_api_key
+        return get_inference_api_key()
+    except ImportError:
+        return "admin123"  # Fallback default
+
+
 class RemoteEvaluator:
     """
     Evaluator that runs on remote RTX 3090 server
@@ -44,6 +53,22 @@ class RemoteEvaluator:
         self.port = port
         self.timeout = timeout
         self.base_url = f"http://{host}:{port}"
+        self.api_key = _get_api_key()
+
+    def _get_headers(self, content_type: str = None) -> Dict[str, str]:
+        """Get HTTP headers with API key authentication."""
+        headers = {"X-API-Key": self.api_key}
+        if content_type:
+            headers["Content-Type"] = content_type
+        return headers
+
+    def _make_request(self, url: str, method: str = "GET",
+                     data: bytes = None, timeout: int = 30) -> Any:
+        """Make authenticated HTTP request."""
+        headers = self._get_headers("application/json" if data else None)
+        req = request.Request(url, data=data, headers=headers, method=method)
+        with request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
 
     def submit_eval_job(self, model_id: str, dataset_ref: str,
                        name: Optional[str] = None,
@@ -81,19 +106,16 @@ class RemoteEvaluator:
             payload["config"] = config
 
         data = json.dumps(payload).encode("utf-8")
-        headers = {"Content-Type": "application/json"}
 
         try:
-            req = request.Request(url, data=data, headers=headers, method="POST")
-            with request.urlopen(req, timeout=30) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-                job_id = result.get("job_id")
+            result = self._make_request(url, method="POST", data=data, timeout=30)
+            job_id = result.get("job_id")
 
-                logger.info(f"✅ Submitted eval job: {job_id}")
-                logger.info(f"   Model: {model_id}")
-                logger.info(f"   Dataset: {dataset_ref}")
+            logger.info(f"✅ Submitted eval job: {job_id}")
+            logger.info(f"   Model: {model_id}")
+            logger.info(f"   Dataset: {dataset_ref}")
 
-                return job_id
+            return job_id
 
         except error.URLError as e:
             logger.error(f"Failed to submit eval job: {e}")
@@ -109,8 +131,7 @@ class RemoteEvaluator:
         url = f"{self.base_url}/eval/jobs/{job_id}"
 
         try:
-            with request.urlopen(url, timeout=10) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+            return self._make_request(url, timeout=10)
 
         except error.URLError as e:
             logger.error(f"Failed to get job status: {e}")
@@ -196,14 +217,11 @@ class RemoteEvaluator:
             payload["tags"] = tags
 
         data = json.dumps(payload).encode("utf-8")
-        headers = {"Content-Type": "application/json"}
 
         try:
-            req = request.Request(url, data=data, headers=headers, method="POST")
-            with request.urlopen(req, timeout=30) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-                logger.info(f"✅ Registered checkpoint: {model_id}")
-                return True
+            self._make_request(url, method="POST", data=data, timeout=30)
+            logger.info(f"✅ Registered checkpoint: {model_id}")
+            return True
 
         except error.URLError as e:
             logger.error(f"Failed to register checkpoint: {e}")
@@ -225,8 +243,7 @@ class RemoteEvaluator:
             url += f"?status={status}"
 
         try:
-            with request.urlopen(url, timeout=10) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+            return self._make_request(url, timeout=10)
 
         except error.URLError as e:
             logger.error(f"Failed to list jobs: {e}")
@@ -237,9 +254,8 @@ class RemoteEvaluator:
         url = f"{self.base_url}/models/active"
 
         try:
-            with request.urlopen(url, timeout=10) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-                return result.get("model_id")
+            result = self._make_request(url, timeout=10)
+            return result.get("model_id")
 
         except error.URLError as e:
             logger.error(f"Failed to get active model: {e}")
@@ -251,13 +267,11 @@ class RemoteEvaluator:
 
         payload = {"id": model_id}
         data = json.dumps(payload).encode("utf-8")
-        headers = {"Content-Type": "application/json"}
 
         try:
-            req = request.Request(url, data=data, headers=headers, method="POST")
-            with request.urlopen(req, timeout=30) as resp:
-                logger.info(f"✅ Set active model: {model_id}")
-                return True
+            self._make_request(url, method="POST", data=data, timeout=30)
+            logger.info(f"✅ Set active model: {model_id}")
+            return True
 
         except error.URLError as e:
             logger.error(f"Failed to set active model: {e}")

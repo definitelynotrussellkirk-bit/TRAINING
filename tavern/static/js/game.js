@@ -69,6 +69,58 @@ const GameState = {
 };
 
 // ============================================
+// SCHEMA VALIDATION (POLICY 1)
+// ============================================
+
+/**
+ * Validate game data (client-side)
+ *
+ * POLICY 1: Schema Validation at All Boundaries
+ * This catches schema mismatches before they cause UI bugs.
+ *
+ * Supports both formats:
+ * - New RealmStore: {state: {training: ...}, events: [], timestamp: "..."}
+ * - Old /api/game: {training: ..., gpu: ..., curriculum: ...}
+ *
+ * @param {object} data - Data from /api/game or /api/realm-state
+ * @returns {{valid: boolean, errors: string[]}}
+ */
+function validateRealmStore(data) {
+    const errors = [];
+
+    // Detect format
+    const isRealmStore = 'state' in data;
+    const isLegacyGame = 'training' in data;
+
+    if (!isRealmStore && !isLegacyGame) {
+        errors.push("Data missing both 'state' (RealmStore) and 'training' (/api/game) fields");
+        return {valid: false, errors};
+    }
+
+    // Get training data from either format
+    const training = isRealmStore ? data.state?.training : data.training;
+
+    if (!training) {
+        errors.push("Missing training data");
+        return {valid: false, errors};
+    }
+
+    // Validate training fields (lenient - only check critical ones)
+    // status and step are required, updated_at is optional for legacy format
+    if (training.status !== undefined && typeof training.status !== 'string') {
+        errors.push("training.status must be a string");
+    }
+    if (training.step !== undefined && typeof training.step !== 'number' && typeof training.current_step !== 'number') {
+        errors.push("training.step or current_step must be a number");
+    }
+
+    return {
+        valid: errors.length === 0,
+        errors: errors
+    };
+}
+
+// ============================================
 // UTILITY FUNCTIONS
 // ============================================
 
@@ -797,6 +849,89 @@ function addLocalLog(message, type = 'info') {
 }
 
 // ============================================
+// POLICY 3: STALENESS DETECTION
+// ============================================
+
+/**
+ * Check if training data is stale (>60s old during active training)
+ *
+ * @param {object} training - Training state from RealmStore
+ * @returns {{is_stale: boolean, message: string, age_seconds: number}}
+ */
+function checkDataFreshness(training) {
+    if (!training || !training.updated_at) {
+        return {
+            is_stale: false,
+            message: "No timestamp available",
+            age_seconds: 0
+        };
+    }
+
+    const updatedAt = new Date(training.updated_at);
+    const ageSeconds = (Date.now() - updatedAt) / 1000;
+
+    // Only consider stale if training is active AND data is old
+    const isTraining = training.status === 'training';
+    const isStale = isTraining && ageSeconds > 60;
+
+    if (isStale) {
+        return {
+            is_stale: true,
+            message: `Training data is ${ageSeconds.toFixed(0)}s old - daemon may be stuck`,
+            age_seconds: ageSeconds
+        };
+    }
+
+    return {is_stale: false, message: "", age_seconds: ageSeconds};
+}
+
+/**
+ * Update staleness warning banner
+ */
+function updateFreshnessWarning(training) {
+    const banner = document.getElementById('dataFreshnessWarning');
+    const messageEl = document.getElementById('freshnessMessage');
+
+    if (!banner || !messageEl) return;
+
+    const check = checkDataFreshness(training);
+
+    if (check.is_stale) {
+        messageEl.textContent = check.message;
+        banner.style.display = 'block';
+    } else {
+        banner.style.display = 'none';
+    }
+}
+
+// ============================================
+// POLICY 5: FAIL-FAST ERROR STATES
+// ============================================
+
+/**
+ * Show schema validation error in UI
+ * POLICY 5: Fail-fast - make errors LOUD and OBVIOUS
+ */
+function showSchemaError(errors) {
+    const battleStatus = document.getElementById('battleStatus');
+    if (!battleStatus) return;
+
+    battleStatus.classList.add('error-state');
+    setText('#battleIcon', '⚠️');
+    setText('#battleTitle', 'DATA PIPELINE BROKEN');
+    setText('#questName', 'Schema validation failed - check console for details');
+    setText('#battleStep', '--');
+    setText('#battleSpeed', '--');
+    setText('#battleStrain', '--');
+    setText('#battleETA', '--');
+
+    // Log to battle log
+    addLocalLog(`Schema validation failed: ${errors[0]}`, 'error');
+
+    console.error("Schema errors:", errors);
+}
+
+// ============================================
 // NOTIFICATIONS
 // ============================================
 
@@ -850,15 +985,26 @@ function processGameData(data) {
      *   - vault: checkpoint data
      *   - comparison: model comparison results
      */
+
+    // POLICY 1: Validate schema before processing
+    const validation = validateRealmStore(data);
+    if (!validation.valid) {
+        console.error("❌ SCHEMA VALIDATION FAILED!");
+        console.error("Errors:", validation.errors);
+        // POLICY 5: Show error state in UI instead of gracefully degrading
+        showSchemaError(validation.errors);
+        return;  // Stop processing - don't render invalid data
+    }
+
     const prevTraining = GameState.isTraining;
     const prevStep = GameState.currentStep;
     const prevTotalLevel = GameState.totalLevel;
 
-    // Training status
-    const training = data.training;
+    // Training status - handle both RealmStore and legacy /api/game format
+    const training = data.state?.training || data.training;
     if (training) {
         GameState.isTraining = training.status === 'training';
-        GameState.currentStep = training.current_step || 0;
+        GameState.currentStep = training.step || training.current_step || 0;
         GameState.totalSteps = training.total_steps || 0;
         GameState.loss = training.loss || 0;
         GameState.valLoss = training.validation_loss || 0;
@@ -870,6 +1016,9 @@ function processGameData(data) {
         // Loss history for graph - DO NOT USE train_loss_history (always empty)
         // Instead, we build it from real-time events (training.step)
         // This prevents duplicate injection and jumping graphs
+
+        // POLICY 3: Check staleness and update warning
+        updateFreshnessWarning(training);
     }
 
     // GPU stats
@@ -1183,13 +1332,10 @@ function updateNextActionUI(campaign, momentum) {
                 <button class="action-btn secondary" onclick="toggleAutoQueue(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
                     Enable Auto-Queue
                 </button>
-                <button class="action-btn secondary" onclick="generateTrainingData(this, 5000)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
-                    Generate 5,000
-                </button>
             </div>
         `;
-        btnEl.textContent = 'Generate 1,000 Examples';
-        btnEl.onclick = () => generateTrainingData(btnEl, 1000);
+        btnEl.textContent = 'Generate 5,000 Examples';
+        btnEl.onclick = () => generateTrainingData(btnEl, 5000);
 
         // Check auto-queue status and update button
         checkAutoQueueStatus();
@@ -1914,9 +2060,883 @@ function updateControlButtons() {
     // TODO: Check actual pause state from API and show correct button
 }
 
+// ============================================
+// 🎮 MUD CONSOLE - COMMAND THE REALM
+// ============================================
+
+/**
+ * Realm Console - zMUD-style command interface
+ */
+const RealmConsole = {
+    isOpen: false,
+    isLoggedIn: false,
+    password: 'ADMIN123',  // Pseudo-security, like the old days
+    history: [],
+    historyIndex: -1,
+
+    // MUD-style room descriptions
+    locations: {
+        tavern: "You are in the Tavern. Torches flicker on the walls. The air hums with potential energy.",
+        forge: "The Forge blazes before you. Heat radiates from GPU cores. This is where heroes are tempered.",
+        guild: "The Guild Hall stretches before you. Skill crystals line the walls, each pulsing with learned knowledge.",
+        vault: "The Vault's iron doors stand open. Rows of checkpoints gleam like treasure.",
+        oracle: "The Oracle's chamber is quiet. Ancient inference patterns swirl in the darkness."
+    },
+    currentLocation: 'tavern',
+
+    init() {
+        const input = document.getElementById('consoleInput');
+        const output = document.getElementById('consoleOutput');
+        if (!input || !output) return;
+
+        // Listen for ` (backtick) to toggle console globally
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '`' && !e.ctrlKey && !e.altKey) {
+                // Don't trigger if typing in an input
+                if (document.activeElement.tagName === 'INPUT' && document.activeElement.id !== 'consoleInput') {
+                    return;
+                }
+                e.preventDefault();
+                this.toggle();
+            }
+        });
+
+        // Command input handling
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const cmd = input.value;
+                input.value = '';
+                if (cmd.trim()) {
+                    this.history.unshift(cmd);
+                    this.historyIndex = -1;
+                    this.execute(cmd);
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (this.history.length > 0) {
+                    this.historyIndex = Math.min(this.historyIndex + 1, this.history.length - 1);
+                    input.value = this.history[this.historyIndex];
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (this.historyIndex > 0) {
+                    this.historyIndex--;
+                    input.value = this.history[this.historyIndex];
+                } else {
+                    this.historyIndex = -1;
+                    input.value = '';
+                }
+            } else if (e.key === 'Escape') {
+                this.toggle();
+            }
+        });
+
+        // Set initial prompt state
+        this.updatePrompt();
+
+        console.log('🎮 Realm Console initialized');
+    },
+
+    toggle() {
+        const console = document.getElementById('realmConsole');
+        const input = document.getElementById('consoleInput');
+        if (!console) return;
+
+        this.isOpen = !this.isOpen;
+        console.classList.toggle('collapsed', !this.isOpen);
+
+        if (this.isOpen) {
+            setTimeout(() => input?.focus(), 100);
+        }
+    },
+
+    print(text, type = '') {
+        const output = document.getElementById('consoleOutput');
+        if (!output) return;
+
+        const line = document.createElement('div');
+        line.className = 'console-line ' + (type ? `console-${type}` : '');
+        line.innerHTML = text;
+        output.appendChild(line);
+        output.scrollTop = output.scrollHeight;
+    },
+
+    updatePrompt() {
+        const prompt = document.getElementById('consolePrompt');
+        if (!prompt) return;
+
+        if (!this.isLoggedIn) {
+            prompt.textContent = 'Password:';
+            prompt.className = 'console-prompt';
+        } else if (GameState.isTraining) {
+            prompt.textContent = '>';
+            prompt.className = 'console-prompt training';
+        } else {
+            prompt.textContent = '>';
+            prompt.className = 'console-prompt';
+        }
+    },
+
+    async execute(cmd) {
+        const trimmed = cmd.trim();
+
+        // Not logged in - check password
+        if (!this.isLoggedIn) {
+            if (trimmed.toUpperCase() === this.password) {
+                this.isLoggedIn = true;
+                this.print('*** ACCESS GRANTED ***', 'success');
+                this.print('Welcome to the Realm, Dungeon Master.', 'system');
+                this.print(`Type <span class="cmd">help</span> for available commands.`);
+                this.updatePrompt();
+                return;
+            } else {
+                this.print('*** ACCESS DENIED ***', 'error');
+                return;
+            }
+        }
+
+        // Logged in - parse command
+        this.print(`> ${trimmed}`, 'cmd');
+
+        const [verb, ...args] = trimmed.toLowerCase().split(/\s+/);
+        const arg = args.join(' ');
+
+        try {
+            switch (verb) {
+                case 'help':
+                case '?':
+                    this.cmdHelp();
+                    break;
+                case 'look':
+                case 'l':
+                    this.cmdLook();
+                    break;
+                case 'status':
+                case 'stat':
+                case 's':
+                    await this.cmdStatus();
+                    break;
+                case 'who':
+                case 'w':
+                    await this.cmdWho();
+                    break;
+                case 'skills':
+                    await this.cmdSkills();
+                    break;
+                case 'checkpoints':
+                case 'ck':
+                    await this.cmdCheckpoints();
+                    break;
+                case 'evals':
+                case 'eval':
+                    await this.cmdEvals(arg);
+                    break;
+                case 'weaver':
+                    await this.cmdWeaver(arg);
+                    break;
+                case 'train':
+                    await this.cmdTrain(arg);
+                    break;
+                case 'go':
+                case 'goto':
+                    this.cmdGo(arg);
+                    break;
+                case 'clear':
+                case 'cls':
+                    this.cmdClear();
+                    break;
+                case 'say':
+                    this.print(`You say: "${arg}"`, 'system');
+                    break;
+                case 'quit':
+                case 'logout':
+                    this.isLoggedIn = false;
+                    this.print('You fade from the Realm...', 'system');
+                    this.print('Enter password to reconnect.', 'info');
+                    this.updatePrompt();
+                    break;
+                default:
+                    this.print(`Unknown command: ${verb}. Type <span class="cmd">help</span> for commands.`, 'error');
+            }
+        } catch (err) {
+            console.error('Console error:', err);
+            this.print(`Error: ${err.message}`, 'error');
+        }
+    },
+
+    cmdHelp() {
+        this.print('=== REALM CONSOLE COMMANDS ===', 'info');
+        this.print('<span class="cmd">look</span> (l)         - Describe your surroundings');
+        this.print('<span class="cmd">status</span> (s)       - Show realm status');
+        this.print('<span class="cmd">who</span> (w)          - Show connected services');
+        this.print('<span class="cmd">skills</span>          - Show DIO\'s skills');
+        this.print('<span class="cmd">checkpoints</span> (ck) - List recent checkpoints');
+        this.print('<span class="cmd">evals</span> [skill]    - Show recent evaluations');
+        this.print('<span class="cmd">weaver</span> [start|stop|status] - Control the Weaver');
+        this.print('<span class="cmd">train</span> [start|stop] - Control training');
+        this.print('<span class="cmd">go</span> [location]    - Travel (tavern/forge/guild/vault/oracle)');
+        this.print('<span class="cmd">clear</span>           - Clear console');
+        this.print('<span class="cmd">logout</span>          - Disconnect from realm');
+    },
+
+    cmdLook() {
+        const desc = this.locations[this.currentLocation] || 'You are somewhere in the Realm.';
+        this.print(desc, 'system');
+
+        // Add exits
+        const exits = Object.keys(this.locations).filter(l => l !== this.currentLocation);
+        this.print(`Exits: ${exits.join(', ')}`, 'info');
+    },
+
+    async cmdStatus() {
+        try {
+            const res = await fetch('/api/state');
+            const data = await res.json();
+
+            const mode = data.mode || 'unknown';
+            const step = data.step?.toLocaleString() || '--';
+            const loss = data.loss?.toFixed(4) || '--';
+            const skill = data.active_skill || '--';
+            const level = data.training_level || '--';
+
+            this.print(`=== REALM STATUS ===`, 'info');
+            this.print(`Mode: <span class="val">${mode.toUpperCase()}</span>`);
+            this.print(`Step: <span class="val">${step}</span> | Loss: <span class="val">${loss}</span>`);
+            this.print(`Active Skill: <span class="highlight">${skill}</span> L${level}`);
+
+            if (data.queue_size !== undefined) {
+                this.print(`Queue: <span class="val">${data.queue_size}</span> jobs waiting`);
+            }
+        } catch (err) {
+            this.print('Failed to fetch realm status', 'error');
+        }
+    },
+
+    async cmdWho() {
+        try {
+            const res = await fetch('/api/cluster/summary');
+            const data = await res.json();
+
+            this.print('=== CONNECTED SERVICES ===', 'info');
+
+            if (data.hosts) {
+                for (const [name, info] of Object.entries(data.hosts)) {
+                    const status = info.online ? '<span class="val">ONLINE</span>' : '<span class="console-error">OFFLINE</span>';
+                    this.print(`${name}: ${status}`);
+                }
+            } else {
+                this.print('No host registry found', 'info');
+            }
+        } catch (err) {
+            this.print('Failed to fetch cluster info', 'error');
+        }
+    },
+
+    async cmdSkills() {
+        try {
+            const res = await fetch('/api/skills');
+            const data = await res.json();
+
+            this.print('=== DIO\'S SKILLS ===', 'info');
+
+            if (data.skills) {
+                for (const skill of data.skills) {
+                    const bar = '█'.repeat(skill.mastered_level || 0) + '░'.repeat(Math.max(0, 10 - (skill.mastered_level || 0)));
+                    this.print(`<span class="highlight">${skill.id.toUpperCase()}</span> [${bar}] L${skill.mastered_level || 0}`);
+                }
+            }
+        } catch (err) {
+            this.print('Failed to fetch skills', 'error');
+        }
+    },
+
+    async cmdCheckpoints() {
+        try {
+            const res = await fetch('/api/ledger?limit=5');
+            const data = await res.json();
+
+            this.print('=== RECENT CHECKPOINTS ===', 'info');
+
+            const checkpoints = data.checkpoints || data || [];
+            for (const cp of checkpoints.slice(0, 5)) {
+                const step = cp.step?.toLocaleString() || cp.name || '??';
+                const loss = cp.train_loss?.toFixed(4) || '--';
+                this.print(`Step <span class="val">${step}</span> | Loss: ${loss}`);
+            }
+        } catch (err) {
+            this.print('Failed to fetch checkpoints', 'error');
+        }
+    },
+
+    async cmdEvals(skill) {
+        try {
+            const url = skill ? `/api/evals/skill/${skill}` : '/api/evals?limit=10';
+            const res = await fetch(url);
+            const data = await res.json();
+
+            this.print(`=== RECENT EVALS ${skill ? `(${skill.toUpperCase()})` : ''} ===`, 'info');
+
+            const evals = data.evaluations || data || [];
+            for (const ev of evals.slice(0, 5)) {
+                const acc = (ev.accuracy * 100).toFixed(1);
+                const level = ev.level || '?';
+                const skillId = ev.skill_id || ev.skill || '?';
+                this.print(`<span class="highlight">${skillId.toUpperCase()}</span> L${level}: <span class="val">${acc}%</span>`);
+            }
+        } catch (err) {
+            this.print('Failed to fetch evals', 'error');
+        }
+    },
+
+    async cmdWeaver(action) {
+        if (!action) {
+            this.print('Usage: weaver [start|stop|status]', 'info');
+            return;
+        }
+
+        switch (action) {
+            case 'status':
+                try {
+                    const res = await fetch('/api/weaver/status');
+                    const data = await res.json();
+                    this.print(`Weaver: <span class="val">${data.running ? 'RUNNING' : 'STOPPED'}</span>`);
+                } catch {
+                    this.print('Weaver status unknown (API not available)', 'error');
+                }
+                break;
+            case 'start':
+                this.print('Awakening the Weaver...', 'system');
+                try {
+                    await fetch('/api/weaver/start', { method: 'POST' });
+                    this.print('Weaver awakened!', 'success');
+                } catch {
+                    this.print('Failed to start Weaver', 'error');
+                }
+                break;
+            case 'stop':
+                this.print('Putting the Weaver to sleep...', 'system');
+                try {
+                    await fetch('/api/weaver/stop', { method: 'POST' });
+                    this.print('Weaver sleeps.', 'success');
+                } catch {
+                    this.print('Failed to stop Weaver', 'error');
+                }
+                break;
+            default:
+                this.print('Unknown weaver action. Use: start, stop, status', 'error');
+        }
+    },
+
+    async cmdTrain(action) {
+        if (!action) {
+            this.print('Usage: train [start|stop]', 'info');
+            return;
+        }
+
+        switch (action) {
+            case 'start':
+                this.print('Initiating training sequence...', 'system');
+                try {
+                    await fetch('/api/realm/mode', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mode: 'training' })
+                    });
+                    this.print('Training mode activated!', 'success');
+                    this.updatePrompt();
+                } catch {
+                    this.print('Failed to start training', 'error');
+                }
+                break;
+            case 'stop':
+                this.print('Halting training...', 'system');
+                try {
+                    await fetch('/api/realm/mode', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mode: 'idle' })
+                    });
+                    this.print('Training halted.', 'success');
+                    this.updatePrompt();
+                } catch {
+                    this.print('Failed to stop training', 'error');
+                }
+                break;
+            default:
+                this.print('Unknown train action. Use: start, stop', 'error');
+        }
+    },
+
+    cmdGo(location) {
+        if (!location) {
+            this.print('Go where? Options: ' + Object.keys(this.locations).join(', '), 'info');
+            return;
+        }
+
+        if (this.locations[location]) {
+            this.currentLocation = location;
+            this.print(`You travel to the ${location.charAt(0).toUpperCase() + location.slice(1)}...`, 'system');
+            this.cmdLook();
+        } else {
+            this.print(`Unknown location: ${location}`, 'error');
+        }
+    },
+
+    cmdClear() {
+        const output = document.getElementById('consoleOutput');
+        if (output) output.innerHTML = '';
+    }
+};
+
+// ============================================
+// 🔥 RPG FLAIR - THE TAVERN IS ALIVE
+// ============================================
+
+/**
+ * RPG Flair Module - Brings the Tavern to life!
+ */
+const RPGFlair = {
+    // Hero sprite - keep consistent, just add occasional sparkle
+    heroBase: '🧔🏽',
+    heroWalking: false,
+
+    // Mini-map state
+    minimapHeroPos: { x: 2, y: 1 },
+    minimapCols: 5,
+    minimapRows: 3,
+    minimapTerrain: [],
+    minimapStructures: [
+        { x: 0, y: 0, icon: '🏰', name: 'Tavern' },
+        { x: 4, y: 0, icon: '🏛️', name: 'Guild' },
+        { x: 4, y: 2, icon: '🗃️', name: 'Vault' },
+        { x: 0, y: 2, icon: '🔮', name: 'Oracle' },
+    ],
+
+    // Room descriptions
+    roomDescriptions: [
+        "You stand in the Training Grounds. The air crackles with gradients. Distant echoes of loss curves rumble like thunder across the Realm.",
+        "The Tavern hums with potential energy. Torches flicker as DIO contemplates the next challenge.",
+        "You feel the weight of accumulated steps. The hero's journey continues ever forward.",
+        "Gradients swirl in the air like motes of dust. Each one carries the memory of a training run.",
+        "The smell of burning GPU fills the air. In the distance, a checkpoint crystallizes into being.",
+    ],
+
+    // Achievement queue
+    achievementQueue: [],
+    achievementShowing: false,
+
+    // Previous state for detecting changes
+    prevStep: 0,
+    prevLevel: 0,
+    prevAccuracy: 0,
+
+    /**
+     * Initialize all RPG flair systems
+     */
+    init() {
+        console.log('🔥 RPG Flair initializing...');
+
+        // Set random room description
+        this.setRandomRoomDescription();
+
+        // Initialize mini-map
+        this.initMinimap();
+
+        // Start hero animation loop
+        this.startHeroAnimation();
+
+        // Set up spell cast effects on buttons
+        this.setupSpellcastButtons();
+
+        // Start mini-map wandering
+        this.startMinimapWander();
+
+        // Initialize HP/MP bars
+        this.updateResourceBars();
+
+        console.log('🔥 RPG Flair ready!');
+    },
+
+    /**
+     * Set a random room description
+     */
+    setRandomRoomDescription() {
+        const descEl = document.getElementById('roomDescription');
+        if (!descEl) return;
+
+        const desc = this.roomDescriptions[Math.floor(Math.random() * this.roomDescriptions.length)];
+        // Keep the exits, just update the main text
+        const exitsHTML = descEl.querySelector('.room-exits')?.outerHTML || '';
+        descEl.innerHTML = desc + exitsHTML;
+    },
+
+    /**
+     * Initialize the mini-map with terrain and structures
+     */
+    initMinimap() {
+        const mapEl = document.getElementById('realmMinimap');
+        if (!mapEl) return;
+
+        mapEl.innerHTML = '';
+
+        // Add random terrain
+        const terrainTypes = ['🌲', '🪨', '🌿', ''];
+        for (let y = 0; y < this.minimapRows; y++) {
+            for (let x = 0; x < this.minimapCols; x++) {
+                // Skip structure positions
+                if (this.minimapStructures.some(s => s.x === x && s.y === y)) continue;
+
+                if (Math.random() < 0.3) {
+                    const terrain = terrainTypes[Math.floor(Math.random() * terrainTypes.length)];
+                    if (terrain) {
+                        const el = document.createElement('div');
+                        el.className = 'minimap-cell minimap-terrain';
+                        el.textContent = terrain;
+                        el.style.left = `${10 + x * 25}px`;
+                        el.style.top = `${10 + y * 25}px`;
+                        mapEl.appendChild(el);
+                    }
+                }
+            }
+        }
+
+        // Add structures
+        for (const struct of this.minimapStructures) {
+            const el = document.createElement('div');
+            el.className = 'minimap-cell minimap-structure';
+            el.textContent = struct.icon;
+            el.title = struct.name;
+            el.style.left = `${10 + struct.x * 25}px`;
+            el.style.top = `${10 + struct.y * 25}px`;
+            mapEl.appendChild(el);
+        }
+
+        // Add hero
+        const heroEl = document.createElement('div');
+        heroEl.className = 'minimap-cell minimap-hero';
+        heroEl.id = 'minimapHero';
+        heroEl.textContent = '🧙‍♂️';
+        heroEl.style.left = `${10 + this.minimapHeroPos.x * 25}px`;
+        heroEl.style.top = `${10 + this.minimapHeroPos.y * 25}px`;
+        mapEl.appendChild(heroEl);
+    },
+
+    /**
+     * Start the hero animation - subtle sparkle only, no frame swapping
+     */
+    startHeroAnimation() {
+        const heroEl = document.getElementById('heroSprite');
+        if (!heroEl) return;
+
+        // Set base hero and let CSS handle the breathing animation
+        heroEl.textContent = this.heroBase;
+
+        // Occasional sparkle (every ~5 seconds when training)
+        setInterval(() => {
+            if (GameState.isTraining) {
+                heroEl.parentElement?.parentElement?.classList.add('hero-walking');
+            } else {
+                heroEl.parentElement?.parentElement?.classList.remove('hero-walking');
+            }
+        }, 2000);
+    },
+
+    /**
+     * Start the mini-map hero wandering
+     */
+    startMinimapWander() {
+        setInterval(() => {
+            const heroEl = document.getElementById('minimapHero');
+            if (!heroEl) return;
+
+            // Random movement
+            const directions = [
+                { dx: 0, dy: -1 },
+                { dx: 0, dy: 1 },
+                { dx: -1, dy: 0 },
+                { dx: 1, dy: 0 },
+            ];
+
+            const dir = directions[Math.floor(Math.random() * directions.length)];
+            const newX = this.minimapHeroPos.x + dir.dx;
+            const newY = this.minimapHeroPos.y + dir.dy;
+
+            // Bounds check
+            if (newX >= 0 && newX < this.minimapCols && newY >= 0 && newY < this.minimapRows) {
+                this.minimapHeroPos.x = newX;
+                this.minimapHeroPos.y = newY;
+                heroEl.style.left = `${10 + newX * 25}px`;
+                heroEl.style.top = `${10 + newY * 25}px`;
+            }
+        }, 1200);
+    },
+
+    /**
+     * Set up spell cast effects on buttons
+     */
+    setupSpellcastButtons() {
+        document.querySelectorAll('.btn-spellcast').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.classList.remove('casting');
+                void btn.offsetWidth; // Force reflow
+                btn.classList.add('casting');
+                setTimeout(() => btn.classList.remove('casting'), 600);
+            });
+        });
+
+        // Also add to any future buttons
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-spellcast, .next-action-btn, .control-btn');
+            if (btn && !btn.classList.contains('casting')) {
+                btn.classList.add('casting');
+                setTimeout(() => btn.classList.remove('casting'), 600);
+            }
+        });
+    },
+
+    /**
+     * Show a floating number animation
+     */
+    showFloatingNumber(text, type = 'xp', targetEl = null) {
+        const container = targetEl || document.querySelector('.hero-frame');
+        if (!container) return;
+
+        const rect = container.getBoundingClientRect();
+        const floater = document.createElement('div');
+        floater.className = `floating-number ${type}`;
+        floater.textContent = text;
+        floater.style.left = `${rect.left + rect.width / 2}px`;
+        floater.style.top = `${rect.top + rect.height / 3}px`;
+        floater.style.position = 'fixed';
+
+        document.body.appendChild(floater);
+
+        // Remove after animation
+        setTimeout(() => floater.remove(), 1500);
+    },
+
+    /**
+     * Show critical hit effect
+     */
+    showCriticalHit(text = 'CRITICAL!') {
+        const overlay = document.getElementById('critOverlay');
+        if (!overlay) return;
+
+        const textEl = overlay.querySelector('.critical-hit-text');
+        if (textEl) textEl.textContent = text;
+
+        overlay.classList.remove('active');
+        void overlay.offsetWidth;
+        overlay.classList.add('active');
+
+        // Screen shake
+        document.body.classList.add('screen-shake');
+        setTimeout(() => {
+            document.body.classList.remove('screen-shake');
+            overlay.classList.remove('active');
+        }, 800);
+    },
+
+    /**
+     * Show achievement toast
+     */
+    showAchievement(name, icon = '🏆') {
+        this.achievementQueue.push({ name, icon });
+        this.processAchievementQueue();
+    },
+
+    processAchievementQueue() {
+        if (this.achievementShowing || this.achievementQueue.length === 0) return;
+
+        const { name, icon } = this.achievementQueue.shift();
+        const toast = document.getElementById('achievementToast');
+        const iconEl = document.getElementById('achievementIcon');
+        const nameEl = document.getElementById('achievementName');
+
+        if (!toast) return;
+
+        if (iconEl) iconEl.textContent = icon;
+        if (nameEl) nameEl.textContent = name;
+
+        this.achievementShowing = true;
+        toast.classList.remove('show');
+        void toast.offsetWidth;
+        toast.classList.add('show');
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+            this.achievementShowing = false;
+            this.processAchievementQueue();
+        }, 3500);
+    },
+
+    /**
+     * Show zone discovery animation
+     */
+    showZoneDiscovery(zoneName, subtitle = 'Zone Discovered') {
+        const el = document.getElementById('zoneDiscovery');
+        const nameEl = document.getElementById('zoneName');
+        const subEl = el?.querySelector('.zone-discovery-subtitle');
+
+        if (!el) return;
+
+        if (nameEl) nameEl.textContent = zoneName;
+        if (subEl) subEl.textContent = subtitle;
+
+        el.classList.remove('show');
+        void el.offsetWidth;
+        el.classList.add('show');
+
+        setTimeout(() => el.classList.remove('show'), 3000);
+    },
+
+    /**
+     * Set weather effect
+     */
+    setWeather(type = null) {
+        const overlay = document.getElementById('weatherOverlay');
+        if (!overlay) return;
+
+        overlay.className = 'weather-overlay';
+        if (type) {
+            overlay.classList.add(type);
+        }
+    },
+
+    /**
+     * Flash lightning (for high strain moments)
+     */
+    flashLightning() {
+        const overlay = document.getElementById('weatherOverlay');
+        if (!overlay) return;
+
+        overlay.classList.add('lightning');
+        setTimeout(() => overlay.classList.remove('lightning'), 200);
+    },
+
+    /**
+     * Update HP/MP resource bars
+     */
+    updateResourceBars() {
+        const hpFill = document.getElementById('hpBarFill');
+        const hpText = document.getElementById('hpBarText');
+        const mpFill = document.getElementById('mpBarFill');
+        const mpText = document.getElementById('mpBarText');
+
+        // VRAM as HP
+        if (hpFill && GameState.vramTotal > 0) {
+            const pct = (GameState.vramUsed / GameState.vramTotal) * 100;
+            hpFill.style.width = `${pct}%`;
+        }
+        if (hpText) {
+            hpText.textContent = `${GameState.vramUsed?.toFixed(1) || '--'} / ${GameState.vramTotal || 24} GB`;
+        }
+
+        // RAM as MP (estimate or placeholder)
+        // Could fetch from /api/system in the future
+        if (mpFill) {
+            mpFill.style.width = '45%'; // Placeholder
+        }
+        if (mpText) {
+            mpText.textContent = '-- / -- GB';
+        }
+    },
+
+    /**
+     * Add shimmer effect to new battle log entries
+     */
+    shimmerLogEntry(entry) {
+        entry.classList.add('new-event');
+        setTimeout(() => entry.classList.remove('new-event'), 800);
+    },
+
+    /**
+     * Check for state changes and trigger effects
+     */
+    checkForEvents(prevState) {
+        // XP gained (steps increased)
+        const stepDiff = GameState.currentStep - this.prevStep;
+        if (stepDiff > 0 && stepDiff < 1000 && GameState.isTraining) {
+            // Show floating XP every ~100 steps
+            if (Math.random() < 0.05) {
+                this.showFloatingNumber(`+${stepDiff} XP`, 'xp');
+            }
+        }
+
+        // Level up detection
+        if (GameState.totalLevel > this.prevLevel && this.prevLevel > 0) {
+            this.showAchievement(`Level ${GameState.totalLevel}!`, '⬆️');
+            this.showZoneDiscovery(`Level ${GameState.totalLevel}`, 'Level Up!');
+        }
+
+        // High accuracy = critical hit
+        if (GameState.currentSkillAcc > 90 && this.prevAccuracy <= 90 && this.prevAccuracy > 0) {
+            this.showCriticalHit('90%+ ACCURACY!');
+        }
+
+        // High strain = storm weather
+        if (GameState.loss > 2.0) {
+            this.setWeather('storm');
+            if (Math.random() < 0.1) {
+                this.flashLightning();
+            }
+        } else {
+            this.setWeather(null);
+        }
+
+        // Update previous state
+        this.prevStep = GameState.currentStep;
+        this.prevLevel = GameState.totalLevel;
+        this.prevAccuracy = GameState.currentSkillAcc;
+    },
+
+    /**
+     * Roll dice animation for eval results
+     */
+    rollDice(callback) {
+        const diceFrames = ['🎲', '🎲', '🎲'];
+        let rolls = 0;
+        const maxRolls = 8;
+
+        const roll = setInterval(() => {
+            rolls++;
+            // Could update a dice display element here
+            if (rolls >= maxRolls) {
+                clearInterval(roll);
+                if (callback) callback();
+            }
+        }, 100);
+    },
+};
+
+// Hook into the main update loop
+const originalUpdateAll = updateAll;
+updateAll = function() {
+    originalUpdateAll();
+    RPGFlair.checkForEvents();
+    RPGFlair.updateResourceBars();
+};
+
+// Hook into battle log rendering
+const originalRenderBattleLog = renderBattleLog;
+renderBattleLog = function(events) {
+    originalRenderBattleLog(events);
+    // Add shimmer to newest entries
+    const container = document.getElementById('logEntries');
+    if (container && container.firstChild) {
+        RPGFlair.shimmerLogEntry(container.firstChild);
+    }
+};
+
 // Start when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+        init();
+        RealmConsole.init();
+        RPGFlair.init();
+    });
 } else {
     init();
+    RealmConsole.init();
+    RPGFlair.init();
 }

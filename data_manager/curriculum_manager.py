@@ -24,19 +24,20 @@ logger = logging.getLogger(__name__)
 # Skill definitions matching API server levels
 # All levels require 80% accuracy to advance
 SKILL_LEVELS = {
-    # DISABLED: Re-enable when Sy trainer is ready
-    # "syllo": {
-    #     "name": "SYLLO Puzzles",
-    #     "total_levels": 10,
-    #     "api_port": 8080,
-    #     "levels": [
-    #         {"level": 1, "name": "Beginner", "word_count": 4, "threshold": 0.80},
-    #         {"level": 2, "name": "Easy", "word_count": 5, "threshold": 0.80},
-    #         ... # See TRAINER_CONTRACT.md for full config
-    #         {"level": 10, "name": "Master", "word_count": 10, "threshold": None},
-    #     ]
-    # },
-    "binary": {
+    "sy": {
+        "name": "Syllacrostic Puzzles",
+        "total_levels": 50,
+        "api_port": 8080,
+        "levels": [
+            {"level": 1, "name": "Beginner", "words": 4, "threshold": 0.80},
+            {"level": 2, "name": "Easy", "words": 5, "threshold": 0.80},
+            {"level": 3, "name": "Novice", "words": 5, "threshold": 0.80},
+            {"level": 4, "name": "Learning", "words": 6, "threshold": 0.80},
+            {"level": 5, "name": "Intermediate", "words": 6, "threshold": 0.80},
+            # Levels 6-50 follow skill YAML progression
+        ] + [{"level": i, "name": f"Level {i}", "threshold": 0.80} for i in range(6, 51)]
+    },
+    "bin": {
         "name": "Binary Arithmetic",
         "total_levels": 30,
         "api_port": 8090,
@@ -99,7 +100,7 @@ class CurriculumManager:
         # Curriculum config
         self.curriculum_config = config.get("curriculum", {})
         self.enabled = self.curriculum_config.get("enabled", True)
-        self.min_evals = self.curriculum_config.get("min_evals_for_progression", 3)
+        self.min_evals = self.curriculum_config.get("min_evals_for_progression", 1)
 
     def _load_state(self) -> Dict:
         """Load curriculum state from disk"""
@@ -121,7 +122,7 @@ class CurriculumManager:
                             "accuracy_history": old_history,
                             "progression_history": old_progressions
                         },
-                        "binary": {"current_level": 0, "accuracy_history": [], "progression_history": []},
+                        "bin": {"current_level": 0, "accuracy_history": [], "progression_history": []},
                     },
                     "active_skill": state.get("current_skill", "syllo"),
                     "started_at": state.get("started_at", datetime.now().isoformat()),
@@ -140,7 +141,7 @@ class CurriculumManager:
         return {
             "skills": {
                 "syllo": {"current_level": 0, "accuracy_history": [], "progression_history": []},
-                "binary": {"current_level": 0, "accuracy_history": [], "progression_history": []},
+                "bin": {"current_level": 0, "accuracy_history": [], "progression_history": []},
             },
             "active_skill": "binary",  # Binary only for now
             "started_at": datetime.now().isoformat()
@@ -291,6 +292,8 @@ class CurriculumManager:
 
         Example: If mastered=0, training=1, and you pass:
           -> mastered becomes 1, next training becomes 2
+
+        Automatically queues evaluation for the new training level.
         """
         skill_state = self.state["skills"][skill]
         old_mastered = skill_state["current_level"]
@@ -315,7 +318,22 @@ class CurriculumManager:
 
         # Get the NEW training level config (what they'll work on next)
         new_training_config = self.get_current_level(skill)
-        logger.info(f"[{skill}] LEVEL EARNED! Mastered L{old_mastered} -> L{new_mastered}. Now training on L{self.get_training_level(skill)}")
+        new_training_level = self.get_training_level(skill)
+        logger.info(f"[{skill}] LEVEL EARNED! Mastered L{old_mastered} -> L{new_mastered}. Now training on L{new_training_level}")
+
+        # Queue evaluation for next level immediately
+        try:
+            from core.evaluation_ledger import queue_evaluation
+            from core.checkpoint_ledger import get_ledger
+
+            ledger = get_ledger()
+            latest = ledger.get_latest()
+
+            if latest:
+                queue_evaluation(latest.step, skill, new_training_level)
+                logger.info(f"[{skill}] Queued eval for L{new_training_level} at checkpoint {latest.step}")
+        except Exception as e:
+            logger.warning(f"[{skill}] Failed to queue next level eval: {e}")
 
         return new_training_config
 
@@ -403,6 +421,92 @@ class CurriculumManager:
         }
         self._save_state()
         logger.info(f"[{skill}] Reset to mastered=0 (training on level 1)")
+
+    # =========================================================================
+    # SKILL ROTATION - Prevents catastrophic forgetting by training all skills
+    # =========================================================================
+
+    def get_rotation_config(self) -> Dict[str, Any]:
+        """Get skill rotation configuration."""
+        return self.state.get("skill_rotation", {
+            "enabled": False,
+            "skills": ["sy", "bin"],
+            "index": 0
+        })
+
+    def set_rotation_enabled(self, enabled: bool):
+        """Enable or disable skill rotation."""
+        if "skill_rotation" not in self.state:
+            self.state["skill_rotation"] = {
+                "enabled": enabled,
+                "skills": list(self.state.get("skills", {}).keys()),
+                "index": 0
+            }
+        else:
+            self.state["skill_rotation"]["enabled"] = enabled
+        self._save_state()
+        logger.info(f"Skill rotation {'enabled' if enabled else 'disabled'}")
+
+    def set_rotation_skills(self, skills: List[str]):
+        """Set which skills to include in rotation."""
+        # Validate skills
+        for skill in skills:
+            if skill not in SKILL_LEVELS:
+                raise ValueError(f"Unknown skill: {skill}")
+
+        if "skill_rotation" not in self.state:
+            self.state["skill_rotation"] = {"enabled": True, "skills": skills, "index": 0}
+        else:
+            self.state["skill_rotation"]["skills"] = skills
+            # Reset index if it's now out of bounds
+            if self.state["skill_rotation"]["index"] >= len(skills):
+                self.state["skill_rotation"]["index"] = 0
+        self._save_state()
+        logger.info(f"Rotation skills set to: {skills}")
+
+    def get_next_rotation_skill(self) -> str:
+        """
+        Get the next skill in rotation and advance the index.
+
+        If rotation is disabled, returns the current active_skill.
+        If rotation is enabled, returns the next skill in the rotation list
+        and advances the index for the next call.
+
+        Returns:
+            Skill ID to generate data for
+        """
+        rotation = self.get_rotation_config()
+
+        if not rotation.get("enabled", False):
+            return self.state.get("active_skill", "sy")
+
+        skills = rotation.get("skills", ["sy", "bin"])
+        if not skills:
+            return self.state.get("active_skill", "sy")
+
+        index = rotation.get("index", 0) % len(skills)
+        skill = skills[index]
+
+        # Advance index for next call
+        self.state["skill_rotation"]["index"] = (index + 1) % len(skills)
+        self._save_state()
+
+        logger.info(f"🔄 Rotation: selected {skill} (index {index}/{len(skills)})")
+        return skill
+
+    def get_rotation_status(self) -> Dict[str, Any]:
+        """Get current rotation status for display."""
+        rotation = self.get_rotation_config()
+        skills = rotation.get("skills", [])
+        index = rotation.get("index", 0)
+
+        return {
+            "enabled": rotation.get("enabled", False),
+            "skills": skills,
+            "current_index": index,
+            "next_skill": skills[index % len(skills)] if skills else None,
+            "total_skills": len(skills)
+        }
 
 
 def main():

@@ -2059,13 +2059,24 @@ class TrainingDaemon:
             if total_queued >= min_queue_depth:
                 return  # Quest Board has enough items
 
-            self.logger.info(f"📜 Quest Board low ({total_queued} < {min_queue_depth}), asking Quest Master for more...")
+            # Generate enough files to reach min_queue_depth
+            files_needed = min_queue_depth - total_queued
+            self.logger.info(f"📜 Quest Board low ({total_queued} < {min_queue_depth}), generating {files_needed} batches...")
 
-            # Data Manager handles all generation logic (and emits its own events)
-            success = self.data_manager.generate_and_queue(force=False)
+            generated = 0
+            for i in range(files_needed):
+                # Data Manager handles all generation logic (and emits its own events)
+                # Use force=True to bypass threshold/cooldown checks since we're filling queue
+                success = self.data_manager.generate_and_queue(force=True)
+                if success:
+                    generated += 1
+                    self.logger.info(f"🤖 Quest Master: Generated batch {generated}/{files_needed}")
+                else:
+                    self.logger.warning(f"Quest Master: Generation {i+1} failed, stopping")
+                    break
 
-            if success:
-                self.logger.info("🤖 Quest Master: Successfully generated and queued new quests")
+            if generated > 0:
+                self.logger.info(f"🤖 Quest Master: Successfully queued {generated} new batches")
 
         except Exception as e:
             self.logger.error(f"Data Manager auto-generation failed: {e}")

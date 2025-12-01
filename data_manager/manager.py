@@ -165,26 +165,42 @@ class DataManager:
         if time_since_last < cooldown:
             return False, f"Cooldown: {cooldown - int(time_since_last)}s remaining"
 
-        # Check skill API availability
-        active_skill = self.curriculum.state.get("active_skill", "syllo")
-        client = self._get_skill_client(active_skill)
+        # Check skill API availability for next skill in rotation
+        rotation = self.curriculum.get_rotation_config()
+        if rotation.get("enabled", False):
+            skills = rotation.get("skills", [])
+            index = rotation.get("index", 0) % len(skills) if skills else 0
+            next_skill = skills[index] if skills else "sy"
+        else:
+            next_skill = self.curriculum.state.get("active_skill", "syllo")
+
+        client = self._get_skill_client(next_skill)
         if not client.health_check():
-            return False, f"{active_skill} API server unavailable"
+            return False, f"{next_skill} API server unavailable"
 
         return True, "All checks passed"
 
-    def generate_batch(self, count: int, seed: Optional[int] = None) -> Tuple[bool, List[Dict], Dict]:
+    def generate_batch(self, count: int, seed: Optional[int] = None, skill: Optional[str] = None) -> Tuple[bool, List[Dict], Dict]:
         """
         Generate a batch of training data using skill API.
 
         Uses curriculum to determine:
-        - Active skill (syllo or binary)
+        - Active skill (from rotation if enabled, or active_skill)
         - Current difficulty level
+
+        Args:
+            count: Number of examples to generate
+            seed: Optional random seed
+            skill: Override skill (bypasses rotation)
 
         Returns:
             (success, data, metadata)
         """
-        active_skill = self.curriculum.state.get("active_skill", "syllo")
+        # Use provided skill, or get from rotation
+        if skill:
+            active_skill = skill
+        else:
+            active_skill = self.curriculum.get_next_rotation_skill()
         gen_params = self.curriculum.get_generation_params(active_skill, count)
         level = gen_params["level"]
         level_info = self.curriculum.get_current_level(active_skill)
@@ -331,17 +347,18 @@ class DataManager:
         seed = auto_cfg.get("seed")
         priority = auto_cfg.get("priority", "normal")
 
-        # Get active skill and level for event emission
-        active_skill = self.curriculum.state.get("active_skill", "syllo")
+        # Get skill from rotation (or active_skill if rotation disabled)
+        # This advances the rotation index
+        active_skill = self.curriculum.get_next_rotation_skill()
         level_info = self.curriculum.get_current_level(active_skill)
         level = level_info.get("level", 1)
 
         # Emit generation starting event
         emit(data_generating_event(skill=active_skill, count=count, level=level))
 
-        # Step 1: Generate
+        # Step 1: Generate (pass skill to avoid double-advancing rotation)
         start_time = time.time()
-        success, data, metadata = self.generate_batch(count, seed)
+        success, data, metadata = self.generate_batch(count, seed, skill=active_skill)
         duration = time.time() - start_time
 
         if not success or not data:
@@ -418,7 +435,8 @@ class DataManager:
                             if self.stats["total_generated"] > 0 else 0.0),
             "avg_quality_score": avg_quality,
             "queue_status": self.queue.get_queue_status(),
-            "curriculum": self.curriculum.get_status()
+            "curriculum": self.curriculum.get_status(),
+            "skill_rotation": self.curriculum.get_rotation_status()
         }
 
 

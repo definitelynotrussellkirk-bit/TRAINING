@@ -1130,16 +1130,26 @@ def prune_stale_queues(base_dir: Path) -> dict:
         logger.error(f"Failed to get checkpoint list: {e}")
         return pruned
 
-    # Prune skill eval queue
+    # Prune skill eval queue - directly modify the queue file
     try:
-        skill_pending = get_pending_evaluations()
-        stale_skills = [e for e in skill_pending if e.checkpoint_step not in existing_steps]
-        if stale_skills:
-            logger.info(f"Pruning {len(stale_skills)} stale skill evals")
-            for entry in stale_skills:
-                # Pop removes from queue - we need a different approach
-                pass  # Will handle via filter in get_pending
-            pruned["skill_evals"] = len(stale_skills)
+        eval_queue_file = base_dir / "status" / "eval_queue.json"
+        if eval_queue_file.exists():
+            with open(eval_queue_file) as f:
+                data = json.load(f)
+
+            original_count = len(data.get("queue", []))
+            # Filter out entries where checkpoint doesn't exist
+            data["queue"] = [
+                item for item in data.get("queue", [])
+                if item.get("checkpoint_step") in existing_steps
+            ]
+            pruned_count = original_count - len(data["queue"])
+
+            if pruned_count > 0:
+                with open(eval_queue_file, "w") as f:
+                    json.dump(data, f, indent=2)
+                logger.info(f"Pruned {pruned_count} stale skill evals from queue")
+                pruned["skill_evals"] = pruned_count
     except Exception as e:
         logger.error(f"Failed to prune skill queue: {e}")
 

@@ -44,8 +44,6 @@ How the Hero learns - each school has its own motto and philosophy:
 | **Whisper** | 👻 | "The wisdom of giants flows to those who listen." | Distill |
 | **Oracle** | 🔮 | "Focus where uncertainty dwells; ignore what is already known." | Fortune Teller |
 
-*The author notes with some amusement that these mappings emerged with surprising ease—the conceptual distance between "training a model" and "raising a hero" proved remarkably small. Contributions of additional isomorphisms are welcomed; perhaps your mental model prefers different metaphors. PRs accepted.*
-
 ---
 
 ## Who This Is For

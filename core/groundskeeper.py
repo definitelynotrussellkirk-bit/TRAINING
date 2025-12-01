@@ -648,6 +648,48 @@ class Groundskeeper:
 
         return result
 
+    # ========== Stale Checkpoint Jobs Cleanup ==========
+
+    def cleanup_stale_checkpoint_jobs(self, dry_run: bool = False) -> CleanupResult:
+        """Cancel pending jobs that reference non-existent checkpoints."""
+        result = CleanupResult(task="stale_jobs", dry_run=dry_run)
+
+        try:
+            from jobs.store import SQLiteJobStore
+
+            db_path = self.base_dir / "vault" / "jobs.db"
+            if not db_path.exists():
+                return result
+
+            store = SQLiteJobStore(str(db_path))
+
+            if not dry_run:
+                result.items_cleaned = store.prune_stale_checkpoint_jobs(self.base_dir)
+            else:
+                # For dry run, just count pending jobs with checkpoint paths
+                from guild.job_types import JobStatus
+                pending = store.list_jobs(status=JobStatus.PENDING, limit=1000)
+                stale_count = 0
+                for job in pending:
+                    payload = job.spec.payload or {}
+                    ckpt_path = payload.get("checkpoint_path")
+                    if ckpt_path:
+                        full_path = self.base_dir / ckpt_path
+                        if not full_path.exists():
+                            stale_count += 1
+                result.items_cleaned = stale_count
+
+            if result.items_cleaned > 0:
+                logger.info(f"{'Would cancel' if dry_run else 'Cancelled'} {result.items_cleaned} stale checkpoint jobs")
+
+        except ImportError:
+            logger.debug("jobs.store not available, skipping stale jobs cleanup")
+        except Exception as e:
+            result.errors.append(str(e))
+            logger.error(f"Error cleaning stale jobs: {e}")
+
+        return result
+
     # ========== Main Sweep ==========
 
     def sweep(self, dry_run: bool = False, tasks: Optional[List[str]] = None) -> Dict[str, CleanupResult]:
@@ -672,6 +714,7 @@ class Groundskeeper:
             "vacuum": self.vacuum_databases,
             "workers": self.cleanup_workers,
             "job_events": self.cleanup_job_events,
+            "stale_jobs": self.cleanup_stale_checkpoint_jobs,
         }
 
         tasks_to_run = tasks if tasks else list(task_map.keys())

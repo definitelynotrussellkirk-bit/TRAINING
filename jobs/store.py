@@ -1099,6 +1099,60 @@ class SQLiteJobStore(JobStore):
             logger.info(f"Cleaned up {count} old jobs")
         return count
 
+    def prune_stale_checkpoint_jobs(self, base_dir: Optional[Path] = None) -> int:
+        """
+        Cancel pending jobs that reference checkpoints that no longer exist.
+
+        Jobs for layer_stats, eval, etc. often reference checkpoint paths.
+        If those checkpoints are deleted by retention policies, the jobs
+        become stale and should be cancelled.
+
+        Args:
+            base_dir: Base directory for resolving checkpoint paths
+
+        Returns:
+            Number of jobs cancelled
+        """
+        from pathlib import Path as P
+
+        if base_dir is None:
+            try:
+                from core.paths import get_base_dir
+                base_dir = get_base_dir()
+            except ImportError:
+                base_dir = P(__file__).parent.parent
+
+        # Get all pending jobs
+        pending_jobs = self.list_jobs(status=JobStatus.PENDING, limit=1000)
+
+        cancelled = 0
+        for job in pending_jobs:
+            payload = job.spec.payload or {}
+
+            # Check checkpoint_path field
+            ckpt_path = payload.get("checkpoint_path")
+            if ckpt_path:
+                full_path = base_dir / ckpt_path if not P(ckpt_path).is_absolute() else P(ckpt_path)
+                if not full_path.exists():
+                    self.cancel(job.job_id, actor="prune_stale")
+                    logger.info(f"Cancelled stale job {job.job_id}: checkpoint {ckpt_path} not found")
+                    cancelled += 1
+                    continue
+
+            # Check reference_checkpoint_path field (for layer_stats drift)
+            ref_path = payload.get("reference_checkpoint_path")
+            if ref_path:
+                full_path = base_dir / ref_path if not P(ref_path).is_absolute() else P(ref_path)
+                if not full_path.exists():
+                    self.cancel(job.job_id, actor="prune_stale")
+                    logger.info(f"Cancelled stale job {job.job_id}: reference checkpoint {ref_path} not found")
+                    cancelled += 1
+                    continue
+
+        if cancelled > 0:
+            logger.info(f"Pruned {cancelled} stale checkpoint jobs")
+        return cancelled
+
     # =========================================================================
     # QUERIES
     # =========================================================================

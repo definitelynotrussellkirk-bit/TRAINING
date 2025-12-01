@@ -277,6 +277,8 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
         elif path.endswith("/release"):
             job_id = path.replace("/api/jobs/", "").replace("/release", "")
             self._handle_jobs_release(job_id)
+        elif path == "/api/jobs/prune":
+            self._handle_jobs_prune()
         else:
             self._send_error(f"Unknown endpoint: {path}", 404)
 
@@ -1591,6 +1593,25 @@ class VaultKeeperHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Jobs release error: {e}")
+            self._send_error(str(e), 500)
+
+    def _handle_jobs_prune(self):
+        """Cancel pending jobs that reference non-existent checkpoints."""
+        try:
+            store = self._get_job_store()
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
+
+            cancelled = store.prune_stale_checkpoint_jobs(base_dir)
+
+            self._send_json({
+                "success": True,
+                "cancelled": cancelled,
+                "message": f"Cancelled {cancelled} stale checkpoint jobs"
+            })
+
+        except Exception as e:
+            logger.error(f"Jobs prune error: {e}")
             self._send_error(str(e), 500)
 
     # =========================================================================

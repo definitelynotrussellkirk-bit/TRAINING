@@ -26,6 +26,7 @@ Usage:
     start_service("tavern")
 """
 
+import errno
 import logging
 import os
 import signal
@@ -33,8 +34,9 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import requests
 
@@ -49,18 +51,38 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+class HealthCheckKind(Enum):
+    """Type of health check."""
+    HTTP = "http"
+    PID = "pid"
+
+
+@dataclass
+class HealthCheck:
+    """
+    Health check configuration.
+
+    Supports two kinds:
+    - HTTP: GET request to a URL, expect 200
+    - PID: Check if PID file exists and process is alive
+    """
+    kind: HealthCheckKind
+    target: str  # URL for HTTP, PID file path for PID
+    timeout: float = 5.0
+
+
 @dataclass
 class ServiceConfig:
     """Configuration for a service."""
     name: str
     description: str
     dependencies: List[str]  # Services that must be running first
-    health_check: str  # "http://host:port/path" or "pid:file.pid"
+    health: HealthCheck  # Health check configuration
     start_cmd: List[str]
     pid_file: Optional[str] = None
     port: Optional[int] = None
     required: bool = True
-    start_delay: float = 3.0  # Seconds to wait after starting
+    start_delay: float = 5.0  # Max seconds to wait for health after starting
 
 
 # Service definitions
@@ -77,7 +99,7 @@ def _init_services():
             name="VaultKeeper",
             description="Asset registry and job store",
             dependencies=[],  # No dependencies
-            health_check="http://localhost:8767/health",
+            health=HealthCheck(HealthCheckKind.HTTP, "http://localhost:8767/health"),
             start_cmd=["python3", str(base_dir / "vault" / "server.py"), "--port", "8767"],
             pid_file=str(base_dir / ".pids" / "vault.pid"),
             port=8767,
@@ -86,7 +108,7 @@ def _init_services():
             name="Tavern",
             description="Game UI",
             dependencies=["vault"],  # Needs VaultKeeper
-            health_check="http://localhost:8888/health",
+            health=HealthCheck(HealthCheckKind.HTTP, "http://localhost:8888/health"),
             start_cmd=["python3", str(base_dir / "tavern" / "server.py"), "--port", "8888"],
             pid_file=str(base_dir / ".pids" / "tavern.pid"),
             port=8888,
@@ -95,7 +117,7 @@ def _init_services():
             name="Training Daemon",
             description="Training orchestrator",
             dependencies=["vault", "tavern"],  # Needs both
-            health_check=f"pid:{base_dir / '.daemon.pid'}",
+            health=HealthCheck(HealthCheckKind.PID, str(base_dir / ".daemon.pid")),
             start_cmd=["python3", str(base_dir / "core" / "training_daemon.py"), "--base-dir", str(base_dir)],
             pid_file=str(base_dir / ".daemon.pid"),
         ),
@@ -103,7 +125,7 @@ def _init_services():
             name="Eval Runner",
             description="Evaluation processor",
             dependencies=["vault"],  # Needs VaultKeeper for job store
-            health_check=f"pid:{base_dir / '.pids' / 'eval_runner.pid'}",
+            health=HealthCheck(HealthCheckKind.PID, str(base_dir / ".pids" / "eval_runner.pid")),
             start_cmd=[
                 "python3", str(base_dir / "core" / "eval_runner.py"),
                 "--daemon", "--interval", "60"
@@ -115,7 +137,7 @@ def _init_services():
             name="RealmState",
             description="State service",
             dependencies=["vault"],
-            health_check="http://localhost:8866/health",
+            health=HealthCheck(HealthCheckKind.HTTP, "http://localhost:8866/health"),
             start_cmd=["python3", "-m", "realm.server", "--host", "0.0.0.0", "--port", "8866"],
             pid_file=str(base_dir / ".pids" / "realm_state.pid"),
             port=8866,
@@ -124,7 +146,7 @@ def _init_services():
             name="Groundskeeper",
             description="Cleanup daemon",
             dependencies=[],  # Independent
-            health_check=f"pid:{base_dir / '.pids' / 'groundskeeper.pid'}",
+            health=HealthCheck(HealthCheckKind.PID, str(base_dir / ".pids" / "groundskeeper.pid")),
             start_cmd=["python3", str(base_dir / "core" / "groundskeeper.py"), "--daemon"],
             pid_file=str(base_dir / ".pids" / "groundskeeper.pid"),
             required=False,
@@ -133,7 +155,7 @@ def _init_services():
             name="Weaver",
             description="Daemon orchestrator",
             dependencies=[],  # Orchestrates others, doesn't depend on them
-            health_check=f"pid:{base_dir / '.pids' / 'weaver.pid'}",
+            health=HealthCheck(HealthCheckKind.PID, str(base_dir / ".pids" / "weaver.pid")),
             start_cmd=["python3", str(base_dir / "weaver" / "weaver.py"), "--daemon"],
             pid_file=str(base_dir / ".pids" / "weaver.pid"),
             required=False,
@@ -142,28 +164,55 @@ def _init_services():
 
 
 def _check_health(service: ServiceConfig) -> bool:
-    """Check if a service is healthy."""
-    if service.health_check.startswith("http"):
+    """
+    Check if a service is healthy.
+
+    HTTP checks: GET the URL, expect 200
+    PID checks: Verify PID file exists and process is alive
+    """
+    hc = service.health
+
+    if hc.kind == HealthCheckKind.HTTP:
         try:
-            resp = requests.get(service.health_check, timeout=5)
+            resp = requests.get(hc.target, timeout=hc.timeout)
             return resp.status_code == 200
         except Exception:
             return False
-    elif service.health_check.startswith("pid:"):
-        pid_file = Path(service.health_check[4:])
+
+    elif hc.kind == HealthCheckKind.PID:
+        pid_file = Path(hc.target)
         if not pid_file.exists():
             return False
         try:
             pid = int(pid_file.read_text().strip())
             os.kill(pid, 0)
             return True
-        except (ValueError, OSError, ProcessLookupError):
+        except ValueError:
+            # Invalid PID in file
             return False
+        except OSError as e:
+            if e.errno == errno.ESRCH:
+                # ESRCH: No such process - definitely dead
+                return False
+            elif e.errno == errno.EPERM:
+                # EPERM: Process exists but no permission to signal
+                # Treat as alive (we just can't signal it)
+                return True
+            else:
+                # Other OS error
+                return False
+
+    logger.warning(f"Unknown health check kind: {hc.kind}")
     return False
 
 
 def _start_service(service: ServiceConfig, base_dir: Path) -> bool:
-    """Start a service."""
+    """
+    Start a service with multi-try health check.
+
+    Instead of sleeping once and checking once, we poll for readiness
+    within the start_delay window. This handles slow-booting services.
+    """
     logger.info(f"Starting {service.name}...")
 
     # Ensure PID directory exists
@@ -186,16 +235,23 @@ def _start_service(service: ServiceConfig, base_dir: Path) -> bool:
                 start_new_session=True
             )
 
-        # Wait for service to start
-        time.sleep(service.start_delay)
+        # Multi-try readiness: poll until healthy or timeout
+        deadline = time.time() + service.start_delay
+        poll_interval = 0.5  # Check every 500ms
 
-        # Verify health
+        while time.time() < deadline:
+            if _check_health(service):
+                logger.info(f"  ✓ {service.name} started successfully")
+                return True
+            time.sleep(poll_interval)
+
+        # Final check after timeout
         if _check_health(service):
             logger.info(f"  ✓ {service.name} started successfully")
             return True
-        else:
-            logger.warning(f"  ✗ {service.name} started but health check failed")
-            return False
+
+        logger.warning(f"  ✗ {service.name} started but health check failed within {service.start_delay}s")
+        return False
 
     except Exception as e:
         logger.error(f"  ✗ Failed to start {service.name}: {e}")
@@ -402,14 +458,123 @@ def get_dependency_order() -> List[str]:
     return order
 
 
+# ========== Realm-Level Operations ==========
+
+def start_realm(include_optional: bool = False) -> bool:
+    """
+    Start all services in the Realm in dependency order.
+
+    Args:
+        include_optional: If True, also start optional services (groundskeeper, weaver, etc.)
+
+    Returns:
+        True if all required services started successfully
+    """
+    if not SERVICES:
+        _init_services()
+
+    order = get_dependency_order()
+    base_dir = get_base_dir()
+    all_ok = True
+    started = []
+    failed = []
+
+    logger.info("=" * 50)
+    logger.info("Starting Realm...")
+    logger.info("=" * 50)
+
+    for name in order:
+        service = SERVICES[name]
+
+        # Skip optional services unless requested
+        if not service.required and not include_optional:
+            logger.debug(f"Skipping optional service: {name}")
+            continue
+
+        # Check if already running
+        if _check_health(service):
+            logger.info(f"  ✓ {service.name} already running")
+            started.append(name)
+            continue
+
+        # Start the service
+        if _start_service(service, base_dir):
+            started.append(name)
+        else:
+            failed.append(name)
+            if service.required:
+                logger.error(f"Required service {service.name} failed to start, aborting")
+                all_ok = False
+                break
+
+    # Summary
+    logger.info("=" * 50)
+    if all_ok:
+        logger.info(f"Realm started: {len(started)} services running")
+    else:
+        logger.error(f"Realm startup failed: {len(started)} started, {len(failed)} failed")
+    logger.info("=" * 50)
+
+    return all_ok
+
+
+def stop_realm() -> bool:
+    """
+    Stop all services in the Realm in reverse dependency order.
+
+    Stops dependents before their dependencies.
+
+    Returns:
+        True if all services stopped successfully
+    """
+    if not SERVICES:
+        _init_services()
+
+    # Reverse order so dependents stop first
+    order = list(reversed(get_dependency_order()))
+    all_ok = True
+    stopped = []
+    failed = []
+
+    logger.info("=" * 50)
+    logger.info("Stopping Realm...")
+    logger.info("=" * 50)
+
+    for name in order:
+        service = SERVICES[name]
+
+        # Check if running
+        if not _check_health(service):
+            logger.debug(f"  {service.name} is not running")
+            continue
+
+        # Stop the service
+        if stop_service(name):
+            stopped.append(name)
+        else:
+            failed.append(name)
+            all_ok = False
+
+    # Summary
+    logger.info("=" * 50)
+    if all_ok:
+        logger.info(f"Realm stopped: {len(stopped)} services stopped")
+    else:
+        logger.warning(f"Realm stop incomplete: {len(stopped)} stopped, {len(failed)} failed")
+    logger.info("=" * 50)
+
+    return all_ok
+
+
 def main():
     """CLI for service management."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Service Registry")
-    parser.add_argument("command", choices=["status", "start", "stop", "deps", "order"],
+    parser.add_argument("command", choices=["status", "start", "stop", "deps", "order", "realm-up", "realm-down"],
                        help="Command to run")
     parser.add_argument("service", nargs="?", help="Service name (for start/stop/deps)")
+    parser.add_argument("--all", action="store_true", help="Include optional services (for realm-up)")
 
     args = parser.parse_args()
 
@@ -452,6 +617,14 @@ def main():
         print("Start order (dependencies first):")
         for i, name in enumerate(order, 1):
             print(f"  {i}. {name}")
+
+    elif args.command == "realm-up":
+        success = start_realm(include_optional=args.all)
+        sys.exit(0 if success else 1)
+
+    elif args.command == "realm-down":
+        success = stop_realm()
+        sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temple | Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+    <style>
+        body {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #333;
+        }
+
+        h1 {
+            margin: 0;
+            color: #ffd700;
+            font-size: 1.8rem;
+        }
+
+        .nav-links a {
+            color: #888;
+            text-decoration: none;
+            margin-left: 16px;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: #ffd700;
+        }
+
+        /* Temple layout */
+        .temple-content {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 24px;
+        }
+
+        /* Cleric panel */
+        .cleric-panel {
+            background: #252538;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .cleric-portrait {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2a2a4e 100%);
+            border: 3px solid rgba(200, 230, 255, 0.4);
+            margin: 0 auto 16px;
+            font-size: 4rem;
+            box-shadow: 0 0 30px rgba(200, 230, 255, 0.15);
+        }
+
+        .cleric-title {
+            font-size: 1.3rem;
+            color: #ffd700;
+            margin-bottom: 8px;
+        }
+
+        .flavor-text {
+            color: #888;
+            font-style: italic;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        /* Rituals list */
+        .rituals-section h2 {
+            color: #ffd700;
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+        }
+
+        .ritual-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ritual-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+            color: #e0e0e0;
+        }
+
+        .ritual-btn:hover {
+            border-color: #ffd700;
+            background: #252538;
+        }
+
+        .ritual-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .ritual-btn.running {
+            border-color: #00ffff;
+            animation: runningPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes runningPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.3); }
+            50% { box-shadow: 0 0 15px 3px rgba(0, 255, 255, 0.2); }
+        }
+
+        .ritual-icon {
+            font-size: 1.5rem;
+        }
+
+        .ritual-info {
+            flex: 1;
+        }
+
+        .ritual-name {
+            font-weight: 500;
+            color: #e0e0e0;
+        }
+
+        .ritual-desc {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        /* Results panel */
+        .results-panel {
+            background: #252538;
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .results-header h2 {
+            margin: 0;
+            color: #ffd700;
+            font-size: 1.3rem;
+        }
+
+        .result-summary {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: #1a1a2e;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .result-summary.ok { border-left: 4px solid #4CAF50; }
+        .result-summary.warn { border-left: 4px solid #ffa726; }
+        .result-summary.fail { border-left: 4px solid #ff6b6b; }
+        .result-summary.skip { border-left: 4px solid #666; }
+
+        .summary-icon {
+            font-size: 2rem;
+        }
+
+        .summary-text h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .summary-meta {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        /* Checks list */
+        .checks-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .check-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #1a1a2e;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .check-row.ok { border-left: 3px solid #4CAF50; }
+        .check-row.warn { border-left: 3px solid #ffa726; }
+        .check-row.fail { border-left: 3px solid #ff6b6b; }
+        .check-row.skip { border-left: 3px solid #666; }
+
+        .check-icon {
+            font-size: 1.2rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .check-info {
+            flex: 1;
+        }
+
+        .check-name {
+            font-weight: 500;
+        }
+
+        .check-desc {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .check-error {
+            font-size: 0.8rem;
+            color: #ff6b6b;
+            margin-top: 4px;
+            font-family: monospace;
+            background: rgba(255, 107, 107, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .check-duration {
+            color: #666;
+            font-size: 0.8rem;
+            font-family: monospace;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            margin: 0;
+        }
+
+        /* Details toggle */
+        .check-details {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #888;
+            display: none;
+        }
+
+        .check-row.expanded .check-details {
+            display: block;
+        }
+
+        .check-row {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Temple of Diagnostics</h1>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/guild">Guild</a>
+                <a href="/jobs">Jobs</a>
+                <a href="/quests">Quests</a>
+                <a href="/vault">Vault</a>
+            </div>
+        </header>
+
+        <div class="temple-content">
+            <div class="cleric-panel">
+                <div class="cleric-portrait">&#129497;</div>
+                <div class="cleric-title">The Cleric</div>
+                <p class="flavor-text">
+                    "Speak your doubts, and I shall test the Realm.
+                    Through sacred rituals, we reveal what lies hidden
+                    in the depths of your systems."
+                </p>
+
+                <div class="rituals-section">
+                    <h2>Rituals</h2>
+                    <div class="ritual-list" id="ritual-list">
+                        <div class="empty-state">
+                            <p>Loading rituals...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="results-panel">
+                <div class="results-header">
+                    <h2>Ritual Results</h2>
+                </div>
+
+                <div id="result-summary" class="result-summary" style="display: none;">
+                    <div class="summary-icon" id="summary-icon"></div>
+                    <div class="summary-text">
+                        <h3 id="summary-title">-</h3>
+                        <div class="summary-meta" id="summary-meta">-</div>
+                    </div>
+                </div>
+
+                <div class="checks-list" id="checks-list">
+                    <div class="empty-state">
+                        <h3>No Ritual Cast</h3>
+                        <p>Select a ritual from the left to begin diagnostics</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STATUS_ICONS = {
+            'ok': '&#x2705;',
+            'warn': '&#x26A0;&#xFE0F;',
+            'fail': '&#x274C;',
+            'skip': '&#x23ED;&#xFE0F;'
+        };
+
+        const RITUAL_ICONS = {
+            'quick': '&#x26A1;',
+            'api': '&#x1F310;',
+            'full': '&#x1F9EA;'
+        };
+
+        let currentRunning = null;
+
+        async function loadRituals() {
+            try {
+                const res = await fetch('/api/temple/rituals');
+                const data = await res.json();
+
+                if (!data.ok) {
+                    throw new Error(data.error || 'Failed to load rituals');
+                }
+
+                const rituals = data.rituals || {};
+                const listEl = document.getElementById('ritual-list');
+
+                if (Object.keys(rituals).length === 0) {
+                    listEl.innerHTML = `
+                        <div class="empty-state">
+                            <p>No rituals available</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                listEl.innerHTML = Object.values(rituals).map(r => `
+                    <button class="ritual-btn" data-ritual="${r.id}" onclick="runRitual('${r.id}')">
+                        <span class="ritual-icon">${RITUAL_ICONS[r.id] || '&#x1F52E;'}</span>
+                        <div class="ritual-info">
+                            <div class="ritual-name">${r.name}</div>
+                            <div class="ritual-desc">${r.description}</div>
+                        </div>
+                    </button>
+                `).join('');
+
+            } catch (err) {
+                console.error('Failed to load rituals:', err);
+                document.getElementById('ritual-list').innerHTML = `
+                    <div class="empty-state">
+                        <p>Error: ${err.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function runRitual(ritualId) {
+            if (currentRunning) return;
+
+            // Mark as running
+            currentRunning = ritualId;
+            const btn = document.querySelector(`[data-ritual="${ritualId}"]`);
+            if (btn) {
+                btn.classList.add('running');
+                btn.disabled = true;
+            }
+
+            // Clear previous results
+            const checksEl = document.getElementById('checks-list');
+            checksEl.innerHTML = `
+                <div class="empty-state">
+                    <p>Casting ritual...</p>
+                </div>
+            `;
+
+            const summaryEl = document.getElementById('result-summary');
+            summaryEl.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/temple/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ritual_id: ritualId })
+                });
+
+                const data = await res.json();
+
+                if (!data.ok) {
+                    throw new Error(data.error || 'Ritual failed');
+                }
+
+                renderResults(data.ritual);
+
+            } catch (err) {
+                console.error('Ritual failed:', err);
+                checksEl.innerHTML = `
+                    <div class="empty-state">
+                        <h3>Ritual Failed</h3>
+                        <p>${err.message}</p>
+                    </div>
+                `;
+            } finally {
+                // Clear running state
+                currentRunning = null;
+                if (btn) {
+                    btn.classList.remove('running');
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        function renderResults(ritual) {
+            // Update summary
+            const summaryEl = document.getElementById('result-summary');
+            const iconEl = document.getElementById('summary-icon');
+            const titleEl = document.getElementById('summary-title');
+            const metaEl = document.getElementById('summary-meta');
+
+            summaryEl.className = `result-summary ${ritual.status}`;
+            summaryEl.style.display = 'flex';
+            iconEl.innerHTML = STATUS_ICONS[ritual.status] || '&#x2754;';
+            titleEl.textContent = `${ritual.name} [${ritual.status.toUpperCase()}]`;
+
+            const duration = ritual.duration_ms ? `${ritual.duration_ms.toFixed(0)}ms` : '-';
+            const counts = countByStatus(ritual.checks);
+            metaEl.textContent = `${counts.ok} passed, ${counts.warn} warnings, ${counts.fail} failed | ${duration}`;
+
+            // Update checks list
+            const checksEl = document.getElementById('checks-list');
+
+            if (!ritual.checks || ritual.checks.length === 0) {
+                checksEl.innerHTML = `
+                    <div class="empty-state">
+                        <p>No checks in this ritual</p>
+                    </div>
+                `;
+                return;
+            }
+
+            checksEl.innerHTML = ritual.checks.map(check => {
+                const duration = check.duration_ms ? `${check.duration_ms.toFixed(0)}ms` : '';
+                const error = check.status === 'fail' && check.details?.error
+                    ? `<div class="check-error">${escapeHtml(check.details.error)}</div>`
+                    : '';
+                const details = JSON.stringify(check.details, null, 2);
+
+                return `
+                    <div class="check-row ${check.status}" onclick="this.classList.toggle('expanded')">
+                        <div class="check-icon">${STATUS_ICONS[check.status] || '&#x2754;'}</div>
+                        <div class="check-info">
+                            <div class="check-name">${escapeHtml(check.name)}</div>
+                            <div class="check-desc">${escapeHtml(check.description || '')}</div>
+                            ${error}
+                            <pre class="check-details">${escapeHtml(details)}</pre>
+                        </div>
+                        <div class="check-duration">${duration}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function countByStatus(checks) {
+            const counts = { ok: 0, warn: 0, fail: 0, skip: 0 };
+            (checks || []).forEach(c => {
+                counts[c.status] = (counts[c.status] || 0) + 1;
+            });
+            return counts;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initial load
+        document.addEventListener('DOMContentLoaded', loadRituals);
+    </script>
+</body>
+</html>

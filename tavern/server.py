@@ -60,6 +60,7 @@ from tavern.api import train as train_api
 from tavern.api import generate as generate_api
 from tavern.api import setup as setup_api
 from tavern.api import run_context as run_context_api
+from tavern.api import temple as temple_api
 
 # Import events system
 try:
@@ -597,6 +598,12 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/forge/rejected":
             self._serve_forge_rejected()
 
+        # Temple - Diagnostic rituals
+        elif path == "/temple" or path == "/temple.html":
+            self._serve_template("temple.html")
+        elif path == "/api/temple/rituals":
+            temple_api.serve_rituals(self)
+
         # Campaign - Hero/Campaign management
         elif path == "/campaign" or path == "/campaign.html":
             self._serve_template("campaign.html")
@@ -756,6 +763,9 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Setup API - Quick start for first-run
         elif path == "/api/setup/quick-start":
             setup_api.serve_quick_start(self)
+        # Temple API - Run diagnostic rituals
+        elif path == "/api/temple/run":
+            temple_api.serve_run_ritual(self)
         # Reset API - Clear stale state
         elif path == "/api/reset":
             self._handle_reset()

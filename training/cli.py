@@ -43,6 +43,7 @@ def run_command(command: str, args) -> int:
         "stop-all": cmd_stop_all,
         "status": cmd_status,
         "reset": cmd_reset,
+        "temple": cmd_temple,
     }
     handler = handlers.get(command)
     if handler:
@@ -676,9 +677,11 @@ def cmd_reset(args) -> int:
     Preserves:
     - campaigns/ (all hero data and checkpoints)
     - models/ (all model files)
-    - vault/jobs.db (unless --clear-jobs)
+    - vault/jobs.db (unless --keep-jobs)
     - config.json (root configuration)
     """
+    from core.reset import reset_environment
+
     base_dir = get_base_dir()
 
     print("=" * 60)
@@ -710,76 +713,34 @@ def cmd_reset(args) -> int:
             print("Cancelled.")
             return 0
 
-    # Step 1: Stop all daemons
+    # Do the actual reset work
+    result = reset_environment(
+        keep_jobs=getattr(args, 'keep_jobs', False),
+        base_dir=base_dir,
+    )
+
+    # Summarize what happened
     print("\n[1/4] Stopping daemons...")
-    stopped = 0
-    pids_dir = base_dir / ".pids"
-    if pids_dir.exists():
-        for pid_file in pids_dir.glob("*.pid"):
-            try:
-                pid = int(pid_file.read_text().strip())
-                os.kill(pid, signal.SIGTERM)
-                print(f"  Stopped {pid_file.stem} (PID {pid})")
-                stopped += 1
-            except (ValueError, ProcessLookupError, PermissionError):
-                pass
-    print(f"  {stopped} daemon(s) stopped")
+    for pid in result.daemons_stopped:
+        print(f"  Stopped PID {pid}")
+    print(f"  {len(result.daemons_stopped)} daemon(s) stopped")
 
-    # Step 2: Clear PID files
     print("\n[2/4] Clearing PID files...")
-    cleared = 0
-    if pids_dir.exists():
-        for pid_file in pids_dir.glob("*.pid"):
-            try:
-                pid_file.unlink()
-                cleared += 1
-            except Exception:
-                pass
-    print(f"  {cleared} PID file(s) cleared")
+    for pid_file in result.pids_cleared:
+        print(f"  Cleared {pid_file.name}")
+    print(f"  {len(result.pids_cleared)} PID file(s) cleared")
 
-    # Step 3: Clear state files
     print("\n[3/4] Clearing state files...")
-    state_files = [
-        base_dir / "control" / "state.json",
-        base_dir / "status" / "training_status.json",
-        base_dir / "status" / "events.jsonl",
-    ]
-    cleared_state = 0
-    for state_file in state_files:
-        if state_file.exists():
-            try:
-                state_file.unlink()
-                print(f"  Cleared {state_file.name}")
-                cleared_state += 1
-            except Exception as e:
-                print(f"  Failed to clear {state_file.name}: {e}")
-    print(f"  {cleared_state} state file(s) cleared")
+    for state_file in result.state_files_cleared:
+        print(f"  Cleared {state_file.name}")
+    print(f"  {len(result.state_files_cleared)} state file(s) cleared")
 
-    # Step 4: Clear pending jobs (unless --keep-jobs)
-    if not getattr(args, 'keep_jobs', False):
-        print("\n[4/4] Clearing pending jobs...")
-        try:
-            from jobs.store import get_store
-            store = get_store()
-            # Cancel all pending/claimed/running jobs
-            from guild.job_types import JobStatus
-            jobs = store.list_jobs(status=JobStatus.PENDING, limit=1000)
-            jobs += store.list_jobs(status=JobStatus.CLAIMED, limit=1000)
-            jobs += store.list_jobs(status=JobStatus.RUNNING, limit=1000)
-            cancelled = 0
-            for job in jobs:
-                try:
-                    store.cancel(job.job_id, actor="reset")
-                    cancelled += 1
-                except Exception:
-                    pass
-            print(f"  {cancelled} job(s) cancelled")
-        except ImportError:
-            print("  Job store not available (skipped)")
-        except Exception as e:
-            print(f"  Error clearing jobs: {e}")
-    else:
+    # Jobs
+    if getattr(args, 'keep_jobs', False):
         print("\n[4/4] Keeping jobs (--keep-jobs)")
+    else:
+        print("\n[4/4] Clearing pending jobs...")
+        print(f"  {result.jobs_cancelled} job(s) cancelled")
 
     print()
     print("=" * 60)
@@ -791,3 +752,91 @@ def cmd_reset(args) -> int:
     print("=" * 60)
 
     return 0
+
+
+# =============================================================================
+# TEMPLE COMMAND - Diagnostic rituals
+# =============================================================================
+
+def cmd_temple(args) -> int:
+    """Run Temple diagnostic rituals."""
+    from temple import list_rituals, run_ritual
+
+    # List rituals if requested
+    if getattr(args, 'list', False):
+        rituals = list_rituals()
+        print()
+        print("=" * 60)
+        print("TEMPLE OF DIAGNOSTICS - Available Rituals")
+        print("=" * 60)
+        print()
+        for rid, meta in rituals.items():
+            print(f"  {rid}: {meta['name']}")
+            print(f"         {meta['description']}")
+            print()
+        return 0
+
+    ritual_id = getattr(args, 'ritual', 'quick')
+    rituals = list_rituals()
+
+    if ritual_id not in rituals:
+        print(f"Unknown ritual: {ritual_id}")
+        print("Available:", ", ".join(sorted(rituals.keys())))
+        return 1
+
+    result = run_ritual(ritual_id)
+
+    # JSON output
+    if getattr(args, 'json', False):
+        import json as json_mod
+        print(json_mod.dumps(_serialize_ritual_result(result), indent=2))
+        return 0 if result.ok else 1
+
+    # CLI output
+    _print_ritual_result_cli(result)
+    return 0 if result.ok else 1
+
+
+def _print_ritual_result_cli(result):
+    """Print ritual result in CLI format."""
+    icons = {"ok": "\u2705", "warn": "\u26a0\ufe0f ", "fail": "\u274c", "skip": "\u23ed\ufe0f"}
+
+    print()
+    print("=" * 60)
+    print(f"  {result.name} [{result.status.upper()}]")
+    print("=" * 60)
+    print()
+
+    for check in result.checks:
+        icon = icons.get(check.status, "\u2754")
+        duration = f" ({check.duration_ms():.0f}ms)" if check.duration_ms() else ""
+        print(f"  {icon} {check.name} ({check.status}){duration}")
+
+        if check.status == "fail" and check.details.get("error"):
+            print(f"       \u2514\u2500 {check.details['error']}")
+
+    print()
+    if result.duration_ms():
+        print(f"  Total time: {result.duration_ms():.0f}ms")
+    print()
+
+
+def _serialize_ritual_result(result):
+    """Serialize RitualResult for JSON output."""
+    return {
+        "ritual_id": result.ritual_id,
+        "name": result.name,
+        "description": result.description,
+        "status": result.status,
+        "duration_ms": result.duration_ms(),
+        "checks": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "status": c.status,
+                "details": c.details,
+                "duration_ms": c.duration_ms(),
+            }
+            for c in result.checks
+        ],
+    }

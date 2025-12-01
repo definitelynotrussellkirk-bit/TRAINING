@@ -92,6 +92,28 @@ def main():
         help="Keep job database (don't clear pending jobs)"
     )
 
+    # temple command - diagnostic rituals
+    p_temple = subparsers.add_parser(
+        "temple",
+        help="Run diagnostic rituals on the realm"
+    )
+    p_temple.add_argument(
+        "ritual",
+        nargs="?",
+        default="quick",
+        help="Ritual to run (quick, api). Default: quick"
+    )
+    p_temple.add_argument(
+        "--list",
+        action="store_true",
+        help="List available rituals"
+    )
+    p_temple.add_argument(
+        "--json",
+        action="store_true",
+        help="Output results as JSON"
+    )
+
     args = parser.parse_args()
 
     if args.command is None:

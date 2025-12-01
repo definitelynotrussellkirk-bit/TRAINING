@@ -1,5 +1,24 @@
-Hardcoded Values Audit (2025-11-27)
+Hardcoded Values Audit (2025-11-27, updated 2025-12-01)
 Reference list for cleanup by another agent. Grouped by type with representative files and suggested remediation patterns. Paths are workspace-relative unless noted.
+
+## Progress (as of commit 610d931)
+
+FIXED in 610d931:
+- tools/adaptive_curriculum/cli.py - now uses get_base_dir() / get_remote_api_url()
+- tools/adaptive_curriculum/example_usage.py - now uses get_base_dir()
+- tools/analysis/baseline_evaluator.py - now uses get_base_dir() / get_remote_api_url()
+- tools/analysis/run_baseline_test.py - now uses get_base_dir()
+- monitoring/tests/test_all_endpoints.py - now uses get_base_dir() / get_external_tool_path()
+- monitoring/ui/analytics_dashboard.html - removed unused STATUS_BASE constant
+- scripts/bin/branch_officer - now reads zone configs from config/hosts.json
+
+REMAINING (lower priority - docs/tests/experiments):
+- Documentation files (scratch/*.md, *README.md) - examples are acceptable
+- tests/test_storage_resolver.py - test fixtures with expected paths, acceptable
+- tools/experiments/*.py - experimental scripts, lower priority
+- Many monitoring/* files still have hardcoded IPs (see section 2 below)
+
+---
 
 1) Absolute base dir (/path/to/training)
    - weaver/weaver.py (class Weaver __init__ default, argparse default), scripts/start_all.sh|stop_all.sh (BASE_DIR variable)

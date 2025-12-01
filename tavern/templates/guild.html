@@ -6,34 +6,21 @@
     <title>Guild Hall - Skills</title>
     <!-- Shared theme -->
     <link rel="stylesheet" href="/static/css/theme.css?v=1">
-    <link rel="stylesheet" href="/static/css/game.css?v=3">
+    <link rel="stylesheet" href="/static/css/game.css?v=4">
     <style>
-        :root {
-            --bg-dark: #0a0a0f;
-            --bg-card: #12121a;
-            --bg-hover: #1a1a25;
-            --border: #2a2a3a;
-            --text: #e0e0e0;
-            --text-dim: #808090;
-            --accent: #7c3aed;
-            --accent-glow: rgba(124, 58, 237, 0.3);
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-        }
-
+        /* Guild-specific styles - uses theme.css variables */
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-family: var(--font-body), system-ui, sans-serif;
             background: var(--bg-dark);
-            color: var(--text);
+            color: var(--text-primary);
             min-height: 100vh;
         }
 
         .header {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-card) 100%);
+            border-bottom: 1px solid var(--border-gold);
             padding: 1rem 2rem;
             display: flex;
             justify-content: space-between;
@@ -45,6 +32,8 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            color: var(--text-gold);
+            font-family: var(--font-title), serif;
         }
 
         .nav-links {
@@ -53,16 +42,16 @@
         }
 
         .nav-links a {
-            color: var(--text-dim);
+            color: var(--text-secondary);
             text-decoration: none;
             padding: 0.5rem 1rem;
-            border-radius: 6px;
+            border-radius: var(--radius-md);
             transition: all 0.2s;
         }
 
         .nav-links a:hover {
-            background: var(--bg-hover);
-            color: var(--text);
+            background: var(--bg-highlight);
+            color: var(--text-primary);
         }
 
         .container {
@@ -73,7 +62,7 @@
 
         .section-title {
             font-size: 1.25rem;
-            color: var(--text);
+            color: var(--text-primary);
             margin-bottom: 1rem;
             display: flex;
             align-items: center;
@@ -90,17 +79,17 @@
 
         .skill-card {
             background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-xl);
             padding: 1.5rem;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .skill-card:hover {
-            border-color: var(--accent);
+            border-color: var(--border-gold);
             transform: translateY(-2px);
-            box-shadow: 0 4px 20px var(--accent-glow);
+            box-shadow: 0 4px 20px var(--glow-gold);
         }
 
         .skill-header {
@@ -117,7 +106,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--bg-hover);
+            background: var(--bg-highlight);
             border-radius: 10px;
         }
 
@@ -129,7 +118,7 @@
         .skill-level {
             font-size: 1.5rem;
             font-weight: bold;
-            color: var(--accent);
+            color: var(--border-gold);
         }
 
         .skill-progress {
@@ -145,7 +134,7 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--accent), #a78bfa);
+            background: linear-gradient(90deg, var(--border-gold), #a78bfa);
             border-radius: 4px;
             transition: width 0.3s;
         }
@@ -156,7 +145,7 @@
             gap: 1rem;
             margin-top: 1rem;
             padding-top: 1rem;
-            border-top: 1px solid var(--border);
+            border-top: 1px solid var(--border-color);
         }
 
         .stat {
@@ -170,7 +159,7 @@
 
         .stat-label {
             font-size: 0.75rem;
-            color: var(--text-dim);
+            color: var(--text-secondary);
             text-transform: uppercase;
         }
 
@@ -187,7 +176,7 @@
 
         .passive-card {
             background: var(--bg-card);
-            border: 1px solid var(--border);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 1rem;
         }
@@ -205,8 +194,8 @@
 
         .passive-version {
             font-size: 0.7rem;
-            color: var(--text-dim);
-            background: var(--bg-hover);
+            color: var(--text-secondary);
+            background: var(--bg-highlight);
             padding: 2px 6px;
             border-radius: 4px;
         }
@@ -217,14 +206,14 @@
             margin: 0.5rem 0;
         }
 
-        .passive-accuracy.good { color: var(--success); }
-        .passive-accuracy.ok { color: var(--warning); }
-        .passive-accuracy.bad { color: var(--danger); }
-        .passive-accuracy.none { color: var(--text-dim); }
+        .passive-accuracy.good { color: var(--color-success); }
+        .passive-accuracy.ok { color: var(--color-warning); }
+        .passive-accuracy.bad { color: var(--color-danger); }
+        .passive-accuracy.none { color: var(--text-secondary); }
 
         .passive-meta {
             font-size: 0.75rem;
-            color: var(--text-dim);
+            color: var(--text-secondary);
         }
 
         /* Primitives Section */
@@ -240,7 +229,7 @@
 
         .track-card {
             background: var(--bg-card);
-            border: 1px solid var(--border);
+            border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 1rem;
         }
@@ -251,7 +240,7 @@
             align-items: center;
             margin-bottom: 1rem;
             padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .track-name {
@@ -262,8 +251,8 @@
 
         .track-count {
             font-size: 0.75rem;
-            color: var(--text-dim);
-            background: var(--bg-hover);
+            color: var(--text-secondary);
+            background: var(--bg-highlight);
             padding: 2px 8px;
             border-radius: 4px;
         }
@@ -279,13 +268,13 @@
             justify-content: space-between;
             align-items: center;
             padding: 0.5rem;
-            background: var(--bg-hover);
+            background: var(--bg-highlight);
             border-radius: 6px;
             font-size: 0.85rem;
         }
 
         .primitive-name {
-            color: var(--text);
+            color: var(--text-primary);
         }
 
         .primitive-accuracy {
@@ -295,10 +284,10 @@
             font-size: 0.75rem;
         }
 
-        .primitive-accuracy.good { color: var(--success); background: rgba(34, 197, 94, 0.1); }
-        .primitive-accuracy.ok { color: var(--warning); background: rgba(245, 158, 11, 0.1); }
-        .primitive-accuracy.bad { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
-        .primitive-accuracy.none { color: var(--text-dim); }
+        .primitive-accuracy.good { color: var(--color-success); background: rgba(34, 197, 94, 0.1); }
+        .primitive-accuracy.ok { color: var(--color-warning); background: rgba(245, 158, 11, 0.1); }
+        .primitive-accuracy.bad { color: var(--color-danger); background: rgba(239, 68, 68, 0.1); }
+        .primitive-accuracy.none { color: var(--text-secondary); }
 
         .drift-indicator {
             display: inline-block;
@@ -308,9 +297,9 @@
             font-weight: 600;
         }
 
-        .drift-positive { background: rgba(34, 197, 94, 0.2); color: var(--success); }
-        .drift-neutral { background: rgba(128, 128, 144, 0.2); color: var(--text-dim); }
-        .drift-negative { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .drift-positive { background: rgba(34, 197, 94, 0.2); color: var(--color-success); }
+        .drift-neutral { background: rgba(128, 128, 144, 0.2); color: var(--text-secondary); }
+        .drift-negative { background: rgba(239, 68, 68, 0.2); color: var(--color-danger); }
 
         /* Summary Cards */
         .summary-row {
@@ -322,7 +311,7 @@
 
         .summary-card {
             background: var(--bg-card);
-            border: 1px solid var(--border);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 1.5rem;
             text-align: center;
@@ -331,11 +320,11 @@
         .summary-value {
             font-size: 2rem;
             font-weight: bold;
-            color: var(--accent);
+            color: var(--border-gold);
         }
 
         .summary-label {
-            color: var(--text-dim);
+            color: var(--text-secondary);
             font-size: 0.875rem;
         }
 
@@ -343,13 +332,13 @@
         .loading {
             text-align: center;
             padding: 2rem;
-            color: var(--text-dim);
+            color: var(--text-secondary);
         }
 
         .error {
             background: rgba(239, 68, 68, 0.1);
-            border: 1px solid var(--danger);
-            color: var(--danger);
+            border: 1px solid var(--color-danger);
+            color: var(--color-danger);
             padding: 1rem;
             border-radius: 8px;
             margin: 1rem 0;
@@ -357,18 +346,42 @@
     </style>
 </head>
 <body>
-    <header class="header">
-        <h1>🏰 Guild Hall</h1>
-        <nav class="nav-links">
-            <a href="/">Tavern</a>
-            <a href="/campaign">Campaign</a>
-            <a href="/vault">Vault</a>
-            <a href="/oracle">Oracle</a>
-            <a href="/settings">Settings</a>
-        </nav>
+    <!-- Shared game header -->
+    <header class="game-header">
+        <div class="header-left">
+            <h1 class="game-title">🏰 Guild Hall</h1>
+        </div>
+        <div class="header-center">
+            <div class="resource-bar">
+                <div class="resource steps">
+                    <span class="resource-icon">⚡</span>
+                    <span class="resource-label">STEPS</span>
+                    <span class="resource-value" id="totalSteps">0</span>
+                </div>
+                <div class="resource evals">
+                    <span class="resource-icon">🎯</span>
+                    <span class="resource-label">EVALS</span>
+                    <span class="resource-value" id="totalEvals">0</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="realm-mode-toggle" id="realmModeToggle">
+                <button class="mode-btn mode-training" id="btnTraining" title="Enable auto-training">TRAIN</button>
+                <button class="mode-btn mode-idle" id="btnIdle" title="Pause auto-training">IDLE</button>
+            </div>
+            <div class="health-indicator" id="healthIndicator" title="Realm health">
+                <span class="health-icon" id="healthIcon">⚪</span>
+            </div>
+            <div class="idle-indicator" id="idleIndicator">
+                <span class="idle-icon" id="modeIcon">💤</span>
+                <span class="idle-text" id="modeText">IDLE</span>
+            </div>
+            <div class="time-display" id="timeDisplay">--:--:--</div>
+        </div>
     </header>
 
-    <div class="container">
+    <main class="container">
         <!-- Summary -->
         <div class="summary-row" id="summary">
             <div class="summary-card">
@@ -392,17 +405,17 @@
         <!-- Hero's Journey - Personal Best -->
         <div class="campaign-peaks-section" id="campaignPeaks" style="margin-bottom: 2rem; display: none;">
             <h2 class="section-title">🏆 Hero's Journey - Personal Best</h2>
-            <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem;">
-                <p id="journeySummary" style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--accent);">Loading...</p>
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem;">
+                <p id="journeySummary" style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--border-gold);">Loading...</p>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
                     <!-- Peak Skills -->
                     <div>
-                        <h4 style="font-size: 0.875rem; color: var(--text-dim); margin-bottom: 0.75rem;">Peak Skill Levels</h4>
+                        <h4 style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Peak Skill Levels</h4>
                         <ul id="peakSkillList" style="list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem;"></ul>
                     </div>
                     <!-- Peak Metrics -->
                     <div>
-                        <h4 style="font-size: 0.875rem; color: var(--text-dim); margin-bottom: 0.75rem;">Best Metrics</h4>
+                        <h4 style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Best Metrics</h4>
                         <ul id="peakMetricList" style="list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem;"></ul>
                     </div>
                 </div>
@@ -418,7 +431,7 @@
         <!-- Passives -->
         <div class="passives-section">
             <h2 class="section-title">🛡️ Passives (Transfer Learning)</h2>
-            <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.875rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.875rem;">
                 General abilities tested independently of active training. Detects catastrophic forgetting.
             </p>
             <div class="passives-grid" id="passivesGrid">
@@ -429,7 +442,7 @@
         <!-- Primitives (Skill Engine) -->
         <div class="primitives-section">
             <h2 class="section-title">🧩 Primitives (Per-Concept Accuracy)</h2>
-            <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.875rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.875rem;">
                 Fine-grained accuracy tracking for atomic concepts within each skill. Identifies specific weaknesses.
             </p>
             <div class="primitives-tracks" id="primitivesGrid">
@@ -440,7 +453,7 @@
         <!-- Task Master (Background Tasks) -->
         <div class="task-master-section" style="margin-top: 2rem;">
             <h2 class="section-title">🤖 Task Master (3090)</h2>
-            <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.875rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.875rem;">
                 Background tasks running on the inference GPU when idle.
             </p>
             <div class="task-master-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
@@ -448,7 +461,7 @@
                 <div class="summary-card" id="taskMasterGpu">
                     <div class="summary-value" id="gpuStatus">--</div>
                     <div class="summary-label">3090 Status</div>
-                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.5rem;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
                         <span id="gpuMemory">--</span> GB used
                     </div>
                 </div>
@@ -458,23 +471,23 @@
                     <div class="summary-label">Last Task</div>
                     <div style="font-size: 0.75rem; margin-top: 0.5rem;">
                         <span id="lastTaskStatus">--</span>
-                        <span id="lastTaskTime" style="color: var(--text-dim);">--</span>
+                        <span id="lastTaskTime" style="color: var(--text-secondary);">--</span>
                     </div>
                 </div>
                 <!-- Stats Card -->
                 <div class="summary-card" id="taskMasterStats">
                     <div style="display: flex; justify-content: space-around;">
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);" id="tasksRun">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-dim);">RUN</div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--border-gold);" id="tasksRun">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">RUN</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--success);" id="tasksSucceeded">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-dim);">OK</div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--color-success);" id="tasksSucceeded">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">OK</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--danger);" id="tasksFailed">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-dim);">FAIL</div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--color-danger);" id="tasksFailed">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">FAIL</div>
                         </div>
                     </div>
                     <div class="summary-label" style="margin-top: 0.5rem;">Task Stats</div>
@@ -483,18 +496,19 @@
                 <div class="summary-card" id="taskMasterDaemon">
                     <div class="summary-value" id="daemonStatus" style="font-size: 1rem;">--</div>
                     <div class="summary-label">Daemon</div>
-                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.5rem;" id="lastCheck">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;" id="lastCheck">
                         Last check: --
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <!-- NAVIGATION (dynamic) -->
     <nav class="game-nav" id="bottomNav"></nav>
     <script src="/static/js/nav.js"></script>
     <script src="/static/js/events.js"></script>
+    <script src="/static/js/realm-state.js?v=1"></script>
     <!-- Shared modules -->
     <script src="/static/js/formatters.js?v=1"></script>
 
@@ -531,7 +545,7 @@
             const grid = document.getElementById('skillsGrid');
 
             if (!skills || skills.length === 0) {
-                grid.innerHTML = '<div class="loading">No skills configured</div>';
+                grid.innerHTML = '<div class="loading">No skills configured<br><small style="opacity: 0.7">Define skills in configs/skills/*.yaml to see them here.</small></div>';
                 return;
             }
 
@@ -542,7 +556,7 @@
                             <div class="skill-icon">${skill.icon || '⚔️'}</div>
                             <div>
                                 <div class="skill-name">${skill.name}</div>
-                                <div style="color: var(--text-dim); font-size: 0.875rem;">
+                                <div style="color: var(--text-secondary); font-size: 0.875rem;">
                                     ${skill.description || ''}
                                 </div>
                             </div>
@@ -551,7 +565,7 @@
                     </div>
                     <div class="skill-progress">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                            <span style="font-size: 0.75rem; color: var(--text-dim);">
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">
                                 Training L${skill.training_level || skill.current_level + 1}
                             </span>
                             <span style="font-size: 0.75rem;">
@@ -674,7 +688,7 @@
                                 <span class="track-count">L${state.level} · ${state.total_evals || 0} evals</span>
                             </div>
                             <div class="primitive-list">
-                                <div style="color: var(--text-dim); font-size: 0.85rem; text-align: center; padding: 1rem;">
+                                <div style="color: var(--text-secondary); font-size: 0.85rem; text-align: center; padding: 1rem;">
                                     No primitive data yet
                                 </div>
                             </div>
@@ -736,19 +750,19 @@
                 const statusEl = document.getElementById('gpuStatus');
                 if (!gpu.available) {
                     statusEl.textContent = '❌ Offline';
-                    statusEl.style.color = 'var(--danger)';
+                    statusEl.style.color = 'var(--color-danger)';
                 } else if (gpu.is_idle) {
                     statusEl.textContent = '✓ Idle';
-                    statusEl.style.color = 'var(--success)';
+                    statusEl.style.color = 'var(--color-success)';
                 } else {
                     statusEl.textContent = '⏳ Busy';
-                    statusEl.style.color = 'var(--warning)';
+                    statusEl.style.color = 'var(--color-warning)';
                 }
                 document.getElementById('gpuMemory').textContent =
                     gpu.memory_used_gb?.toFixed(1) || '--';
             } else if (!data.available) {
                 document.getElementById('gpuStatus').textContent = 'Not Run';
-                document.getElementById('gpuStatus').style.color = 'var(--text-dim)';
+                document.getElementById('gpuStatus').style.color = 'var(--text-secondary)';
             }
 
             // Last Task
@@ -782,10 +796,10 @@
             const daemonEl = document.getElementById('daemonStatus');
             if (data.daemon_running) {
                 daemonEl.textContent = '🟢 Running';
-                daemonEl.style.color = 'var(--success)';
+                daemonEl.style.color = 'var(--color-success)';
             } else {
                 daemonEl.textContent = '⚪ Stopped';
-                daemonEl.style.color = 'var(--text-dim)';
+                daemonEl.style.color = 'var(--text-secondary)';
             }
 
             // Last check time
@@ -823,12 +837,12 @@
                 const skillKeys = Object.keys(peaks);
 
                 if (skillKeys.length === 0) {
-                    skillsUl.innerHTML = '<li style="color: var(--text-dim);">No skills peaked yet</li>';
+                    skillsUl.innerHTML = '<li style="color: var(--text-secondary);">No skills peaked yet</li>';
                 } else {
                     skillsUl.innerHTML = skillKeys.map(skillId => `
-                        <li style="background: var(--bg-hover); padding: 0.5rem 1rem; border-radius: 6px;">
+                        <li style="background: var(--bg-highlight); padding: 0.5rem 1rem; border-radius: 6px;">
                             <span style="font-weight: 600; text-transform: uppercase;">${skillId}</span>:
-                            <span style="color: var(--accent);">L${peaks[skillId]}</span>
+                            <span style="color: var(--border-gold);">L${peaks[skillId]}</span>
                         </li>
                     `).join('');
                 }
@@ -839,7 +853,7 @@
                 const metricKeys = Object.keys(metrics);
 
                 if (metricKeys.length === 0) {
-                    metricsUl.innerHTML = '<li style="color: var(--text-dim);">No metrics tracked yet</li>';
+                    metricsUl.innerHTML = '<li style="color: var(--text-secondary);">No metrics tracked yet</li>';
                 } else {
                     metricsUl.innerHTML = metricKeys.map(name => {
                         const value = metrics[name];
@@ -849,9 +863,9 @@
                         const icon = name.includes('loss') ? '📉' : name.includes('accuracy') ? '🎯' : '📊';
                         const displayName = name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                         return `
-                            <li style="background: var(--bg-hover); padding: 0.5rem 1rem; border-radius: 6px;">
+                            <li style="background: var(--bg-highlight); padding: 0.5rem 1rem; border-radius: 6px;">
                                 ${icon} ${displayName}:
-                                <span style="color: var(--success); font-weight: 600;">${displayValue}</span>
+                                <span style="color: var(--color-success); font-weight: 600;">${displayValue}</span>
                             </li>
                         `;
                     }).join('');

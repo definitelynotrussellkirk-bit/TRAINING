@@ -525,9 +525,15 @@ Unified cleanup daemon for all resource leaks.
 python3 core/groundskeeper.py              # Run cleanup
 python3 core/groundskeeper.py --dry-run    # See what would be cleaned
 python3 core/groundskeeper.py --daemon     # Run as daemon (hourly)
+
+# Advanced options
+python3 core/groundskeeper.py --task jsonl --task queue  # Run specific tasks only
+python3 core/groundskeeper.py --force-vacuum             # Force VACUUM now
+python3 core/groundskeeper.py --interval 1800            # Daemon interval (default 3600s)
+python3 core/groundskeeper.py --base-dir /path/to/realm  # Custom base directory
 ```
 
-Handles: JSONL rotation, queue cleanup, battle_log, logs, PIDs, SQLite VACUUM, workers.
+Tasks: `jsonl`, `queue`, `battle_log`, `logs`, `pids`, `vacuum`, `workers`, `job_events`
 
 Key files: `core/groundskeeper.py`
 
@@ -538,7 +544,9 @@ Service dependency graph and auto-start.
 ```bash
 python3 core/service_registry.py status           # Show all services
 python3 core/service_registry.py start training   # Start with deps
+python3 core/service_registry.py stop training    # Stop gracefully
 python3 core/service_registry.py deps training    # Ensure deps only
+python3 core/service_registry.py order            # Print startup order
 ```
 
 Dependency graph:
@@ -546,6 +554,9 @@ Dependency graph:
 - `tavern` → vault
 - `training` → vault, tavern
 - `eval_runner` → vault
+- `groundskeeper` → (none)
+- `realm_state` → vault
+- `weaver` → (none)
 
 Key files: `core/service_registry.py`
 

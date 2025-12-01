@@ -10,6 +10,7 @@ The Groundskeeper handles ALL cleanup tasks in one place:
 - Stale PID cleanup (remove PIDs for dead processes)
 - SQLite VACUUM (monthly to reclaim space)
 - Worker cleanup (remove long-offline workers)
+- Job events cleanup (remove old job_events records)
 
 Usage:
     # Single cleanup run

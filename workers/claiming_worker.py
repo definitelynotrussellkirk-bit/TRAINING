@@ -597,6 +597,29 @@ class ClaimingWorker:
         # Score results
         result, state = engine.run_eval(skill_id, answers, level=level, count=batch_size)
 
+        # Log to battle log for UI visibility
+        try:
+            from core.battle_log import log_eval
+
+            pct = result.accuracy * 100
+            severity = "success" if pct >= 80 else "warning" if pct >= 50 else "error"
+            msg = f"Eval {skill_id} L{level}: {pct:.1f}% ({result.num_correct}/{result.num_examples})"
+
+            log_eval(
+                msg,
+                severity=severity,
+                details={
+                    "skill": skill_id,
+                    "level": level,
+                    "accuracy": result.accuracy,
+                    "correct": result.num_correct,
+                    "total": result.num_examples,
+                    "per_primitive": result.per_primitive_accuracy,
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to log to battle log: {e}")
+
         return {
             "success": True,
             "skill_id": skill_id,

@@ -190,8 +190,12 @@ class BattleLogger:
             self._local.conn = sqlite3.connect(
                 str(self.db_path),
                 check_same_thread=False,
+                timeout=30,
             )
             self._local.conn.row_factory = sqlite3.Row
+            # Enable WAL mode for better concurrency (must match job store)
+            self._local.conn.execute("PRAGMA journal_mode=WAL")
+            self._local.conn.execute("PRAGMA busy_timeout=5000")
         return self._local.conn
 
     def _init_schema(self):

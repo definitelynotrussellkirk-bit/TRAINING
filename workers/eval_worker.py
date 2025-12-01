@@ -227,6 +227,32 @@ class EvalWorker(BaseWorker):
             except Exception as e:
                 logger.warning(f"Failed to record eval to ledger: {e}")
 
+            # Log to battle log for UI visibility
+            try:
+                from core.battle_log import log_eval
+
+                pct = result.accuracy * 100
+                severity = "success" if pct >= 80 else "warning" if pct >= 50 else "error"
+                msg = f"Eval {skill_id} L{level}: {pct:.1f}% ({result.num_correct}/{result.num_examples})"
+
+                log_eval(
+                    msg,
+                    severity=severity,
+                    details={
+                        "skill": skill_id,
+                        "level": level,
+                        "accuracy": result.accuracy,
+                        "correct": result.num_correct,
+                        "total": result.num_examples,
+                        "checkpoint_step": checkpoint_step,
+                        "hero_id": hero_id,
+                        "campaign_id": campaign_id,
+                        "per_primitive": result.per_primitive_accuracy,
+                    },
+                )
+            except Exception as e:
+                logger.debug(f"Failed to log to battle log: {e}")
+
             return {
                 "success": True,
                 "skill_id": skill_id,

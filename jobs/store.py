@@ -1558,6 +1558,7 @@ class SQLiteJobStore(JobStore):
             Registration result with allowed job types
         """
         now = self._now()
+        is_new_worker = False
 
         with self._transaction() as conn:
             # Check if worker exists
@@ -1633,24 +1634,26 @@ class SQLiteJobStore(JobStore):
                     ),
                 )
                 logger.info(f"Worker {worker_id} registered (device={device_id}, resource_class={resource_class})")
+                is_new_worker = True
 
-                # Log to Battle Log for new worker joins
-                try:
-                    from core.battle_log import log_jobs
-                    log_jobs(
-                        f"Worker {worker_id} joined ({resource_class or 'unknown'})",
-                        source="jobs.store",
-                        severity="success",
-                        details={
-                            "worker_id": worker_id,
-                            "device_id": device_id,
-                            "resource_class": resource_class,
-                            "priority_class": priority_class,
-                            "roles": roles,
-                        }
-                    )
-                except ImportError:
-                    pass
+        # Log to Battle Log for new worker joins (OUTSIDE transaction to avoid deadlock)
+        if is_new_worker:
+            try:
+                from core.battle_log import log_jobs
+                log_jobs(
+                    f"Worker {worker_id} joined ({resource_class or 'unknown'})",
+                    source="jobs.store",
+                    severity="success",
+                    details={
+                        "worker_id": worker_id,
+                        "device_id": device_id,
+                        "resource_class": resource_class,
+                        "priority_class": priority_class,
+                        "roles": roles,
+                    }
+                )
+            except ImportError:
+                pass
 
         # Get allowed job types for this worker
         from jobs.registry import get_allowed_job_types

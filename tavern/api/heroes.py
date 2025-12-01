@@ -202,8 +202,10 @@ def serve_hero_model_info(handler: "TavernHandler"):
     - /api/hero (active hero)
     - /api/active-campaign (campaign info)
     - /api/hero-config/{hero_id} (model specs)
+    - HeroProfile (VRAM profile + training defaults)
 
-    Returns a single JSON with all the info the settings page needs.
+    Returns a single JSON with all the info the settings page needs,
+    including VRAM estimates.
     """
     try:
         import yaml
@@ -244,6 +246,42 @@ def serve_hero_model_info(handler: "TavernHandler"):
         architecture = model_config.get("architecture") or hero.get("model_family")
         context_length = model_config.get("context_length")
         vocab_size = model_config.get("vocab_size")
+        size_b = model_config.get("size_b")
+
+        # Load full HeroProfile for VRAM data
+        vram_profile = None
+        vram_estimate = None
+        training_defaults = None
+        if hero_id:
+            try:
+                from guild.heroes import get_hero as get_hero_profile
+                hero_profile = get_hero_profile(hero_id, base_dir=base_dir)
+
+                # Extract VRAM profile
+                vram_profile = {
+                    "base_memory_gb": hero_profile.vram.base_memory_gb,
+                    "per_batch_gb": hero_profile.vram.per_batch_gb,
+                    "optimizer_overhead_gb": hero_profile.vram.optimizer_overhead_gb,
+                }
+
+                # Extract training defaults
+                td = hero_profile.training_defaults
+                training_defaults = {
+                    "batch_size": td.batch_size,
+                    "gradient_accumulation": td.gradient_accumulation,
+                    "learning_rate": td.learning_rate,
+                    "max_length": td.max_length,
+                    "precision": td.precision,
+                    "gradient_checkpointing": td.gradient_checkpointing,
+                    "optimizer": td.optimizer,
+                    "save_steps": td.save_steps,
+                }
+
+                # Compute default VRAM estimate using hero defaults
+                vram_estimate = hero_profile.estimate_vram()
+
+            except Exception as e:
+                logger.warning(f"Could not compute hero VRAM profile: {e}")
 
         # Build response
         result = {
@@ -253,6 +291,7 @@ def serve_hero_model_info(handler: "TavernHandler"):
             "architecture": architecture,
             "context_length": context_length,
             "vocab_size": vocab_size,
+            "size_b": size_b,
             "campaign_id": campaign.id if campaign else None,
             "campaign_path": str(campaign.path) if campaign else None,
             "campaign_name": campaign.name if campaign else None,
@@ -260,6 +299,10 @@ def serve_hero_model_info(handler: "TavernHandler"):
             "peak_skill_levels": campaign.peak_skill_levels if campaign else {},
             "peak_metrics": campaign.peak_metrics if campaign else {},
             "journey_summary": campaign.journey_summary if campaign else None,
+            # VRAM data (new)
+            "vram_profile": vram_profile,
+            "vram_estimate_default": vram_estimate,
+            "training_defaults": training_defaults,
         }
 
         handler._send_json(result)

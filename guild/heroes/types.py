@@ -140,32 +140,111 @@ class VRAMProfile:
     All values calibrated at max_length=2048, bf16 precision.
 
     Attributes:
-        base_memory_gb: Model weights in memory
-        per_batch_gb: Additional memory per micro-batch sample
-        optimizer_overhead_gb: AdamW optimizer states
+        base_memory_gb: Model weights in memory (bf16/fp16 at 2048 tokens)
+        per_batch_gb: Additional memory per micro-batch sample (activations)
+        optimizer_overhead_gb: Optimizer + gradient states (AdamW-style)
     """
     base_memory_gb: float = 1.0
     per_batch_gb: float = 0.5
     optimizer_overhead_gb: float = 0.5
 
-    def estimate_total(
+    def estimate_breakdown(
         self,
         batch_size: int = 1,
-        gradient_checkpointing: bool = True
-    ) -> float:
+        max_length: int = 2048,
+        precision: str = "bf16",
+        gradient_checkpointing: bool = True,
+    ) -> Dict[str, float]:
         """
-        Estimate total VRAM usage.
+        Estimate VRAM breakdown in GB.
+
+        Uses the documented formula from CHANGELOG:
+
+            activation_memory = batch_size × per_batch_gb × (max_length / 2048) × checkpoint_factor
+            checkpoint_factor = 0.35 if gradient_checkpointing else 1.0
+
+        Precision scaling (approximate):
+            - bf16 / fp16: 1.0 × baseline
+            - fp32:        2.0 × baseline
 
         Args:
             batch_size: Micro-batch size
+            max_length: Maximum sequence length
+            precision: Floating point precision (bf16, fp16, fp32)
             gradient_checkpointing: Whether checkpointing is enabled
 
         Returns:
-            Estimated VRAM in GB
+            Dict with keys: model, optimizer, gradients, activations, total
         """
+        # 1) Precision factor
+        prec = (precision or "").lower()
+        if prec in ("bf16", "fp16"):
+            precision_factor = 1.0
+        elif prec == "fp32":
+            precision_factor = 2.0
+        else:
+            precision_factor = 1.0
+
+        # 2) Length & checkpoint factors
+        length_factor = max(max_length, 1) / 2048.0
         checkpoint_factor = 0.35 if gradient_checkpointing else 1.0
-        activation_mem = self.per_batch_gb * batch_size * checkpoint_factor
-        return self.base_memory_gb + self.optimizer_overhead_gb + activation_mem
+
+        # 3) Components
+        model_mem = self.base_memory_gb * precision_factor
+        optimizer_mem = self.optimizer_overhead_gb * precision_factor
+
+        activation_total = (
+            self.per_batch_gb
+            * batch_size
+            * length_factor
+            * checkpoint_factor
+            * precision_factor
+        )
+
+        # Split activations into "gradients" vs "activations" for UI
+        # This is approximate - real split depends on model architecture
+        gradients_mem = activation_total * 0.4
+        activations_mem = activation_total * 0.6
+
+        total = model_mem + optimizer_mem + gradients_mem + activations_mem
+
+        return {
+            "model": round(model_mem, 2),
+            "optimizer": round(optimizer_mem, 2),
+            "gradients": round(gradients_mem, 2),
+            "activations": round(activations_mem, 2),
+            "total": round(total, 2),
+        }
+
+    def estimate_total(
+        self,
+        batch_size: int = 1,
+        max_length: int = 2048,
+        precision: str = "bf16",
+        gradient_checkpointing: bool = True,
+    ) -> float:
+        """
+        Backwards-compatible helper returning total VRAM in GB.
+
+        Older callers can continue using estimate_total(batch_size, gc)
+        if they don't care about max_length/precision.
+
+        Args:
+            batch_size: Micro-batch size
+            max_length: Maximum sequence length
+            precision: Floating point precision (bf16, fp16, fp32)
+            gradient_checkpointing: Whether checkpointing is enabled
+
+        Returns:
+            Estimated total VRAM in GB
+        """
+        breakdown = self.estimate_breakdown(
+            batch_size=batch_size,
+            max_length=max_length,
+            precision=precision,
+            gradient_checkpointing=gradient_checkpointing,
+        )
+        return breakdown["total"]
 
 
 @dataclass
@@ -248,3 +327,35 @@ class HeroProfile:
     def size_b(self) -> float:
         """Shortcut to model.size_b."""
         return self.model.size_b
+
+    def estimate_vram(
+        self,
+        batch_size: Optional[int] = None,
+        max_length: Optional[int] = None,
+        precision: Optional[str] = None,
+        gradient_checkpointing: Optional[bool] = None,
+    ) -> Dict[str, float]:
+        """
+        Estimate VRAM breakdown using hero's VRAM profile and training defaults.
+
+        Args are optional - if None, uses training_defaults values.
+
+        Args:
+            batch_size: Micro-batch size (default: training_defaults.batch_size)
+            max_length: Maximum sequence length (default: training_defaults.max_length)
+            precision: Floating point precision (default: training_defaults.precision)
+            gradient_checkpointing: Whether checkpointing is enabled (default: training_defaults)
+
+        Returns:
+            Dict with keys: model, optimizer, gradients, activations, total
+        """
+        td = self.training_defaults
+        return self.vram.estimate_breakdown(
+            batch_size=batch_size if batch_size is not None else td.batch_size,
+            max_length=max_length if max_length is not None else td.max_length,
+            precision=precision if precision is not None else td.precision,
+            gradient_checkpointing=(
+                td.gradient_checkpointing if gradient_checkpointing is None
+                else gradient_checkpointing
+            ),
+        )

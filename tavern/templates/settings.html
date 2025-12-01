@@ -1267,13 +1267,61 @@
         });
 
         // ============================================
-        // VRAM CALCULATOR
+        // VRAM CALCULATOR (Hero-aware)
         // ============================================
 
-        const MODEL_PARAMS = 620_000_000;
-        const HIDDEN_DIM = 1024;
-        const NUM_LAYERS = 28;
+        // These will be populated from /api/hero-model-info
+        let vramProfile = null;
+        let heroDefaults = null;
+        let heroSizeB = null;
         let selectedGpuVram = 24;
+
+        /**
+         * Estimate VRAM breakdown using hero's VRAM profile.
+         * Matches the formula in guild/heroes/types.py VRAMProfile.estimate_breakdown()
+         */
+        function estimateVramBreakdown(batchSize, maxLength, precision, gradientCheckpointing) {
+            if (!vramProfile) {
+                // Fallback to hardcoded 0.6B model defaults if no profile loaded
+                vramProfile = {
+                    base_memory_gb: 1.2,
+                    per_batch_gb: 0.8,
+                    optimizer_overhead_gb: 0.6
+                };
+            }
+
+            const base = vramProfile.base_memory_gb;
+            const perBatch = vramProfile.per_batch_gb;
+            const opt = vramProfile.optimizer_overhead_gb;
+
+            // Precision factor
+            const prec = (precision || '').toLowerCase();
+            let precisionFactor = 1.0;
+            if (prec === 'fp32') precisionFactor = 2.0;
+
+            // Length & checkpoint factors
+            const lengthFactor = Math.max(maxLength, 1) / 2048.0;
+            const checkpointFactor = gradientCheckpointing ? 0.35 : 1.0;
+
+            // Components
+            const modelMem = base * precisionFactor;
+            const optimizerMem = opt * precisionFactor;
+            const activationTotal = perBatch * batchSize * lengthFactor * checkpointFactor * precisionFactor;
+
+            // Split activations into gradients vs activations (approximate)
+            const gradientsMem = activationTotal * 0.4;
+            const activationsMem = activationTotal * 0.6;
+
+            const total = modelMem + optimizerMem + gradientsMem + activationsMem;
+
+            return {
+                model: modelMem,
+                optimizer: optimizerMem,
+                gradients: gradientsMem,
+                activations: activationsMem,
+                total: total
+            };
+        }
 
         function calculateVram() {
             const batchSize = parseInt($('#batch_size')?.value) || 1;
@@ -1281,26 +1329,7 @@
             const precision = $('#fp_precision')?.value || 'bf16';
             const gradCheckpoint = getToggle('#use_gradient_checkpointing');
 
-            const bytesPerParam = { 'bf16': 2, 'fp16': 2, 'fp32': 4 }[precision] || 2;
-
-            const modelWeights = MODEL_PARAMS * bytesPerParam;
-            const optimizerStates = MODEL_PARAMS * 4 * 2;
-            const gradients = MODEL_PARAMS * bytesPerParam;
-
-            let activationFactor = 34;
-            if (gradCheckpoint) activationFactor /= Math.sqrt(NUM_LAYERS);
-            const activations = batchSize * maxLength * HIDDEN_DIM * NUM_LAYERS * bytesPerParam * activationFactor / NUM_LAYERS;
-
-            const toGB = (bytes) => bytes / (1024 ** 3);
-
-            const vram = {
-                model: toGB(modelWeights),
-                optimizer: toGB(optimizerStates),
-                gradients: toGB(gradients),
-                activations: toGB(activations),
-                total: toGB(modelWeights + optimizerStates + gradients + activations)
-            };
-
+            const vram = estimateVramBreakdown(batchSize, maxLength, precision, gradCheckpoint);
             updateVramUI(vram);
         }
 
@@ -1327,17 +1356,52 @@
             setText('#vramGradientsVal', `${vram.gradients.toFixed(1)}GB`);
             setText('#vramActivationsVal', `${vram.activations.toFixed(1)}GB`);
 
-            // Tip
+            // Enhanced tips based on hero size and VRAM usage
             const tip = $('#vramTip');
             const headroom = selectedGpuVram - vram.total;
+            const ratio = selectedGpuVram > 0 ? vram.total / selectedGpuVram : 0;
+
             if (vram.total > selectedGpuVram) {
-                tip.innerHTML = `<strong>Over limit!</strong> Enable gradient checkpointing or reduce batch size.`;
-            } else if (headroom < 2) {
-                tip.innerHTML = `<strong>Tight fit.</strong> Leave ~2GB for CUDA kernels.`;
-            } else if (headroom > 8) {
-                tip.innerHTML = `<strong>Room to spare.</strong> Consider larger batch size.`;
+                tip.innerHTML = `<strong>DANGER</strong> – Over limit! Enable gradient checkpointing or reduce batch size.`;
+            } else if (ratio > 0.9) {
+                tip.innerHTML = `<strong>WARNING</strong> – Very tight fit. May OOM during training spikes.`;
+            } else if (ratio > 0.7) {
+                tip.innerHTML = `<strong>CAUTION</strong> – Leave ~2GB for CUDA kernels. ~${headroom.toFixed(1)}GB headroom.`;
+            } else if (headroom > 10) {
+                tip.innerHTML = `<strong>SAFE</strong> – Plenty of headroom (~${headroom.toFixed(1)}GB). Consider larger batch size.`;
             } else {
-                tip.innerHTML = `<strong>Good fit.</strong> ~${headroom.toFixed(1)}GB headroom.`;
+                tip.innerHTML = `<strong>GOOD</strong> – Comfortable fit with ~${headroom.toFixed(1)}GB headroom.`;
+            }
+
+            // Add model-specific tip for 4B+ models
+            if (heroSizeB && heroSizeB >= 4 && vram.total < 18) {
+                tip.innerHTML += `<br><small style="color: var(--text-muted);">4B models typically need 18-20GB for full FT.</small>`;
+            }
+        }
+
+        /**
+         * Load VRAM profile from hero-model-info API
+         */
+        async function loadVramProfile() {
+            try {
+                const res = await fetch('/api/hero-model-info');
+                if (!res.ok) return;
+                const info = await res.json();
+
+                if (info.vram_profile) {
+                    vramProfile = info.vram_profile;
+                }
+                if (info.training_defaults) {
+                    heroDefaults = info.training_defaults;
+                }
+                if (info.size_b) {
+                    heroSizeB = info.size_b;
+                }
+
+                console.log(`[VRAM] Loaded profile for ${info.hero_name || 'unknown'} (${info.size_b || '?'}B)`);
+                calculateVram();
+            } catch (err) {
+                console.warn('[VRAM] Could not load hero profile, using defaults:', err);
             }
         }
 
@@ -1476,7 +1540,10 @@
         // INIT
         // ============================================
 
-        loadConfig().then(() => calculateVram());
+        // Load hero VRAM profile first, then config, then calculate
+        loadVramProfile().then(() => {
+            loadConfig().then(() => calculateVram());
+        });
         loadScheduler();
     </script>
 </body>

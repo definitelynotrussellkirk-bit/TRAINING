@@ -14,31 +14,6 @@
             padding: 20px;
         }
 
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 215, 0, 0.2);
-        }
-
-        .page-title {
-            font-family: 'Cinzel', serif;
-            font-size: 2em;
-            color: #ffd700;
-            margin: 0;
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
-        }
-
-        .page-subtitle {
-            color: #888;
-            font-size: 0.9em;
-            margin-top: 4px;
-        }
-
         body {
             padding-bottom: 80px;
         }
@@ -47,6 +22,27 @@
             font-size: 0.8em;
             color: #666;
             font-family: 'Inter', sans-serif;
+        }
+
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-sm:hover {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: rgba(255, 215, 0, 0.4);
+        }
+
+        .header-right {
+            display: flex;
+            gap: 8px;
+            align-items: center;
         }
 
         /* Locations Summary */
@@ -541,19 +537,33 @@
     </style>
 </head>
 <body>
-    <div class="garrison-page">
-        <div class="page-header">
-            <div>
-                <h1 class="page-title">🛡️ Garrison</h1>
-                <p class="page-subtitle">Fleet Health & Infrastructure <span class="host-count" id="host-count">(0 hosts)</span></p>
-            </div>
-            <div class="actions">
-                <button class="btn btn-primary" onclick="refreshStatus()">🔄 Refresh</button>
-                <button class="btn btn-secondary" onclick="refreshStatus(true)">📡 Live Scan</button>
-                <button class="btn btn-secondary" onclick="runMaintenance()">🔧 Maintenance</button>
+    <!-- TITLE BAR -->
+    <header class="game-header">
+        <div class="header-left">
+            <h1 class="game-title">🛡️ Garrison</h1>
+        </div>
+        <div class="header-center">
+            <div class="resource-bar">
+                <div class="resource">
+                    <span class="resource-icon">🖥️</span>
+                    <span class="resource-label">HOSTS</span>
+                    <span class="resource-value" id="hostCount">0</span>
+                </div>
+                <div class="resource">
+                    <span class="resource-icon" id="statusIcon">⚪</span>
+                    <span class="resource-label">STATUS</span>
+                    <span class="resource-value" id="statusText">--</span>
+                </div>
             </div>
         </div>
+        <div class="header-right">
+            <button class="btn btn-sm" onclick="refreshStatus()" title="Load cached status (fast, updates every few minutes)">🔄</button>
+            <button class="btn btn-sm" onclick="refreshStatus(true)" title="Scan all hosts now (slower, but always current)">📡</button>
+            <button class="btn btn-sm" onclick="runMaintenance()" title="Run cleanup tasks on all hosts">🔧</button>
+        </div>
+    </header>
 
+    <div class="garrison-page">
         <div id="status-banner" class="status-banner status-unknown">
             <span class="status-icon">?</span>
             <span>Loading fleet status...</span>
@@ -581,7 +591,7 @@
     </div>
 
     <!-- Bottom Navigation -->
-    <nav id="bottom-nav"></nav>
+    <nav id="bottomNav"></nav>
     <script src="/static/js/nav.js"></script>
 
     <script>
@@ -948,19 +958,25 @@
         function renderStatus(data) {
             statusData = data;
 
-            // Update host count
+            // Update header stats
             const hostCount = Object.keys(data.hosts || {}).length;
-            const hostCountEl = document.getElementById('host-count');
-            if (hostCountEl) hostCountEl.textContent = `(${hostCount} hosts)`;
+            const hostCountEl = document.getElementById('hostCount');
+            if (hostCountEl) hostCountEl.textContent = hostCount;
+
+            const status = data.overall_status || 'unknown';
+            const statusIcons = { healthy: '🟢', warning: '🟡', critical: '🔴', unknown: '⚪', offline: '⚫' };
+            const statusIconEl = document.getElementById('statusIcon');
+            const statusTextEl = document.getElementById('statusText');
+            if (statusIconEl) statusIconEl.textContent = statusIcons[status] || '⚪';
+            if (statusTextEl) statusTextEl.textContent = status.toUpperCase();
 
             // Update banner
             const banner = document.getElementById('status-banner');
-            const status = data.overall_status || 'unknown';
-            const icons = { healthy: '&#10003;', warning: '&#9888;', critical: '&#10007;', unknown: '?', offline: '&#9675;' };
+            const bannerIcons = { healthy: '&#10003;', warning: '&#9888;', critical: '&#10007;', unknown: '?', offline: '&#9675;' };
             if (banner) {
                 banner.className = `status-banner status-${status}`;
                 banner.innerHTML = `
-                    <span class="status-icon">${icons[status] || '?'}</span>
+                    <span class="status-icon">${bannerIcons[status] || '?'}</span>
                     <span>Fleet Status: ${status.toUpperCase()}</span>
                 `;
             }

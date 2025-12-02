@@ -50,10 +50,26 @@ class HostHealth:
     """Health report for a single host."""
     host: str
     status: HealthStatus
+    # Disk
     disk_percent: Optional[float] = None
     disk_free_gb: Optional[float] = None
+    disk_total_gb: Optional[float] = None
+    # Memory
+    ram_percent: Optional[float] = None
+    ram_used_gb: Optional[float] = None
+    ram_total_gb: Optional[float] = None
+    # GPU
     gpu_memory_percent: Optional[float] = None
+    gpu_memory_used_mb: Optional[float] = None
+    gpu_memory_total_mb: Optional[float] = None
+    gpu_temp_c: Optional[float] = None
+    gpu_name: Optional[str] = None
+    # CPU
+    cpu_temp_c: Optional[float] = None
+    cpu_percent: Optional[float] = None
+    # Meta
     last_check: Optional[str] = None
+    uptime: Optional[str] = None
     services: dict = field(default_factory=dict)
     issues: list = field(default_factory=list)
     maintenance_performed: list = field(default_factory=list)
@@ -125,32 +141,118 @@ class Garrison:
         except Exception as e:
             return False, str(e)
 
-    def _get_disk_usage(self, host: str, path: str = "/") -> tuple[Optional[float], Optional[float]]:
-        """Get disk usage percent and free GB for a path on host."""
-        success, output = self._ssh_command(host, f"df -h {path} | tail -1")
+    def _get_disk_usage(self, host: str, path: str = "/") -> dict:
+        """Get disk usage for a path on host. Returns dict with percent, free_gb, total_gb."""
+        success, output = self._ssh_command(host, f"df -BG {path} | tail -1")
         if not success:
-            return None, None
+            return {}
 
         try:
             parts = output.split()
             # Format: Filesystem Size Used Avail Use% Mounted
+            # With -BG: values are in GB with 'G' suffix
+            total_gb = float(parts[1].rstrip('G'))
+            used_gb = float(parts[2].rstrip('G'))
+            free_gb = float(parts[3].rstrip('G'))
             percent = float(parts[4].rstrip('%'))
-            avail = parts[3]
 
-            # Parse available space
-            if avail.endswith('G'):
-                free_gb = float(avail[:-1])
-            elif avail.endswith('M'):
-                free_gb = float(avail[:-1]) / 1024
-            elif avail.endswith('T'):
-                free_gb = float(avail[:-1]) * 1024
-            else:
-                free_gb = float(avail) / (1024**3)  # Assume bytes
-
-            return percent, free_gb
+            return {
+                "percent": percent,
+                "free_gb": free_gb,
+                "total_gb": total_gb,
+                "used_gb": used_gb,
+            }
         except (IndexError, ValueError) as e:
             logger.warning(f"Failed to parse disk usage for {host}: {e}")
-            return None, None
+            return {}
+
+    def _get_ram_usage(self, host: str) -> dict:
+        """Get RAM usage for a host. Returns dict with percent, used_gb, total_gb."""
+        success, output = self._ssh_command(host, "free -g | grep Mem")
+        if not success:
+            return {}
+
+        try:
+            parts = output.split()
+            # Format: Mem: total used free shared buff/cache available
+            total_gb = float(parts[1])
+            used_gb = float(parts[2])
+            free_gb = float(parts[3])
+            available_gb = float(parts[6]) if len(parts) > 6 else free_gb
+            percent = (used_gb / total_gb * 100) if total_gb > 0 else 0
+
+            return {
+                "percent": percent,
+                "used_gb": used_gb,
+                "total_gb": total_gb,
+                "free_gb": free_gb,
+                "available_gb": available_gb,
+            }
+        except (IndexError, ValueError) as e:
+            logger.warning(f"Failed to parse RAM usage for {host}: {e}")
+            return {}
+
+    def _get_cpu_temp(self, host: str) -> Optional[float]:
+        """Get CPU temperature for a host."""
+        # Try sensors first
+        success, output = self._ssh_command(host, "sensors 2>/dev/null | grep -i 'core 0' | head -1")
+        if success and output:
+            try:
+                # Format: "Core 0:        +45.0°C  (high = +80.0°C, crit = +100.0°C)"
+                temp_str = output.split('+')[1].split('°')[0]
+                return float(temp_str)
+            except (IndexError, ValueError):
+                pass
+
+        # Try thermal zone
+        success, output = self._ssh_command(host, "cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null")
+        if success and output:
+            try:
+                return float(output) / 1000  # Convert millidegrees to degrees
+            except ValueError:
+                pass
+
+        return None
+
+    def _get_gpu_info(self, host: str) -> dict:
+        """Get GPU info via nvidia-smi. Returns dict with name, memory, temp."""
+        success, output = self._ssh_command(
+            host,
+            "nvidia-smi --query-gpu=name,memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits 2>/dev/null"
+        )
+        if not success:
+            return {}
+
+        try:
+            parts = [p.strip() for p in output.split(',')]
+            if len(parts) >= 4:
+                name = parts[0]
+                mem_used = float(parts[1])
+                mem_total = float(parts[2])
+                temp = float(parts[3])
+                mem_percent = (mem_used / mem_total * 100) if mem_total > 0 else 0
+
+                return {
+                    "name": name,
+                    "memory_used_mb": mem_used,
+                    "memory_total_mb": mem_total,
+                    "memory_percent": mem_percent,
+                    "temp_c": temp,
+                }
+        except (IndexError, ValueError) as e:
+            logger.warning(f"Failed to parse GPU info for {host}: {e}")
+
+        return {}
+
+    def _get_uptime(self, host: str) -> Optional[str]:
+        """Get system uptime."""
+        success, output = self._ssh_command(host, "uptime -p 2>/dev/null || uptime")
+        if success and output:
+            # Clean up output
+            if output.startswith("up "):
+                return output[3:]
+            return output.split("up")[-1].split(",")[0].strip() if "up" in output else output
+        return None
 
     def _count_checkpoints(self, host: str, path: str) -> Optional[int]:
         """Count checkpoints on remote host."""
@@ -197,6 +299,7 @@ class Garrison:
         host = config.get("host", config.get("ip", ""))
         user = config.get("ssh_user", config.get("user", "russ"))
         models_path = config.get("models_dir", config.get("checkpoints_dir", ""))
+        name = config.get("name", host_key)
 
         if not host:
             return HostHealth(
@@ -211,29 +314,54 @@ class Garrison:
             status=HealthStatus.HEALTHY,
             last_check=datetime.now().isoformat(),
         )
+        health.services["name"] = name
 
         # Check disk space
-        percent, free_gb = self._get_disk_usage(ssh_target)
-        if percent is not None:
-            health.disk_percent = percent
-            health.disk_free_gb = free_gb
+        disk = self._get_disk_usage(ssh_target)
+        if disk:
+            health.disk_percent = disk.get("percent")
+            health.disk_free_gb = disk.get("free_gb")
+            health.disk_total_gb = disk.get("total_gb")
 
-            if percent >= self.DISK_CRITICAL_PERCENT:
+            if health.disk_percent and health.disk_percent >= self.DISK_CRITICAL_PERCENT:
                 health.status = HealthStatus.CRITICAL
-                health.issues.append(f"Disk critically full: {percent}%")
-            elif percent >= self.DISK_WARNING_PERCENT:
+                health.issues.append(f"Disk critically full: {health.disk_percent}%")
+            elif health.disk_percent and health.disk_percent >= self.DISK_WARNING_PERCENT:
                 if health.status == HealthStatus.HEALTHY:
                     health.status = HealthStatus.WARNING
-                health.issues.append(f"Disk usage high: {percent}%")
+                health.issues.append(f"Disk usage high: {health.disk_percent}%")
         else:
             health.issues.append("Could not check disk space")
 
+        # Check RAM
+        ram = self._get_ram_usage(ssh_target)
+        if ram:
+            health.ram_percent = ram.get("percent")
+            health.ram_used_gb = ram.get("used_gb")
+            health.ram_total_gb = ram.get("total_gb")
+
+        # Check GPU via SSH (nvidia-smi)
+        gpu = self._get_gpu_info(ssh_target)
+        if gpu:
+            health.gpu_name = gpu.get("name")
+            health.gpu_memory_used_mb = gpu.get("memory_used_mb")
+            health.gpu_memory_total_mb = gpu.get("memory_total_mb")
+            health.gpu_memory_percent = gpu.get("memory_percent")
+            health.gpu_temp_c = gpu.get("temp_c")
+
+        # Check CPU temp
+        health.cpu_temp_c = self._get_cpu_temp(ssh_target)
+
+        # Check uptime
+        health.uptime = self._get_uptime(ssh_target)
+
         # Check checkpoint count
-        checkpoint_count = self._count_checkpoints(ssh_target, models_path)
-        if checkpoint_count is not None:
-            health.services["checkpoints"] = checkpoint_count
-            if checkpoint_count > self.CHECKPOINT_MAX_COUNT + 5:
-                health.issues.append(f"Too many checkpoints: {checkpoint_count}")
+        if models_path:
+            checkpoint_count = self._count_checkpoints(ssh_target, models_path)
+            if checkpoint_count is not None:
+                health.services["checkpoints"] = checkpoint_count
+                if checkpoint_count > self.CHECKPOINT_MAX_COUNT + 5:
+                    health.issues.append(f"Too many checkpoints: {checkpoint_count}")
 
         # Check inference server API
         services = config.get("services", {})
@@ -244,11 +372,14 @@ class Garrison:
             resp = requests.get(api_url, timeout=5)
             if resp.status_code == 200:
                 health.services["inference_api"] = "up"
+                # API might have more accurate GPU info
                 data = resp.json()
-                if "gpu" in data:
+                if "gpu" in data and not health.gpu_memory_percent:
                     gpu_used = data["gpu"].get("memory_used_mb", 0)
                     gpu_total = data["gpu"].get("memory_total_mb", 1)
                     health.gpu_memory_percent = (gpu_used / gpu_total) * 100
+                    health.gpu_memory_used_mb = gpu_used
+                    health.gpu_memory_total_mb = gpu_total
             else:
                 health.services["inference_api"] = "error"
                 health.issues.append(f"Inference API returned {resp.status_code}")
@@ -261,39 +392,89 @@ class Garrison:
         return health
 
     def check_trainer(self, host_key: str = "trainer") -> HostHealth:
-        """Check health of training machine."""
+        """Check health of training machine (local)."""
+        config = self.hosts_config.get("4090", {})
+        name = config.get("name", "Training Server")
+
         health = HostHealth(
             host="localhost",
             status=HealthStatus.HEALTHY,
             last_check=datetime.now().isoformat(),
         )
+        health.services["name"] = name
 
         # Check local disk space
         try:
             result = subprocess.run(
-                ["df", "-h", str(self.base_dir)],
+                ["df", "-BG", str(self.base_dir)],
                 capture_output=True,
                 text=True,
             )
             if result.returncode == 0:
                 parts = result.stdout.strip().split('\n')[-1].split()
-                percent = float(parts[4].rstrip('%'))
-                health.disk_percent = percent
+                health.disk_total_gb = float(parts[1].rstrip('G'))
+                health.disk_free_gb = float(parts[3].rstrip('G'))
+                health.disk_percent = float(parts[4].rstrip('%'))
 
-                avail = parts[3]
-                if avail.endswith('G'):
-                    health.disk_free_gb = float(avail[:-1])
-                elif avail.endswith('T'):
-                    health.disk_free_gb = float(avail[:-1]) * 1024
-
-                if percent >= self.DISK_CRITICAL_PERCENT:
+                if health.disk_percent >= self.DISK_CRITICAL_PERCENT:
                     health.status = HealthStatus.CRITICAL
-                    health.issues.append(f"Disk critically full: {percent}%")
-                elif percent >= self.DISK_WARNING_PERCENT:
+                    health.issues.append(f"Disk critically full: {health.disk_percent}%")
+                elif health.disk_percent >= self.DISK_WARNING_PERCENT:
                     health.status = HealthStatus.WARNING
-                    health.issues.append(f"Disk usage high: {percent}%")
+                    health.issues.append(f"Disk usage high: {health.disk_percent}%")
         except Exception as e:
             health.issues.append(f"Could not check disk: {e}")
+
+        # Check local RAM
+        try:
+            result = subprocess.run(["free", "-g"], capture_output=True, text=True)
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if line.startswith('Mem:'):
+                        parts = line.split()
+                        health.ram_total_gb = float(parts[1])
+                        health.ram_used_gb = float(parts[2])
+                        health.ram_percent = (health.ram_used_gb / health.ram_total_gb * 100) if health.ram_total_gb > 0 else 0
+                        break
+        except Exception:
+            pass
+
+        # Check local GPU
+        try:
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name,memory.used,memory.total,temperature.gpu",
+                 "--format=csv,noheader,nounits"],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                parts = [p.strip() for p in result.stdout.strip().split(',')]
+                if len(parts) >= 4:
+                    health.gpu_name = parts[0]
+                    health.gpu_memory_used_mb = float(parts[1])
+                    health.gpu_memory_total_mb = float(parts[2])
+                    health.gpu_temp_c = float(parts[3])
+                    health.gpu_memory_percent = (health.gpu_memory_used_mb / health.gpu_memory_total_mb * 100) if health.gpu_memory_total_mb > 0 else 0
+        except Exception:
+            pass
+
+        # Check CPU temp
+        try:
+            result = subprocess.run(
+                ["cat", "/sys/class/thermal/thermal_zone0/temp"],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                health.cpu_temp_c = float(result.stdout.strip()) / 1000
+        except Exception:
+            pass
+
+        # Check uptime
+        try:
+            result = subprocess.run(["uptime", "-p"], capture_output=True, text=True)
+            if result.returncode == 0:
+                health.uptime = result.stdout.strip().replace("up ", "")
+        except Exception:
+            pass
 
         # Check key services
         services_to_check = [
@@ -301,33 +482,34 @@ class Garrison:
             ("tavern", 8888),
         ]
 
-        for name, port in services_to_check:
+        for svc_name, port in services_to_check:
             try:
                 import requests
                 resp = requests.get(f"http://localhost:{port}/health", timeout=3)
-                health.services[name] = "up" if resp.status_code == 200 else "error"
+                health.services[svc_name] = "up" if resp.status_code == 200 else "error"
             except:
-                health.services[name] = "down"
+                health.services[svc_name] = "down"
 
         # Check training daemon
         try:
-            result = subprocess.run(
-                ["pgrep", "-f", "training_daemon"],
-                capture_output=True,
-            )
+            result = subprocess.run(["pgrep", "-f", "training_daemon"], capture_output=True)
             health.services["training_daemon"] = "up" if result.returncode == 0 else "down"
         except:
             health.services["training_daemon"] = "unknown"
 
         # Check eval runner
         try:
-            result = subprocess.run(
-                ["pgrep", "-f", "eval_runner"],
-                capture_output=True,
-            )
+            result = subprocess.run(["pgrep", "-f", "eval_runner"], capture_output=True)
             health.services["eval_runner"] = "up" if result.returncode == 0 else "down"
         except:
             health.services["eval_runner"] = "unknown"
+
+        # Check garrison
+        try:
+            result = subprocess.run(["pgrep", "-f", "garrison"], capture_output=True)
+            health.services["garrison"] = "up" if result.returncode == 0 else "down"
+        except:
+            health.services["garrison"] = "unknown"
 
         return health
 

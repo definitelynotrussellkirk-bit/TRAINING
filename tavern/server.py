@@ -619,6 +619,14 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/temple/rituals":
             temple_api.serve_rituals(self)
 
+        # Garrison - Fleet health monitoring
+        elif path == "/garrison" or path == "/garrison.html":
+            self._serve_template("garrison.html")
+        elif path == "/api/garrison":
+            self._serve_garrison_status()
+        elif path == "/api/garrison/maintenance":
+            self._serve_garrison_maintenance()
+
         # Fleet - Node management and monitoring
         elif path == "/api/fleet/status":
             fleet_api.serve_fleet_status(self)
@@ -3708,6 +3716,45 @@ class TavernHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Reset error: {e}")
             self._send_json({"success": False, "error": str(e)}, 500)
+
+    # =========================================================================
+    # GARRISON - Fleet Health Monitoring
+    # =========================================================================
+
+    def _serve_garrison_status(self):
+        """Get fleet health status from Garrison."""
+        try:
+            from core.garrison import Garrison
+            garrison = Garrison()
+            report = garrison.get_fleet_health()
+            self._send_json(report.to_dict())
+        except Exception as e:
+            logger.exception("Error getting garrison status")
+            self._send_json({
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
+                "overall_status": "unknown",
+                "hosts": {},
+            })
+
+    def _serve_garrison_maintenance(self):
+        """Run garrison maintenance and return results."""
+        try:
+            from core.garrison import Garrison
+            garrison = Garrison()
+            actions = garrison.perform_maintenance(dry_run=False)
+            self._send_json({
+                "success": True,
+                "actions": actions,
+                "timestamp": datetime.now().isoformat(),
+            })
+        except Exception as e:
+            logger.exception("Error running garrison maintenance")
+            self._send_json({
+                "success": False,
+                "error": str(e),
+                "actions": [],
+            })
 
     # =========================================================================
     # FORGE - Data Validation and Queue Health

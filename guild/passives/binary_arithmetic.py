@@ -101,9 +101,11 @@ class BinaryArithmeticPassive(PassiveModule):
         if a == 0:
             a = 1 << random.randint(0, bits - 1)
         if b == 0:
-            pos = random.randint(0, bits - 1)
-            while (a >> pos) & 1:  # Find non-overlapping position
+            # Find non-overlapping position with iteration limit
+            for _ in range(100):
                 pos = random.randint(0, bits - 1)
+                if not ((a >> pos) & 1):
+                    break
             b = 1 << pos
 
         result = a + b
@@ -128,8 +130,10 @@ class BinaryArithmeticPassive(PassiveModule):
         a = random.randint(1, (1 << bits) - 1)
         b = random.randint(1, (1 << bits) - 1)
 
-        # Ensure at least one position carries
-        while (a & b) == 0:  # No overlapping bits = no carry
+        # Ensure at least one position carries (with iteration limit)
+        for _ in range(100):
+            if (a & b) != 0:
+                break
             b = random.randint(1, (1 << bits) - 1)
 
         result = a + b
@@ -181,8 +185,10 @@ class BinaryArithmeticPassive(PassiveModule):
         a = random.randint((1 << (bits - 1)), (1 << bits) - 1)  # Larger number
         b = random.randint(1, a - 1)  # Smaller number
 
-        # Ensure borrow is needed (b has a 1 where a has 0)
-        while (b & ~a) == 0:
+        # Ensure borrow is needed (b has a 1 where a has 0) - with iteration limit
+        for _ in range(100):
+            if (b & ~a) != 0:
+                break
             b = random.randint(1, a - 1)
 
         result = a - b
@@ -268,7 +274,10 @@ class BinaryArithmeticPassive(PassiveModule):
         bits = self._get_bits_for_level()
         a = random.randint(1, (1 << bits) - 1)
         b = random.randint(1, (1 << bits) - 1)
-        while a == b:
+        # Ensure a != b with iteration limit
+        for _ in range(100):
+            if a != b:
+                break
             b = random.randint(1, (1 << bits) - 1)
 
         a_bin = self._format_binary(a, bits)

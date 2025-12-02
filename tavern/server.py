@@ -1576,10 +1576,18 @@ class TavernHandler(SimpleHTTPRequestHandler):
                             last_acc = last_entry.get("accuracy", 0) * 100
                             last_eval_time = last_entry.get("timestamp")
 
+                        # Get mastered/training from last eval entry (more accurate)
+                        if history:
+                            mastered = last_entry.get("mastered_level", skill_state.get("current_level", 0))
+                            training = last_entry.get("training_level", mastered + 1)
+                        else:
+                            mastered = skill_state.get("current_level", 0)
+                            training = mastered + 1
+
                         skills_data[skill_id] = {
                             "current_level": skill_state.get("current_level", 0),
-                            "training_level": skill_state.get("current_level", 1),
-                            "mastered_level": max(0, skill_state.get("current_level", 1) - 1),
+                            "training_level": training,
+                            "mastered_level": mastered,
                             "recent_accuracy": recent_acc,
                             "last_accuracy": last_acc,
                             "last_eval_time": last_eval_time,

@@ -69,6 +69,9 @@ const GameState = {
     checkpointCount: 0,
     totalSize: 0,
     bestCheckpoint: null,
+
+    // State flags
+    realmSyncActive: false,
 };
 
 // ============================================
@@ -204,7 +207,7 @@ function initRealmStateSync() {
 
         // Update UI
         updateBattleStatus();
-        updateTrainingUI();
+        updateHeroStats();
     });
 
     // Subscribe to queue state changes
@@ -236,6 +239,7 @@ function initRealmStateSync() {
             GameState.sylloMastered = syData.mastered_level ?? GameState.sylloMastered ?? 0;
             GameState.sylloTraining = syData.training_level ?? GameState.sylloTraining ?? 1;
             GameState.sylloAcc = (syData.accuracy ?? syData.last_accuracy ?? 0) * 100;
+            if (syData.eval_count != null) GameState.sylloEvals = syData.eval_count;
         }
 
         // Update BIN skill
@@ -244,13 +248,17 @@ function initRealmStateSync() {
             GameState.binaryMastered = binData.mastered_level ?? GameState.binaryMastered ?? 0;
             GameState.binaryTraining = binData.training_level ?? GameState.binaryTraining ?? 1;
             GameState.binaryAcc = (binData.accuracy ?? binData.last_accuracy ?? 0) * 100;
+            if (binData.eval_count != null) GameState.binaryEvals = binData.eval_count;
         }
 
-        // Total level = sum of all MASTERED skill levels
-        GameState.totalLevel = GameState.sylloMastered + GameState.binaryMastered;
+        // Only update totals if we have actual skill data
+        if (syData || binData) {
+            GameState.totalLevel = GameState.sylloMastered + GameState.binaryMastered;
+            // Don't recompute totalEvals here - /api/game is authoritative for eval counts
+        }
 
-        // Update skill bars UI
-        updateSkillsUI();
+        // Update UI
+        renderSkills();
     });
 
     return true;
@@ -503,25 +511,13 @@ function renderLossChart(lossHistory) {
     }
 }
 
-// ============================================
-// DOM HELPERS
-// ============================================
-
-function $(selector) {
-    return document.querySelector(selector);
-}
-
-function $$(selector) {
-    return document.querySelectorAll(selector);
-}
-
 function setText(selector, text) {
-    const el = $(selector);
+    const el = document.querySelector(selector);
     if (el) el.textContent = text;
 }
 
 function setWidth(selector, percent) {
-    const el = $(selector);
+    const el = document.querySelector(selector);
     if (el) el.style.width = `${Math.min(100, Math.max(0, percent))}%`;
 }
 
@@ -563,8 +559,8 @@ function updateHeroStats() {
 }
 
 function updateBattleStatus() {
-    const battleStatus = $('#battleStatus');
-    const idleIndicator = $('#idleIndicator');
+    const battleStatus = document.querySelector('#battleStatus');
+    const idleIndicator = document.querySelector('#idleIndicator');
 
     if (GameState.isTraining) {
         // Training mode
@@ -654,7 +650,7 @@ async function fetchSkills() {
 }
 
 function renderSkills() {
-    const container = $('#skillsContainer');
+    const container = document.querySelector('#skillsContainer');
     if (!container || skillsData.length === 0) return;
 
     container.innerHTML = skillsData.map(skill => {
@@ -814,7 +810,7 @@ async function fetchSaga() {
 }
 
 function renderBattleLog(events) {
-    const container = $('#logEntries');
+    const container = document.querySelector('#logEntries');
     if (!container) return;
 
     // First load: replace everything
@@ -882,7 +878,7 @@ function getCategoryClass(category) {
 
 // Local log for immediate feedback (before chronicle catches up)
 function addLocalLog(message, type = 'info') {
-    const container = $('#logEntries');
+    const container = document.querySelector('#logEntries');
     if (!container) return;
 
     const time = new Date().toLocaleTimeString('en-US', { hour12: false });
@@ -989,7 +985,7 @@ function showSchemaError(errors) {
 // ============================================
 
 function showNotification(title, text, type = 'info') {
-    const container = $('#notifications');
+    const container = document.querySelector('#notifications');
     if (!container) return;
 
     const notification = document.createElement('div');
@@ -1084,7 +1080,7 @@ function processGameData(data) {
     // Training status - SKIP when RealmState is active (it's the source of truth)
     // This prevents rubber-banding between /api/game and RealmState
     const training = data.state?.training || data.training;
-    if (training && !realmSyncActive) {
+    if (training && !GameState.realmSyncActive) {
         // Only process training data from /api/game when RealmState is NOT active
         GameState.isTraining = training.status === 'training';
         GameState.currentStep = training.step ?? training.current_step ?? GameState.currentStep ?? 0;
@@ -1099,7 +1095,7 @@ function processGameData(data) {
 
         // POLICY 3: Check staleness and update warning
         updateFreshnessWarning(training);
-    } else if (training && realmSyncActive) {
+    } else if (training && GameState.realmSyncActive) {
         // When RealmState is active, only update quest progress (batch progress)
         // which isn't available from RealmState
         GameState.questProgress = training.progress_percent ?? GameState.questProgress ?? 0;
@@ -1124,7 +1120,7 @@ function processGameData(data) {
     // Curriculum (skills) - SKIP when RealmState is active (it handles skills)
     // This prevents rubber-banding between /api/game and RealmState
     const curriculum = data.curriculum;
-    if (curriculum?.skills && !realmSyncActive) {
+    if (curriculum?.skills && !GameState.realmSyncActive) {
         const skills = curriculum.skills;
 
         // Handle both old (syllo/binary) and new (sy/bin) skill IDs
@@ -1150,6 +1146,16 @@ function processGameData(data) {
         GameState.totalEvals = GameState.sylloEvals + GameState.binaryEvals;
     }
 
+    // Always update eval counts from /api/game (RealmState doesn't track these)
+    if (curriculum?.skills) {
+        const skills = curriculum.skills;
+        const syData = skills.sy || skills.syllo;
+        const binData = skills.bin || skills.binary;
+        if (syData) GameState.sylloEvals = syData.eval_count || 0;
+        if (binData) GameState.binaryEvals = binData.eval_count || 0;
+        GameState.totalEvals = GameState.sylloEvals + GameState.binaryEvals;
+    }
+
     // Determine current skill - always process skill_context from training (useful for both modes)
     if (training?.skill_context) {
         // Use authoritative skill context from training daemon
@@ -1164,7 +1170,7 @@ function processGameData(data) {
         GameState.skillTargetAcc = ctx.skill_target_accuracy
             ? ctx.skill_target_accuracy * 100
             : 80;
-    } else if (!realmSyncActive) {
+    } else if (!GameState.realmSyncActive) {
         // Fallback: infer from training file name (only when RealmState not active)
         const questName = (GameState.currentQuest || '').toLowerCase();
         if (questName.includes('syllo') || questName.includes('sy_')) {
@@ -1969,9 +1975,9 @@ function init() {
     fetchEffortHistory();
 
     // Try to use unified RealmState (single source of truth)
-    const realmSyncActive = initRealmStateSync();
+    GameState.realmSyncActive = initRealmStateSync();
 
-    if (realmSyncActive) {
+    if (GameState.realmSyncActive) {
         console.log('[Game] Using RealmState for training/queue/events data');
         // RealmState handles: training status, queue, battle log
         // We still need: GPU, vault, curriculum from /api/game

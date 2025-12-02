@@ -157,46 +157,6 @@
     }
   },
 
-  "skill_sy": {
-    "name": "Syllacrostic API",
-    "description": "SY skill server",
-    "command": ["python3", "guild/skills/servers/sy_server.py", "--port", "8080"],
-    "port": 8080,
-    "pid_file": ".pids/skill_sy.pid",
-    "required": false,
-    "depends_on": [],
-    "health_check": {
-      "type": "http",
-      "path": "/health",
-      "timeout": 5.0
-    },
-    "startup": {
-      "delay": 5.0,
-      "max_restarts": 3,
-      "restart_delay": 5
-    }
-  },
-
-  "skill_bin": {
-    "name": "Binary API",
-    "description": "BIN skill server",
-    "command": ["python3", "guild/skills/servers/bin_server.py", "--port", "8090"],
-    "port": 8090,
-    "pid_file": ".pids/skill_bin.pid",
-    "required": false,
-    "depends_on": [],
-    "health_check": {
-      "type": "http",
-      "path": "/health",
-      "timeout": 5.0
-    },
-    "startup": {
-      "delay": 5.0,
-      "max_restarts": 3,
-      "restart_delay": 5
-    }
-  },
-
   "garrison": {
     "name": "Garrison",
     "description": "Fleet health manager - the watchtower",

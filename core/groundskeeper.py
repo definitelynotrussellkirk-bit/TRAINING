@@ -5,6 +5,7 @@ Groundskeeper - Unified cleanup daemon for all leaky systems
 The Groundskeeper handles ALL cleanup tasks in one place:
 - JSONL file rotation (events.jsonl, job_history.jsonl, data_file_impact.jsonl)
 - Queue cleanup (recently_completed/ older than 7 days)
+- Eval queue cleanup (remove entries for deleted checkpoints)
 - Battle log cleanup (entries older than 7 days)
 - Log file rotation (delete logs older than 30 days)
 - Stale PID cleanup (remove PIDs for dead processes)
@@ -25,6 +26,7 @@ Usage:
     # Specific tasks only
     python3 core/groundskeeper.py --task jsonl
     python3 core/groundskeeper.py --task queue
+    python3 core/groundskeeper.py --task eval_queues
     python3 core/groundskeeper.py --task battle_log
     python3 core/groundskeeper.py --task logs
     python3 core/groundskeeper.py --task pids
@@ -332,6 +334,85 @@ class Groundskeeper:
         except Exception as e:
             result.errors.append(str(e))
             logger.error(f"Error cleaning queue: {e}")
+
+        return result
+
+    # ========== Eval Queue Cleanup ==========
+
+    def cleanup_eval_queues(self, dry_run: bool = False) -> CleanupResult:
+        """
+        Clean up eval and passive queues for non-existent checkpoints.
+
+        When checkpoints are deleted, their queued evaluations become stale.
+        This removes queue entries for checkpoints that no longer exist.
+        """
+        result = CleanupResult(task="eval_queues", dry_run=dry_run)
+
+        # Find existing checkpoint steps
+        checkpoint_dir = self.base_dir / "models" / "current_model"
+        existing_steps = set()
+
+        if checkpoint_dir.exists():
+            for ckpt in checkpoint_dir.glob("checkpoint-*"):
+                try:
+                    step = int(ckpt.name.split("-")[1])
+                    existing_steps.add(step)
+                except (ValueError, IndexError):
+                    pass
+
+        if not existing_steps:
+            logger.debug("No checkpoints found, skipping eval queue cleanup")
+            return result
+
+        # Clean passive queue
+        passive_queue_file = self.base_dir / "status" / "passive_queue.json"
+        if passive_queue_file.exists():
+            try:
+                with open(passive_queue_file) as f:
+                    data = json.load(f)
+
+                original_count = len(data.get("queue", []))
+                data["queue"] = [
+                    e for e in data.get("queue", [])
+                    if e.get("checkpoint_step") in existing_steps
+                ]
+                removed = original_count - len(data["queue"])
+
+                if removed > 0:
+                    if not dry_run:
+                        with open(passive_queue_file, "w") as f:
+                            json.dump(data, f, indent=2)
+                    result.items_cleaned += removed
+                    logger.info(f"Cleaned {removed} stale passive queue entries")
+
+            except Exception as e:
+                result.errors.append(f"Failed to clean passive queue: {e}")
+                logger.error(f"Error cleaning passive queue: {e}")
+
+        # Clean eval queue
+        eval_queue_file = self.base_dir / "status" / "eval_queue.json"
+        if eval_queue_file.exists():
+            try:
+                with open(eval_queue_file) as f:
+                    data = json.load(f)
+
+                original_count = len(data.get("queue", []))
+                data["queue"] = [
+                    e for e in data.get("queue", [])
+                    if e.get("checkpoint_step") in existing_steps
+                ]
+                removed = original_count - len(data["queue"])
+
+                if removed > 0:
+                    if not dry_run:
+                        with open(eval_queue_file, "w") as f:
+                            json.dump(data, f, indent=2)
+                    result.items_cleaned += removed
+                    logger.info(f"Cleaned {removed} stale eval queue entries")
+
+            except Exception as e:
+                result.errors.append(f"Failed to clean eval queue: {e}")
+                logger.error(f"Error cleaning eval queue: {e}")
 
         return result
 
@@ -708,6 +789,7 @@ class Groundskeeper:
         task_map = {
             "jsonl": self.rotate_jsonl_files,
             "queue": self.cleanup_queue,
+            "eval_queues": self.cleanup_eval_queues,
             "battle_log": self.cleanup_battle_log,
             "logs": self.cleanup_logs,
             "pids": self.cleanup_stale_pids,

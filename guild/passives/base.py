@@ -100,13 +100,16 @@ class PassiveModule(ABC):
             raise ValueError(f"{self.__class__.__name__} must define 'category' attribute")
 
     @abstractmethod
-    def generate_problems(self, count: int, seed: Optional[int] = None) -> List[Dict[str, Any]]:
+    def generate_problems(self, count: int, seed: Optional[int] = None, level: int = 1) -> List[Dict[str, Any]]:
         """
         Generate problems for evaluation.
 
         Args:
             count: Number of problems to generate
             seed: Optional random seed for reproducibility
+            level: Skill level (1-30) for difficulty scaling. Passives that
+                   support level-based difficulty should use this to adjust
+                   problem complexity. Default is 1 (easiest).
 
         Returns:
             List of dicts with at least:

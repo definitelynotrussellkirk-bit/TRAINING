@@ -22,9 +22,21 @@ class BinaryArithmeticPassive(PassiveModule):
     lite_count = 5
     full_count = 30
 
-    def generate_problems(self, count: int, seed: Optional[int] = None) -> List[Dict[str, Any]]:
+    def generate_problems(self, count: int, seed: Optional[int] = None, level: int = 1) -> List[Dict[str, Any]]:
+        """
+        Generate binary arithmetic problems.
+
+        Args:
+            count: Number of problems to generate
+            seed: Optional random seed
+            level: Skill level (1-30) - controls bit width:
+                   L1=3 bits, L7=8 bits, L15=16 bits, L30=32 bits
+        """
         if seed is not None:
             random.seed(seed)
+
+        # Store level for problem generators to use
+        self._current_level = level
 
         problems = []
         problem_types = [
@@ -46,6 +58,19 @@ class BinaryArithmeticPassive(PassiveModule):
 
         return problems
 
+    def _get_bits_for_level(self) -> int:
+        """
+        Get bit width based on current level.
+
+        Matches bin.yaml level progression:
+        L1=2bits, L7=8bits, L15=16bits, L20=21bits, L25=26bits, L30=32bits
+        """
+        level = getattr(self, '_current_level', 1)
+        # Linear interpolation: level 1 = 2 bits, level 30 = 32 bits
+        # bits = 2 + (level - 1) * (32 - 2) / (30 - 1) ≈ 2 + level
+        bits = min(2 + level, 32)
+        return bits
+
     def _format_binary(self, n: int, min_bits: int = 4) -> str:
         """Format number as binary string without 0b prefix."""
         if n < 0:
@@ -56,7 +81,7 @@ class BinaryArithmeticPassive(PassiveModule):
     def _binary_add_no_carry(self) -> Dict[str, Any]:
         """Generate binary addition that doesn't require carry."""
         # Create numbers with non-overlapping bits (no carry needed)
-        bits = random.randint(3, 6)
+        bits = self._get_bits_for_level()
         # Use sparse bit patterns that don't overlap
         a = 0
         b = 0
@@ -93,7 +118,7 @@ class BinaryArithmeticPassive(PassiveModule):
 
     def _binary_add_with_carry(self) -> Dict[str, Any]:
         """Generate binary addition that requires carry."""
-        bits = random.randint(3, 6)
+        bits = self._get_bits_for_level()
         # Create numbers with overlapping bits to force carry
         a = random.randint(1, (1 << bits) - 1)
         b = random.randint(1, (1 << bits) - 1)
@@ -119,7 +144,7 @@ class BinaryArithmeticPassive(PassiveModule):
 
     def _binary_sub_no_borrow(self) -> Dict[str, Any]:
         """Generate binary subtraction without borrowing."""
-        bits = random.randint(3, 6)
+        bits = self._get_bits_for_level()
         # Ensure a >= b and no borrowing needed (a has 1 everywhere b has 1)
         b = random.randint(1, (1 << bits) - 1)
         # Make a have all bits of b plus some extras
@@ -146,7 +171,7 @@ class BinaryArithmeticPassive(PassiveModule):
 
     def _binary_sub_with_borrow(self) -> Dict[str, Any]:
         """Generate binary subtraction that requires borrowing."""
-        bits = random.randint(3, 6)
+        bits = self._get_bits_for_level()
         # Create situation where borrowing is needed
         a = random.randint((1 << (bits - 1)), (1 << bits) - 1)  # Larger number
         b = random.randint(1, a - 1)  # Smaller number
@@ -172,7 +197,7 @@ class BinaryArithmeticPassive(PassiveModule):
 
     def _bitwise_and(self) -> Dict[str, Any]:
         """Generate bitwise AND problem."""
-        bits = random.randint(4, 6)
+        bits = self._get_bits_for_level()
         a = random.randint(1, (1 << bits) - 1)
         b = random.randint(1, (1 << bits) - 1)
         result = a & b
@@ -193,7 +218,7 @@ class BinaryArithmeticPassive(PassiveModule):
 
     def _bitwise_or(self) -> Dict[str, Any]:
         """Generate bitwise OR problem."""
-        bits = random.randint(4, 6)
+        bits = self._get_bits_for_level()
         a = random.randint(1, (1 << bits) - 1)
         b = random.randint(1, (1 << bits) - 1)
         result = a | b
@@ -214,7 +239,7 @@ class BinaryArithmeticPassive(PassiveModule):
 
     def _bitwise_xor(self) -> Dict[str, Any]:
         """Generate bitwise XOR problem."""
-        bits = random.randint(4, 6)
+        bits = self._get_bits_for_level()
         a = random.randint(1, (1 << bits) - 1)
         b = random.randint(1, (1 << bits) - 1)
         result = a ^ b
@@ -235,7 +260,7 @@ class BinaryArithmeticPassive(PassiveModule):
 
     def _binary_compare(self) -> Dict[str, Any]:
         """Generate binary comparison problem."""
-        bits = random.randint(4, 6)
+        bits = self._get_bits_for_level()
         a = random.randint(1, (1 << bits) - 1)
         b = random.randint(1, (1 << bits) - 1)
         while a == b:
@@ -256,7 +281,7 @@ class BinaryArithmeticPassive(PassiveModule):
 
     def _binary_to_decimal(self) -> Dict[str, Any]:
         """Generate binary to decimal conversion."""
-        bits = random.randint(4, 8)
+        bits = self._get_bits_for_level()
         n = random.randint(1, (1 << bits) - 1)
         n_bin = self._format_binary(n, bits)
 
@@ -271,7 +296,8 @@ class BinaryArithmeticPassive(PassiveModule):
 
     def _decimal_to_binary(self) -> Dict[str, Any]:
         """Generate decimal to binary conversion."""
-        n = random.randint(1, 255)
+        bits = self._get_bits_for_level()
+        n = random.randint(1, (1 << bits) - 1)
         n_bin = self._format_binary(n)
 
         return {

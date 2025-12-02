@@ -70,17 +70,17 @@ class PassiveAdapter:
 
         Args:
             skill_id: Skill this batch is for
-            level: Skill level (passed to batch metadata, not used by most passives)
+            level: Skill level (passed to passive for difficulty scaling)
             count: Number of problems to generate
             seed: Optional random seed for reproducibility
 
         Returns:
             EvalBatch containing problems for evaluation
         """
-        logger.debug(f"Generating {count} eval problems from passive {self.passive.id}")
+        logger.debug(f"Generating {count} eval problems from passive {self.passive.id} at level {level}")
 
-        # Generate raw problems from passive
-        problems_raw = self.passive.generate_problems(count=count, seed=seed)
+        # Generate raw problems from passive (pass level for difficulty scaling)
+        problems_raw = self.passive.generate_problems(count=count, seed=seed, level=level)
 
         # Convert to EvalProblem format
         problems = []

@@ -1453,6 +1453,17 @@ class TavernHandler(SimpleHTTPRequestHandler):
             except Exception as e:
                 logger.warning(f"Failed to get GPU stats: {e}")
 
+            # 2b. System RAM stats
+            try:
+                import psutil
+                mem = psutil.virtual_memory()
+                response["system"] = {
+                    "ram_used_gb": (mem.total - mem.available) / (1024**3),
+                    "ram_total_gb": mem.total / (1024**3),
+                }
+            except Exception as e:
+                logger.warning(f"Failed to get RAM stats: {e}")
+
             # 3. Curriculum state (campaign-specific if available)
             curriculum_file = None
             try:

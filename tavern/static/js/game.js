@@ -60,6 +60,8 @@ const GameState = {
     // GPU (real hardware stats)
     vramUsed: 0,
     vramTotal: 24,
+    ramUsed: 0,
+    ramTotal: 0,
     gpuTemp: 0,
     gpuUtil: 0,
 
@@ -1027,6 +1029,13 @@ function processGameData(data) {
         GameState.vramTotal = gpu.vram_total_gb || 24;
         GameState.gpuTemp = gpu.temperature_c || 0;
         GameState.gpuUtil = gpu.utilization_pct || 0;
+    }
+
+    // System RAM stats
+    const system = data.system;
+    if (system) {
+        GameState.ramUsed = system.ram_used_gb || 0;
+        GameState.ramTotal = system.ram_total_gb || 0;
     }
 
     // Curriculum (skills)
@@ -2825,22 +2834,28 @@ const RPGFlair = {
         const staminaFill = document.getElementById('staminaBarFill');
         const staminaText = document.getElementById('staminaBarText');
 
-        // VRAM as HP
+        // VRAM as HP (round total to nearest integer for cleaner display)
+        const vramTotalRounded = Math.round(GameState.vramTotal || 24);
         if (hpFill && GameState.vramTotal > 0) {
             const pct = (GameState.vramUsed / GameState.vramTotal) * 100;
             hpFill.style.width = `${pct}%`;
         }
         if (hpText) {
-            hpText.textContent = `${GameState.vramUsed?.toFixed(1) || '--'} / ${GameState.vramTotal || 24} GB`;
+            hpText.textContent = `${GameState.vramUsed?.toFixed(1) || '--'} / ${vramTotalRounded} GB`;
         }
 
-        // RAM as MP (estimate or placeholder)
-        // Could fetch from /api/system in the future
-        if (mpFill) {
-            mpFill.style.width = '45%'; // Placeholder
+        // RAM as MP
+        const ramTotalRounded = Math.round(GameState.ramTotal || 0);
+        if (mpFill && GameState.ramTotal > 0) {
+            const pct = (GameState.ramUsed / GameState.ramTotal) * 100;
+            mpFill.style.width = `${pct}%`;
         }
         if (mpText) {
-            mpText.textContent = '-- / -- GB';
+            if (GameState.ramTotal > 0) {
+                mpText.textContent = `${GameState.ramUsed?.toFixed(1) || '--'} / ${ramTotalRounded} GB`;
+            } else {
+                mpText.textContent = '-- / -- GB';
+            }
         }
 
         // GPU Utilization as Stamina

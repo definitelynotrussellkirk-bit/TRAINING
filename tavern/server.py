@@ -3722,12 +3722,45 @@ class TavernHandler(SimpleHTTPRequestHandler):
     # =========================================================================
 
     def _serve_garrison_status(self):
-        """Get fleet health status from Garrison."""
+        """Get fleet health status from Garrison.
+
+        By default, reads from cached status file for instant response.
+        Use ?fresh=true to force a live scan.
+        """
+        from urllib.parse import urlparse, parse_qs
+        import time
+
         try:
+            # Parse query params
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            force_fresh = params.get('fresh', [''])[0].lower() == 'true'
+
+            # Check for cached data first (unless fresh requested)
+            from core.paths import get_base_dir
+            status_file = get_base_dir() / "status" / "garrison.json"
+
+            if not force_fresh and status_file.exists():
+                file_age = time.time() - status_file.stat().st_mtime
+                max_age = 300  # 5 minutes
+
+                if file_age < max_age:
+                    # Serve cached data
+                    with open(status_file) as f:
+                        cached_data = json.load(f)
+                    cached_data["_cached"] = True
+                    cached_data["_cache_age_seconds"] = int(file_age)
+                    self._send_json(cached_data)
+                    return
+
+            # Do live scan
             from core.garrison import Garrison
             garrison = Garrison()
             report = garrison.get_fleet_health()
-            self._send_json(report.to_dict())
+            result = report.to_dict()
+            result["_cached"] = False
+            self._send_json(result)
+
         except Exception as e:
             logger.exception("Error getting garrison status")
             self._send_json({

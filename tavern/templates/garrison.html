@@ -15,7 +15,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
 
@@ -69,7 +69,7 @@
             background: linear-gradient(135deg, #3a1a1a 0%, #2a0d0d 100%);
             border: 2px solid #f44336;
         }
-        .status-unknown {
+        .status-unknown, .status-offline {
             background: #252538;
             border: 2px solid #666;
         }
@@ -78,10 +78,48 @@
             font-size: 2rem;
         }
 
+        /* Zones summary */
+        .zones-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .zone-card {
+            background: #252538;
+            border-radius: 8px;
+            padding: 16px;
+            border-left: 4px solid;
+        }
+
+        .zone-card.hot { border-left-color: #f44336; }
+        .zone-card.warm { border-left-color: #ffa726; }
+        .zone-card.cold { border-left-color: #2196F3; }
+
+        .zone-name {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .zone-percent {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .zone-detail {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 4px;
+        }
+
         /* Host grid */
         .hosts-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
             gap: 20px;
             margin-bottom: 24px;
         }
@@ -91,40 +129,79 @@
             border-radius: 12px;
             padding: 20px;
             border: 1px solid #333;
+            position: relative;
+        }
+
+        /* Role-based styling */
+        .host-card.role-trainer {
+            border-top: 3px solid #ffd700;
+        }
+        .host-card.role-inference {
+            border-top: 3px solid #9c27b0;
+        }
+        .host-card.role-storage {
+            border-top: 3px solid #2196F3;
+        }
+        .host-card.role-worker {
+            border-top: 3px solid #4CAF50;
         }
 
         .host-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 16px;
             padding-bottom: 12px;
             border-bottom: 1px solid #333;
         }
 
         .host-name {
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             font-weight: 600;
             color: #fff;
         }
+
+        .host-ip {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        .host-roles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .role-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #333;
+            color: #aaa;
+        }
+
+        .role-badge.trainer { background: #3d3d00; color: #ffd700; }
+        .role-badge.inference { background: #2d1a3d; color: #ce93d8; }
+        .role-badge.eval_worker { background: #1a3d1a; color: #a5d6a7; }
+        .role-badge.data_forge { background: #3d2a1a; color: #ffcc80; }
+        .role-badge.storage_warm { background: #1a2a3d; color: #90caf9; }
+        .role-badge.storage_cold { background: #1a1a3d; color: #9fa8da; }
 
         .host-status {
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 0.85rem;
             font-weight: 500;
+            white-space: nowrap;
         }
 
         .host-status.healthy { background: #1b5e20; color: #a5d6a7; }
         .host-status.warning { background: #e65100; color: #ffcc80; }
         .host-status.critical { background: #b71c1c; color: #ef9a9a; }
         .host-status.unknown { background: #424242; color: #bdbdbd; }
-
-        .host-ip {
-            color: #888;
-            font-size: 0.9rem;
-            margin-top: 4px;
-        }
+        .host-status.offline { background: #37474f; color: #90a4ae; }
 
         /* Metrics grid */
         .metrics-grid {
@@ -138,6 +215,10 @@
             background: #1a1a2e;
             border-radius: 8px;
             padding: 12px;
+        }
+
+        .metric-box.wide {
+            grid-column: span 2;
         }
 
         .metric-label {
@@ -181,6 +262,35 @@
         .progress-fill.good { background: #4CAF50; }
         .progress-fill.warning { background: #ffa726; }
         .progress-fill.critical { background: #f44336; }
+
+        /* Volumes section (for NAS) */
+        .volumes-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #333;
+        }
+
+        .volumes-title {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .volume-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 0.85rem;
+        }
+
+        .volume-path {
+            color: #aaa;
+        }
+
+        .volume-stats {
+            color: #666;
+        }
 
         /* Services list */
         .services-section {
@@ -227,6 +337,18 @@
             color: #ffcc80;
             margin-bottom: 6px;
         }
+
+        /* RAID status */
+        .raid-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .raid-status.healthy { background: #1b5e20; color: #a5d6a7; }
+        .raid-status.degraded { background: #b71c1c; color: #ef9a9a; }
 
         /* Uptime */
         .uptime {
@@ -297,12 +419,50 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* Alerts section */
+        .alerts-section {
+            background: #2a1a1a;
+            border: 1px solid #5a2a2a;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .alerts-title {
+            color: #f44336;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .alert-item {
+            padding: 8px 12px;
+            background: #3a1a1a;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: #ffcdd2;
+        }
+
+        .alert-item:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Host count badges */
+        .host-count {
+            background: #333;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            color: #888;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Garrison</h1>
+            <h1>Garrison <span class="host-count" id="host-count">0 hosts</span></h1>
             <nav class="nav-links">
                 <a href="/">Tavern</a>
                 <a href="/guild">Guild</a>
@@ -313,6 +473,7 @@
 
         <div class="actions">
             <button class="btn btn-primary" onclick="refreshStatus()">Refresh</button>
+            <button class="btn btn-secondary" onclick="refreshStatus(true)">Live Scan</button>
             <button class="btn btn-secondary" onclick="runMaintenance()">Run Maintenance</button>
         </div>
 
@@ -320,6 +481,10 @@
             <span class="status-icon">?</span>
             <span>Loading fleet status...</span>
         </div>
+
+        <div id="alerts-container"></div>
+
+        <div id="zones-container" class="zones-summary" style="display: none;"></div>
 
         <div id="hosts-container" class="hosts-grid">
             <div class="loading">
@@ -349,16 +514,97 @@
             return mb.toFixed(0) + ' MB';
         }
 
-        function renderHost(hostId, host) {
-            const status = host.status || 'unknown';
-            const name = host.services?.name || hostId;
+        function getRoleClass(host) {
+            const roles = host.roles || [];
+            if (roles.includes('trainer') || roles.includes('control_plane')) return 'role-trainer';
+            if (roles.includes('inference')) return 'role-inference';
+            if (roles.includes('storage_warm') || roles.includes('storage_cold')) return 'role-storage';
+            if (roles.includes('eval_worker') || roles.includes('data_forge')) return 'role-worker';
+            return '';
+        }
+
+        function renderZones(zones) {
+            const container = document.getElementById('zones-container');
+            if (!zones || Object.keys(zones).length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            let hasData = false;
+            let html = '';
+
+            for (const [zoneName, stats] of Object.entries(zones)) {
+                if (stats.total_gb > 0) {
+                    hasData = true;
+                    const percentClass = getProgressClass(stats.percent);
+                    html += `
+                        <div class="zone-card ${zoneName}">
+                            <div class="zone-name">${zoneName} Zone</div>
+                            <div class="zone-percent ${percentClass}">${stats.percent.toFixed(1)}%</div>
+                            <div class="zone-detail">${stats.used_gb.toFixed(0)} GB / ${stats.total_gb.toFixed(0)} GB</div>
+                            <div class="zone-detail">${stats.devices.length} device(s)</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill ${percentClass}" style="width: ${stats.percent}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            if (hasData) {
+                container.innerHTML = html;
+                container.style.display = 'grid';
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
+        function renderAlerts(alerts) {
+            const container = document.getElementById('alerts-container');
+            if (!alerts || alerts.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
 
             let html = `
-                <div class="host-card">
+                <div class="alerts-section">
+                    <div class="alerts-title">Alerts (${alerts.length})</div>
+            `;
+
+            for (const alert of alerts) {
+                html += `<div class="alert-item">${alert}</div>`;
+            }
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderHost(hostId, host) {
+            const status = host.status || 'unknown';
+            const name = host.name || hostId;
+            const roleClass = getRoleClass(host);
+
+            let html = `
+                <div class="host-card ${roleClass}">
                     <div class="host-header">
                         <div>
                             <div class="host-name">${name}</div>
                             <div class="host-ip">${host.host}</div>
+            `;
+
+            // Role badges
+            if (host.roles && host.roles.length > 0) {
+                html += '<div class="host-roles">';
+                for (const role of host.roles.slice(0, 4)) {
+                    html += `<span class="role-badge ${role}">${role.replace('_', ' ')}</span>`;
+                }
+                if (host.roles.length > 4) {
+                    html += `<span class="role-badge">+${host.roles.length - 4}</span>`;
+                }
+                html += '</div>';
+            }
+
+            html += `
                         </div>
                         <span class="host-status ${status}">${status.toUpperCase()}</span>
                     </div>
@@ -367,7 +613,7 @@
             `;
 
             // Disk
-            if (host.disk_percent !== null) {
+            if (host.disk_percent !== null && host.disk_percent !== undefined) {
                 const diskClass = getProgressClass(host.disk_percent);
                 html += `
                     <div class="metric-box">
@@ -382,7 +628,7 @@
             }
 
             // RAM
-            if (host.ram_percent !== null) {
+            if (host.ram_percent !== null && host.ram_percent !== undefined) {
                 const ramClass = getProgressClass(host.ram_percent);
                 html += `
                     <div class="metric-box">
@@ -396,14 +642,35 @@
                 `;
             }
 
+            // Load Average (for CPU workers)
+            if (host.load_avg_1m !== null && host.load_avg_1m !== undefined) {
+                const cores = host.cpu_cores || 1;
+                const loadPercent = (host.load_avg_1m / cores) * 100;
+                const loadClass = loadPercent >= 100 ? 'critical' : loadPercent >= 80 ? 'warning' : 'good';
+                html += `
+                    <div class="metric-box">
+                        <div class="metric-label">Load (1/5/15m)</div>
+                        <div class="metric-value ${loadClass}">${host.load_avg_1m.toFixed(2)}</div>
+                        <div class="metric-detail">${host.load_avg_5m?.toFixed(2) || '?'} / ${host.load_avg_15m?.toFixed(2) || '?'}${host.cpu_cores ? ' (' + host.cpu_cores + ' cores)' : ''}</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill ${loadClass}" style="width: ${Math.min(loadPercent, 100)}%"></div>
+                        </div>
+                    </div>
+                `;
+            }
+
             // GPU Memory
-            if (host.gpu_memory_percent !== null) {
+            if (host.gpu_memory_percent !== null && host.gpu_memory_percent !== undefined) {
                 const gpuClass = getProgressClass(host.gpu_memory_percent);
+                let gpuDetail = `${formatBytes(host.gpu_memory_used_mb || 0)} / ${formatBytes(host.gpu_memory_total_mb || 0)}`;
+                if (host.gpu_utilization !== null && host.gpu_utilization !== undefined) {
+                    gpuDetail += ` (${host.gpu_utilization.toFixed(0)}% util)`;
+                }
                 html += `
                     <div class="metric-box">
                         <div class="metric-label">GPU Memory</div>
                         <div class="metric-value ${gpuClass}">${host.gpu_memory_percent.toFixed(0)}%</div>
-                        <div class="metric-detail">${formatBytes(host.gpu_memory_used_mb || 0)} / ${formatBytes(host.gpu_memory_total_mb || 0)}</div>
+                        <div class="metric-detail">${gpuDetail}</div>
                         <div class="progress-bar">
                             <div class="progress-fill ${gpuClass}" style="width: ${host.gpu_memory_percent}%"></div>
                         </div>
@@ -412,19 +679,23 @@
             }
 
             // GPU Temp
-            if (host.gpu_temp_c !== null) {
+            if (host.gpu_temp_c !== null && host.gpu_temp_c !== undefined) {
                 const tempClass = host.gpu_temp_c >= 80 ? 'critical' : host.gpu_temp_c >= 70 ? 'warning' : 'good';
+                let tempDetail = host.gpu_name || 'GPU';
+                if (host.gpu_power_watts) {
+                    tempDetail += ` (${host.gpu_power_watts.toFixed(0)}W)`;
+                }
                 html += `
                     <div class="metric-box">
                         <div class="metric-label">GPU Temp</div>
                         <div class="metric-value ${tempClass}">${host.gpu_temp_c.toFixed(0)}°C</div>
-                        <div class="metric-detail">${host.gpu_name || 'GPU'}</div>
+                        <div class="metric-detail">${tempDetail}</div>
                     </div>
                 `;
             }
 
-            // CPU Temp (if available)
-            if (host.cpu_temp_c !== null) {
+            // CPU Temp (if available and no GPU)
+            if (host.cpu_temp_c !== null && host.cpu_temp_c !== undefined && host.gpu_temp_c === null) {
                 const tempClass = host.cpu_temp_c >= 80 ? 'critical' : host.cpu_temp_c >= 70 ? 'warning' : 'good';
                 html += `
                     <div class="metric-box">
@@ -435,6 +706,37 @@
             }
 
             html += `</div>`; // Close metrics-grid
+
+            // Volumes (for NAS)
+            if (host.volumes && host.volumes.length > 0) {
+                html += `
+                    <div class="volumes-section">
+                        <div class="volumes-title">Volumes</div>
+                `;
+                for (const vol of host.volumes) {
+                    const volClass = getProgressClass(vol.percent);
+                    html += `
+                        <div class="volume-item">
+                            <span class="volume-path">${vol.path}</span>
+                            <span class="volume-stats ${volClass}">${vol.percent.toFixed(0)}% (${vol.free_gb.toFixed(0)}GB free)</span>
+                        </div>
+                        <div class="progress-bar" style="margin-top: 4px; margin-bottom: 8px;">
+                            <div class="progress-fill ${volClass}" style="width: ${vol.percent}%"></div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
+            // RAID status
+            if (host.raid_status) {
+                const raidClass = host.raid_status === 'HEALTHY' ? 'healthy' : 'degraded';
+                html += `
+                    <div style="margin-top: 12px;">
+                        <span class="raid-status ${raidClass}">RAID: ${host.raid_status}</span>
+                    </div>
+                `;
+            }
 
             // Services
             const services = host.services || {};
@@ -463,7 +765,7 @@
             if (host.issues && host.issues.length > 0) {
                 html += `<div class="issues-section">`;
                 for (const issue of host.issues) {
-                    html += `<div class="issue-item">⚠ ${issue}</div>`;
+                    html += `<div class="issue-item">&#9888; ${issue}</div>`;
                 }
                 html += `</div>`;
             }
@@ -480,37 +782,69 @@
         function renderStatus(data) {
             statusData = data;
 
+            // Update host count
+            const hostCount = Object.keys(data.hosts || {}).length;
+            document.getElementById('host-count').textContent = `${hostCount} hosts`;
+
             // Update banner
             const banner = document.getElementById('status-banner');
             const status = data.overall_status || 'unknown';
-            const icons = { healthy: '✓', warning: '⚠', critical: '✗', unknown: '?' };
+            const icons = { healthy: '&#10003;', warning: '&#9888;', critical: '&#10007;', unknown: '?', offline: '&#9675;' };
             banner.className = `status-banner status-${status}`;
             banner.innerHTML = `
                 <span class="status-icon">${icons[status] || '?'}</span>
                 <span>Fleet Status: ${status.toUpperCase()}</span>
             `;
 
-            // Render hosts
+            // Render alerts
+            renderAlerts(data.alerts);
+
+            // Render zones
+            renderZones(data.zones);
+
+            // Render hosts (sorted by role priority)
             const container = document.getElementById('hosts-container');
             let html = '';
 
-            for (const [hostId, host] of Object.entries(data.hosts || {})) {
+            // Sort hosts: trainer > inference > storage > workers
+            const sortedHosts = Object.entries(data.hosts || {}).sort(([, a], [, b]) => {
+                const priority = (host) => {
+                    const roles = host.roles || [];
+                    if (roles.includes('trainer') || roles.includes('control_plane')) return 0;
+                    if (roles.includes('inference')) return 1;
+                    if (roles.includes('storage_warm') || roles.includes('storage_cold')) return 2;
+                    return 3;
+                };
+                return priority(a) - priority(b);
+            });
+
+            for (const [hostId, host] of sortedHosts) {
                 html += renderHost(hostId, host);
             }
 
             container.innerHTML = html || '<p>No hosts found</p>';
 
-            // Update timestamp
+            // Update timestamp with cache info
             const lastUpdated = document.getElementById('last-updated');
-            lastUpdated.textContent = `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
+            let timeText = `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
+            if (data._cached) {
+                const ageMin = Math.floor(data._cache_age_seconds / 60);
+                const ageSec = data._cache_age_seconds % 60;
+                timeText += ` (cached ${ageMin}m ${ageSec}s ago)`;
+            } else {
+                timeText += ' (live)';
+            }
+            lastUpdated.textContent = timeText;
         }
 
-        async function refreshStatus() {
+        async function refreshStatus(forceFresh = false) {
             try {
                 const container = document.getElementById('hosts-container');
-                container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Refreshing...</p></div>';
+                const loadingMsg = forceFresh ? 'Scanning fleet...' : 'Refreshing...';
+                container.innerHTML = `<div class="loading"><div class="spinner"></div><p>${loadingMsg}</p></div>`;
 
-                const response = await fetch('/api/garrison');
+                const url = forceFresh ? '/api/garrison?fresh=true' : '/api/garrison';
+                const response = await fetch(url);
                 const data = await response.json();
                 renderStatus(data);
             } catch (error) {

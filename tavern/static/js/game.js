@@ -634,19 +634,40 @@ function renderSkills() {
         const isActive = skill.id === GameState.currentSkill?.toLowerCase() ||
                         skill.short_name === GameState.currentSkill;
 
+        // Format time ago for last eval
+        let timeAgo = '';
+        if (skill.last_eval_time) {
+            const evalDate = new Date(skill.last_eval_time);
+            const now = new Date();
+            const diffMs = now - evalDate;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) timeAgo = 'just now';
+            else if (diffMins < 60) timeAgo = `${diffMins}m ago`;
+            else if (diffHours < 24) timeAgo = `${diffHours}h ago`;
+            else timeAgo = `${diffDays}d ago`;
+        }
+
+        // Last accuracy with time indicator
+        const lastAccDisplay = skill.last_accuracy !== undefined
+            ? `${skill.last_accuracy.toFixed(0)}%${timeAgo ? ` <span class="eval-time">(${timeAgo})</span>` : ''}`
+            : '--';
+
         return `
             <div class="skill-card clickable ${isActive ? 'active' : ''}" data-skill="${skill.id}" style="--skill-color: ${skill.color}">
                 <div class="skill-header">
                     <span class="skill-icon">${skill.icon}</span>
                     <span class="skill-name">${skill.short_name}</span>
-                    <span class="skill-level">L${skill.mastered_level}/${skill.max_level}</span>
+                    <span class="skill-level">${progressPct.toFixed(0)}%</span>
                 </div>
                 <div class="skill-bar-container">
                     <div class="skill-bar" style="width: ${progressPct}%; background: ${skill.color}"></div>
                 </div>
                 <div class="skill-meta">
-                    <span class="skill-acc">${skill.accuracy.toFixed(1)}%</span>
-                    <span class="skill-desc">${skill.rpg_name}</span>
+                    <span class="skill-acc">${lastAccDisplay}</span>
+                    <span class="skill-desc">L${skill.mastered_level}/${skill.max_level}</span>
                 </div>
                 <div class="skill-training">
                     Training L${skill.training_level}
@@ -2514,12 +2535,26 @@ const RPGFlair = {
     minimapCols: 5,
     minimapRows: 3,
     minimapTerrain: [],
-    minimapStructures: [
-        { x: 0, y: 0, icon: '🏰', name: 'Tavern' },
-        { x: 4, y: 0, icon: '🏛️', name: 'Guild' },
-        { x: 4, y: 2, icon: '🗃️', name: 'Vault' },
-        { x: 0, y: 2, icon: '🔮', name: 'Oracle' },
+    // All possible locations (randomly selected for display)
+    allLocations: [
+        { icon: '🏰', name: 'Tavern', url: '/' },
+        { icon: '🏛️', name: 'Guild', url: '/guild' },
+        { icon: '🗝️', name: 'Vault', url: '/vault' },
+        { icon: '🔮', name: 'Oracle', url: '/oracle' },
+        { icon: '🛕', name: 'Temple', url: '/temple' },
+        { icon: '📜', name: 'Quests', url: '/quests' },
+        { icon: '🛡️', name: 'Garrison', url: '/garrison' },
+        { icon: '🔥', name: 'Forge', url: '/forge' },
+        { icon: '📋', name: 'Jobs', url: '/jobs' },
     ],
+    // Corner positions for structures
+    cornerPositions: [
+        { x: 0, y: 0 },  // top-left
+        { x: 4, y: 0 },  // top-right
+        { x: 0, y: 2 },  // bottom-left
+        { x: 4, y: 2 },  // bottom-right
+    ],
+    minimapStructures: [],  // Populated randomly on init
 
     // Room descriptions
     roomDescriptions: [
@@ -2588,6 +2623,14 @@ const RPGFlair = {
 
         mapEl.innerHTML = '';
 
+        // Randomly select 4 locations from the pool
+        const shuffled = [...this.allLocations].sort(() => Math.random() - 0.5);
+        this.minimapStructures = shuffled.slice(0, 4).map((loc, i) => ({
+            ...loc,
+            x: this.cornerPositions[i].x,
+            y: this.cornerPositions[i].y,
+        }));
+
         // Add random terrain
         const terrainTypes = ['🌲', '🪨', '🌿', ''];
         for (let y = 0; y < this.minimapRows; y++) {
@@ -2609,7 +2652,7 @@ const RPGFlair = {
             }
         }
 
-        // Add structures
+        // Add structures (clickable)
         for (const struct of this.minimapStructures) {
             const el = document.createElement('div');
             el.className = 'minimap-cell minimap-structure';
@@ -2617,6 +2660,8 @@ const RPGFlair = {
             el.title = struct.name;
             el.style.left = `${10 + struct.x * 25}px`;
             el.style.top = `${10 + struct.y * 25}px`;
+            el.style.cursor = 'pointer';
+            el.onclick = () => window.location.href = struct.url;
             mapEl.appendChild(el);
         }
 

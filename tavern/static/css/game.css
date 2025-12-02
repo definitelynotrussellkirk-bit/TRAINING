@@ -709,6 +709,12 @@ body {
     color: var(--text-muted);
 }
 
+.eval-time {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
 .skill-training {
     font-size: 0.7rem;
     color: var(--text-muted);

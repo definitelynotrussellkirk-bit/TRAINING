@@ -205,6 +205,18 @@ class EvalWorker(BaseWorker):
 
                 checkpoint_step = extract_checkpoint_step(checkpoint_path or checkpoint_id)
 
+                # Extract problem-level details from result items
+                problems = []
+                for i, item in enumerate(result.items):
+                    problems.append({
+                        "problem_idx": i,
+                        "correct": item.is_correct,
+                        "expected": item.problem.expected if item.problem else "",
+                        "got": item.model_answer,
+                        "prompt": item.problem.prompt if item.problem else "",
+                        "primitive_id": item.primitive_id,
+                    })
+
                 record_job_eval(
                     job_id=job_id,
                     skill_id=skill_id,
@@ -222,6 +234,7 @@ class EvalWorker(BaseWorker):
                     started_at=started_at,
                     ended_at=ended_at,
                     per_primitive=result.per_primitive_accuracy,
+                    problems=problems,
                 )
                 logger.info(f"Recorded eval to ledger: {skill_id} L{level} = {result.accuracy:.1%}")
             except Exception as e:

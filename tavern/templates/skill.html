@@ -658,16 +658,17 @@
                 </div>
                 <div class="skill-stats-row">
                     <div class="skill-stat-box">
-                        <div class="skill-stat-value" id="masteredLevel">0</div>
-                        <div class="skill-stat-label">Mastered</div>
+                        <div class="skill-stat-value" id="masteryPct">0%</div>
+                        <div class="skill-stat-label">Mastery</div>
                     </div>
                     <div class="skill-stat-box">
-                        <div class="skill-stat-value" id="trainingLevel">1</div>
-                        <div class="skill-stat-label">Training</div>
+                        <div class="skill-stat-value" id="masteredLevel">0</div>
+                        <div class="skill-stat-label">Level</div>
                     </div>
                     <div class="skill-stat-box">
                         <div class="skill-stat-value" id="accuracy">0%</div>
-                        <div class="skill-stat-label">Accuracy</div>
+                        <div class="skill-stat-label">Last Acc</div>
+                        <div class="skill-stat-sub" id="lastEvalTime" style="font-size: 0.7em; color: #888;">--</div>
                     </div>
                 </div>
             </div>
@@ -676,7 +677,7 @@
             <div class="skill-content">
                 <!-- Description -->
                 <div class="skill-card">
-                    <h3>📜 Description</h3>
+                    <h3>📋 Description</h3>
                     <p class="skill-description" id="skillDescription">-</p>
                     <div class="rpg-description" id="rpgDescription">-</div>
                 </div>
@@ -736,7 +737,7 @@
 
                 <!-- Accuracy History -->
                 <div class="skill-card">
-                    <h3>🎯 Recent Accuracy</h3>
+                    <h3>⚖️ Recent Accuracy</h3>
                     <div class="accuracy-chart" id="accuracyChart">
                         <p style="color: #666; width: 100%; text-align: center;">No evaluation data yet</p>
                     </div>
@@ -842,6 +843,10 @@
             </div>
             <div class="eval-modal-body">
                 <div class="eval-section">
+                    <div class="eval-section-label">📝 Prompt</div>
+                    <div class="eval-section-content" id="evalPrompt" style="max-height: 200px; overflow-y: auto;">-</div>
+                </div>
+                <div class="eval-section">
                     <div class="eval-section-label">✅ Expected Answer</div>
                     <div class="eval-section-content expected" id="evalExpected">-</div>
                 </div>
@@ -900,16 +905,45 @@
             }
 
             // Stats
-            document.getElementById('masteredLevel').textContent = state.mastered_level;
-            document.getElementById('trainingLevel').textContent = state.training_level;
-            document.getElementById('accuracy').textContent = state.accuracy + '%';
+            const maxLevel = config.max_level || 50;
+            const masteryPct = maxLevel > 0 ? ((state.mastered_level / maxLevel) * 100).toFixed(0) : 0;
+            document.getElementById('masteryPct').textContent = masteryPct + '%';
+            document.getElementById('masteredLevel').textContent = `L${state.mastered_level}/${maxLevel}`;
+
+            // Last accuracy and time
+            const history = state.accuracy_history || [];
+            if (history.length > 0) {
+                const lastEntry = history[history.length - 1];
+                const lastAcc = (lastEntry.accuracy || 0) * 100;
+                document.getElementById('accuracy').textContent = lastAcc.toFixed(0) + '%';
+
+                // Format time ago
+                if (lastEntry.timestamp) {
+                    const evalDate = new Date(lastEntry.timestamp);
+                    const now = new Date();
+                    const diffMs = now - evalDate;
+                    const diffMins = Math.floor(diffMs / 60000);
+                    const diffHours = Math.floor(diffMs / 3600000);
+                    const diffDays = Math.floor(diffMs / 86400000);
+
+                    let timeAgo;
+                    if (diffMins < 1) timeAgo = 'just now';
+                    else if (diffMins < 60) timeAgo = `${diffMins}m ago`;
+                    else if (diffHours < 24) timeAgo = `${diffHours}h ago`;
+                    else timeAgo = `${diffDays}d ago`;
+
+                    document.getElementById('lastEvalTime').textContent = timeAgo;
+                }
+            } else {
+                document.getElementById('accuracy').textContent = '--';
+                document.getElementById('lastEvalTime').textContent = 'no evals';
+            }
 
             // Description
             document.getElementById('skillDescription').textContent = config.description || '-';
             document.getElementById('rpgDescription').textContent = config.rpg_description || '-';
 
             // Level progress - NEW multi-segment design
-            const maxLevel = config.max_level || 50;
             const mastered = state.mastered_level;
             const training = state.training_level;
 
@@ -920,17 +954,16 @@
             document.getElementById('currentLevelNum').textContent = training;
 
             // Multi-segment progress bar
-            const masteredPct = (mastered / maxLevel) * 100;
-            const trainingPct = (1 / maxLevel) * 100;  // Training level is always 1 level
-            const lockedPct = 100 - masteredPct - trainingPct;
+            const masteredSegmentPct = (mastered / maxLevel) * 100;
+            const trainingSegmentPct = (1 / maxLevel) * 100;  // Training level is always 1 level
+            const lockedPct = 100 - masteredSegmentPct - trainingSegmentPct;
 
-            document.getElementById('masteredSegment').style.width = masteredPct + '%';
-            document.getElementById('trainingSegment').style.width = trainingPct + '%';
+            document.getElementById('masteredSegment').style.width = masteredSegmentPct + '%';
+            document.getElementById('trainingSegment').style.width = trainingSegmentPct + '%';
             document.getElementById('lockedSegment').style.width = Math.max(0, lockedPct) + '%';
             document.getElementById('maxLevelMarker').textContent = 'L' + maxLevel;
 
             // Calculate 3-eval streak for level-up
-            const history = state.accuracy_history || [];
             const atCurrentLevel = history.filter(h =>
                 (h.training_level || h.level) === training
             );
@@ -1097,6 +1130,7 @@
 
         let evalResults = [];
         let currentEvalIndex = 0;
+        let selectedLevel = null;
 
         async function loadEvalResults(level = null) {
             try {
@@ -1199,8 +1233,12 @@
             document.getElementById('evalModalCounter').textContent =
                 `${index + 1}/${evalResults.length}`;
 
+            const promptEl = document.getElementById('evalPrompt');
             const expectedEl = document.getElementById('evalExpected');
             const modelEl = document.getElementById('evalModelAnswer');
+
+            promptEl.textContent = result.prompt || '(no prompt recorded)';
+            promptEl.classList.toggle('empty', !result.prompt);
 
             expectedEl.textContent = result.expected || '(no expected answer)';
             expectedEl.classList.toggle('empty', !result.expected);
@@ -1246,8 +1284,6 @@
             selectedLevel = level ? parseInt(level) : null;
             loadEvalResults(selectedLevel);
         });
-
-        let selectedLevel = null;
 
         // ============================================
         // VALIDATION SET (browse test problems)

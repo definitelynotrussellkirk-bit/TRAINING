@@ -1566,19 +1566,25 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
             raw_problems = validation.get(level_key, [])
 
-            # Transform messages format to prompt/expected format for frontend
+            # Transform to prompt/expected format for frontend
+            # Handle both formats: direct prompt/expected or messages format
             problems = []
             for prob in raw_problems:
-                messages = prob.get("messages", [])
                 prompt = ""
                 expected = ""
 
-                # Extract user message (prompt) and assistant message (expected answer)
-                for msg in messages:
-                    if msg.get("role") == "user":
-                        prompt = msg.get("content", "")
-                    elif msg.get("role") == "assistant":
-                        expected = msg.get("content", "")
+                # Check for direct format first
+                if "prompt" in prob:
+                    prompt = prob.get("prompt", "")
+                    expected = prob.get("expected", "")
+                # Fall back to messages format
+                elif "messages" in prob:
+                    messages = prob.get("messages", [])
+                    for msg in messages:
+                        if msg.get("role") == "user":
+                            prompt = msg.get("content", "")
+                        elif msg.get("role") == "assistant":
+                            expected = msg.get("content", "")
 
                 problems.append({
                     "prompt": prompt,
@@ -1651,6 +1657,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
                             "partial_score": prob.get("partial_score", 0.0),
                             "expected": prob.get("expected", ""),
                             "model_answer": prob.get("got", prob.get("model_answer", "")),
+                            "prompt": prob.get("prompt", ""),
                         })
 
                     response["latest"] = {
@@ -3367,68 +3374,79 @@ class TavernHandler(SimpleHTTPRequestHandler):
             if active_models:
                 assets["base_model"] = active_models[0]
 
-            def scan_checkpoint_dir(checkpoint_dir, hero_id=None, campaign_id=None):
-                """Scan a directory for checkpoints."""
-                checkpoints = []
-                if not checkpoint_dir.exists():
-                    return checkpoints
+            # Load ALL checkpoints from the ledger (single source of truth)
+            try:
+                from core.checkpoint_ledger import get_ledger
+                from vault.device_mapping import device_to_stronghold, get_local_device_id
 
-                for item in sorted(checkpoint_dir.iterdir(), reverse=True):
-                    if item.is_dir() and item.name.startswith("checkpoint-"):
-                        try:
-                            step = int(item.name.split("-")[1])
-                            # Get size
-                            size_bytes = sum(
-                                f.stat().st_size for f in item.rglob("*") if f.is_file()
-                            )
-                            size_gb = round(size_bytes / (1024**3), 2)
-                            # Get modification time
-                            mtime = datetime.fromtimestamp(item.stat().st_mtime)
+                ledger = get_ledger()
+                all_records = ledger.list_all()
+                local_device = get_local_device_id()
 
-                            checkpoints.append({
-                                "name": item.name,
-                                "step": step,
-                                "path": str(item),
-                                "size_gb": size_gb,
-                                "created": mtime.isoformat(),
-                                "age_hours": round((datetime.now() - mtime).total_seconds() / 3600, 1),
-                                "eval_count": 0,
-                                "hero_id": hero_id,
-                                "campaign_id": campaign_id,
-                                "is_active_campaign": (hero_id == active_hero_id and campaign_id == active_campaign_id),
-                            })
-                        except (ValueError, OSError) as e:
-                            logger.warning(f"Error processing {item}: {e}")
-                return checkpoints
+                # Group by device for stats
+                by_device = {}
 
-            # Scan campaign checkpoint directories
-            campaigns_dir = BASE_DIR / "campaigns"
-            if campaigns_dir.exists():
-                for hero_dir in campaigns_dir.iterdir():
-                    if hero_dir.is_dir() and hero_dir.name not in ('active', 'archived'):
-                        hero_id = hero_dir.name
-                        for campaign_dir in hero_dir.iterdir():
-                            if campaign_dir.is_dir():
-                                campaign_id = campaign_dir.name
-                                checkpoint_dir = campaign_dir / "checkpoints"
-                                cps = scan_checkpoint_dir(checkpoint_dir, hero_id, campaign_id)
-                                assets["checkpoints"].extend(cps)
-                                for cp in cps:
-                                    assets["total_size_gb"] += cp["size_gb"]
+                for record in all_records:
+                    # Build checkpoint entry
+                    size_gb = round(record.size_bytes / (1024**3), 2) if record.size_bytes else 0
 
-            # Also scan legacy current_model/ directory (for DIO's old checkpoints)
-            current_model_dir = BASE_DIR / "models" / "current_model"
-            if current_model_dir.exists():
-                # Assume current_model belongs to DIO unless we know otherwise
-                legacy_hero = "dio-qwen3-0.6b"
-                legacy_campaign = "campaign-001"
-                cps = scan_checkpoint_dir(current_model_dir, legacy_hero, legacy_campaign)
-                # Mark as active if DIO campaign-001 is active
-                for cp in cps:
-                    cp["is_active_campaign"] = (legacy_hero == active_hero_id and legacy_campaign == active_campaign_id)
-                assets["checkpoints"].extend(cps)
-                for cp in cps:
-                    assets["total_size_gb"] += cp["size_gb"]
+                    # Determine locations - can be list of strings or list of dicts
+                    locations = record.locations if record.locations else []
+                    if locations and isinstance(locations[0], dict):
+                        device_ids = [loc.get("device_id", "unknown") for loc in locations]
+                    else:
+                        # Simple list of device ID strings
+                        device_ids = list(locations) if locations else []
+
+                    # Check if local
+                    is_local = local_device in device_ids or (record.path and Path(record.path).exists())
+
+                    # Get primary path
+                    primary_path = record.path
+
+                    # Extract hero/campaign from path if possible
+                    hero_id = getattr(record, "hero_id", None)
+                    campaign_id = getattr(record, "campaign_id", None)
+
+                    # Try to infer from path
+                    if not hero_id and primary_path:
+                        if "dio" in primary_path.lower() or "current_model" in primary_path:
+                            hero_id = "dio-qwen3-0.6b"
+                            campaign_id = "campaign-001"
+                        elif "titan" in primary_path.lower() or "4b" in primary_path.lower():
+                            hero_id = "titan-qwen3-4b"
+                            campaign_id = "campaign-001"
+
+                    checkpoint = {
+                        "name": record.canonical_name or f"checkpoint-{record.step}",
+                        "step": record.step,
+                        "path": primary_path,
+                        "size_gb": size_gb,
+                        "train_loss": getattr(record, "train_loss", None),
+                        "eval_count": 0,
+                        "hero_id": hero_id,
+                        "campaign_id": campaign_id,
+                        "is_active_campaign": (hero_id == active_hero_id and campaign_id == active_campaign_id),
+                        "is_local": is_local,
+                        "locations": device_ids,
+                        "location_count": len(device_ids) if device_ids else (1 if is_local else 0),
+                    }
+
+                    assets["checkpoints"].append(checkpoint)
+                    assets["total_size_gb"] += size_gb
+
+                    # Track by device
+                    for device in device_ids:
+                        by_device.setdefault(device, {"count": 0, "size_gb": 0})
+                        by_device[device]["count"] += 1
+                        by_device[device]["size_gb"] += size_gb
+
+                assets["by_device"] = by_device
+
+            except Exception as e:
+                logger.warning(f"Could not load from ledger: {e}")
+                import traceback
+                traceback.print_exc()
 
             # Sort all checkpoints by step descending
             assets["checkpoints"].sort(key=lambda x: x["step"], reverse=True)
@@ -3437,13 +3455,12 @@ class TavernHandler(SimpleHTTPRequestHandler):
             assets["total_size_gb"] = round(assets["total_size_gb"], 2)
             assets["checkpoint_count"] = len(assets["checkpoints"])
 
-            # Mark latest and find best from status file
+            # Mark latest
             if assets["checkpoints"]:
                 assets["checkpoints"][0]["is_latest"] = True
 
             # Mark best checkpoint from ledger
             try:
-                from core.checkpoint_ledger import get_ledger
                 ledger = get_ledger()
                 best_record = ledger.get_best(metric="train_loss")
                 if best_record:

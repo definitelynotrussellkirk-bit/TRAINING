@@ -4,45 +4,126 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Garrison | Realm of Training</title>
-    <link rel="stylesheet" href="/static/css/common.css">
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <link rel="stylesheet" href="/static/css/game.css?v=7">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        body {
-            background: #1a1a2e;
-            color: #e0e0e0;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            margin: 0;
+        .garrison-page {
+            max-width: 1600px;
+            margin: 0 auto;
             padding: 20px;
         }
 
-        .container {
-            max-width: 1600px;
-            margin: 0 auto;
-        }
-
-        header {
+        .page-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid #333;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
         }
 
-        h1 {
+        .page-title {
+            font-family: 'Cinzel', serif;
+            font-size: 2em;
+            color: #ffd700;
             margin: 0;
-            color: #ffd700;
-            font-size: 1.8rem;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
         }
 
-        .nav-links a {
+        .page-subtitle {
             color: #888;
-            text-decoration: none;
-            margin-left: 16px;
-            transition: color 0.2s;
+            font-size: 0.9em;
+            margin-top: 4px;
         }
 
-        .nav-links a:hover {
-            color: #ffd700;
+        body {
+            padding-bottom: 80px;
+        }
+
+        .host-count {
+            font-size: 0.8em;
+            color: #666;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Locations Summary */
+        .locations-summary {
+            margin-bottom: 20px;
+        }
+
+        .locations-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .location-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 12px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 200px;
+            transition: all 0.2s;
+        }
+
+        .location-card:hover {
+            border-color: rgba(255, 215, 0, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .location-card.online {
+            border-color: rgba(34, 197, 94, 0.4);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .location-card.offline {
+            border-color: rgba(100, 100, 100, 0.3);
+            opacity: 0.6;
+        }
+
+        .location-card.warning {
+            border-color: rgba(255, 167, 38, 0.4);
+            background: rgba(255, 167, 38, 0.1);
+        }
+
+        .location-icon {
+            font-size: 2rem;
+        }
+
+        .location-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .location-name {
+            font-weight: 600;
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .location-status {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .location-status.online {
+            color: #4CAF50;
+        }
+
+        .location-status.offline {
+            color: #666;
+        }
+
+        .location-stats {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 2px;
         }
 
         /* Status banner */
@@ -460,26 +541,29 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Garrison <span class="host-count" id="host-count">0 hosts</span></h1>
-            <nav class="nav-links">
-                <a href="/">Tavern</a>
-                <a href="/guild">Guild</a>
-                <a href="/jobs">Jobs</a>
-                <a href="/settings">Settings</a>
-            </nav>
-        </header>
-
-        <div class="actions">
-            <button class="btn btn-primary" onclick="refreshStatus()">Refresh</button>
-            <button class="btn btn-secondary" onclick="refreshStatus(true)">Live Scan</button>
-            <button class="btn btn-secondary" onclick="runMaintenance()">Run Maintenance</button>
+    <div class="garrison-page">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">🛡️ Garrison</h1>
+                <p class="page-subtitle">Fleet Health & Infrastructure <span class="host-count" id="host-count">(0 hosts)</span></p>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="refreshStatus()">🔄 Refresh</button>
+                <button class="btn btn-secondary" onclick="refreshStatus(true)">📡 Live Scan</button>
+                <button class="btn btn-secondary" onclick="runMaintenance()">🔧 Maintenance</button>
+            </div>
         </div>
 
         <div id="status-banner" class="status-banner status-unknown">
             <span class="status-icon">?</span>
             <span>Loading fleet status...</span>
+        </div>
+
+        <!-- Locations Summary -->
+        <div class="locations-summary" id="locationsSummary">
+            <div class="locations-grid" id="locationsGrid">
+                <!-- Populated by JS -->
+            </div>
         </div>
 
         <div id="alerts-container"></div>
@@ -495,6 +579,10 @@
 
         <div id="last-updated" class="last-updated"></div>
     </div>
+
+    <!-- Bottom Navigation -->
+    <nav id="bottom-nav"></nav>
+    <script src="/static/js/nav.js"></script>
 
     <script>
         let statusData = null;
@@ -521,6 +609,84 @@
             if (roles.includes('storage_warm') || roles.includes('storage_cold')) return 'role-storage';
             if (roles.includes('eval_worker') || roles.includes('data_forge')) return 'role-worker';
             return '';
+        }
+
+        // Location definitions with icons
+        const LOCATIONS = {
+            'trainer': { icon: '💻', name: 'Trainer', desc: 'RTX 4090 Training Server' },
+            'inference': { icon: '🔮', name: 'Inference', desc: 'RTX 3090 Inference Server' },
+            'synology': { icon: '📦', name: 'Synology NAS', desc: 'Network Storage (Warm)' },
+            'cold_storage': { icon: '🧊', name: 'Cold Storage', desc: 'Archive Storage' },
+            'vault': { icon: '🗝️', name: 'Vault', desc: 'Asset Registry' },
+            'oracle': { icon: '🔮', name: 'Oracle', desc: 'Inference Endpoint' },
+            'forge': { icon: '🔥', name: 'Forge', desc: 'Data Generation' },
+            'guild': { icon: '🏰', name: 'Guild', desc: 'Skill Management' },
+        };
+
+        function renderLocations(hosts) {
+            const container = document.getElementById('locationsGrid');
+            if (!container) return;
+
+            // Build location cards from hosts data
+            let html = '';
+
+            // Define all locations we want to show
+            const locationDefs = [
+                { id: 'trainer4090', icon: '💻', name: 'Trainer (4090)', hostKey: 'trainer4090' },
+                { id: 'inference3090', icon: '🔮', name: 'Inference (3090)', hostKey: 'inference3090' },
+                { id: 'synology_data', icon: '📦', name: 'Synology NAS', hostKey: 'synology_data' },
+                { id: 'vault', icon: '🗝️', name: 'Vault', service: true, port: 8767 },
+                { id: 'oracle', icon: '🔮', name: 'Oracle', service: true, port: 8765 },
+                { id: 'tavern', icon: '🏰', name: 'Tavern', service: true, port: 8888 },
+            ];
+
+            for (const loc of locationDefs) {
+                let status = 'offline';
+                let statusText = 'Offline';
+                let statsText = '';
+
+                // Check if this is a host-based location
+                if (loc.hostKey && hosts) {
+                    // Direct match by hostKey
+                    const host = hosts[loc.hostKey];
+                    if (host) {
+                        status = host.status || 'unknown';
+                        statusText = status.charAt(0).toUpperCase() + status.slice(1);
+
+                        // Build stats
+                        const stats = [];
+                        if (host.disk_percent != null) {
+                            stats.push(`Disk: ${host.disk_percent.toFixed(0)}%`);
+                        }
+                        if (host.gpu_memory_percent != null) {
+                            stats.push(`GPU: ${host.gpu_memory_percent.toFixed(0)}%`);
+                        }
+                        if (host.services?.checkpoints != null) {
+                            stats.push(`${host.services.checkpoints} ckpts`);
+                        }
+                        statsText = stats.join(' · ');
+                    }
+                }
+
+                // Service-based locations - assume online for now
+                if (loc.service) {
+                    status = 'online';
+                    statusText = `Port ${loc.port}`;
+                }
+
+                html += `
+                    <div class="location-card ${status}">
+                        <span class="location-icon">${loc.icon}</span>
+                        <div class="location-info">
+                            <span class="location-name">${loc.name}</span>
+                            <span class="location-status ${status}">${statusText}</span>
+                            ${statsText ? `<span class="location-stats">${statsText}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
         }
 
         function renderZones(zones) {
@@ -784,20 +950,26 @@
 
             // Update host count
             const hostCount = Object.keys(data.hosts || {}).length;
-            document.getElementById('host-count').textContent = `${hostCount} hosts`;
+            const hostCountEl = document.getElementById('host-count');
+            if (hostCountEl) hostCountEl.textContent = `(${hostCount} hosts)`;
 
             // Update banner
             const banner = document.getElementById('status-banner');
             const status = data.overall_status || 'unknown';
             const icons = { healthy: '&#10003;', warning: '&#9888;', critical: '&#10007;', unknown: '?', offline: '&#9675;' };
-            banner.className = `status-banner status-${status}`;
-            banner.innerHTML = `
-                <span class="status-icon">${icons[status] || '?'}</span>
-                <span>Fleet Status: ${status.toUpperCase()}</span>
-            `;
+            if (banner) {
+                banner.className = `status-banner status-${status}`;
+                banner.innerHTML = `
+                    <span class="status-icon">${icons[status] || '?'}</span>
+                    <span>Fleet Status: ${status.toUpperCase()}</span>
+                `;
+            }
 
             // Render alerts
             renderAlerts(data.alerts);
+
+            // Render locations summary
+            renderLocations(data.hosts || {});
 
             // Render zones
             renderZones(data.zones);
@@ -822,35 +994,44 @@
                 html += renderHost(hostId, host);
             }
 
-            container.innerHTML = html || '<p>No hosts found</p>';
+            if (container) container.innerHTML = html || '<p>No hosts found</p>';
 
             // Update timestamp with cache info
             const lastUpdated = document.getElementById('last-updated');
-            let timeText = `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
-            if (data._cached) {
-                const ageMin = Math.floor(data._cache_age_seconds / 60);
-                const ageSec = data._cache_age_seconds % 60;
-                timeText += ` (cached ${ageMin}m ${ageSec}s ago)`;
-            } else {
-                timeText += ' (live)';
+            if (lastUpdated) {
+                let timeText = `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
+                if (data._cached) {
+                    const ageMin = Math.floor(data._cache_age_seconds / 60);
+                    const ageSec = Math.floor(data._cache_age_seconds % 60);
+                    timeText += ` (cached ${ageMin}m ${ageSec}s ago)`;
+                } else {
+                    timeText += ' (live)';
+                }
+                lastUpdated.textContent = timeText;
             }
-            lastUpdated.textContent = timeText;
         }
 
         async function refreshStatus(forceFresh = false) {
+            const container = document.getElementById('hosts-container');
             try {
-                const container = document.getElementById('hosts-container');
                 const loadingMsg = forceFresh ? 'Scanning fleet...' : 'Refreshing...';
-                container.innerHTML = `<div class="loading"><div class="spinner"></div><p>${loadingMsg}</p></div>`;
+                if (container) {
+                    container.innerHTML = `<div class="loading"><div class="spinner"></div><p>${loadingMsg}</p></div>`;
+                }
 
                 const url = forceFresh ? '/api/garrison?fresh=true' : '/api/garrison';
                 const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
                 const data = await response.json();
                 renderStatus(data);
             } catch (error) {
                 console.error('Failed to fetch status:', error);
-                document.getElementById('hosts-container').innerHTML =
-                    '<p style="color: #f44336;">Failed to load fleet status</p>';
+                if (container) {
+                    container.innerHTML =
+                        `<p style="color: #f44336;">Failed to load fleet status: ${error.message}</p>`;
+                }
             }
         }
 

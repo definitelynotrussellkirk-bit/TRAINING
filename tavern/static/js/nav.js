@@ -11,6 +11,7 @@ const NAV_ITEMS = [
     { href: '/vault', icon: '🗝️', label: 'Vault', id: 'vault' },
     { href: '/oracle', icon: '🔮', label: 'Oracle', id: 'oracle' },
     { href: '/temple', icon: '🏛️', label: 'Temple', id: 'temple' },
+    { href: '/garrison', icon: '🛡️', label: 'Garrison', id: 'garrison' },
     { href: '/settings', icon: '⚙️', label: 'Settings', id: 'settings' },
 ];
 
@@ -346,6 +347,8 @@ function autoRenderNav() {
         activeId = 'oracle';
     } else if (path.startsWith('/temple')) {
         activeId = 'temple';
+    } else if (path.startsWith('/garrison')) {
+        activeId = 'garrison';
     } else if (path.startsWith('/settings') || path.startsWith('/scheduler')) {
         activeId = 'settings';
     }

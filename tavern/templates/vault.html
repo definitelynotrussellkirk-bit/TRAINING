@@ -260,6 +260,118 @@
             box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
         }
 
+        .location-badges {
+            display: inline-flex;
+            gap: 2px;
+            margin-left: 8px;
+        }
+
+        .loc-badge {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        .loc-badge.unknown {
+            opacity: 0.4;
+        }
+
+        .loss-badge {
+            font-size: 0.7rem;
+            color: #888;
+            margin-left: 8px;
+            font-family: monospace;
+        }
+
+        .asset-card.remote-only {
+            opacity: 0.7;
+            border-left: 2px solid #666;
+        }
+
+        /* Ledger Summary */
+        .ledger-summary {
+            background: linear-gradient(135deg, rgba(30, 30, 50, 0.9) 0%, rgba(20, 20, 35, 0.95) 100%);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 12px;
+            padding: 16px 24px;
+            margin: 0 20px 20px 20px;
+        }
+
+        .ledger-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .ledger-header h2 {
+            font-family: 'Cinzel', serif;
+            color: #ffd700;
+            font-size: 1.2rem;
+            margin: 0;
+        }
+
+        .ledger-total {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .ledger-devices {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .ledger-device {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 180px;
+        }
+
+        .ledger-device.local {
+            border-color: rgba(34, 197, 94, 0.3);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .ledger-device.remote {
+            border-color: rgba(139, 92, 246, 0.3);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .ledger-device.unknown {
+            border-color: rgba(100, 100, 100, 0.3);
+            background: rgba(100, 100, 100, 0.1);
+        }
+
+        .device-icon {
+            font-size: 1.5rem;
+        }
+
+        .device-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .device-name {
+            font-weight: 600;
+            color: #fff;
+            font-size: 0.9rem;
+        }
+
+        .device-stats {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .device-count {
+            color: #ffd700;
+            font-weight: 600;
+        }
+
         .empty-vault {
             text-align: center;
             padding: 3rem;
@@ -350,6 +462,20 @@
             <div class="time-display" id="timeDisplay">--:--:--</div>
         </div>
     </header>
+
+    <!-- LEDGER SUMMARY -->
+    <div class="ledger-summary" id="ledgerSummary">
+        <div class="ledger-header">
+            <h2>📒 Checkpoint Ledger</h2>
+            <span class="ledger-total" id="ledgerTotal">0 checkpoints</span>
+        </div>
+        <div class="ledger-devices" id="ledgerDevices">
+            <div class="ledger-device loading">
+                <span class="device-icon">⏳</span>
+                <span class="device-name">Loading...</span>
+            </div>
+        </div>
+    </div>
 
     <!-- MAIN VAULT AREA -->
     <main class="vault-main">
@@ -558,10 +684,35 @@
             }
 
             // Storage stats
-            setText('#totalSize', `${data.total_size_gb} GB`);
-            setText('#storageUsed', `${data.total_size_gb} GB`);
+            const sizeDisplay = data.total_size_gb > 1000
+                ? `${(data.total_size_gb / 1024).toFixed(1)} TB`
+                : `${data.total_size_gb} GB`;
+            setText('#totalSize', sizeDisplay);
+            setText('#storageUsed', sizeDisplay);
             setText('#checkpointCount', data.checkpoint_count || 0);
             setText('#assetCount', (data.checkpoint_count || 0) + (data.base_model ? 1 : 0));
+
+            // Update zone stats from by_device
+            if (data.by_device) {
+                const devices = data.by_device;
+                if (devices.trainer4090) {
+                    const dot = $('#zone4090');
+                    if (dot) dot.classList.add('online');
+                }
+                if (devices.inference3090) {
+                    const dot = $('#zone3090');
+                    const status = $('#zone3090Status');
+                    if (dot) dot.classList.add('online');
+                    if (status) {
+                        status.textContent = `${devices.inference3090.count} checkpoints`;
+                        status.classList.remove('muted');
+                        status.classList.add('success');
+                    }
+                }
+            }
+
+            // Render ledger summary
+            renderLedgerSummary(data);
 
             // Latest checkpoint
             if (data.checkpoints?.length > 0) {
@@ -604,6 +755,73 @@
             } catch (error) {
                 console.error('Failed to fetch zones:', error);
             }
+        }
+
+        function renderLedgerSummary(data) {
+            const totalEl = $('#ledgerTotal');
+            const devicesEl = $('#ledgerDevices');
+            if (!devicesEl) return;
+
+            // Update total
+            if (totalEl) {
+                const sizeStr = data.total_size_gb > 1000
+                    ? `${(data.total_size_gb / 1024).toFixed(1)} TB`
+                    : `${data.total_size_gb.toFixed(1)} GB`;
+                totalEl.textContent = `${data.checkpoint_count || 0} checkpoints · ${sizeStr}`;
+            }
+
+            // Device config
+            const deviceConfig = {
+                'trainer4090': { icon: '💻', name: 'Trainer (4090)', type: 'local' },
+                'inference3090': { icon: '🔮', name: 'Inference (3090)', type: 'remote' },
+                'synology_data': { icon: '📦', name: 'Synology NAS', type: 'remote' },
+            };
+
+            // Count checkpoints without locations
+            const unknownCount = (data.checkpoints || []).filter(cp =>
+                !cp.locations || cp.locations.length === 0
+            ).length;
+
+            let html = '';
+
+            // Render known devices
+            if (data.by_device) {
+                for (const [deviceId, stats] of Object.entries(data.by_device)) {
+                    const config = deviceConfig[deviceId] || { icon: '📍', name: deviceId, type: 'remote' };
+                    const sizeStr = stats.size_gb > 1000
+                        ? `${(stats.size_gb / 1024).toFixed(1)} TB`
+                        : `${stats.size_gb.toFixed(0)} GB`;
+
+                    html += `
+                        <div class="ledger-device ${config.type}">
+                            <span class="device-icon">${config.icon}</span>
+                            <div class="device-info">
+                                <span class="device-name">${config.name}</span>
+                                <span class="device-stats">
+                                    <span class="device-count">${stats.count}</span> checkpoints · ${sizeStr}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            // Add unknown/untracked
+            if (unknownCount > 0) {
+                html += `
+                    <div class="ledger-device unknown">
+                        <span class="device-icon">❓</span>
+                        <div class="device-info">
+                            <span class="device-name">Untracked</span>
+                            <span class="device-stats">
+                                <span class="device-count">${unknownCount}</span> checkpoints · location unknown
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            devicesEl.innerHTML = html || '<div class="ledger-device">No devices found</div>';
         }
 
         function updateZoneUI(zone) {
@@ -744,18 +962,41 @@
                 if (cp.is_champion) classes.push('champion');
                 if (cp.is_latest && cp.is_active_campaign) classes.push('latest');
                 if (isInactive) classes.push('inactive-campaign');
+                if (!cp.is_local) classes.push('remote-only');
 
                 const icon = cp.is_champion ? '👑' : (cp.is_latest && cp.is_active_campaign ? '✨' : '⚱️');
                 const heroLabel = cp.hero_id ? cp.hero_id.split('-')[0].toUpperCase() : '';
 
+                // Location badges
+                let locationBadges = '';
+                if (cp.locations && cp.locations.length > 0) {
+                    const badgeMap = {
+                        'trainer4090': { icon: '💻', label: 'Local' },
+                        'inference3090': { icon: '🔮', label: '3090' },
+                        'synology_data': { icon: '📦', label: 'NAS' },
+                    };
+                    locationBadges = cp.locations.map(loc => {
+                        const badge = badgeMap[loc] || { icon: '📍', label: loc.slice(0, 6) };
+                        return `<span class="loc-badge" title="${loc}">${badge.icon}</span>`;
+                    }).join('');
+                } else if (cp.is_local) {
+                    locationBadges = '<span class="loc-badge" title="Local">💻</span>';
+                } else {
+                    locationBadges = '<span class="loc-badge unknown" title="Unknown location">❓</span>';
+                }
+
+                // Loss display
+                const lossDisplay = cp.train_loss ? `<span class="loss-badge" title="Train loss">${cp.train_loss.toFixed(3)}</span>` : '';
+
                 return `
-                    <div class="${classes.join(' ')}" data-step="${cp.step}" data-path="${cp.path}" ${isInactive ? 'style="opacity: 0.5;"' : ''}>
+                    <div class="${classes.join(' ')}" data-step="${cp.step}" data-path="${cp.path || ''}" ${isInactive ? 'style="opacity: 0.5;"' : ''}>
                         <div class="asset-icon" style="cursor: pointer;" onclick="viewCheckpoint(${cp.step})">${icon}</div>
                         <div class="asset-info" style="cursor: pointer;" onclick="viewCheckpoint(${cp.step})">
-                            <div class="asset-name">${cp.name}</div>
+                            <div class="asset-name">${cp.name || 'checkpoint-' + cp.step}</div>
                             <div class="asset-meta">
                                 <span>${heroLabel ? heroLabel + ' · ' : ''}Step ${cp.step.toLocaleString()}</span>
-                                <span>${cp.age_hours < 1 ? 'Just now' : cp.age_hours.toFixed(1) + 'h ago'}</span>
+                                <span class="location-badges">${locationBadges}</span>
+                                ${lossDisplay}
                             </div>
                         </div>
                         <div class="asset-metrics">
@@ -765,10 +1006,10 @@
                             </div>
                             ` : ''}
                             <div class="metric">
-                                <div class="metric-value">${cp.size_gb}</div>
+                                <div class="metric-value">${cp.size_gb || '?'}</div>
                                 <div class="metric-label">GB</div>
                             </div>
-                            <button class="delete-btn" onclick="event.stopPropagation(); deleteCheckpoint(${cp.step}, '${cp.path}')" title="Delete checkpoint">🗑️</button>
+                            ${cp.is_local && cp.path ? `<button class="delete-btn" onclick="event.stopPropagation(); deleteCheckpoint(${cp.step}, '${cp.path}')" title="Delete checkpoint">🗑️</button>` : ''}
                         </div>
                     </div>
                 `;

@@ -16,7 +16,7 @@ category: math
 # DISPLAY
 # =============================================================================
 display:
-  icon: "🔢"
+  icon: "🧮"
   color: "#F59E0B"              # Amber/Orange
   short_name: "BIN"
 

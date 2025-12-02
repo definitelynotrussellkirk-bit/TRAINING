@@ -16,7 +16,7 @@ category: reasoning
 # DISPLAY
 # =============================================================================
 display:
-  icon: "🧩"
+  icon: "🪶"
   color: "#8B5CF6"              # Purple
   short_name: "SY"
 

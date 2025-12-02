@@ -899,7 +899,12 @@ class Garrison:
 
     def _check_device(self, device_id: str, config: dict) -> HostHealth:
         """Route to appropriate checker based on device roles."""
-        roles = set(config.get("roles", []))
+        # Handle both "role" (string) and "roles" (list) formats
+        roles_config = config.get("roles", config.get("role", []))
+        if isinstance(roles_config, str):
+            roles = {roles_config}
+        else:
+            roles = set(roles_config)
 
         # Skip if disabled
         if not config.get("enabled", True):
@@ -920,9 +925,8 @@ class Garrison:
             return self.check_gpu_host(device_id, config)
 
         # Storage hosts (NAS)
-        if "storage_warm" in roles or "storage_cold" in roles:
-            if config.get("resource_class") == "storage":
-                return self.check_storage_host(device_id, config)
+        if "storage" in roles or "storage_warm" in roles or "storage_cold" in roles:
+            return self.check_storage_host(device_id, config)
 
         # Compute workers (CPU-based)
         if any(r in roles for r in ["eval_worker", "data_forge", "vault_worker", "analytics"]):

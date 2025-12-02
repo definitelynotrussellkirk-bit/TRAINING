@@ -60,9 +60,15 @@ def _get_skills_data():
 
                 # Calculate recent accuracy (last 3 evals)
                 recent_acc = 0
+                last_eval_time = None
+                last_single_acc = 0
                 if history:
                     recent = history[-3:]
                     recent_acc = (sum(r.get("accuracy", 0) for r in recent) / len(recent)) * 100
+                    # Get most recent eval timestamp and accuracy
+                    last_entry = history[-1]
+                    last_eval_time = last_entry.get("timestamp")
+                    last_single_acc = last_entry.get("accuracy", 0) * 100
 
                 # Use ledger count for total evals (persisted, stable)
                 ledger_count = eval_counts.get(skill_id, 0)
@@ -79,6 +85,8 @@ def _get_skills_data():
                     "mastered_level": mastered,
                     "training_level": training,
                     "accuracy": round(recent_acc, 1),
+                    "last_accuracy": round(last_single_acc, 1),
+                    "last_eval_time": last_eval_time,
                     "eval_count": ledger_count,
                     "category": config.category.value if hasattr(config.category, 'value') else str(config.category),
                     "description": config.description or "",

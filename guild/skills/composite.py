@@ -98,7 +98,10 @@ class CompositeSkill(Skill):
         seed: Optional[int] = None
     ) -> EvalBatch:
         """
-        Generate eval problems via passive.
+        Generate eval problems via API (preferred) or passive (fallback).
+
+        Tries the generator's API first since it has proper level scaling.
+        Falls back to passive if API is unavailable.
 
         Args:
             level: Skill level (1 to max_level)
@@ -109,6 +112,22 @@ class CompositeSkill(Skill):
             EvalBatch containing problems for evaluation
         """
         logger.debug(f"CompositeSkill({self.id}): generating {count} eval problems at level {level}")
+
+        # Try API first (has proper level scaling)
+        if hasattr(self.generator, 'generate_eval_batch'):
+            try:
+                batch = self.generator.generate_eval_batch(
+                    skill_id=self.id,
+                    level=level,
+                    count=count,
+                    seed=seed,
+                )
+                logger.debug(f"CompositeSkill({self.id}): got {len(batch.problems)} eval problems from API")
+                return batch
+            except Exception as e:
+                logger.warning(f"CompositeSkill({self.id}): API eval failed, falling back to passive: {e}")
+
+        # Fallback to passive
         return self.passive.generate_eval_batch(
             skill_id=self.id,
             level=level,

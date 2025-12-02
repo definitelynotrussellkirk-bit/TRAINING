@@ -298,6 +298,53 @@ class SkillClient:
             passing_score="4/5",
         )
 
+    def get_eval(self, level: int, count: int = 5) -> list[dict]:
+        """
+        Get eval problems for a level via GET /eval/{level}.
+
+        Args:
+            level: Skill level (1 to max_level)
+            count: Number of problems to return (API may return different amount)
+
+        Returns:
+            List of eval problems with prompt and expected fields:
+            [{"prompt": ..., "expected": ..., "metadata": {...}}, ...]
+        """
+        r = requests.get(
+            f"{self.api_url}/eval/{level}",
+            timeout=self.timeout
+        )
+        r.raise_for_status()
+        data = r.json()
+
+        # Extract problems from response
+        problems = data.get("problems", [])
+
+        # Normalize to standard format
+        result = []
+        for p in problems[:count]:
+            # Handle different response formats
+            prompt = p.get("prompt", p.get("user_prompt", ""))
+            # Try various field names for expected answer
+            expected = (
+                p.get("expected") or
+                p.get("expected_answer_format") or
+                p.get("solution") or
+                p.get("answer") or
+                ""
+            )
+
+            result.append({
+                "prompt": prompt,
+                "expected": expected,
+                "metadata": {
+                    k: v for k, v in p.items()
+                    if k not in ("prompt", "expected", "user_prompt", "solution", "answer", "expected_answer_format")
+                },
+            })
+
+        return result
+
     def clear_cache(self):
         """Clear cached info/levels."""
         self._info_cache = None

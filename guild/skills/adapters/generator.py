@@ -9,6 +9,7 @@ from typing import Optional
 import logging
 
 from guild.skills.contract import SkillClient, Batch
+from guild.skills.eval_types import EvalBatch, EvalProblem
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,54 @@ class GeneratorAdapter:
 
         logger.debug(f"Generated {len(training_samples)} samples")
         return training_samples
+
+    def generate_eval_batch(
+        self,
+        skill_id: str,
+        level: int,
+        count: int,
+        seed: Optional[int] = None
+    ) -> EvalBatch:
+        """
+        Generate eval problems via API's /eval/{level} endpoint.
+
+        Args:
+            skill_id: Skill identifier
+            level: Skill level (1 to max_level)
+            count: Number of problems to generate
+            seed: Optional random seed (not used by most APIs)
+
+        Returns:
+            EvalBatch containing problems for evaluation
+        """
+        logger.debug(f"Fetching {count} eval problems for {skill_id} level {level} from API")
+
+        try:
+            raw_problems = self.client.get_eval(level, count)
+
+            # Convert to EvalProblem format
+            problems = []
+            for p in raw_problems:
+                problems.append(EvalProblem(
+                    prompt=p["prompt"],
+                    expected=p["expected"],
+                    primitive_id=p.get("metadata", {}).get("primitive_id", "unknown"),
+                    metadata=p.get("metadata", {}),
+                ))
+
+            return EvalBatch(
+                skill_id=skill_id,
+                level=level,
+                problems=problems,
+                metadata={
+                    "source": "api",
+                    "api_url": self.api_url,
+                },
+            )
+
+        except Exception as e:
+            logger.warning(f"API eval fetch failed for {skill_id} L{level}: {e}")
+            raise
 
     def health(self) -> bool:
         """

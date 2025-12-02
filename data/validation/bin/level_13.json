@@ -1,65 +1,72 @@
 {
   "level": 13,
-  "level_name": "Large",
+  "level_name": "14-bit (large: 0 to 16,383)",
   "bits": 14,
-  "eval_version": "1.0",
+  "eval_version": "2.0-training-format",
   "pass_threshold": 0.8,
-  "passing_score": "4/5",
-  "scoring_rule": "Each problem: answer must match exactly. Level: 80% of problems must pass.",
-  "response_schema": {
-    "type": "object",
-    "required": [
-      "answer"
-    ],
-    "properties": {
-      "answer": {
-        "type": "string",
-        "description": "Result in circled binary notation (\u24ea\u2460)"
-      }
-    },
-    "example": "{\"answer\": \"\u2460\u24ea\u2460\u24ea\"}"
-  },
-  "num_problems": 5,
+  "scoring_rule": "Response must contain the expected result pattern",
   "problems": [
     {
-      "problem_id": "eval_L13_P1",
-      "problem_index": 0,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udc3b represents 0\n  \ud83d\udc3c represents 1\n\nCompute combine(\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b, \ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udc3b/\ud83d\udc3c symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (easy): 3448 + 264 = 3712"
+      "prompt": "Compute: divide_by_2(①①⓪①①①⓪①⓪①①①⓪)",
+      "expected": "divide_by_2(①①⓪①①①⓪①⓪①①①⓪) = ①①⓪①①①⓪①⓪①①①",
+      "metadata": {
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-13"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L13_P2",
-      "problem_index": 1,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udc3c represents 0\n  \ud83d\udc3b represents 1\n\nCompute minus(\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b, \ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udc3c/\ud83d\udc3b symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (easy): 1223 - 905 = 318"
+      "prompt": "Symbol Key:\n  💜 = 0 (zero bit)\n  💛 = 1 (one bit)\n\nOperations:\n  📐 = absolute_value\n  merge = add\n  signed_add = add_signed\n  ⬇️ = decrement\n  split = divide\n  half = divide_by_2\n  ⚖️ = equals\n  next = increment\n  least = minimum\n  scale = multiply\n  🔼 = multiply_by_2\n  smul = multiply_signed\n  polarity = sign_of\n  minus = subtract\n  ssub = subtract_signed\n  bin = tobinary\n  🔟 = todecimal\n\nCompute: minus(💛💛💜💛💜💜💜💛💛💛💛💜💛, 💛💜💛💛💛💜💜💛💛💛💜💜💛)",
+      "expected": "minus(💛💛💜💛💜💜💜💛💛💛💛💜💛, 💛💜💛💛💛💜💜💛💛💛💜💜💛) = 💛💛💜💜💜💜💜💛💜💜",
+      "metadata": {
+        "scenario": "subtract-basic",
+        "tags": [
+          "subtract",
+          "easy",
+          "level-13",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L13_P3",
-      "problem_index": 2,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \u2b50 represents 0\n  \ud83c\udf1f represents 1\n\nCompute \u2716\ufe0f(\ud83c\udf1f\ud83c\udf1f\u2b50\ud83c\udf1f\ud83c\udf1f\u2b50, \ud83c\udf1f\u2b50\ud83c\udf1f)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u2b50/\ud83c\udf1f symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (medium): 54 * 5 = 270"
+      "prompt": "Symbol Key:\n  🐶 = 0 (zero bit)\n  🐱 = 1 (one bit)\n\nOperations:\n  abs = absolute_value\n  ➕ = add\n  dec = decrement\n  🔪 = divide\n  div2 = divide_by_2\n  ⚖️ = equals\n  ➡️ = greaterthan\n  next = increment\n  ⬆️ = maximum\n  smallest = minimum\n  product = multiply\n  double = multiply_by_2\n  smul = multiply_signed\n  ↔️ = negate\n  sign = sign_of\n  reduce = subtract\n  ➖🔢 = subtract_signed\n  bin = tobinary\n  📊 = todecimal\n\nCompute: dec(🐱🐱🐶🐶🐶🐱🐶🐶🐱🐱🐱🐶)",
+      "expected": "dec(🐱🐱🐶🐶🐶🐱🐶🐶🐱🐱🐱🐶) = 🐱🐱🐶🐶🐶🐱🐶🐶🐱🐱🐶🐱",
+      "metadata": {
+        "scenario": "decrement",
+        "tags": [
+          "decrement",
+          "easy",
+          "level-13",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L13_P4",
-      "problem_index": 3,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83c\udf11 represents 0\n  \ud83c\udf15 represents 1\n\nCompute plus(\ud83c\udf15\ud83c\udf11\ud83c\udf15\ud83c\udf15\ud83c\udf11\ud83c\udf15\ud83c\udf15\ud83c\udf15\ud83c\udf15\ud83c\udf15\ud83c\udf11\ud83c\udf11\ud83c\udf11, \ud83c\udf15\ud83c\udf15\ud83c\udf11\ud83c\udf11\ud83c\udf11\ud83c\udf11\ud83c\udf15\ud83c\udf11\ud83c\udf11\ud83c\udf11\ud83c\udf15\ud83c\udf11\ud83c\udf15)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83c\udf11/\ud83c\udf15 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (hard): 5880 + 6213 = 12093"
+      "prompt": "Compute: multiply_by_2(①⓪⓪①⓪⓪⓪①⓪①①①⓪)",
+      "expected": "multiply_by_2(①⓪⓪①⓪⓪⓪①⓪①①①⓪) = ①⓪⓪①⓪⓪⓪①⓪①①①⓪⓪",
+      "metadata": {
+        "scenario": "multiply-by-2",
+        "tags": [
+          "multiply-by-2",
+          "easy",
+          "level-13"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L13_P5",
-      "problem_index": 4,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute multiply(\u2460\u2460\u2460\u24ea\u2460\u24ea\u24ea, \u2460\u2460\u2460\u24ea\u2460\u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (hard): 116 * 59 = 6844"
+      "prompt": "Compute: todecimal(①①⓪⓪⓪①⓪⓪⓪⓪⓪⓪⓪)",
+      "expected": "todecimal(①①⓪⓪⓪①⓪⓪⓪⓪⓪⓪⓪) = 6272",
+      "metadata": {
+        "scenario": "todecimal",
+        "tags": [
+          "conversion",
+          "easy",
+          "level-13"
+        ]
+      }
     }
   ]
 }

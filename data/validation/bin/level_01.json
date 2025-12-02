@@ -1,57 +1,69 @@
 {
   "level": 1,
-  "level_name": "Tiny (2-bit)",
+  "level_name": "2-bit (tiny: 0 to 3)",
   "bits": 2,
   "eval_version": "2.0-training-format",
   "pass_threshold": 0.8,
   "scoring_rule": "Response must contain the expected result pattern",
   "problems": [
     {
-      "prompt": "Compute: add(①⓪, ①)",
-      "expected": "add(①⓪, ①) = ①①",
+      "prompt": "Compute: divide_by_2(①)",
+      "expected": "divide_by_2(①) = ⓪",
       "metadata": {
-        "operation": "add",
-        "a": "①⓪",
-        "b": "①",
-        "result": "①①"
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-1"
+        ]
       }
     },
     {
-      "prompt": "Compute: increment(①)",
-      "expected": "increment(①) = ①⓪",
+      "prompt": "Compute: divide_by_2(①)",
+      "expected": "divide_by_2(①) = ⓪",
       "metadata": {
-        "operation": "increment",
-        "a": "①",
-        "result": "①⓪"
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-1"
+        ]
+      }
+    },
+    {
+      "prompt": "Compute: divide_by_2(①)",
+      "expected": "divide_by_2(①) = ⓪",
+      "metadata": {
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-1"
+        ]
       }
     },
     {
       "prompt": "Compute: decrement(①⓪)",
       "expected": "decrement(①⓪) = ①",
       "metadata": {
-        "operation": "decrement",
-        "a": "①⓪",
-        "result": "①"
+        "scenario": "decrement",
+        "tags": [
+          "decrement",
+          "easy",
+          "level-1"
+        ]
       }
     },
     {
-      "prompt": "Compute: add(①, ①)",
-      "expected": "add(①, ①) = ①⓪",
+      "prompt": "Compute: tobinary(1)",
+      "expected": "tobinary(1) = ①",
       "metadata": {
-        "operation": "add",
-        "a": "①",
-        "b": "①",
-        "result": "①⓪"
-      }
-    },
-    {
-      "prompt": "Compute: subtract(①①, ①)",
-      "expected": "subtract(①①, ①) = ①⓪",
-      "metadata": {
-        "operation": "subtract",
-        "a": "①①",
-        "b": "①",
-        "result": "①⓪"
+        "scenario": "tobinary",
+        "tags": [
+          "conversion",
+          "easy",
+          "level-1"
+        ]
       }
     }
   ]

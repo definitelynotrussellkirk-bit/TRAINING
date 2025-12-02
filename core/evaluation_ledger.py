@@ -749,6 +749,14 @@ def record_evaluation(
                 metadata={"level": level, "problems": total, "correct": correct}
             )
 
+            # Check ahead: if 100% accuracy, queue eval for next level
+            if accuracy >= 1.0:
+                next_level = level + 1
+                # Only queue if not already evaluated at that level
+                if not ledger.has_evaluation(checkpoint_step, skill, next_level):
+                    queue_evaluation(checkpoint_step, skill, next_level, priority=5)
+                    logger.info(f"[{skill_id}] 100% on L{level} - checking ahead at L{next_level}")
+
             # Check and trigger progression if ready
             should_progress, reason = cm.should_progress(skill_id)
             if should_progress:

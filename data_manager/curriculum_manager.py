@@ -244,6 +244,19 @@ class CurriculumManager:
         self._save_state()
         logger.info(f"[{skill}] Recorded accuracy: {accuracy:.1%} at step {step} (Training L{training_level}, Mastered L{mastered_level})")
 
+        # Sync to RealmState for real-time UI updates
+        try:
+            from core.realm_store import update_skill
+            update_skill(
+                skill,
+                mastered_level=mastered_level,
+                training_level=training_level,
+                accuracy=accuracy,
+                last_eval_step=step,
+            )
+        except Exception as e:
+            logger.debug(f"[{skill}] Failed to sync accuracy to RealmState: {e}")
+
     def should_progress(self, skill: str) -> Tuple[bool, str]:
         """
         Check if should progress to next level (earn the training level).
@@ -294,9 +307,12 @@ class CurriculumManager:
           -> mastered becomes 1, next training becomes 2
 
         Automatically queues evaluation for the new training level.
+
+        IMPORTANT: Only progresses FORWARD, never backwards. This prevents
+        backfill evaluations from old checkpoints from regressing progress.
         """
         skill_state = self.state["skills"][skill]
-        old_mastered = skill_state["current_level"]
+        current_mastered = skill_state["current_level"]
         earned_level = self.get_training_level(skill)  # The level just passed
         new_mastered = earned_level  # Now mastered up to this level
 
@@ -304,10 +320,16 @@ class CurriculumManager:
         if new_mastered > skill_config["total_levels"]:
             new_mastered = skill_config["total_levels"]
 
+        # CRITICAL: Only progress forward, never backward!
+        # This prevents backfill evals from regressing current progress
+        if new_mastered <= current_mastered:
+            logger.debug(f"[{skill}] Skipping progression: new_mastered={new_mastered} <= current={current_mastered}")
+            return self.get_current_level(skill)
+
         # Record progression
         progression = {
             "earned_level": earned_level,
-            "old_mastered": old_mastered,
+            "old_mastered": current_mastered,
             "new_mastered": new_mastered,
             "timestamp": datetime.now().isoformat()
         }
@@ -319,7 +341,18 @@ class CurriculumManager:
         # Get the NEW training level config (what they'll work on next)
         new_training_config = self.get_current_level(skill)
         new_training_level = self.get_training_level(skill)
-        logger.info(f"[{skill}] LEVEL EARNED! Mastered L{old_mastered} -> L{new_mastered}. Now training on L{new_training_level}")
+        logger.info(f"[{skill}] LEVEL EARNED! Mastered L{current_mastered} -> L{new_mastered}. Now training on L{new_training_level}")
+
+        # Sync to RealmState for real-time UI updates
+        try:
+            from core.realm_store import update_skill
+            update_skill(
+                skill,
+                mastered_level=new_mastered,
+                training_level=new_training_level,
+            )
+        except Exception as e:
+            logger.debug(f"[{skill}] Failed to sync to RealmState: {e}")
 
         # Queue evaluation for next level immediately
         try:

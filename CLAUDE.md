@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-12-01 (Vocabulary Canonicalization Update)
+**Last Updated:** 2025-12-02 (RealmState SSE & Ledger Cleanup)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 **Philosophy:** This repo is the method, not the results (see META section)
 
@@ -62,6 +62,7 @@ DROP QUEST → DIO BATTLES → GAIN XP → LEVEL UP → UNLOCK SKILLS → REPEAT
 | **Settings** | http://localhost:8888/settings | Config, VRAM calc, scheduler |
 | **Guild Hall** | http://localhost:8888/guild | Skill progression dashboard |
 | VaultKeeper API | http://localhost:8767/api/stats | Asset & Ledger API |
+| RealmState API | http://localhost:8866/api/realm | Real-time game state (SSE) |
 
 ### Start Playing
 
@@ -239,6 +240,7 @@ Skills are defined in `configs/skills/*.yaml` - YAML is the single source of tru
 | **Arena** | Training daemon (`core/training_daemon.py`) | - |
 | **Guild** | Skills & progression (`guild/`) | - |
 | **Vault** | VaultKeeper API (`vault/server.py`) | 8767 |
+| **RealmState** | Real-time state service (`realm/server.py`) | 8866 |
 | **Oracle** | Inference server (3090) | 8765 |
 | **Watchtower** | Monitoring (`watchtower/`) | 8081 |
 | **Garrison** | Fleet health manager (`core/garrison.py`) | - |
@@ -519,7 +521,22 @@ Key files: `configs/domains/`, `configs/physics/`, `trainer/techniques.py`
 
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
-Latest (2025-12-01) - **VOCABULARY CANONICALIZATION**:
+Latest (2025-12-02) - **REALMSTATE SSE & LEDGER CLEANUP**:
+- **RealmState SSE** - Server-Sent Events for real-time UI updates (`realm/server.py`)
+- **Atomic Worker Updates** - New `/api/worker/{id}` endpoint for worker state
+- **Staleness Detection** - Warns when data sources go stale
+- **Ledger Cleanup** - `cleanup_stale_entries()` and `verify_local_checkpoints()` methods
+- **UI Fixes** - Fixed speed/ETA flickering, step count rubber-banding, vault staleness
+- **Cleaned 665 stale entries** - Vault went from 763/2.5TB to 98/337GB
+
+Previous (2025-12-02) - **VAULT UNIFICATION**:
+- **Device Mapping** - Bridge between Ledger device_ids and VaultKeeper strongholds (`config/device_mapping.json`, `vault/device_mapping.py`)
+- **Ledger-VaultKeeper Sync** - Automatic sync from Ledger to VaultKeeper on checkpoint save/usage/delete
+- **VaultKeeper Startup Sync** - Catches up any missed checkpoints from Ledger on startup
+- **Unified Source of Truth** - Ledger is authoritative, VaultKeeper mirrors it
+- **221 checkpoints synced** - Vault catalog now matches Ledger (was 20k steps behind)
+
+Previous (2025-12-01) - **VOCABULARY CANONICALIZATION**:
 - **Six Training Schools** - Scribe, Mirror, Judge, Champion, Whisper, Oracle (`guild/training_schools.py`)
 - **Five Job Schools** - Inference, Forge, Vault, Analytics, Archaeology (`guild/job_types.py`)
 - **Temple Blessing System** - Effort → Experience via quality_factor (`temple/schemas.py`)
@@ -609,26 +626,62 @@ Previous (2025-11-27):
 
 ## 🗃️ KEY SYSTEMS REFERENCE
 
-### VaultKeeper (port 8767)
+### Checkpoint Ledger & VaultKeeper (Unified)
 
-Central asset registry. Pattern: **Ask Vault First**
+**Single Source of Truth:** Checkpoint Ledger (`status/checkpoint_ledger.json`)
+
+The Ledger is authoritative for checkpoint existence and locations. VaultKeeper
+catalog (`vault/catalog.db`) mirrors Ledger state via automatic sync hooks.
+
+**Sync Flow:**
+1. Training saves → `ledger.record()` → `keeper.register()` (automatic)
+2. Checkpoint used → `ledger.record_usage()` → `keeper.add_location()` (automatic)
+3. Checkpoint deleted → `ledger.remove_location()` → `keeper.remove_location()` (automatic)
+4. VaultKeeper startup → `_sync_from_ledger()` catches up any missed entries
+
+**Device↔Stronghold Mapping:** `config/device_mapping.json`
+
+| device_id | stronghold | zone |
+|-----------|------------|------|
+| trainer4090 | local_vault | hot |
+| inference3090 | inference_cache | hot |
+| synology_data | nas_archive | warm |
 
 ```python
-from vault import ask_vault_first
-model_path = ask_vault_first("checkpoint_175000", fallback="models/checkpoint-175000")
-```
+# Device mapping
+from vault.device_mapping import device_to_stronghold, get_local_device_id
+stronghold = device_to_stronghold("trainer4090")  # "local_vault"
+local_device = get_local_device_id()  # "trainer4090"
 
-Key endpoints: `/api/stats`, `/api/ledger`, `/api/checkpoints`, `/api/jobs`
-
-### Checkpoint Ledger
-
-Records stats when checkpoints are saved. Canonical name: `checkpoint-{step}-{YYYYMMDD}-{HHMM}`
-
-```python
+# Ledger usage (primary)
 from core.checkpoint_ledger import get_ledger
 ledger = get_ledger()
+record = ledger.get(201796)  # Get by step
 best = ledger.get_best(metric="train_loss")
+records = ledger.list_by_device("trainer4090")
+
+# VaultKeeper usage (mirrors ledger, use for cross-device queries)
+from vault import get_vault_keeper, ask_vault_first
+keeper = get_vault_keeper()
+result = keeper.locate("checkpoint_201796")
+
+# Ask vault first pattern (finds best location)
+path = ask_vault_first("checkpoint_201796", fallback="/default/path")
+
+# Ledger cleanup (removes stale entries)
+stale = ledger.cleanup_stale_entries(dry_run=False)  # Remove entries with no valid locations
+removed = ledger.verify_local_checkpoints("trainer4090")  # Remove device from non-existent paths
 ```
+
+**Cleanup Methods:**
+- `cleanup_stale_entries(dry_run=False)` - Remove entries where path doesn't exist AND no known locations
+- `verify_local_checkpoints(device_id, dry_run=False)` - Remove device from locations where path doesn't exist
+
+Both methods use direct save (without merge) to prevent deleted entries from reappearing.
+
+Canonical checkpoint name: `checkpoint-{step}-{YYYYMMDD}-{HHMM}`
+
+Key endpoints: `/api/stats`, `/api/ledger`, `/api/checkpoints`, `/api/jobs`
 
 ### Host Registry (`config/hosts.json`)
 
@@ -638,6 +691,55 @@ Service discovery - components query this instead of hardcoding IPs.
 from core.hosts import get_service_url
 inference_url = get_service_url("inference")  # http://inference.local:8765
 ```
+
+### RealmState Service (port 8866)
+
+Real-time game state with Server-Sent Events (SSE) for push updates.
+
+**Features:**
+- **SSE streaming** - Real-time updates via `/api/stream`
+- **Atomic worker updates** - `/api/worker/{id}` for concurrent-safe updates
+- **Staleness detection** - Warns when data sources go stale
+- **History snapshots** - `/api/history/{section}` for debugging
+- **Metrics** - `/metrics` endpoint for monitoring
+
+**Server (`realm/server.py`):**
+```python
+# Endpoints
+GET  /api/realm          # Full state (training, queue, workers, skills)
+GET  /api/stream         # SSE stream with channel filtering
+POST /api/realm          # Update section
+PUT  /api/worker/{id}    # Atomic worker update
+GET  /api/history/{sec}  # Last N snapshots for section
+GET  /metrics            # Prometheus-style metrics
+```
+
+**Client (`realm/client.py`):**
+```python
+from realm.client import RealmClient
+
+client = RealmClient()
+client.update_training(step=1000, loss=0.5)
+client.update_worker("gpu_0", status="busy", task="eval")
+client.update_skill("sy", level=14, accuracy=0.95)
+
+# SSE subscription
+for event in client.stream(channels=["training", "skills"]):
+    print(f"{event.channel}: {event.data}")
+```
+
+**JavaScript (`tavern/static/js/realm-state.js`):**
+```javascript
+// SSE with polling fallback
+RealmState.init({
+    sseEndpoint: '/api/realm/stream',
+    pollInterval: 2000,
+    onTraining: (data) => updateUI(data),
+    onSkills: (data) => updateSkillsUI(data)
+});
+```
+
+Key files: `realm/server.py`, `realm/client.py`, `tavern/static/js/realm-state.js`
 
 ### Job System V2
 
@@ -931,6 +1033,26 @@ python3 guild/sparring.py --skill binary --count 100
 
 ```bash
 python3 scripts/check_hardcodes.py --ignore-ips
+```
+
+### Ledger Cleanup
+
+```bash
+# Dry run - see what would be cleaned
+python3 -c "
+from core.checkpoint_ledger import get_ledger
+ledger = get_ledger()
+print(f'Would remove from trainer4090: {ledger.verify_local_checkpoints(\"trainer4090\", dry_run=True)}')
+print(f'Would remove stale: {ledger.cleanup_stale_entries(dry_run=True)}')
+"
+
+# Actually clean up
+python3 -c "
+from core.checkpoint_ledger import get_ledger
+ledger = get_ledger()
+ledger.verify_local_checkpoints('trainer4090')
+ledger.cleanup_stale_entries()
+"
 ```
 
 ---

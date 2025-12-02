@@ -4,6 +4,63 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-12-02 - RealmState SSE & Ledger Cleanup
+
+### The Problem
+1. UI flickering - speed/ETA would appear then disappear, step count rubber-banding between correct value and 0
+2. Vault displayed 763 checkpoints / 2.5TB but only 98 actually existed
+3. No real-time push updates - polling-only caused stale data
+
+### The Solution
+
+**RealmState SSE** (`realm/server.py`) - Server-Sent Events for real-time updates:
+- SSE streaming via `/api/stream` with channel filtering
+- Atomic worker updates via `/api/worker/{id}`
+- Staleness detection with configurable thresholds
+- History snapshots via `/api/history/{section}`
+- Metrics endpoint at `/metrics`
+
+**RealmState Client** (`realm/client.py`) - Connection pooling and debouncing:
+- `requests.Session` for HTTP keep-alive
+- `DebouncedUpdater` for batching rapid updates
+- SSE subscription via `stream()` generator
+
+**Tavern Integration** (`tavern/static/js/realm-state.js`):
+- SSE with automatic polling fallback
+- Reconnection with exponential backoff
+- Skills state support
+
+**Checkpoint Ledger Cleanup** (`core/checkpoint_ledger.py`):
+- `cleanup_stale_entries()` - Remove entries with no valid locations
+- `verify_local_checkpoints()` - Remove device from non-existent paths
+- Both use direct save (without merge) to prevent deleted entries from reappearing
+
+**UI Fixes** (`tavern/static/js/game.js`):
+- Changed `|| 0` to `?? existingValue ?? 0` to preserve existing values (nullish coalescing)
+- Skip training data in `processGameData()` when `realmSyncActive` is true
+- Added vault polling with 60s interval
+
+**Host Resolution Fix** (`core/hosts.py`):
+- `get_service_url()` now uses `localhost` for local services instead of external IP
+
+### Impact
+- Vault: 763 entries → 98 entries (665 stale removed)
+- Vault size: 2.5TB → 337GB displayed
+- UI: No more flickering/rubber-banding
+- Updates: Real-time via SSE (polling fallback)
+
+### Files Modified
+- `realm/server.py` - SSE support, atomic endpoints, staleness detection
+- `realm/client.py` - Connection pooling, debouncing, SSE subscription
+- `tavern/static/js/realm-state.js` - SSE with polling fallback
+- `tavern/static/js/game.js` - Nullish coalescing, vault polling
+- `tavern/server.py` - SSE proxy, queue filesystem sync
+- `core/hosts.py` - Localhost for local services
+- `core/checkpoint_ledger.py` - Cleanup methods with direct save
+- `data_manager/curriculum_manager.py` - Progression guard, RealmState sync
+
+---
+
 ## 2025-12-02 - Garrison Fleet Health Manager
 
 ### The Problem

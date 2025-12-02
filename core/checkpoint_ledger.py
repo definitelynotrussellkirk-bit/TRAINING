@@ -492,6 +492,9 @@ class CheckpointLedger:
         # Update campaign peak metrics (outside lock)
         self._update_campaign_peak_loss(train_loss, val_loss)
 
+        # Sync to VaultKeeper catalog (outside lock)
+        self._sync_to_vault(record)
+
         return record
 
     def _update_campaign_peak_loss(
@@ -533,6 +536,137 @@ class CheckpointLedger:
         except Exception as e:
             # Don't crash checkpoint saving because peak tracking failed
             logger.warning(f"Failed to update peak loss: {e}")
+
+    def _sync_to_vault(self, record: CheckpointRecord) -> None:
+        """
+        Sync checkpoint record to VaultKeeper catalog.
+
+        This keeps the VaultKeeper catalog in sync with the Ledger.
+        Converts device_id locations to stronghold locations via the
+        device mapping, then registers the asset with VaultKeeper.
+
+        Non-fatal: errors are logged but don't affect checkpoint saving.
+        """
+        try:
+            from vault.keeper import get_vault_keeper
+            from vault.device_mapping import get_mapping
+            from vault.assets import Asset, AssetType, AssetLocation, LocationStatus
+
+            keeper = get_vault_keeper()
+            mapping = get_mapping()
+
+            # Convert device_id locations to stronghold locations
+            locations = []
+            local_device_id = self._get_local_device_id()
+
+            for device_id in record.locations:
+                try:
+                    stronghold = mapping.device_to_stronghold(device_id)
+                    base_path = mapping.get_base_path(device_id)
+
+                    # Get relative path from base
+                    try:
+                        rel_path = str(Path(record.path).relative_to(base_path))
+                    except ValueError:
+                        # Path not relative to base, use as-is
+                        rel_path = record.path
+
+                    locations.append(AssetLocation(
+                        stronghold=stronghold,
+                        path=rel_path,
+                        status=LocationStatus.VERIFIED,
+                        is_primary=(device_id == local_device_id),
+                    ))
+                except KeyError:
+                    # Unknown device_id, skip
+                    continue
+
+            if not locations:
+                return
+
+            # Generate vault asset_id from step
+            asset_id = f"checkpoint_{record.step}"
+
+            # Create and register asset
+            asset = Asset(
+                asset_id=asset_id,
+                asset_type=AssetType.CHECKPOINT,
+                name=record.canonical_name,
+                size_bytes=record.size_bytes or 0,
+                locations=locations,
+                metadata={
+                    "step": record.step,
+                    "train_loss": record.train_loss,
+                    "canonical_name": record.canonical_name,
+                    "ledger_synced": True,
+                },
+            )
+            keeper.register(asset)
+            logger.debug(f"Synced checkpoint {record.step} to VaultKeeper catalog")
+
+        except Exception as e:
+            # Non-fatal: don't crash checkpoint saving
+            logger.debug(f"VaultKeeper sync failed (non-fatal): {e}")
+
+    def _add_vault_location(self, step: int, device_id: str) -> None:
+        """
+        Add a location to VaultKeeper when Ledger location is added.
+
+        Called after record_usage() to keep VaultKeeper in sync.
+        """
+        try:
+            from vault.keeper import get_vault_keeper
+            from vault.device_mapping import get_mapping
+
+            keeper = get_vault_keeper()
+            mapping = get_mapping()
+
+            asset_id = f"checkpoint_{step}"
+            stronghold = mapping.device_to_stronghold(device_id)
+            record = self.get(step)
+
+            if record:
+                base_path = mapping.get_base_path(device_id)
+                try:
+                    rel_path = str(Path(record.path).relative_to(base_path))
+                except ValueError:
+                    rel_path = record.path
+
+                keeper.add_location(asset_id, stronghold, rel_path)
+                logger.debug(f"Added VaultKeeper location: {asset_id} @ {stronghold}")
+
+        except Exception as e:
+            logger.debug(f"VaultKeeper location add failed (non-fatal): {e}")
+
+    def _remove_vault_location(self, step: int, device_id: str) -> None:
+        """
+        Remove a location from VaultKeeper when Ledger location is removed.
+
+        Called after remove_location() to keep VaultKeeper in sync.
+        """
+        try:
+            from vault.keeper import get_vault_keeper
+            from vault.device_mapping import get_mapping
+
+            keeper = get_vault_keeper()
+            mapping = get_mapping()
+
+            asset_id = f"checkpoint_{step}"
+            stronghold = mapping.device_to_stronghold(device_id)
+            record = self.get(step)
+
+            if record:
+                base_path = mapping.get_base_path(device_id)
+                try:
+                    rel_path = str(Path(record.path).relative_to(base_path))
+                except ValueError:
+                    rel_path = record.path
+
+                keeper.remove_location(asset_id, stronghold, rel_path)
+                logger.debug(f"Removed VaultKeeper location: {asset_id} @ {stronghold}")
+
+        except Exception as e:
+            logger.debug(f"VaultKeeper location remove failed (non-fatal): {e}")
 
     def get(self, step: int) -> Optional[CheckpointRecord]:
         """Get record for a specific step."""
@@ -618,7 +752,10 @@ class CheckpointLedger:
 
             self._save_index()
             logger.debug(f"Recorded usage: checkpoint {step} on {device_id}")
-            return True
+
+        # Sync location to VaultKeeper (outside lock)
+        self._add_vault_location(step, device_id)
+        return True
 
     def remove_location(self, step: int, device_id: str) -> bool:
         """
@@ -644,7 +781,147 @@ class CheckpointLedger:
                 record.locations.remove(device_id)
                 self._save_index()
                 logger.debug(f"Removed location: checkpoint {step} from {device_id}")
-            return True
+
+        # Sync removal to VaultKeeper (outside lock)
+        self._remove_vault_location(step, device_id)
+        return True
+
+    def cleanup_stale_entries(self, dry_run: bool = False) -> int:
+        """
+        Remove ledger entries for checkpoints that no longer exist anywhere.
+
+        A checkpoint is considered stale if:
+        - Its path doesn't exist AND
+        - It has no locations listed (or all locations are unknown)
+
+        This cleans up historical entries for deleted checkpoints.
+
+        Args:
+            dry_run: If True, only count without deleting
+
+        Returns:
+            Number of entries removed (or would be removed if dry_run)
+        """
+        from pathlib import Path
+        import fcntl
+        import tempfile
+
+        self._ensure_fresh()
+        stale_steps = []
+
+        with self._lock:
+            for step, record in list(self._index.items()):
+                # Check if checkpoint exists locally
+                path_exists = record.path and Path(record.path).exists()
+
+                # Check if it has any known locations
+                has_locations = bool(record.locations) and any(
+                    loc not in ('unknown', '') for loc in record.locations
+                )
+
+                # If doesn't exist locally and has no known locations, it's stale
+                if not path_exists and not has_locations:
+                    stale_steps.append(step)
+
+            if not dry_run and stale_steps:
+                for step in stale_steps:
+                    del self._index[step]
+
+                # Direct save WITHOUT merge (cleanup is authoritative)
+                lock_file = self.index_path.with_suffix(".lock")
+                with open(lock_file, "w") as lock_fd:
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+                    try:
+                        data = {
+                            "version": "1.0.0",
+                            "updated_at": datetime.now().isoformat(),
+                            "checkpoint_count": len(self._index),
+                            "checkpoints": {
+                                str(step): record.to_dict()
+                                for step, record in sorted(self._index.items())
+                            },
+                        }
+                        fd, temp_path = tempfile.mkstemp(
+                            dir=self.status_dir,
+                            prefix="ledger_",
+                            suffix=".tmp"
+                        )
+                        try:
+                            with os.fdopen(fd, "w") as f:
+                                json.dump(data, f, indent=2)
+                            os.replace(temp_path, self.index_path)
+                        except Exception:
+                            os.unlink(temp_path)
+                            raise
+                    finally:
+                        fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+
+                logger.info(f"Cleaned up {len(stale_steps)} stale ledger entries")
+
+        return len(stale_steps)
+
+    def verify_local_checkpoints(self, device_id: str, dry_run: bool = False) -> int:
+        """
+        Verify ledger entries for a device match actual filesystem state.
+
+        Removes the device from locations for checkpoints that don't exist locally.
+        Uses direct save to avoid merge logic re-adding locations.
+
+        Args:
+            device_id: Device to verify
+            dry_run: If True, only count without modifying
+
+        Returns:
+            Number of locations removed
+        """
+        from pathlib import Path
+        import fcntl
+        import tempfile
+
+        self._ensure_fresh()
+        removed = 0
+
+        with self._lock:
+            records = [r for r in self._index.values() if device_id in r.locations]
+            for record in records:
+                if record.path and not Path(record.path).exists():
+                    if not dry_run:
+                        record.locations.remove(device_id)
+                    removed += 1
+
+            if not dry_run and removed > 0:
+                # Direct save WITHOUT merge
+                lock_file = self.index_path.with_suffix(".lock")
+                with open(lock_file, "w") as lock_fd:
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+                    try:
+                        data = {
+                            "version": "1.0.0",
+                            "updated_at": datetime.now().isoformat(),
+                            "checkpoint_count": len(self._index),
+                            "checkpoints": {
+                                str(step): record.to_dict()
+                                for step, record in sorted(self._index.items())
+                            },
+                        }
+                        fd, temp_path = tempfile.mkstemp(
+                            dir=self.status_dir,
+                            prefix="ledger_",
+                            suffix=".tmp"
+                        )
+                        try:
+                            with os.fdopen(fd, "w") as f:
+                                json.dump(data, f, indent=2)
+                            os.replace(temp_path, self.index_path)
+                        except Exception:
+                            os.unlink(temp_path)
+                            raise
+                    finally:
+                        fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+
+                logger.info(f"Removed {device_id} from {removed} non-existent checkpoints")
+
+        return removed
 
     def list_by_device(self, device_id: str, sort_by_usage: bool = True) -> List[CheckpointRecord]:
         """

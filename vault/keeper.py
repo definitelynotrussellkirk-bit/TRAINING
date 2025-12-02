@@ -160,8 +160,14 @@ class VaultKeeper:
         # Thread lock for database access
         self._lock = threading.Lock()
 
+        # Flag to prevent recursive sync
+        self._syncing_from_ledger = False
+
         # Initialize database
         self._init_catalog()
+
+        # Sync from ledger on startup (catch up any missed checkpoints)
+        self._sync_from_ledger()
 
     # =========================================================================
     # DATABASE MANAGEMENT
@@ -252,6 +258,110 @@ class VaultKeeper:
                 raise
             finally:
                 conn.close()
+
+    # =========================================================================
+    # LEDGER SYNC
+    # =========================================================================
+
+    def _sync_from_ledger(self) -> int:
+        """
+        Sync all checkpoints from Ledger to catalog on startup.
+
+        This catches up the VaultKeeper catalog with any checkpoints
+        that were added to the Ledger while VaultKeeper was not running.
+
+        Returns:
+            Number of checkpoints synced
+        """
+        if self._syncing_from_ledger:
+            return 0
+
+        self._syncing_from_ledger = True
+        synced = 0
+
+        try:
+            from core.checkpoint_ledger import get_ledger
+            from vault.device_mapping import get_mapping
+
+            ledger = get_ledger()
+            mapping = get_mapping()
+
+            # Get all ledger records
+            records = ledger.list_all()
+            if not records:
+                return 0
+
+            # Check each record against catalog
+            for record in records:
+                asset_id = f"checkpoint_{record.step}"
+
+                # Skip if already exists in catalog
+                if self.get(asset_id):
+                    continue
+
+                # Build locations from ledger locations
+                locations = []
+                for device_id in record.locations:
+                    try:
+                        stronghold = mapping.device_to_stronghold(device_id)
+                        base_path = mapping.get_base_path(device_id)
+
+                        try:
+                            rel_path = str(Path(record.path).relative_to(base_path))
+                        except ValueError:
+                            rel_path = record.path
+
+                        locations.append(AssetLocation(
+                            stronghold=stronghold,
+                            path=rel_path,
+                            status=LocationStatus.UNVERIFIED,
+                        ))
+                    except KeyError:
+                        continue
+
+                if locations:
+                    asset = Asset(
+                        asset_id=asset_id,
+                        asset_type=AssetType.CHECKPOINT,
+                        name=record.canonical_name,
+                        size_bytes=record.size_bytes or 0,
+                        locations=locations,
+                        metadata={
+                            "step": record.step,
+                            "train_loss": record.train_loss,
+                            "canonical_name": record.canonical_name,
+                            "ledger_synced": True,
+                        },
+                    )
+                    self.register(asset)
+                    synced += 1
+
+            if synced > 0:
+                import logging
+                logging.getLogger("vault.keeper").info(
+                    f"Synced {synced} checkpoints from Ledger to catalog"
+                )
+
+            return synced
+
+        except Exception as e:
+            import logging
+            logging.getLogger("vault.keeper").warning(
+                f"Ledger sync failed: {e}"
+            )
+            return 0
+
+        finally:
+            self._syncing_from_ledger = False
+
+    def sync_from_ledger(self) -> int:
+        """
+        Public method to manually trigger ledger sync.
+
+        Returns:
+            Number of checkpoints synced
+        """
+        return self._sync_from_ledger()
 
     # =========================================================================
     # HANDLER MANAGEMENT

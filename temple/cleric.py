@@ -355,6 +355,7 @@ def _ensure_rituals_loaded():
             "oracle",     # Inference server
             "guild",      # Skills/curriculum
             "scribe",     # Evaluation system
+            "vault",      # Vault unification & remote ops
             "deep",       # Comprehensive (runs all)
         ]
 

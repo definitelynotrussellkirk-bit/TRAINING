@@ -1,0 +1,70 @@
+{
+  "_comment": "Device-to-Stronghold Mapping - Single source of truth for location naming",
+  "version": "1.0",
+  "updated_at": "2025-12-02",
+
+  "mappings": {
+    "trainer4090": {
+      "stronghold": "local_vault",
+      "zone": "hot",
+      "is_primary": true,
+      "base_path": "$TRAINING_BASE_DIR",
+      "description": "Training server (RTX 4090)"
+    },
+    "inference3090": {
+      "stronghold": "inference_cache",
+      "zone": "hot",
+      "is_primary": false,
+      "base_path": "~/llm",
+      "description": "Inference server (RTX 3090)"
+    },
+    "synology_data": {
+      "stronghold": "nas_archive",
+      "zone": "warm",
+      "is_primary": false,
+      "base_path": "/volume1/data/llm_training",
+      "description": "Synology NAS primary storage"
+    },
+    "synology_backup": {
+      "stronghold": "nas_backup",
+      "zone": "warm",
+      "is_primary": false,
+      "base_path": "/volume1/backup/llm_training",
+      "description": "Synology NAS backup storage"
+    },
+    "synology_archive": {
+      "stronghold": "nas_cold",
+      "zone": "cold",
+      "is_primary": false,
+      "base_path": "/volume1/archive/llm_training",
+      "description": "Synology NAS archive storage"
+    }
+  },
+
+  "stronghold_priority": [
+    "local_vault",
+    "inference_cache",
+    "nas_archive",
+    "nas_backup",
+    "nas_cold"
+  ],
+
+  "zone_priority": ["hot", "warm", "cold"],
+
+  "_notes": [
+    "This file bridges two naming conventions:",
+    "  - device_id: Used by CheckpointLedger (trainer4090, inference3090, synology_data)",
+    "  - stronghold: Used by VaultKeeper catalog (local_vault, nas_archive)",
+    "",
+    "The mapping allows bidirectional lookup:",
+    "  - device_to_stronghold('trainer4090') -> 'local_vault'",
+    "  - stronghold_to_device('local_vault') -> 'trainer4090'",
+    "",
+    "Priority lists determine preferred source when multiple copies exist.",
+    "",
+    "Zone mapping:",
+    "  - hot: Fast local NVMe (trainer4090, inference3090)",
+    "  - warm: NAS primary storage (synology_data, synology_backup)",
+    "  - cold: NAS archive (synology_archive)"
+  ]
+}

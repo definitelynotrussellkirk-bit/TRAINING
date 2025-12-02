@@ -226,6 +226,19 @@ from vault.storage_resolver import (
     KindNotConfigured,
 )
 
+# Device Mapping (NEW - bridge between Ledger device_ids and VaultKeeper strongholds)
+from vault.device_mapping import (
+    # Core
+    DeviceMapping,
+    DeviceInfo,
+    get_mapping,
+    # Convenience functions
+    device_to_stronghold,
+    stronghold_to_device,
+    get_local_device_id,
+    get_local_stronghold,
+)
+
 
 __all__ = [
     # VaultKeeper - Central Registry
@@ -325,6 +338,14 @@ __all__ = [
     "StorageResolverError",
     "ZoneNotAvailable",
     "KindNotConfigured",
+    # Device Mapping
+    "DeviceMapping",
+    "DeviceInfo",
+    "get_mapping",
+    "device_to_stronghold",
+    "stronghold_to_device",
+    "get_local_device_id",
+    "get_local_stronghold",
 ]
 
 

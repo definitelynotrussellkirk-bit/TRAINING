@@ -1,65 +1,74 @@
 {
   "level": 20,
-  "level_name": "Huge",
+  "level_name": "21-bit (huge: 0 to 2,097,151)",
   "bits": 21,
-  "eval_version": "1.0",
+  "eval_version": "2.0-training-format",
   "pass_threshold": 0.8,
-  "passing_score": "4/5",
-  "scoring_rule": "Each problem: answer must match exactly. Level: 80% of problems must pass.",
-  "response_schema": {
-    "type": "object",
-    "required": [
-      "answer"
-    ],
-    "properties": {
-      "answer": {
-        "type": "string",
-        "description": "Result in circled binary notation (\u24ea\u2460)"
-      }
-    },
-    "example": "{\"answer\": \"\u2460\u24ea\u2460\u24ea\"}"
-  },
-  "num_problems": 5,
+  "scoring_rule": "Response must contain the expected result pattern",
   "problems": [
     {
-      "problem_id": "eval_L20_P1",
-      "problem_index": 0,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udd34 represents 0\n  \ud83d\udd35 represents 1\n\nCompute plus(\ud83d\udd35\ud83d\udd35\ud83d\udd34\ud83d\udd34\ud83d\udd34\ud83d\udd35\ud83d\udd35\ud83d\udd35\ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd34, \ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd35\ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd35\ud83d\udd35\ud83d\udd35\ud83d\udd34)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udd34/\ud83d\udd35 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (easy): 408922 + 175838 = 584760"
+      "prompt": "Symbol Key:\n  🔴 = 0 (zero bit)\n  🔵 = 1 (one bit)\n\nOperations:\n  📏 = absolute_value\n  join = add\n  splus = add_signed\n  ➗ = divide\n  🔽 = divide_by_2\n  match = equals\n  next = increment\n  max = maximum\n  min = minimum\n  🌀 = multiply\n  ⏫ = multiply_by_2\n  smul = multiply_signed\n  flip = negate\n  sign = sign_of\n  ➖ = subtract\n  signed_sub = subtract_signed\n\nCompute: decrement(🔵🔵🔵🔴🔴🔵🔵🔵🔵🔴🔴🔴🔵🔵🔵🔴🔴🔴🔴🔵)",
+      "expected": "decrement(🔵🔵🔵🔴🔴🔵🔵🔵🔵🔴🔴🔴🔵🔵🔵🔴🔴🔴🔴🔵) = 🔵🔵🔵🔴🔴🔵🔵🔵🔵🔴🔴🔴🔵🔵🔵🔴🔴🔴🔴🔴",
+      "metadata": {
+        "scenario": "decrement",
+        "tags": [
+          "decrement",
+          "easy",
+          "level-20",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L20_P2",
-      "problem_index": 1,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udd37 represents 0\n  \ud83d\udd36 represents 1\n\nCompute remove(\ud83d\udd36\ud83d\udd36\ud83d\udd36\ud83d\udd36\ud83d\udd37\ud83d\udd37\ud83d\udd36\ud83d\udd37\ud83d\udd37\ud83d\udd36\ud83d\udd36\ud83d\udd36\ud83d\udd37\ud83d\udd37\ud83d\udd36\ud83d\udd37\ud83d\udd37\ud83d\udd36\ud83d\udd36, \ud83d\udd36\ud83d\udd37\ud83d\udd36\ud83d\udd37\ud83d\udd36\ud83d\udd37\ud83d\udd36\ud83d\udd37\ud83d\udd36\ud83d\udd37\ud83d\udd36\ud83d\udd36\ud83d\udd36\ud83d\udd37\ud83d\udd36\ud83d\udd36\ud83d\udd36\ud83d\udd36\ud83d\udd36)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udd37/\ud83d\udd36 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (easy): 496531 - 349663 = 146868"
+      "prompt": "Compute: increment(①⓪①①⓪①①①①①①①⓪①①①⓪⓪)",
+      "expected": "increment(①⓪①①⓪①①①①①①①⓪①①①⓪⓪) = ①⓪①①⓪①①①①①①①⓪①①①⓪①",
+      "metadata": {
+        "scenario": "increment",
+        "tags": [
+          "increment",
+          "easy",
+          "level-20"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L20_P3",
-      "problem_index": 2,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udd35 represents 0\n  \ud83d\udd34 represents 1\n\nCompute mult(\ud83d\udd34\ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd34\ud83d\udd35\ud83d\udd34\ud83d\udd34\ud83d\udd35, \ud83d\udd34\ud83d\udd35\ud83d\udd35\ud83d\udd34\ud83d\udd34\ud83d\udd34\ud83d\udd34\ud83d\udd34\ud83d\udd34\ud83d\udd35)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udd35/\ud83d\udd34 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (medium): 342 * 638 = 218196"
+      "prompt": "Symbol Key:\n  🐻 = 0 (zero bit)\n  🐼 = 1 (one bit)\n\nOperations:\n  size = absolute_value\n  ➕🔢 = add_signed\n  ⬇️ = decrement\n  div = divide\n  bisect = divide_by_2\n  same = equals\n  ▶️ = greaterthan\n  📈 = increment\n  below = lessthan\n  most = maximum\n  least = minimum\n  product = multiply\n  mul2 = multiply_by_2\n  stimes = multiply_signed\n  flip = negate\n  take = subtract\n  sminus = subtract_signed\n  📝 = tobinary\n  decimal = todecimal\n\nCompute: add(🐼🐼🐼🐻🐼🐼🐻🐻🐼🐻🐻🐼🐼🐼🐼🐼🐻🐻🐻, 🐼🐼🐻🐻🐻🐼🐼🐻🐻🐻🐻🐻🐼🐻🐻🐻🐻🐻🐻🐻)",
+      "expected": "add(🐼🐼🐼🐻🐼🐼🐻🐻🐼🐻🐻🐼🐼🐼🐼🐼🐻🐻🐻, 🐼🐼🐻🐻🐻🐼🐼🐻🐻🐻🐻🐻🐼🐻🐻🐻🐻🐻🐻🐻) = 🐼🐻🐻🐼🐼🐼🐼🐻🐻🐻🐼🐻🐼🐻🐼🐼🐼🐼🐻🐻🐻",
+      "metadata": {
+        "scenario": "add-basic",
+        "tags": [
+          "add",
+          "easy",
+          "level-20",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L20_P4",
-      "problem_index": 3,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udc9c represents 0\n  \ud83d\udc9b represents 1\n\nCompute plus(\ud83d\udc9b\ud83d\udc9b\ud83d\udc9c\ud83d\udc9b\ud83d\udc9c\ud83d\udc9b\ud83d\udc9b\ud83d\udc9c\ud83d\udc9b\ud83d\udc9c\ud83d\udc9b\ud83d\udc9b\ud83d\udc9b\ud83d\udc9b\ud83d\udc9b\ud83d\udc9b\ud83d\udc9b\ud83d\udc9c\ud83d\udc9b\ud83d\udc9b, \ud83d\udc9b\ud83d\udc9c\ud83d\udc9b\ud83d\udc9b\ud83d\udc9b\ud83d\udc9c\ud83d\udc9c\ud83d\udc9b\ud83d\udc9c\ud83d\udc9c\ud83d\udc9c\ud83d\udc9c\ud83d\udc9b\ud83d\udc9c\ud83d\udc9c\ud83d\udc9b\ud83d\udc9b\ud83d\udc9c\ud83d\udc9c\ud83d\udc9b)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udc9c/\ud83d\udc9b symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (hard): 879611 + 757913 = 1637524"
+      "prompt": "Symbol Key:\n  🟢 = 0 (zero bit)\n  🟣 = 1 (one bit)\n\nOperations:\n  magnitude = absolute_value\n  plus = add\n  ➕🔢 = add_signed\n  ⬇️ = decrement\n  halve = divide\n  div2 = divide_by_2\n  same = equals\n  larger = greaterthan\n  bump = increment\n  smaller = lessthan\n  max = maximum\n  min = minimum\n  ✖️ = multiply\n  🔼 = multiply_by_2\n  signed_mul = multiply_signed\n  invert = negate\n  direction = sign_of\n  reduce = subtract\n  ssub = subtract_signed\n  binary = tobinary\n  📊 = todecimal\n\nCompute: reduce(🟣🟢🟢🟢🟢🟣🟢🟣🟢🟣🟣🟢🟢🟢🟣🟣🟢🟣🟢🟢, 🟣🟣🟢🟣🟢🟣🟢🟢🟢🟣🟣🟢🟣🟣🟢🟣🟢🟢🟣)",
+      "expected": "reduce(🟣🟢🟢🟢🟢🟣🟢🟣🟢🟣🟣🟢🟢🟢🟣🟣🟢🟣🟢🟢, 🟣🟣🟢🟣🟢🟣🟢🟢🟢🟣🟣🟢🟣🟣🟢🟣🟢🟢🟣) = 🟣🟣🟢🟣🟣🟢🟢🟣🟢🟣🟣🟢🟢🟣🟢🟣🟣",
+      "metadata": {
+        "scenario": "subtract-basic",
+        "tags": [
+          "subtract",
+          "easy",
+          "level-20",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L20_P5",
-      "problem_index": 4,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute subtract(\u2460\u24ea\u24ea\u2460\u2460\u2460\u24ea\u2460\u2460\u2460\u24ea\u24ea\u2460\u2460\u24ea\u24ea\u2460\u24ea\u24ea\u24ea\u2460, \u2460\u2460\u2460\u2460\u2460\u24ea\u24ea\u2460\u2460\u2460\u24ea\u24ea\u2460\u24ea\u2460\u24ea\u24ea\u2460\u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (hard): 1292689 - 511571 = 781118"
+      "prompt": "Symbol Key:\n  🎵 = 0 (zero bit)\n  🎶 = 1 (one bit)\n\nOperations:\n  📏 = absolute_value\n  sum = add\n  ➕🔢 = add_signed\n  halve = divide\n  half = divide_by_2\n  🟰 = equals\n  larger = greaterthan\n  inc = increment\n  under = lessthan\n  largest = maximum\n  🌀 = multiply\n  double = multiply_by_2\n  smul = multiply_signed\n  ↔️ = negate\n  sign = sign_of\n  diff = subtract\n  ➖🔢 = subtract_signed\n  📝 = tobinary\n  🔟 = todecimal\n\nCompute: diff(🎶🎵🎵🎶🎶🎵🎵🎶🎶🎶🎶🎵🎶🎶🎵🎶🎶🎶🎵🎵, 🎶🎵🎶🎶🎵🎶🎶🎶🎶🎵🎵🎶🎶🎶🎶🎶🎵🎵)",
+      "expected": "diff(🎶🎵🎵🎶🎶🎵🎵🎶🎶🎶🎶🎵🎶🎶🎵🎶🎶🎶🎵🎵, 🎶🎵🎶🎶🎵🎶🎶🎶🎶🎵🎵🎶🎶🎶🎶🎶🎵🎵) = 🎶🎶🎵🎶🎶🎵🎵🎵🎵🎵🎵🎵🎶🎶🎵🎵🎵🎵🎵",
+      "metadata": {
+        "scenario": "subtract-basic",
+        "tags": [
+          "subtract",
+          "easy",
+          "level-20",
+          "symbol-language"
+        ]
+      }
     }
   ]
 }

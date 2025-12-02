@@ -345,6 +345,53 @@ class RealmStateStore:
         return self.get("hero", {})
 
     # =========================================================================
+    # TYPED ACCESSORS - SKILLS
+    # =========================================================================
+
+    def update_skills(
+        self,
+        skills: Optional[Dict[str, Dict]] = None,
+        active_skill: Optional[str] = None,
+        **extra
+    ):
+        """Update skills/curriculum state."""
+        if self._client:
+            self._client.update_skills(skills=skills, active_skill=active_skill, **extra)
+        else:
+            updates = {}
+            if skills is not None: updates["skills"] = skills
+            if active_skill is not None: updates["active_skill"] = active_skill
+            updates.update(extra)
+            self.update("skills", **updates)
+
+    def get_skills(self) -> Dict[str, Any]:
+        """Get skills/curriculum state."""
+        return self.get("skills", {})
+
+    def update_skill(
+        self,
+        skill_id: str,
+        mastered_level: Optional[int] = None,
+        training_level: Optional[int] = None,
+        accuracy: Optional[float] = None,
+        **extra
+    ):
+        """Update a single skill's state."""
+        current = self.get_skills()
+        skills = current.get("skills", {})
+
+        if skill_id not in skills:
+            skills[skill_id] = {"id": skill_id}
+
+        skill = skills[skill_id]
+        if mastered_level is not None: skill["mastered_level"] = mastered_level
+        if training_level is not None: skill["training_level"] = training_level
+        if accuracy is not None: skill["last_accuracy"] = accuracy
+        skill.update(extra)
+
+        self.update_skills(skills=skills)
+
+    # =========================================================================
     # EVENTS
     # =========================================================================
 
@@ -481,6 +528,21 @@ def update_hero(**kwargs):
 def get_hero_state() -> Dict[str, Any]:
     """Get hero state."""
     return get_store().get_hero()
+
+
+def update_skills(**kwargs):
+    """Update skills/curriculum state."""
+    get_store().update_skills(**kwargs)
+
+
+def get_skills_state() -> Dict[str, Any]:
+    """Get skills/curriculum state."""
+    return get_store().get_skills()
+
+
+def update_skill(skill_id: str, **kwargs):
+    """Update a single skill's state."""
+    get_store().update_skill(skill_id, **kwargs)
 
 
 def emit_event(kind: str, message: str, **kwargs) -> Dict:

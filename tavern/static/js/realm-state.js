@@ -1,11 +1,17 @@
 /**
  * Realm State Manager - Single Source of Truth for all UI data
  *
- * This module fetches from /api/realm ONCE and distributes the data
- * to all UI components. No more multiple fetch calls to different endpoints.
+ * Features:
+ * - Server-Sent Events (SSE) for real-time push updates
+ * - Automatic fallback to polling if SSE unavailable
+ * - Subscriber pattern for component updates
+ * - Skills/curriculum state support
+ * - Connection health monitoring
  *
  * Architecture:
- *   /api/realm -> RealmState (cache) -> Subscribers (UI components)
+ *   SSE /api/stream -> RealmState (cache) -> Subscribers (UI components)
+ *   OR
+ *   Polling /api/realm -> RealmState (cache) -> Subscribers (UI components)
  *
  * Usage:
  *   // Subscribe to state changes
@@ -16,7 +22,7 @@
  *   // Read current state directly
  *   const step = RealmState.training.step;
  *
- *   // Manually trigger refresh
+ *   // Manually trigger refresh (polling mode only)
  *   await RealmState.refresh();
  */
 
@@ -60,6 +66,12 @@ const RealmState = {
         updatedAt: null,
     },
 
+    skills: {
+        skills: {},          // skill_id -> { mastered_level, training_level, accuracy, ... }
+        activeSkill: null,
+        updatedAt: null,
+    },
+
     mode: 'idle',            // training, idle, eval_only, maintenance
     health: 'unknown',       // healthy, warning, error, unknown
     warnings: [],
@@ -67,13 +79,21 @@ const RealmState = {
     events: [],              // Recent battle log events
 
     // =================================================================
-    // METADATA
+    // METADATA & CONNECTION
     // =================================================================
 
     lastFetch: null,
     lastError: null,
     fetchCount: 0,
-    isPolling: false,
+    schemaVersion: null,
+
+    // Connection state
+    _connectionMode: 'none',  // 'sse', 'polling', 'none'
+    _eventSource: null,
+    _pollInterval: null,
+    _reconnectAttempts: 0,
+    _maxReconnectAttempts: 5,
+    _reconnectDelay: 1000,
 
     // =================================================================
     // SUBSCRIBERS
@@ -84,6 +104,7 @@ const RealmState = {
         queue: [],
         workers: [],
         hero: [],
+        skills: [],
         mode: [],
         events: [],
         all: [],  // Called on any change
@@ -91,14 +112,14 @@ const RealmState = {
 
     /**
      * Subscribe to state changes for a section
-     * @param {string} section - 'training', 'queue', 'workers', 'hero', 'mode', 'events', or 'all'
+     * @param {string} section - 'training', 'queue', 'workers', 'hero', 'skills', 'mode', 'events', or 'all'
      * @param {function} callback - Called with the section data when it changes
      */
     subscribe(section, callback) {
         if (this._subscribers[section]) {
             this._subscribers[section].push(callback);
         } else {
-            console.warn(`Unknown section: ${section}`);
+            console.warn(`[RealmState] Unknown section: ${section}`);
         }
     },
 
@@ -124,7 +145,7 @@ const RealmState = {
                 try {
                     cb(data);
                 } catch (e) {
-                    console.error(`Subscriber error (${section}):`, e);
+                    console.error(`[RealmState] Subscriber error (${section}):`, e);
                 }
             }
         }
@@ -133,13 +154,156 @@ const RealmState = {
             try {
                 cb(section, data);
             } catch (e) {
-                console.error('Subscriber error (all):', e);
+                console.error('[RealmState] Subscriber error (all):', e);
             }
         }
     },
 
     // =================================================================
-    // FETCHING
+    // SSE CONNECTION
+    // =================================================================
+
+    /**
+     * Connect via Server-Sent Events for real-time updates
+     */
+    connectSSE() {
+        if (this._eventSource) {
+            this._eventSource.close();
+        }
+
+        const url = `/api/realm/stream`;
+        console.log(`[RealmState] Connecting to SSE: ${url}`);
+
+        try {
+            this._eventSource = new EventSource(url);
+            this._connectionMode = 'sse';
+
+            this._eventSource.onopen = () => {
+                console.log('[RealmState] SSE connected');
+                this._reconnectAttempts = 0;
+                this.health = 'healthy';
+                this._notify('mode', { mode: this.mode, health: 'healthy' });
+            };
+
+            // Handle initial state
+            this._eventSource.addEventListener('init', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    console.log('[RealmState] Received initial state via SSE');
+                    this._processState(data);
+                } catch (err) {
+                    console.error('[RealmState] Error parsing init event:', err);
+                }
+            });
+
+            // Handle training updates
+            this._eventSource.addEventListener('training', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    this._updateTraining(data);
+                } catch (err) {
+                    console.error('[RealmState] Error parsing training event:', err);
+                }
+            });
+
+            // Handle queue updates
+            this._eventSource.addEventListener('queue', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    this._updateQueue(data);
+                } catch (err) {
+                    console.error('[RealmState] Error parsing queue event:', err);
+                }
+            });
+
+            // Handle worker updates
+            this._eventSource.addEventListener('worker_update', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    this._updateWorker(data);
+                } catch (err) {
+                    console.error('[RealmState] Error parsing worker event:', err);
+                }
+            });
+
+            this._eventSource.addEventListener('workers', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    this._updateWorkers(data);
+                } catch (err) {
+                    console.error('[RealmState] Error parsing workers event:', err);
+                }
+            });
+
+            // Handle hero updates
+            this._eventSource.addEventListener('hero', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    this._updateHero(data);
+                } catch (err) {
+                    console.error('[RealmState] Error parsing hero event:', err);
+                }
+            });
+
+            // Handle skills updates
+            this._eventSource.addEventListener('skills', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    this._updateSkills(data);
+                } catch (err) {
+                    console.error('[RealmState] Error parsing skills event:', err);
+                }
+            });
+
+            // Handle battle log events
+            this._eventSource.addEventListener('event', (e) => {
+                try {
+                    const event = JSON.parse(e.data);
+                    this._addEvent(event);
+                } catch (err) {
+                    console.error('[RealmState] Error parsing event:', err);
+                }
+            });
+
+            // Handle errors
+            this._eventSource.onerror = (e) => {
+                console.warn('[RealmState] SSE error, will reconnect...');
+                this._eventSource.close();
+                this._eventSource = null;
+                this._connectionMode = 'none';
+                this.health = 'warning';
+
+                // Attempt reconnection with backoff
+                if (this._reconnectAttempts < this._maxReconnectAttempts) {
+                    this._reconnectAttempts++;
+                    const delay = this._reconnectDelay * Math.pow(2, this._reconnectAttempts - 1);
+                    console.log(`[RealmState] Reconnecting in ${delay}ms (attempt ${this._reconnectAttempts})`);
+                    setTimeout(() => this.connectSSE(), delay);
+                } else {
+                    console.log('[RealmState] Max reconnect attempts reached, falling back to polling');
+                    this.startPolling(2000);
+                }
+            };
+
+        } catch (err) {
+            console.error('[RealmState] Failed to create EventSource:', err);
+            this.startPolling(2000);
+        }
+    },
+
+    /**
+     * Disconnect SSE
+     */
+    disconnectSSE() {
+        if (this._eventSource) {
+            this._eventSource.close();
+            this._eventSource = null;
+        }
+        this._connectionMode = 'none';
+    },
+
+    // =================================================================
+    // POLLING (fallback)
     // =================================================================
 
     /**
@@ -159,6 +323,7 @@ const RealmState = {
             this.fetchCount++;
             this.lastFetch = new Date();
             this.lastError = null;
+            this.schemaVersion = data.schema_version;
 
             // Process the response
             this._processState(data);
@@ -166,7 +331,7 @@ const RealmState = {
             return data;
 
         } catch (err) {
-            console.error('RealmState fetch error:', err);
+            console.error('[RealmState] Fetch error:', err);
             this.lastError = err.message;
             this.health = 'error';
             this._notify('mode', { mode: this.mode, health: 'error' });
@@ -175,7 +340,42 @@ const RealmState = {
     },
 
     /**
-     * Process state response and update local cache
+     * Start polling for state updates (fallback when SSE unavailable)
+     * @param {number} intervalMs - Poll interval in milliseconds (default 2000)
+     */
+    startPolling(intervalMs = 2000) {
+        if (this._connectionMode === 'polling') return;
+
+        this.stopPolling();
+        this._connectionMode = 'polling';
+        this.refresh();  // Initial fetch
+
+        this._pollInterval = setInterval(() => {
+            this.refresh();
+        }, intervalMs);
+
+        console.log(`[RealmState] Polling started (${intervalMs}ms interval)`);
+    },
+
+    /**
+     * Stop polling
+     */
+    stopPolling() {
+        if (this._pollInterval) {
+            clearInterval(this._pollInterval);
+            this._pollInterval = null;
+        }
+        if (this._connectionMode === 'polling') {
+            this._connectionMode = 'none';
+        }
+    },
+
+    // =================================================================
+    // STATE PROCESSING
+    // =================================================================
+
+    /**
+     * Process complete state response
      */
     _processState(data) {
         const state = data.state || {};
@@ -186,84 +386,42 @@ const RealmState = {
 
         // Training state
         if (state.training) {
-            const t = state.training;
-            const changed = (
-                this.training.step !== t.step ||
-                this.training.status !== t.status ||
-                this.training.loss !== t.loss
-            );
-
-            this.training = {
-                status: t.status || 'idle',
-                step: t.step || 0,
-                totalSteps: t.total_steps || 0,
-                loss: t.loss,
-                learningRate: t.learning_rate,
-                file: t.file,
-                speed: t.speed,
-                etaSeconds: t.eta_seconds,
-                strain: t.strain,
-                updatedAt: t.updated_at,
-            };
-
-            if (changed) changes.push('training');
+            if (this._updateTrainingInternal(state.training)) {
+                changes.push('training');
+            }
         }
 
         // Queue state
         if (state.queue) {
-            const q = state.queue;
-            const changed = this.queue.depth !== q.depth;
-
-            this.queue = {
-                depth: q.depth || 0,
-                highPriority: q.high_priority || 0,
-                normalPriority: q.normal_priority || 0,
-                lowPriority: q.low_priority || 0,
-                status: q.status || 'ok',
-                updatedAt: q.updated_at,
-            };
-
-            if (changed) changes.push('queue');
+            if (this._updateQueueInternal(state.queue)) {
+                changes.push('queue');
+            }
         }
 
         // Workers state
         if (state.workers) {
-            const workersChanged = JSON.stringify(this.workers) !== JSON.stringify(state.workers);
-            this.workers = {};
-            for (const [id, w] of Object.entries(state.workers)) {
-                this.workers[id] = {
-                    workerId: w.worker_id,
-                    role: w.role,
-                    status: w.status,
-                    device: w.device,
-                    currentJob: w.current_job,
-                    lastHeartbeat: w.last_heartbeat,
-                };
+            if (this._updateWorkersInternal(state.workers)) {
+                changes.push('workers');
             }
-            if (workersChanged) changes.push('workers');
         }
 
         // Hero state
         if (state.hero) {
-            const h = state.hero;
-            const changed = this.hero.level !== h.level || this.hero.xp !== h.xp;
+            if (this._updateHeroInternal(state.hero)) {
+                changes.push('hero');
+            }
+        }
 
-            this.hero = {
-                name: h.name || 'DIO',
-                title: h.title || '',
-                level: h.level || 0,
-                xp: h.xp || 0,
-                campaignId: h.campaign_id,
-                currentSkill: h.current_skill,
-                currentSkillLevel: h.current_skill_level || 0,
-                updatedAt: h.updated_at,
-            };
-
-            if (changed) changes.push('hero');
+        // Skills state
+        if (state.skills) {
+            if (this._updateSkillsInternal(state.skills)) {
+                changes.push('skills');
+            }
         }
 
         // Mode state
-        const newMode = state.mode || 'idle';
+        const modeInfo = state.mode_info || {};
+        const newMode = modeInfo.mode || state.mode || 'idle';
         if (this.mode !== newMode) {
             this.mode = newMode;
             changes.push('mode');
@@ -285,6 +443,150 @@ const RealmState = {
         for (const section of changes) {
             this._notify(section, this[section]);
         }
+    },
+
+    // Individual update methods (for SSE events)
+    _updateTraining(data) {
+        if (this._updateTrainingInternal(data)) {
+            this._notify('training', this.training);
+        }
+    },
+
+    _updateTrainingInternal(t) {
+        const changed = (
+            this.training.step !== t.step ||
+            this.training.status !== t.status ||
+            this.training.loss !== t.loss ||
+            this.training.speed !== t.speed
+        );
+
+        // Preserve existing values when incoming data is null/undefined
+        // This prevents flickering when different endpoints have different data
+        this.training = {
+            status: t.status ?? this.training.status ?? 'idle',
+            step: t.step ?? this.training.step ?? 0,
+            totalSteps: t.total_steps ?? this.training.totalSteps ?? 0,
+            loss: t.loss ?? this.training.loss,
+            learningRate: t.learning_rate ?? this.training.learningRate,
+            file: t.file ?? this.training.file,
+            speed: t.speed ?? this.training.speed,
+            etaSeconds: t.eta_seconds ?? this.training.etaSeconds,
+            strain: t.strain ?? this.training.strain,
+            updatedAt: t.updated_at ?? this.training.updatedAt,
+        };
+
+        return changed;
+    },
+
+    _updateQueue(data) {
+        if (this._updateQueueInternal(data)) {
+            this._notify('queue', this.queue);
+        }
+    },
+
+    _updateQueueInternal(q) {
+        const changed = this.queue.depth !== q.depth;
+
+        this.queue = {
+            depth: q.depth || 0,
+            highPriority: q.high_priority || 0,
+            normalPriority: q.normal_priority || 0,
+            lowPriority: q.low_priority || 0,
+            status: q.status || 'ok',
+            updatedAt: q.updated_at,
+        };
+
+        return changed;
+    },
+
+    _updateWorker(data) {
+        const workerId = data.worker_id;
+        if (!workerId) return;
+
+        this.workers[workerId] = {
+            workerId: data.worker_id,
+            role: data.role,
+            status: data.status,
+            device: data.device,
+            currentJob: data.current_job,
+            lastHeartbeat: data.last_heartbeat,
+        };
+
+        this._computeHealth();
+        this._notify('workers', this.workers);
+    },
+
+    _updateWorkers(data) {
+        if (this._updateWorkersInternal(data)) {
+            this._notify('workers', this.workers);
+        }
+    },
+
+    _updateWorkersInternal(workersData) {
+        const workersChanged = JSON.stringify(this.workers) !== JSON.stringify(workersData);
+        this.workers = {};
+        for (const [id, w] of Object.entries(workersData)) {
+            this.workers[id] = {
+                workerId: w.worker_id,
+                role: w.role,
+                status: w.status,
+                device: w.device,
+                currentJob: w.current_job,
+                lastHeartbeat: w.last_heartbeat,
+            };
+        }
+        return workersChanged;
+    },
+
+    _updateHero(data) {
+        if (this._updateHeroInternal(data)) {
+            this._notify('hero', this.hero);
+        }
+    },
+
+    _updateHeroInternal(h) {
+        const changed = this.hero.level !== h.level || this.hero.xp !== h.xp;
+
+        this.hero = {
+            name: h.name || 'DIO',
+            title: h.title || '',
+            level: h.level || 0,
+            xp: h.xp || 0,
+            campaignId: h.campaign_id,
+            currentSkill: h.current_skill,
+            currentSkillLevel: h.current_skill_level || 0,
+            updatedAt: h.updated_at,
+        };
+
+        return changed;
+    },
+
+    _updateSkills(data) {
+        if (this._updateSkillsInternal(data)) {
+            this._notify('skills', this.skills);
+        }
+    },
+
+    _updateSkillsInternal(s) {
+        const changed = JSON.stringify(this.skills.skills) !== JSON.stringify(s.skills);
+
+        this.skills = {
+            skills: s.skills || {},
+            activeSkill: s.active_skill || null,
+            updatedAt: s.updated_at,
+        };
+
+        return changed;
+    },
+
+    _addEvent(event) {
+        // Add to front (newest first)
+        this.events.unshift(event);
+        // Keep only last 100
+        if (this.events.length > 100) {
+            this.events = this.events.slice(0, 100);
+        }
+        this._notify('events', this.events);
     },
 
     /**
@@ -314,41 +616,6 @@ const RealmState = {
     },
 
     // =================================================================
-    // POLLING
-    // =================================================================
-
-    _pollInterval: null,
-
-    /**
-     * Start polling for state updates
-     * @param {number} intervalMs - Poll interval in milliseconds (default 2000)
-     */
-    startPolling(intervalMs = 2000) {
-        if (this.isPolling) return;
-
-        this.isPolling = true;
-        this.refresh();  // Initial fetch
-
-        this._pollInterval = setInterval(() => {
-            this.refresh();
-        }, intervalMs);
-
-        console.log(`[RealmState] Polling started (${intervalMs}ms interval)`);
-    },
-
-    /**
-     * Stop polling
-     */
-    stopPolling() {
-        if (this._pollInterval) {
-            clearInterval(this._pollInterval);
-            this._pollInterval = null;
-        }
-        this.isPolling = false;
-        console.log('[RealmState] Polling stopped');
-    },
-
-    // =================================================================
     // MODE CONTROL
     // =================================================================
 
@@ -365,16 +632,18 @@ const RealmState = {
 
             if (!res.ok) {
                 const err = await res.json();
-                console.error('Failed to set mode:', err);
+                console.error('[RealmState] Failed to set mode:', err);
                 return false;
             }
 
-            // Refresh state
-            await this.refresh();
+            // In polling mode, refresh state
+            if (this._connectionMode === 'polling') {
+                await this.refresh();
+            }
             return true;
 
         } catch (err) {
-            console.error('Failed to set realm mode:', err);
+            console.error('[RealmState] Failed to set realm mode:', err);
             return false;
         }
     },
@@ -410,6 +679,32 @@ const RealmState = {
     get healthyWorkerCount() {
         return Object.values(this.workers).filter(w => w.status === 'running').length;
     },
+
+    get connectionMode() {
+        return this._connectionMode;
+    },
+
+    get isConnected() {
+        return this._connectionMode !== 'none';
+    },
+
+    // =================================================================
+    // SKILL HELPERS
+    // =================================================================
+
+    getSkill(skillId) {
+        return this.skills.skills?.[skillId] || null;
+    },
+
+    getSkillLevel(skillId) {
+        const skill = this.getSkill(skillId);
+        return skill ? skill.training_level : 0;
+    },
+
+    getSkillMasteredLevel(skillId) {
+        const skill = this.getSkill(skillId);
+        return skill ? skill.mastered_level : 0;
+    },
 };
 
 // =================================================================
@@ -439,8 +734,14 @@ const MODE_LABELS = {
     offline: 'OFFLINE',
 };
 
+const CONNECTION_ICONS = {
+    sse: '📡',
+    polling: '🔄',
+    none: '❌',
+};
+
 // =================================================================
-// UI UPDATE FUNCTIONS (moved from world-state.js)
+// UI UPDATE FUNCTIONS
 // =================================================================
 
 /**
@@ -506,8 +807,14 @@ function updateHeaderUI() {
         totalSteps.textContent = RealmState.training.step.toLocaleString();
     }
     if (totalEvals) {
-        // TODO: Get from hero state when available
         totalEvals.textContent = RealmState.hero.level || 0;
+    }
+
+    // Connection indicator (if present)
+    const connIcon = document.getElementById('connectionIcon');
+    if (connIcon) {
+        connIcon.textContent = CONNECTION_ICONS[RealmState.connectionMode] || CONNECTION_ICONS.none;
+        connIcon.title = `Connection: ${RealmState.connectionMode}`;
     }
 }
 
@@ -551,8 +858,16 @@ function initRealmState() {
     // Initialize header handlers
     initHeaderHandlers();
 
-    // Start polling (2 second interval)
-    RealmState.startPolling(2000);
+    // Try SSE first, fall back to polling
+    // Check if SSE is supported and if the endpoint exists
+    if (typeof EventSource !== 'undefined') {
+        // Try SSE connection
+        RealmState.connectSSE();
+    } else {
+        // Fall back to polling
+        console.log('[RealmState] EventSource not supported, using polling');
+        RealmState.startPolling(2000);
+    }
 
     console.log('[RealmState] Initialized');
 }
@@ -566,6 +881,7 @@ if (document.readyState === 'loading') {
 
 // Clean up on page unload
 window.addEventListener('beforeunload', () => {
+    RealmState.disconnectSSE();
     RealmState.stopPolling();
 });
 

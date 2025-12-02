@@ -564,6 +564,11 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/game":
             self._serve_game_data()
 
+        # Effort history API - returns last N steps of loss/effort data
+        elif path == "/api/effort-history":
+            limit = int(query.get("limit", ["200"])[0])
+            self._serve_effort_history(limit)
+
         # Eval results API
         elif path.startswith("/api/evals/"):
             skill_id = path.replace("/api/evals/", "").strip("/")
@@ -681,6 +686,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._serve_realm_state()
         elif path == "/api/realm-mode":
             self._serve_realm_mode()
+        elif path == "/api/realm/stream":
+            self._proxy_realm_sse()
 
         # Cluster State API - Host registry and cluster management
         elif path == "/api/cluster":
@@ -979,7 +986,23 @@ class TavernHandler(SimpleHTTPRequestHandler):
         Reads from RealmState HTTP service (port 8866) instead of file.
         """
         try:
-            from core.realm_store import get_realm_state
+            from core.realm_store import get_realm_state, update_queue
+
+            # First, update queue state from filesystem (always fresh)
+            try:
+                from core.training_queue import TrainingQueue
+                queue = TrainingQueue(str(BASE_DIR / "queue"))
+                depth, breakdown = queue.get_depth_with_breakdown()
+                update_queue(
+                    depth=depth,
+                    high_priority=breakdown.get("high", 0),
+                    normal_priority=breakdown.get("normal", 0),
+                    low_priority=breakdown.get("low", 0),
+                    status="ok" if depth > 5 else ("low" if depth > 0 else "empty"),
+                )
+            except Exception:
+                pass  # Queue update is best-effort
+
             data = get_realm_state()
 
             if data and "state" in data:
@@ -1008,6 +1031,59 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 "state": {},
                 "events": [],
             }, 503)
+
+    def _proxy_realm_sse(self):
+        """Proxy SSE stream from RealmState service to client."""
+        import urllib.request
+        import urllib.error
+
+        # Get RealmState service URL
+        try:
+            from core.hosts import get_service_url
+            realm_url = get_service_url("realm_state") or "http://localhost:8866"
+        except:
+            realm_url = "http://localhost:8866"
+
+        sse_url = f"{realm_url}/api/stream"
+        logger.info(f"Proxying SSE from {sse_url}")
+
+        try:
+            # Set up SSE response headers
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+
+            # Connect to upstream SSE
+            req = urllib.request.Request(sse_url)
+            req.add_header("Accept", "text/event-stream")
+
+            with urllib.request.urlopen(req, timeout=None) as response:
+                # Stream data from upstream to client
+                while True:
+                    try:
+                        line = response.readline()
+                        if not line:
+                            break
+                        self.wfile.write(line)
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError):
+                        logger.debug("SSE client disconnected")
+                        break
+
+        except urllib.error.URLError as e:
+            logger.error(f"SSE proxy error: {e}")
+            # Send error event
+            try:
+                error_msg = f"event: error\ndata: {{\"message\": \"RealmState service unavailable\"}}\n\n"
+                self.wfile.write(error_msg.encode())
+                self.wfile.flush()
+            except:
+                pass
+        except Exception as e:
+            logger.error(f"SSE proxy error: {e}")
 
     def _populate_store_from_legacy(self, store):
         """Populate realm store from legacy sources during transition."""
@@ -1488,10 +1564,26 @@ class TavernHandler(SimpleHTTPRequestHandler):
                     # Transform to expected format
                     skills_data = {}
                     for skill_id, skill_state in curriculum.get("skills", {}).items():
+                        # Calculate recent accuracy from history (last 3 evals)
+                        history = skill_state.get("accuracy_history", [])
+                        recent_acc = 0
+                        last_acc = 0
+                        last_eval_time = None
+                        if history:
+                            recent = history[-3:]
+                            recent_acc = (sum(r.get("accuracy", 0) for r in recent) / len(recent)) * 100
+                            last_entry = history[-1]
+                            last_acc = last_entry.get("accuracy", 0) * 100
+                            last_eval_time = last_entry.get("timestamp")
+
                         skills_data[skill_id] = {
                             "current_level": skill_state.get("current_level", 0),
-                            "recent_accuracy": skill_state.get("recent_accuracy", 0),
-                            "eval_count": len(skill_state.get("accuracy_history", [])),
+                            "training_level": skill_state.get("current_level", 1),
+                            "mastered_level": max(0, skill_state.get("current_level", 1) - 1),
+                            "recent_accuracy": recent_acc,
+                            "last_accuracy": last_acc,
+                            "last_eval_time": last_eval_time,
+                            "eval_count": len(history),
                         }
 
                     response["curriculum"] = {
@@ -1533,6 +1625,71 @@ class TavernHandler(SimpleHTTPRequestHandler):
             import traceback
             traceback.print_exc()
             self._send_json({"error": str(e)}, 500)
+
+    def _serve_effort_history(self, limit: int = 200):
+        """
+        Serve effort history from training logs for the Effort History chart.
+
+        Reads from daily JSONL training history files and returns last N entries
+        with step, loss, and calculated effort (cumulative strain).
+        """
+        try:
+            from datetime import datetime, timedelta
+
+            logs_dir = BASE_DIR / "logs" / "training"
+            entries = []
+
+            # Read from today and yesterday's logs (in case we need more data)
+            for days_ago in range(2):
+                date_str = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+                log_file = logs_dir / f"training_history_{date_str}.jsonl"
+
+                if log_file.exists():
+                    with open(log_file) as f:
+                        for line in f:
+                            try:
+                                entry = json.loads(line.strip())
+                                if entry.get("step") and entry.get("loss") is not None:
+                                    entries.append({
+                                        "step": entry["step"],
+                                        "loss": entry["loss"],
+                                        "ts": entry.get("ts", ""),
+                                    })
+                            except json.JSONDecodeError:
+                                continue
+
+            # Sort by step and take last N
+            entries.sort(key=lambda x: x["step"])
+            entries = entries[-limit:]
+
+            if not entries:
+                self._send_json({"history": [], "count": 0, "floor": 0})
+                return
+
+            # Calculate dynamic floor (min loss in window, or 10% below min)
+            losses = [e["loss"] for e in entries]
+            min_loss = min(losses)
+            floor = min_loss * 0.9  # Floor is 10% below minimum loss seen
+
+            # Calculate cumulative effort (strain = loss - floor, effort = cumulative strain)
+            cumulative_effort = 0
+            for entry in entries:
+                strain = max(0, entry["loss"] - floor)
+                cumulative_effort += strain
+                entry["strain"] = strain
+                entry["effort"] = cumulative_effort
+
+            self._send_json({
+                "history": entries,
+                "count": len(entries),
+                "floor": floor,
+                "min_loss": min_loss,
+                "max_loss": max(losses),
+            })
+
+        except Exception as e:
+            logger.error(f"Effort history error: {e}")
+            self._send_json({"error": str(e), "history": []}, 500)
 
     def _serve_validation_set(self, skill_id: str, level: str):
         """

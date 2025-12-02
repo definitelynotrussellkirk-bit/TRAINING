@@ -1,65 +1,70 @@
 {
   "level": 6,
-  "level_name": "Small",
+  "level_name": "7-bit (small: 0 to 127)",
   "bits": 7,
-  "eval_version": "1.0",
+  "eval_version": "2.0-training-format",
   "pass_threshold": 0.8,
-  "passing_score": "4/5",
-  "scoring_rule": "Each problem: answer must match exactly. Level: 80% of problems must pass.",
-  "response_schema": {
-    "type": "object",
-    "required": [
-      "answer"
-    ],
-    "properties": {
-      "answer": {
-        "type": "string",
-        "description": "Result in circled binary notation (\u24ea\u2460)"
-      }
-    },
-    "example": "{\"answer\": \"\u2460\u24ea\u2460\u24ea\"}"
-  },
-  "num_problems": 5,
+  "scoring_rule": "Response must contain the expected result pattern",
   "problems": [
     {
-      "problem_id": "eval_L6_P1",
-      "problem_index": 0,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute add(\u2460\u24ea\u2460\u2460\u24ea, \u2460\u2460\u2460\u2460\u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (easy): 22 + 31 = 53"
+      "prompt": "Compute: multiply(①⓪, ①①)",
+      "expected": "multiply(①⓪, ①①) = ①①⓪",
+      "metadata": {
+        "scenario": "multiply-basic",
+        "tags": [
+          "multiply",
+          "easy",
+          "level-6"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L6_P2",
-      "problem_index": 1,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute subtract(\u2460\u2460\u24ea, \u2460\u24ea\u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (easy): 6 - 5 = 1"
+      "prompt": "Compute: tobinary(58)",
+      "expected": "tobinary(58) = ①①①⓪①⓪",
+      "metadata": {
+        "scenario": "tobinary",
+        "tags": [
+          "conversion",
+          "easy",
+          "level-6"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L6_P3",
-      "problem_index": 2,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute multiply(\u2460\u24ea, \u2460\u24ea)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (medium): 2 * 2 = 4"
+      "prompt": "Compute: divide_by_2(①⓪①⓪⓪)",
+      "expected": "divide_by_2(①⓪①⓪⓪) = ①⓪①⓪",
+      "metadata": {
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-6"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L6_P4",
-      "problem_index": 3,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute add(\u2460\u24ea\u24ea\u24ea\u24ea\u24ea, \u2460\u24ea\u24ea)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (medium): 32 + 4 = 36"
+      "prompt": "Compute: multiply(①①, ①⓪①)",
+      "expected": "multiply(①①, ①⓪①) = ①①①①",
+      "metadata": {
+        "scenario": "multiply-basic",
+        "tags": [
+          "multiply",
+          "easy",
+          "level-6"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L6_P5",
-      "problem_index": 4,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute subtract(\u2460\u24ea\u2460\u2460\u2460\u24ea\u24ea, \u2460\u24ea\u2460\u24ea\u2460\u24ea)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (hard): 92 - 42 = 50"
+      "prompt": "Compute: add(①①①①⓪⓪, ①⓪⓪①⓪①)",
+      "expected": "add(①①①①⓪⓪, ①⓪⓪①⓪①) = ①①⓪⓪⓪⓪①",
+      "metadata": {
+        "scenario": "add-basic",
+        "tags": [
+          "add",
+          "easy",
+          "level-6"
+        ]
+      }
     }
   ]
 }

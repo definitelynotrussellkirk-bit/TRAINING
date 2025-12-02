@@ -1,65 +1,73 @@
 {
   "level": 29,
-  "level_name": "Massive",
+  "level_name": "30-bit (massive: 0 to 1,073,741,823)",
   "bits": 30,
-  "eval_version": "1.0",
+  "eval_version": "2.0-training-format",
   "pass_threshold": 0.8,
-  "passing_score": "4/5",
-  "scoring_rule": "Each problem: answer must match exactly. Level: 80% of problems must pass.",
-  "response_schema": {
-    "type": "object",
-    "required": [
-      "answer"
-    ],
-    "properties": {
-      "answer": {
-        "type": "string",
-        "description": "Result in circled binary notation (\u24ea\u2460)"
-      }
-    },
-    "example": "{\"answer\": \"\u2460\u24ea\u2460\u24ea\"}"
-  },
-  "num_problems": 5,
+  "scoring_rule": "Response must contain the expected result pattern",
   "problems": [
     {
-      "problem_id": "eval_L29_P1",
-      "problem_index": 0,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \u26aa represents 0\n  \u26ab represents 1\n\nCompute \ud83d\udd17(\u26ab\u26aa\u26ab\u26aa\u26aa\u26aa\u26aa\u26ab\u26aa\u26aa\u26aa\u26ab\u26ab\u26ab\u26aa\u26aa\u26aa\u26ab\u26aa\u26aa\u26ab\u26aa\u26ab\u26ab\u26ab\u26aa\u26ab\u26aa, \u26ab\u26ab\u26aa\u26aa\u26ab\u26ab\u26aa\u26ab\u26aa\u26ab\u26aa\u26aa\u26aa\u26ab\u26aa\u26aa\u26ab\u26ab\u26ab\u26aa\u26aa\u26aa\u26ab\u26ab\u26aa\u26ab\u26ab)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u26aa/\u26ab symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (easy): 168936634 + 107620123 = 276556757"
+      "prompt": "Symbol Key:\n  🎵 = 0 (zero bit)\n  🎶 = 1 (one bit)\n\nOperations:\n  magnitude = absolute_value\n  ⚡ = add\n  splus = add_signed\n  prev = decrement\n  ⏬ = divide_by_2\n  same = equals\n  larger = greaterthan\n  bump = increment\n  smaller = lessthan\n  least = minimum\n  ✖️ = multiply\n  x2 = multiply_by_2\n  ✖️🔢 = multiply_signed\n  invert = negate\n  polarity = sign_of\n  ➖ = subtract\n  ssub = subtract_signed\n  encode = tobinary\n  📊 = todecimal\n\nCompute: ⏬(🎶🎶🎶🎵🎵🎵🎶🎵🎵🎶🎶🎵🎵🎵🎵🎵🎵🎵🎶🎵🎶🎶🎶🎵🎶🎶🎵🎶🎵)",
+      "expected": "⏬(🎶🎶🎶🎵🎵🎵🎶🎵🎵🎶🎶🎵🎵🎵🎵🎵🎵🎵🎶🎵🎶🎶🎶🎵🎶🎶🎵🎶🎵) = 🎶🎶🎶🎵🎵🎵🎶🎵🎵🎶🎶🎵🎵🎵🎵🎵🎵🎵🎶🎵🎶🎶🎶🎵🎶🎶🎵🎶",
+      "metadata": {
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-29",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L29_P2",
-      "problem_index": 1,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udd3b represents 0\n  \ud83d\udd3a represents 1\n\nCompute minus(\ud83d\udd3a\ud83d\udd3a\ud83d\udd3a\ud83d\udd3a\ud83d\udd3b\ud83d\udd3b\ud83d\udd3b\ud83d\udd3a\ud83d\udd3a\ud83d\udd3b\ud83d\udd3b\ud83d\udd3a\ud83d\udd3a\ud83d\udd3b\ud83d\udd3a\ud83d\udd3a\ud83d\udd3b\ud83d\udd3a\ud83d\udd3b\ud83d\udd3b\ud83d\udd3a\ud83d\udd3b\ud83d\udd3b\ud83d\udd3a\ud83d\udd3a, \ud83d\udd3a\ud83d\udd3a\ud83d\udd3a\ud83d\udd3b\ud83d\udd3a\ud83d\udd3b\ud83d\udd3a\ud83d\udd3a\ud83d\udd3b\ud83d\udd3a\ud83d\udd3a\ud83d\udd3b\ud83d\udd3a\ud83d\udd3b\ud83d\udd3b\ud83d\udd3b\ud83d\udd3a\ud83d\udd3b\ud83d\udd3a\ud83d\udd3b\ud83d\udd3a)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udd3b/\ud83d\udd3a symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (easy): 31667859 - 1928469 = 29739390"
+      "prompt": "Symbol Key:\n  🌑 = 0 (zero bit)\n  🌕 = 1 (one bit)\n\nOperations:\n  magnitude = absolute_value\n  sum = add\n  signed_add = add_signed\n  📉 = decrement\n  🔪 = divide\n  halve = divide_by_2\n  match = equals\n  larger = greaterthan\n  📈 = increment\n  ◀️ = lessthan\n  max = maximum\n  mult = multiply\n  twice = multiply_by_2\n  signed_mul = multiply_signed\n  🔄 = negate\n  direction = sign_of\n  take = subtract\n  sminus = subtract_signed\n  binary = tobinary\n  decode = todecimal\n\nCompute: twice(🌕🌑🌕🌕🌑🌑🌕🌕🌕🌕🌑🌑🌕🌕🌑🌕🌕🌕🌑🌕🌕🌕🌑🌑🌕🌑🌕🌕🌕)",
+      "expected": "twice(🌕🌑🌕🌕🌑🌑🌕🌕🌕🌕🌑🌑🌕🌕🌑🌕🌕🌕🌑🌕🌕🌕🌑🌑🌕🌑🌕🌕🌕) = 🌕🌑🌕🌕🌑🌑🌕🌕🌕🌕🌑🌑🌕🌕🌑🌕🌕🌕🌑🌕🌕🌕🌑🌑🌕🌑🌕🌕🌕🌑",
+      "metadata": {
+        "scenario": "multiply-by-2",
+        "tags": [
+          "multiply-by-2",
+          "easy",
+          "level-29",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L29_P3",
-      "problem_index": 2,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83c\udf4e represents 0\n  \ud83c\udf4a represents 1\n\nCompute times(\ud83c\udf4a\ud83c\udf4e\ud83c\udf4e\ud83c\udf4a\ud83c\udf4a\ud83c\udf4e\ud83c\udf4a\ud83c\udf4a\ud83c\udf4e\ud83c\udf4e\ud83c\udf4a\ud83c\udf4e, \ud83c\udf4a\ud83c\udf4e\ud83c\udf4e\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4e\ud83c\udf4e\ud83c\udf4e\ud83c\udf4e\ud83c\udf4e\ud83c\udf4e\ud83c\udf4e\ud83c\udf4e)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83c\udf4e/\ud83c\udf4a symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (medium): 2482 * 9984 = 24780288"
+      "prompt": "Compute: multiply_by_2(①⓪①⓪⓪①①⓪⓪⓪⓪①①①①⓪⓪①⓪①⓪①⓪⓪①⓪①)",
+      "expected": "multiply_by_2(①⓪①⓪⓪①①⓪⓪⓪⓪①①①①⓪⓪①⓪①⓪①⓪⓪①⓪①) = ①⓪①⓪⓪①①⓪⓪⓪⓪①①①①⓪⓪①⓪①⓪①⓪⓪①⓪①⓪",
+      "metadata": {
+        "scenario": "multiply-by-2",
+        "tags": [
+          "multiply-by-2",
+          "easy",
+          "level-29"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L29_P4",
-      "problem_index": 3,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udc3c represents 0\n  \ud83d\udc3b represents 1\n\nCompute \ud83d\udd17(\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c, \ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udc3c/\ud83d\udc3b symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (hard): 381139242 + 323270378 = 704409620"
+      "prompt": "Symbol Key:\n  🔵 = 0 (zero bit)\n  🔴 = 1 (one bit)\n\nOperations:\n  ➕ = add\n  signed_add = add_signed\n  📉 = decrement\n  halve = divide\n  div2 = divide_by_2\n  ⚖️ = equals\n  ▶️ = greaterthan\n  most = maximum\n  ⬇️ = minimum\n  product = multiply\n  🔼 = multiply_by_2\n  ✖️🔢 = multiply_signed\n  🔄 = negate\n  diff = subtract\n  ssub = subtract_signed\n  decode = todecimal\n\nCompute: decode(🔴🔵🔵🔵🔵🔵🔵🔴🔴🔵🔵🔴🔴🔵🔵🔵🔴🔴🔵🔵🔵🔵🔴🔵🔴🔵🔴🔵🔵)",
+      "expected": "decode(🔴🔵🔵🔵🔵🔵🔵🔴🔴🔵🔵🔴🔴🔵🔵🔵🔴🔴🔵🔵🔵🔵🔴🔵🔴🔵🔴🔵🔵) = 271784020",
+      "metadata": {
+        "scenario": "todecimal",
+        "tags": [
+          "conversion",
+          "easy",
+          "level-29",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L29_P5",
-      "problem_index": 4,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute multiply(\u2460\u2460\u24ea\u2460\u24ea\u24ea\u24ea\u24ea\u24ea\u2460\u2460\u2460\u2460\u24ea\u2460, \u2460\u24ea\u2460\u24ea\u2460\u2460\u2460\u24ea\u2460\u2460\u24ea\u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (hard): 26685 * 2797 = 74637945"
+      "prompt": "Compute: divide_by_2(①⓪⓪⓪①①①①⓪①⓪①⓪⓪⓪⓪①①①①⓪①⓪⓪⓪①⓪①⓪)",
+      "expected": "divide_by_2(①⓪⓪⓪①①①①⓪①⓪①⓪⓪⓪⓪①①①①⓪①⓪⓪⓪①⓪①⓪) = ①⓪⓪⓪①①①①⓪①⓪①⓪⓪⓪⓪①①①①⓪①⓪⓪⓪①⓪①",
+      "metadata": {
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-29"
+        ]
+      }
     }
   ]
 }

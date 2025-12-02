@@ -1,65 +1,73 @@
 {
   "level": 8,
-  "level_name": "Medium",
+  "level_name": "9-bit (medium: 0 to 511)",
   "bits": 9,
-  "eval_version": "1.0",
+  "eval_version": "2.0-training-format",
   "pass_threshold": 0.8,
-  "passing_score": "4/5",
-  "scoring_rule": "Each problem: answer must match exactly. Level: 80% of problems must pass.",
-  "response_schema": {
-    "type": "object",
-    "required": [
-      "answer"
-    ],
-    "properties": {
-      "answer": {
-        "type": "string",
-        "description": "Result in circled binary notation (\u24ea\u2460)"
-      }
-    },
-    "example": "{\"answer\": \"\u2460\u24ea\u2460\u24ea\"}"
-  },
-  "num_problems": 5,
+  "scoring_rule": "Response must contain the expected result pattern",
   "problems": [
     {
-      "problem_id": "eval_L8_P1",
-      "problem_index": 0,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83c\udf38 represents 0\n  \ud83c\udf3a represents 1\n\nCompute \u26a1(\ud83c\udf3a\ud83c\udf3a\ud83c\udf3a\ud83c\udf38\ud83c\udf38\ud83c\udf38\ud83c\udf3a, \ud83c\udf3a\ud83c\udf38\ud83c\udf38\ud83c\udf3a)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83c\udf38/\ud83c\udf3a symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (easy): 113 + 9 = 122"
+      "prompt": "Compute: add(①①①①⓪①⓪⓪, ①⓪①⓪①⓪①⓪)",
+      "expected": "add(①①①①⓪①⓪⓪, ①⓪①⓪①⓪①⓪) = ①①⓪⓪①①①①⓪",
+      "metadata": {
+        "scenario": "add-basic",
+        "tags": [
+          "add",
+          "easy",
+          "level-8"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L8_P2",
-      "problem_index": 1,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \u2b50 represents 0\n  \ud83c\udf1f represents 1\n\nCompute minus(\ud83c\udf1f\ud83c\udf1f\u2b50\ud83c\udf1f\u2b50\ud83c\udf1f\u2b50, \ud83c\udf1f\ud83c\udf1f\u2b50\u2b50\ud83c\udf1f\u2b50\ud83c\udf1f)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u2b50/\ud83c\udf1f symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (easy): 106 - 101 = 5"
+      "prompt": "Symbol Key:\n  🔺 = 0 (zero bit)\n  🔻 = 1 (one bit)\n\nOperations:\n  abs = absolute_value\n  🔗 = add\n  drop = decrement\n  half = divide_by_2\n  same = equals\n  over = greaterthan\n  inc = increment\n  ⬅️ = lessthan\n  max = maximum\n  🌀 = multiply\n  ⏫ = multiply_by_2\n  smul = multiply_signed\n  neg = negate\n  sign = sign_of\n  sminus = subtract_signed\n  📝 = tobinary\n  📊 = todecimal\n\nCompute: inc(🔻🔺🔻🔺🔻)",
+      "expected": "inc(🔻🔺🔻🔺🔻) = 🔻🔺🔻🔻🔺",
+      "metadata": {
+        "scenario": "increment",
+        "tags": [
+          "increment",
+          "easy",
+          "level-8",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L8_P3",
-      "problem_index": 2,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udc9c represents 0\n  \ud83d\udc9b represents 1\n\nCompute \u2716\ufe0f(\ud83d\udc9b\ud83d\udc9c\ud83d\udc9b\ud83d\udc9b, \ud83d\udc9b\ud83d\udc9c\ud83d\udc9b)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udc9c/\ud83d\udc9b symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (medium): 11 * 5 = 55"
+      "prompt": "Symbol Key:\n  🌕 = 0 (zero bit)\n  🌑 = 1 (one bit)\n\nOperations:\n  ⚡ = add\n  ➕🔢 = add_signed\n  🔪 = divide\n  div2 = divide_by_2\n  ⚖️ = equals\n  ➡️ = greaterthan\n  bump = increment\n  below = lessthan\n  max = maximum\n  ⬇️ = minimum\n  🔼 = multiply_by_2\n  ✖️🔢 = multiply_signed\n  neg = negate\n  direction = sign_of\n  💨 = subtract\n  ➖🔢 = subtract_signed\n  🔢 = tobinary\n  🔟 = todecimal\n\nCompute: div2(🌑🌑🌑🌕🌑🌑🌕🌑)",
+      "expected": "div2(🌑🌑🌑🌕🌑🌑🌕🌑) = 🌑🌑🌑🌕🌑🌑🌕",
+      "metadata": {
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-8",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L8_P4",
-      "problem_index": 3,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udc3c represents 0\n  \ud83d\udc3b represents 1\n\nCompute \ud83d\udd17(\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b, \ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udc3c/\ud83d\udc3b symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (medium): 249 + 17 = 266"
+      "prompt": "Compute: decrement(①①①①⓪①①⓪)",
+      "expected": "decrement(①①①①⓪①①⓪) = ①①①①⓪①⓪①",
+      "metadata": {
+        "scenario": "decrement",
+        "tags": [
+          "decrement",
+          "easy",
+          "level-8"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L8_P5",
-      "problem_index": 4,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute subtract(\u2460\u24ea\u24ea\u24ea\u24ea\u24ea\u2460\u24ea\u24ea, \u2460\u2460\u2460\u2460\u2460\u24ea\u2460\u24ea)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (hard): 260 - 250 = 10"
+      "prompt": "Symbol Key:\n  🐇 = 0 (zero bit)\n  🐢 = 1 (one bit)\n\nOperations:\n  abs = absolute_value\n  join = add\n  sadd = add_signed\n  halve = divide\n  half = divide_by_2\n  ⚖️ = equals\n  ▶️ = greaterthan\n  📈 = increment\n  ◀️ = lessthan\n  least = minimum\n  mult = multiply\n  double = multiply_by_2\n  stimes = multiply_signed\n  🔄 = negate\n  polarity = sign_of\n  remove = subtract\n  ssub = subtract_signed\n  binary = tobinary\n  dec = todecimal\n\nCompute: half(🐢🐇🐇🐢🐇🐢)",
+      "expected": "half(🐢🐇🐇🐢🐇🐢) = 🐢🐇🐇🐢🐇",
+      "metadata": {
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-8",
+          "symbol-language"
+        ]
+      }
     }
   ]
 }

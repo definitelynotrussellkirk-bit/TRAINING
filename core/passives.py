@@ -385,7 +385,7 @@ _passive_queue_lock = Lock()
 
 
 def queue_passive_lite(checkpoint_step: int):
-    """Queue LITE passive evaluations for a checkpoint."""
+    """Queue LITE passive evaluations for a checkpoint (all passives)."""
     ledger = get_passives_ledger()
 
     for passive in get_passive_definitions():
@@ -403,7 +403,7 @@ def queue_passive_lite(checkpoint_step: int):
 
 
 def queue_passive_full(checkpoint_step: int):
-    """Queue FULL passive evaluations for a checkpoint (manual)."""
+    """Queue FULL passive evaluations for a checkpoint (all passives, manual)."""
     ledger = get_passives_ledger()
 
     for passive in get_passive_definitions():
@@ -420,6 +420,94 @@ def queue_passive_full(checkpoint_step: int):
     logger.info(f"Queued FULL passives for checkpoint-{checkpoint_step}")
 
 
+# =============================================================================
+# TIERED QUEUE FUNCTIONS (NEW)
+# =============================================================================
+
+
+def queue_core_passives(checkpoint_step: int, mode: str = "lite"):
+    """
+    Queue only CORE (sentinel) passives for a checkpoint.
+
+    Use this for automatic checkpoint evaluation - runs the minimal set
+    of passives needed to detect catastrophic forgetting.
+
+    Args:
+        checkpoint_step: Checkpoint step number
+        mode: "lite" (5 problems) or "full" (30 problems)
+    """
+    from guild.passives import get_core_passives
+
+    ledger = get_passives_ledger()
+    core_passives = get_core_passives()
+    queued = 0
+
+    for passive in core_passives:
+        if not ledger.has_result(checkpoint_step, passive.id, mode):
+            with _passive_queue_lock:
+                _passive_queue.append({
+                    "checkpoint_step": checkpoint_step,
+                    "passive_id": passive.id,
+                    "mode": mode,
+                    "tier": "core",
+                    "priority": passive.priority,
+                    "queued_at": datetime.now().isoformat(),
+                })
+                queued += 1
+
+    _save_passive_queue()
+    if queued > 0:
+        logger.info(f"Queued {queued} CORE {mode.upper()} passives for checkpoint-{checkpoint_step}")
+
+
+def queue_extended_passives(checkpoint_step: int, mode: str = "lite"):
+    """
+    Queue only EXTENDED passives for a checkpoint.
+
+    Use this for comprehensive on-demand evaluation.
+
+    Args:
+        checkpoint_step: Checkpoint step number
+        mode: "lite" (5 problems) or "full" (30 problems)
+    """
+    from guild.passives import get_extended_passives
+
+    ledger = get_passives_ledger()
+    extended_passives = get_extended_passives()
+    queued = 0
+
+    for passive in extended_passives:
+        if not ledger.has_result(checkpoint_step, passive.id, mode):
+            with _passive_queue_lock:
+                _passive_queue.append({
+                    "checkpoint_step": checkpoint_step,
+                    "passive_id": passive.id,
+                    "mode": mode,
+                    "tier": "extended",
+                    "priority": passive.priority,
+                    "queued_at": datetime.now().isoformat(),
+                })
+                queued += 1
+
+    _save_passive_queue()
+    if queued > 0:
+        logger.info(f"Queued {queued} EXTENDED {mode.upper()} passives for checkpoint-{checkpoint_step}")
+
+
+def queue_all_passives(checkpoint_step: int, mode: str = "lite"):
+    """
+    Queue ALL passives (core + extended) for a checkpoint.
+
+    Use this for comprehensive evaluation.
+
+    Args:
+        checkpoint_step: Checkpoint step number
+        mode: "lite" (5 problems) or "full" (30 problems)
+    """
+    queue_core_passives(checkpoint_step, mode)
+    queue_extended_passives(checkpoint_step, mode)
+
+
 def get_pending_passives() -> List[Dict[str, Any]]:
     """Get pending passive evaluations."""
     _load_passive_queue()
@@ -428,7 +516,15 @@ def get_pending_passives() -> List[Dict[str, Any]]:
 
 
 def pop_passive() -> Optional[Dict[str, Any]]:
-    """Pop next passive from queue (LITE first), skipping already-recorded items."""
+    """
+    Pop next passive from queue, skipping already-recorded items.
+
+    Sort order:
+    1. Mode: LITE before FULL
+    2. Tier: CORE before EXTENDED
+    3. Priority: Lower priority numbers first
+    4. Queue time: Earlier first
+    """
     _load_passive_queue()
     ledger = get_passives_ledger()
 
@@ -436,8 +532,15 @@ def pop_passive() -> Optional[Dict[str, Any]]:
         if not _passive_queue:
             return None
 
-        # Sort: LITE before FULL
-        _passive_queue.sort(key=lambda x: (0 if x["mode"] == "lite" else 1, x["queued_at"]))
+        # Sort: LITE before FULL, CORE before EXTENDED, then by priority, then by queue time
+        def sort_key(x):
+            mode_order = 0 if x["mode"] == "lite" else 1
+            tier_order = 0 if x.get("tier") == "core" else 1
+            priority = x.get("priority", 50)
+            queued_at = x.get("queued_at", "")
+            return (mode_order, tier_order, priority, queued_at)
+
+        _passive_queue.sort(key=sort_key)
 
         # Find first item that isn't already recorded
         items_removed = 0

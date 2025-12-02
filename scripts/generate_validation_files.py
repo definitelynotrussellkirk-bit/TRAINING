@@ -112,23 +112,22 @@ def main():
     print("Generating validation files...")
     print()
 
-    # Skip bin files - already generated
-    # Generate bin files (L2-30, L1 already exists)
-    # print("Binary (bin) levels 2-30:")
-    # for level in range(2, 31):
-    #     try:
-    #         validation_data = generate_bin_validation(level)
-    #         output_path = bin_dir / f"level_{level:02d}.json"
-    #
-    #         with open(output_path, 'w') as f:
-    #             json.dump(validation_data, f, indent=2, ensure_ascii=False)
-    #
-    #         print(f"  ✓ Level {level:02d} - {validation_data['level_name']} ({validation_data['bits']}-bit)")
-    #     except Exception as e:
-    #         print(f"  ✗ Level {level:02d} - Error: {e}")
-    #         continue
-    #
-    # print()
+    # Generate bin files (L1-30)
+    print("Binary (bin) levels 1-30:")
+    for level in range(1, 31):
+        try:
+            validation_data = generate_bin_validation(level)
+            output_path = bin_dir / f"level_{level:02d}.json"
+
+            with open(output_path, 'w') as f:
+                json.dump(validation_data, f, indent=2, ensure_ascii=False)
+
+            print(f"  ✓ Level {level:02d} - {validation_data['level_name']} ({validation_data['bits']}-bit)")
+        except Exception as e:
+            print(f"  ✗ Level {level:02d} - Error: {e}")
+            continue
+
+    print()
 
     # Generate sy files (L1-50)
     print("Syllacrostic (sy) levels 1-50:")

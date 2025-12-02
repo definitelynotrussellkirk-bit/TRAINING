@@ -1,65 +1,73 @@
 {
   "level": 24,
-  "level_name": "Massive",
+  "level_name": "25-bit (massive: 0 to 33,554,431)",
   "bits": 25,
-  "eval_version": "1.0",
+  "eval_version": "2.0-training-format",
   "pass_threshold": 0.8,
-  "passing_score": "4/5",
-  "scoring_rule": "Each problem: answer must match exactly. Level: 80% of problems must pass.",
-  "response_schema": {
-    "type": "object",
-    "required": [
-      "answer"
-    ],
-    "properties": {
-      "answer": {
-        "type": "string",
-        "description": "Result in circled binary notation (\u24ea\u2460)"
-      }
-    },
-    "example": "{\"answer\": \"\u2460\u24ea\u2460\u24ea\"}"
-  },
-  "num_problems": 5,
+  "scoring_rule": "Response must contain the expected result pattern",
   "problems": [
     {
-      "problem_id": "eval_L24_P1",
-      "problem_index": 0,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udc3b represents 0\n  \ud83d\udc3c represents 1\n\nCompute plus(\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3c\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c, \ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3b\ud83d\udc3c\ud83d\udc3c\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b\ud83d\udc3b)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udc3b/\ud83d\udc3c symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (easy): 2852603 + 6478528 = 9331131"
+      "prompt": "Symbol Key:\n  🐼 = 0 (zero bit)\n  🐻 = 1 (one bit)\n\nOperations:\n  abs = absolute_value\n  ➕🔢 = add_signed\n  drop = decrement\n  div = divide\n  half = divide_by_2\n  🟰 = equals\n  ▶️ = greaterthan\n  bump = increment\n  ⬅️ = lessthan\n  max = maximum\n  least = minimum\n  ✖️ = multiply\n  double = multiply_by_2\n  smul = multiply_signed\n  flip = negate\n  direction = sign_of\n  ➖ = subtract\n  ➖🔢 = subtract_signed\n  📝 = tobinary\n  🔟 = todecimal\n\nCompute: 📝(5422663)",
+      "expected": "📝(5422663) = 🐻🐼🐻🐼🐼🐻🐼🐻🐼🐻🐻🐻🐻🐻🐼🐼🐻🐼🐼🐼🐻🐻🐻",
+      "metadata": {
+        "scenario": "tobinary",
+        "tags": [
+          "conversion",
+          "easy",
+          "level-24",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L24_P2",
-      "problem_index": 1,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udc31 represents 0\n  \ud83d\udc36 represents 1\n\nCompute \u2796(\ud83d\udc36\ud83d\udc36\ud83d\udc31\ud83d\udc31\ud83d\udc31\ud83d\udc36\ud83d\udc36\ud83d\udc31\ud83d\udc31\ud83d\udc31\ud83d\udc31\ud83d\udc36\ud83d\udc36\ud83d\udc36\ud83d\udc36\ud83d\udc36\ud83d\udc31\ud83d\udc31\ud83d\udc31\ud83d\udc31\ud83d\udc36, \ud83d\udc36\ud83d\udc31\ud83d\udc31\ud83d\udc36\ud83d\udc36\ud83d\udc31\ud83d\udc31\ud83d\udc36\ud83d\udc31\ud83d\udc31\ud83d\udc31\ud83d\udc31\ud83d\udc31\ud83d\udc36\ud83d\udc36\ud83d\udc36\ud83d\udc36)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udc31/\ud83d\udc36 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (easy): 1623009 - 78351 = 1544658"
+      "prompt": "Compute: decrement(①①①①⓪①⓪⓪①①①⓪①⓪①⓪①①⓪⓪⓪⓪①⓪)",
+      "expected": "decrement(①①①①⓪①⓪⓪①①①⓪①⓪①⓪①①⓪⓪⓪⓪①⓪) = ①①①①⓪①⓪⓪①①①⓪①⓪①⓪①①⓪⓪⓪⓪⓪①",
+      "metadata": {
+        "scenario": "decrement",
+        "tags": [
+          "decrement",
+          "easy",
+          "level-24"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L24_P3",
-      "problem_index": 2,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udca7 represents 0\n  \ud83d\udd25 represents 1\n\nCompute \u2716\ufe0f(\ud83d\udd25\ud83d\udca7\ud83d\udca7\ud83d\udca7\ud83d\udd25\ud83d\udca7\ud83d\udca7\ud83d\udca7\ud83d\udca7\ud83d\udca7, \ud83d\udd25\ud83d\udd25\ud83d\udd25\ud83d\udd25\ud83d\udca7\ud83d\udca7\ud83d\udd25\ud83d\udca7)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udca7/\ud83d\udd25 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (medium): 544 * 242 = 131648"
+      "prompt": "Symbol Key:\n  🐶 = 0 (zero bit)\n  🐱 = 1 (one bit)\n\nOperations:\n  abs = absolute_value\n  plus = add\n  sadd = add_signed\n  drop = decrement\n  🔪 = divide\n  ⏬ = divide_by_2\n  same = equals\n  ▶️ = greaterthan\n  below = lessthan\n  ⬆️ = maximum\n  least = minimum\n  mult = multiply\n  double = multiply_by_2\n  ↔️ = negate\n  polarity = sign_of\n  minus = subtract\n  sminus = subtract_signed\n  decode = todecimal\n\nCompute: ⏬(🐱🐱🐱🐱🐶🐱🐱🐱🐱🐶🐶🐶🐱🐱🐶🐱🐶🐶🐱🐶🐱🐶🐱)",
+      "expected": "⏬(🐱🐱🐱🐱🐶🐱🐱🐱🐱🐶🐶🐶🐱🐱🐶🐱🐶🐶🐱🐶🐱🐶🐱) = 🐱🐱🐱🐱🐶🐱🐱🐱🐱🐶🐶🐶🐱🐱🐶🐱🐶🐶🐱🐶🐱🐶",
+      "metadata": {
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-24",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L24_P4",
-      "problem_index": 3,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83c\udfb6 represents 0\n  \ud83c\udfb5 represents 1\n\nCompute sum(\ud83c\udfb5\ud83c\udfb5\ud83c\udfb6\ud83c\udfb5\ud83c\udfb5\ud83c\udfb5\ud83c\udfb6\ud83c\udfb5\ud83c\udfb6\ud83c\udfb5\ud83c\udfb5\ud83c\udfb6\ud83c\udfb6\ud83c\udfb6\ud83c\udfb6\ud83c\udfb6\ud83c\udfb5\ud83c\udfb5\ud83c\udfb6\ud83c\udfb6\ud83c\udfb5\ud83c\udfb6\ud83c\udfb6\ud83c\udfb6, \ud83c\udfb5\ud83c\udfb6\ud83c\udfb6\ud83c\udfb6\ud83c\udfb5\ud83c\udfb6\ud83c\udfb6\ud83c\udfb5\ud83c\udfb6\ud83c\udfb6\ud83c\udfb5\ud83c\udfb6\ud83c\udfb5\ud83c\udfb5\ud83c\udfb5\ud83c\udfb6\ud83c\udfb6\ud83c\udfb5\ud83c\udfb6\ud83c\udfb6\ud83c\udfb6\ud83c\udfb6\ud83c\udfb6\ud83c\udfb5)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83c\udfb6/\ud83c\udfb5 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (hard): 14508232 + 8990273 = 23498505"
+      "prompt": "Symbol Key:\n  🥵 = 0 (zero bit)\n  🥶 = 1 (one bit)\n\nOperations:\n  magnitude = absolute_value\n  plus = add\n  ➕🔢 = add_signed\n  split = divide\n  half = divide_by_2\n  ⬆️ = increment\n  ⬅️ = lessthan\n  max = maximum\n  ⬇️ = minimum\n  times = multiply\n  🔼 = multiply_by_2\n  flip = negate\n  🧭 = sign_of\n  minus = subtract\n  ssub = subtract_signed\n  encode = tobinary\n  📊 = todecimal\n\nCompute: decrement(🥶🥶🥶🥵🥵🥵🥶🥶🥶🥶🥶🥵🥵🥶🥶🥵🥶🥶🥵🥶🥶🥶🥶)",
+      "expected": "decrement(🥶🥶🥶🥵🥵🥵🥶🥶🥶🥶🥶🥵🥵🥶🥶🥵🥶🥶🥵🥶🥶🥶🥶) = 🥶🥶🥶🥵🥵🥵🥶🥶🥶🥶🥶🥵🥵🥶🥶🥵🥶🥶🥵🥶🥶🥶🥵",
+      "metadata": {
+        "scenario": "decrement",
+        "tags": [
+          "decrement",
+          "easy",
+          "level-24",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L24_P5",
-      "problem_index": 4,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute subtract(\u2460\u24ea\u2460\u2460\u24ea\u24ea\u2460\u24ea\u24ea\u2460\u2460\u2460\u24ea\u24ea\u2460\u24ea\u2460\u2460\u24ea\u24ea\u24ea\u2460\u2460\u24ea\u24ea, \u2460\u2460\u2460\u24ea\u2460\u2460\u2460\u24ea\u2460\u24ea\u2460\u24ea\u24ea\u24ea\u2460\u24ea\u2460\u2460\u24ea\u24ea\u24ea\u2460\u2460\u24ea)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (hard): 23389580 - 15639238 = 7750342"
+      "prompt": "Compute: tobinary(14603450)",
+      "expected": "tobinary(14603450) = ①①⓪①①①①⓪①①⓪①⓪①⓪⓪①⓪①①①⓪①⓪",
+      "metadata": {
+        "scenario": "tobinary",
+        "tags": [
+          "conversion",
+          "easy",
+          "level-24"
+        ]
+      }
     }
   ]
 }

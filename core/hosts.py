@@ -320,10 +320,11 @@ class HostRegistry:
         if not candidates:
             return None
 
-        # Prefer local host
+        # Prefer local host - use localhost instead of external IP for local services
         local = self.get_local()
         if local and local.has_service(service):
-            return local.get_service_url(service)
+            svc = local.services[service]
+            return svc.get_url("localhost")  # Use localhost for local services
 
         # Prefer trainer for ledger/vault services
         if service in ("ledger", "vault", "training"):

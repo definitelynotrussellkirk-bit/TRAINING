@@ -72,11 +72,12 @@ def to_chat_problem(prompt: str, expected: str, metadata: dict = None) -> dict:
 
 
 def extract_prompt_expected(problem: dict) -> tuple:
-    """Extract prompt and expected from either format.
+    """Extract prompt and expected from various formats.
 
     Handles:
     - Chat format: {"messages": [{"role": "user", ...}, {"role": "assistant", ...}]}
     - Legacy format: {"prompt": ..., "expected": ...}
+    - Validation format: {"prompt": ..., "expected_answer_format": ...}
     """
     if "messages" in problem:
         messages = problem["messages"]
@@ -84,7 +85,10 @@ def extract_prompt_expected(problem: dict) -> tuple:
         expected = next((m["content"] for m in messages if m.get("role") == "assistant"), "")
         return prompt, expected
     else:
-        return problem.get("prompt", ""), problem.get("expected", "")
+        prompt = problem.get("prompt", "")
+        # Try expected, then expected_answer_format (used in validation files)
+        expected = problem.get("expected", "") or problem.get("expected_answer_format", "")
+        return prompt, expected
 
 
 class EvalRunner:
@@ -289,6 +293,7 @@ class EvalRunner:
             results.append({
                 "problem_idx": i,
                 "correct": is_correct,
+                "prompt": prompt,
                 "expected": expected,
                 "got": response,
             })
@@ -793,15 +798,29 @@ class EvalRunner:
 
     def _check_answer(self, expected: str, got: str, skill: str) -> bool:
         """Check if answer is correct for a skill evaluation."""
+        # Guard: empty expected means we don't have an answer to check against
+        if not expected or not expected.strip():
+            logger.warning(f"Empty expected answer for {skill} - marking as incorrect")
+            return False
+
         # Normalize
         expected_norm = expected.strip().lower()
         got_norm = got.strip().lower()
 
         # Skill-specific checking
         if skill in ("bin", "binary"):
-            # For binary, check if expected result appears in response
-            # The expected format is like "decrement(①⓪) = ①"
-            # Model might include verification steps
+            # Handle JSON format from validation files: {"answer": "①⓪①"}
+            import json
+            try:
+                expected_data = json.loads(expected.strip())
+                if isinstance(expected_data, dict) and "answer" in expected_data:
+                    expected_answer = expected_data["answer"]
+                    # Check if answer appears in response
+                    return expected_answer in got
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            # Legacy format: "decrement(①⓪) = ①" - check if result appears
             return expected_norm in got_norm or self._extract_binary_result(expected) in got
 
         elif skill in ("sy", "syllo"):

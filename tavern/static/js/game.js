@@ -188,14 +188,16 @@ function initRealmStateSync() {
     // Subscribe to training state changes
     RealmState.subscribe('training', (training) => {
         // Sync training data to GameState
+        // Use nullish coalescing (??) to preserve existing values when data is null/undefined
+        // This prevents flickering when different data sources have different update frequencies
         GameState.isTraining = training.status === 'training';
-        GameState.currentStep = training.step || 0;
-        GameState.totalSteps = training.totalSteps || 0;
-        GameState.loss = training.loss || 0;
-        GameState.learningRate = training.learningRate || 0;
-        GameState.currentQuest = training.file || null;
-        GameState.stepsPerSecond = training.speed || 0;
-        GameState.etaSeconds = training.etaSeconds || 0;
+        GameState.currentStep = training.step ?? GameState.currentStep ?? 0;
+        GameState.totalSteps = training.totalSteps ?? GameState.totalSteps ?? 0;
+        GameState.loss = training.loss ?? GameState.loss ?? 0;
+        GameState.learningRate = training.learningRate ?? GameState.learningRate ?? 0;
+        GameState.currentQuest = training.file ?? GameState.currentQuest ?? null;
+        GameState.stepsPerSecond = training.speed ?? GameState.stepsPerSecond ?? 0;
+        GameState.etaSeconds = training.etaSeconds ?? GameState.etaSeconds ?? 0;
 
         // Quest progress comes from progress_percent (batch progress)
         // NOT from currentStep/totalSteps (campaign steps - meaningless for continuous training)
@@ -220,6 +222,35 @@ function initRealmStateSync() {
     RealmState.subscribe('events', (events) => {
         // Update battle log display
         renderBattleLogFromRealm(events);
+    });
+
+    // Subscribe to skills state changes
+    RealmState.subscribe('skills', (skillsData) => {
+        if (!skillsData?.skills) return;
+
+        const skills = skillsData.skills;
+
+        // Update SY skill
+        const syData = skills.sy || skills.syllo;
+        if (syData) {
+            GameState.sylloMastered = syData.mastered_level ?? GameState.sylloMastered ?? 0;
+            GameState.sylloTraining = syData.training_level ?? GameState.sylloTraining ?? 1;
+            GameState.sylloAcc = (syData.accuracy ?? syData.last_accuracy ?? 0) * 100;
+        }
+
+        // Update BIN skill
+        const binData = skills.bin || skills.binary;
+        if (binData) {
+            GameState.binaryMastered = binData.mastered_level ?? GameState.binaryMastered ?? 0;
+            GameState.binaryTraining = binData.training_level ?? GameState.binaryTraining ?? 1;
+            GameState.binaryAcc = (binData.accuracy ?? binData.last_accuracy ?? 0) * 100;
+        }
+
+        // Total level = sum of all MASTERED skill levels
+        GameState.totalLevel = GameState.sylloMastered + GameState.binaryMastered;
+
+        // Update skill bars UI
+        updateSkillsUI();
     });
 
     return true;
@@ -997,6 +1028,34 @@ async function fetchGameData() {
     }
 }
 
+/**
+ * Fetch effort history from training logs for the Effort History chart.
+ * This provides initial data on page load (before SSE events arrive).
+ */
+async function fetchEffortHistory() {
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/effort-history?limit=200&_t=${Date.now()}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (data.history && data.history.length > 0) {
+            // Populate lossHistory from API data
+            GameState.lossHistory = data.history.map(entry => ({
+                step: entry.step,
+                loss: entry.loss,
+                strain: entry.strain,
+                effort: entry.effort,
+            }));
+            console.log(`[Game] Loaded ${data.history.length} effort history entries`);
+            renderLossChart(GameState.lossHistory);
+        }
+    } catch (error) {
+        console.error('Failed to fetch effort history:', error);
+    }
+}
+
 function processGameData(data) {
     /**
      * Process fresh game data from /api/game endpoint.
@@ -1022,25 +1081,28 @@ function processGameData(data) {
     const prevStep = GameState.currentStep;
     const prevTotalLevel = GameState.totalLevel;
 
-    // Training status - handle both RealmStore and legacy /api/game format
+    // Training status - SKIP when RealmState is active (it's the source of truth)
+    // This prevents rubber-banding between /api/game and RealmState
     const training = data.state?.training || data.training;
-    if (training) {
+    if (training && !realmSyncActive) {
+        // Only process training data from /api/game when RealmState is NOT active
         GameState.isTraining = training.status === 'training';
-        GameState.currentStep = training.step || training.current_step || 0;
-        GameState.totalSteps = training.total_steps || 0;
-        GameState.loss = training.loss || 0;
-        GameState.valLoss = training.validation_loss || 0;
-        GameState.currentQuest = training.current_file || null;
-        GameState.questProgress = training.progress_percent || 0;
-        GameState.stepsPerSecond = training.steps_per_second || 0;
-        GameState.etaSeconds = training.eta_seconds || 0;
-        GameState.learningRate = training.learning_rate || 0;
-        // Loss history for graph - DO NOT USE train_loss_history (always empty)
-        // Instead, we build it from real-time events (training.step)
-        // This prevents duplicate injection and jumping graphs
+        GameState.currentStep = training.step ?? training.current_step ?? GameState.currentStep ?? 0;
+        GameState.totalSteps = training.total_steps ?? GameState.totalSteps ?? 0;
+        GameState.loss = training.loss ?? GameState.loss ?? 0;
+        GameState.valLoss = training.validation_loss ?? GameState.valLoss ?? 0;
+        GameState.currentQuest = training.current_file ?? GameState.currentQuest ?? null;
+        GameState.questProgress = training.progress_percent ?? GameState.questProgress ?? 0;
+        GameState.stepsPerSecond = training.steps_per_second ?? training.speed ?? GameState.stepsPerSecond ?? 0;
+        GameState.etaSeconds = training.eta_seconds ?? GameState.etaSeconds ?? 0;
+        GameState.learningRate = training.learning_rate ?? GameState.learningRate ?? 0;
 
         // POLICY 3: Check staleness and update warning
         updateFreshnessWarning(training);
+    } else if (training && realmSyncActive) {
+        // When RealmState is active, only update quest progress (batch progress)
+        // which isn't available from RealmState
+        GameState.questProgress = training.progress_percent ?? GameState.questProgress ?? 0;
     }
 
     // GPU stats
@@ -1059,26 +1121,26 @@ function processGameData(data) {
         GameState.ramTotal = system.ram_total_gb || 0;
     }
 
-    // Curriculum (skills)
-    // current_level = level being TRAINED on (not mastered)
-    // mastered = current_level - 1 (minimum 0)
+    // Curriculum (skills) - SKIP when RealmState is active (it handles skills)
+    // This prevents rubber-banding between /api/game and RealmState
     const curriculum = data.curriculum;
-    if (curriculum?.skills) {
+    if (curriculum?.skills && !realmSyncActive) {
         const skills = curriculum.skills;
 
-        if (skills.syllo) {
-            const trainingLevel = skills.syllo.current_level || 1;
-            GameState.sylloMastered = Math.max(0, trainingLevel - 1);
-            GameState.sylloTraining = trainingLevel;
-            GameState.sylloAcc = skills.syllo.recent_accuracy || 0;
-            GameState.sylloEvals = skills.syllo.eval_count || 0;
+        // Handle both old (syllo/binary) and new (sy/bin) skill IDs
+        const syData = skills.sy || skills.syllo;
+        if (syData) {
+            GameState.sylloMastered = syData.mastered_level ?? Math.max(0, (syData.current_level || 1) - 1);
+            GameState.sylloTraining = syData.training_level ?? syData.current_level ?? 1;
+            GameState.sylloAcc = syData.recent_accuracy || 0;
+            GameState.sylloEvals = syData.eval_count || 0;
         }
-        if (skills.binary) {
-            const trainingLevel = skills.binary.current_level || 1;
-            GameState.binaryMastered = Math.max(0, trainingLevel - 1);
-            GameState.binaryTraining = trainingLevel;
-            GameState.binaryAcc = skills.binary.recent_accuracy || 0;
-            GameState.binaryEvals = skills.binary.eval_count || 0;
+        const binData = skills.bin || skills.binary;
+        if (binData) {
+            GameState.binaryMastered = binData.mastered_level ?? Math.max(0, (binData.current_level || 1) - 1);
+            GameState.binaryTraining = binData.training_level ?? binData.current_level ?? 1;
+            GameState.binaryAcc = binData.recent_accuracy || 0;
+            GameState.binaryEvals = binData.eval_count || 0;
         }
 
         // Total level = sum of all MASTERED skill levels
@@ -1086,38 +1148,38 @@ function processGameData(data) {
 
         // Total evals = SYLLO + BINARY evaluations
         GameState.totalEvals = GameState.sylloEvals + GameState.binaryEvals;
+    }
 
-        // Determine current skill - prefer skill_context from training status
-        if (training?.skill_context) {
-            // Use authoritative skill context from training daemon
-            const ctx = training.skill_context;
-            GameState.currentSkill = ctx.skill_name || ctx.skill_id?.toUpperCase() || 'UNKNOWN';
-            GameState.currentSkillTraining = ctx.skill_level || 1;
-            GameState.currentSkillMastered = Math.max(0, GameState.currentSkillTraining - 1);
-            GameState.currentSkillAcc = ctx.skill_last_accuracy != null
-                ? ctx.skill_last_accuracy * 100
-                : 0;
-            GameState.skillIcon = ctx.skill_icon || '⚔️';
-            GameState.skillTargetAcc = ctx.skill_target_accuracy
-                ? ctx.skill_target_accuracy * 100
-                : 80;
+    // Determine current skill - always process skill_context from training (useful for both modes)
+    if (training?.skill_context) {
+        // Use authoritative skill context from training daemon
+        const ctx = training.skill_context;
+        GameState.currentSkill = ctx.skill_name || ctx.skill_id?.toUpperCase() || 'UNKNOWN';
+        GameState.currentSkillTraining = ctx.skill_level || 1;
+        GameState.currentSkillMastered = Math.max(0, GameState.currentSkillTraining - 1);
+        GameState.currentSkillAcc = ctx.skill_last_accuracy != null
+            ? ctx.skill_last_accuracy * 100
+            : 0;
+        GameState.skillIcon = ctx.skill_icon || '⚔️';
+        GameState.skillTargetAcc = ctx.skill_target_accuracy
+            ? ctx.skill_target_accuracy * 100
+            : 80;
+    } else if (!realmSyncActive) {
+        // Fallback: infer from training file name (only when RealmState not active)
+        const questName = (GameState.currentQuest || '').toLowerCase();
+        if (questName.includes('syllo') || questName.includes('sy_')) {
+            GameState.currentSkill = 'SYLLO';
+            GameState.currentSkillMastered = GameState.sylloMastered;
+            GameState.currentSkillTraining = GameState.sylloTraining;
+            GameState.currentSkillAcc = GameState.sylloAcc;
         } else {
-            // Fallback: infer from training file name
-            const questName = (GameState.currentQuest || '').toLowerCase();
-            if (questName.includes('syllo') || questName.includes('sy_')) {
-                GameState.currentSkill = 'SYLLO';
-                GameState.currentSkillMastered = GameState.sylloMastered;
-                GameState.currentSkillTraining = GameState.sylloTraining;
-                GameState.currentSkillAcc = GameState.sylloAcc;
-            } else {
-                GameState.currentSkill = 'BINARY';
-                GameState.currentSkillMastered = GameState.binaryMastered;
-                GameState.currentSkillTraining = GameState.binaryTraining;
-                GameState.currentSkillAcc = GameState.binaryAcc;
-            }
-            GameState.skillIcon = null;
-            GameState.skillTargetAcc = 80;
+            GameState.currentSkill = 'BINARY';
+            GameState.currentSkillMastered = GameState.binaryMastered;
+            GameState.currentSkillTraining = GameState.binaryTraining;
+            GameState.currentSkillAcc = GameState.binaryAcc;
         }
+        GameState.skillIcon = null;
+        GameState.skillTargetAcc = 80;
     }
 
     // Vault data (checkpoints)
@@ -1903,6 +1965,9 @@ function init() {
     // Fetch skills (from YAML configs)
     fetchSkills();
 
+    // Fetch effort history for the chart (from training logs)
+    fetchEffortHistory();
+
     // Try to use unified RealmState (single source of truth)
     const realmSyncActive = initRealmStateSync();
 
@@ -1935,6 +2000,7 @@ function init() {
     pollers.add('skills', fetchSkills, 30000, { immediate: false });
     pollers.add('time', updateTime, 1000, { immediate: false });
     pollers.add('momentum', fetchMomentum, 15000, { immediate: false });
+    pollers.add('vault', fetchVaultData, 60000, { immediate: true }); // Vault data from ledger (accurate)
 
     // Start all pollers
     pollers.startAll();

@@ -1,65 +1,72 @@
 {
   "level": 9,
-  "level_name": "Medium",
+  "level_name": "10-bit (medium: 0 to 1,023)",
   "bits": 10,
-  "eval_version": "1.0",
+  "eval_version": "2.0-training-format",
   "pass_threshold": 0.8,
-  "passing_score": "4/5",
-  "scoring_rule": "Each problem: answer must match exactly. Level: 80% of problems must pass.",
-  "response_schema": {
-    "type": "object",
-    "required": [
-      "answer"
-    ],
-    "properties": {
-      "answer": {
-        "type": "string",
-        "description": "Result in circled binary notation (\u24ea\u2460)"
-      }
-    },
-    "example": "{\"answer\": \"\u2460\u24ea\u2460\u24ea\"}"
-  },
-  "num_problems": 5,
+  "scoring_rule": "Response must contain the expected result pattern",
   "problems": [
     {
-      "problem_id": "eval_L9_P1",
-      "problem_index": 0,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83d\udc31 represents 0\n  \ud83d\udc36 represents 1\n\nCompute \u2795(\ud83d\udc36\ud83d\udc36\ud83d\udc36\ud83d\udc36\ud83d\udc36\ud83d\udc31\ud83d\udc36\ud83d\udc36, \ud83d\udc36\ud83d\udc36\ud83d\udc31\ud83d\udc31\ud83d\udc36\ud83d\udc36\ud83d\udc31)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83d\udc31/\ud83d\udc36 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (easy): 251 + 102 = 353"
+      "prompt": "Symbol Key:\n  🌕 = 0 (zero bit)\n  🌑 = 1 (one bit)\n\nOperations:\n  📏 = absolute_value\n  ➕🔢 = add_signed\n  📉 = decrement\n  ✂️ = divide\n  halve = divide_by_2\n  equal = equals\n  ▶️ = greaterthan\n  ⬆️ = increment\n  smaller = lessthan\n  most = maximum\n  mult = multiply\n  double = multiply_by_2\n  ✖️🔢 = multiply_signed\n  invert = negate\n  sign = sign_of\n  💨 = subtract\n  ssub = subtract_signed\n\nCompute: halve(🌑🌑🌑🌑🌕🌑🌕)",
+      "expected": "halve(🌑🌑🌑🌑🌕🌑🌕) = 🌑🌑🌑🌑🌕🌑",
+      "metadata": {
+        "scenario": "divide-by-2",
+        "tags": [
+          "divide-by-2",
+          "easy",
+          "level-9",
+          "symbol-language"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L9_P2",
-      "problem_index": 1,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83e\udd76 represents 0\n  \ud83e\udd75 represents 1\n\nCompute minus(\ud83e\udd75\ud83e\udd75\ud83e\udd75\ud83e\udd75\ud83e\udd75, \ud83e\udd75\ud83e\udd76\ud83e\udd75\ud83e\udd75\ud83e\udd76)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83e\udd76/\ud83e\udd75 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "subtract",
-      "difficulty_notes": "subtract (easy): 31 - 22 = 9"
+      "prompt": "Compute: subtract(①①⓪①⓪⓪⓪①⓪, ①①⓪⓪⓪①⓪①⓪)",
+      "expected": "subtract(①①⓪①⓪⓪⓪①⓪, ①①⓪⓪⓪①⓪①⓪) = ①①⓪⓪⓪",
+      "metadata": {
+        "scenario": "subtract-basic",
+        "tags": [
+          "subtract",
+          "easy",
+          "level-9"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L9_P3",
-      "problem_index": 2,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83c\udf15 represents 0\n  \ud83c\udf11 represents 1\n\nCompute \u2716\ufe0f(\ud83c\udf11\ud83c\udf11\ud83c\udf15, \ud83c\udf11\ud83c\udf15\ud83c\udf11\ud83c\udf11)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83c\udf15/\ud83c\udf11 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (medium): 6 * 11 = 66"
+      "prompt": "Compute: subtract(①①①①①①①①⓪, ①①①①①⓪①⓪)",
+      "expected": "subtract(①①①①①①①①⓪, ①①①①①⓪①⓪) = ①⓪⓪⓪⓪⓪①⓪⓪",
+      "metadata": {
+        "scenario": "subtract-basic",
+        "tags": [
+          "subtract",
+          "easy",
+          "level-9"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L9_P4",
-      "problem_index": 3,
-      "prompt": "You are performing binary arithmetic using symbol notation.\n\nIn this notation:\n  \ud83c\udf19 represents 0\n  \ud83c\udf1e represents 1\n\nCompute merge(\ud83c\udf1e\ud83c\udf19\ud83c\udf19\ud83c\udf1e\ud83c\udf1e\ud83c\udf1e\ud83c\udf1e\ud83c\udf19\ud83c\udf19, \ud83c\udf1e\ud83c\udf19\ud83c\udf19\ud83c\udf19\ud83c\udf1e\ud83c\udf19\ud83c\udf1e\ud83c\udf19)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \ud83c\udf19/\ud83c\udf1e symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "add",
-      "difficulty_notes": "add (medium): 316 + 138 = 454"
+      "prompt": "Compute: todecimal(①①①⓪⓪⓪⓪⓪①)",
+      "expected": "todecimal(①①①⓪⓪⓪⓪⓪①) = 449",
+      "metadata": {
+        "scenario": "todecimal",
+        "tags": [
+          "conversion",
+          "easy",
+          "level-9"
+        ]
+      }
     },
     {
-      "problem_id": "eval_L9_P5",
-      "problem_index": 4,
-      "prompt": "You are performing binary arithmetic using circled notation.\n\nIn this notation:\n  \u24ea represents 0\n  \u2460 represents 1\n\nCompute multiply(\u2460\u2460\u2460\u2460\u2460, \u2460\u2460)\n\nReturn your answer as JSON: {\"answer\": \"<result>\"}\nThe answer should use the same \u24ea/\u2460 symbols.",
-      "expected_answer_format": "{\"answer\": \"\u2460\u24ea\u2460\"}",
-      "operation": "multiply",
-      "difficulty_notes": "multiply (hard): 31 * 3 = 93"
+      "prompt": "Symbol Key:\n  🌴 = 0 (zero bit)\n  🌲 = 1 (one bit)\n\nOperations:\n  size = absolute_value\n  🔗 = add\n  drop = decrement\n  🔪 = divide\n  bisect = divide_by_2\n  match = equals\n  over = greaterthan\n  📈 = increment\n  smaller = lessthan\n  ✖️ = multiply\n  double = multiply_by_2\n  signed_mul = multiply_signed\n  neg = negate\n  sign = sign_of\n  take = subtract\n  ssub = subtract_signed\n  📝 = tobinary\n  📊 = todecimal\n\nCompute: 🔗(🌲🌴🌴🌴🌴🌲🌲🌴🌴, 🌲🌲🌲🌲🌴🌲🌴🌲)",
+      "expected": "🔗(🌲🌴🌴🌴🌴🌲🌲🌴🌴, 🌲🌲🌲🌲🌴🌲🌴🌲) = 🌲🌴🌴🌴🌴🌴🌴🌴🌴🌲",
+      "metadata": {
+        "scenario": "add-basic",
+        "tags": [
+          "add",
+          "easy",
+          "level-9",
+          "symbol-language"
+        ]
+      }
     }
   ]
 }

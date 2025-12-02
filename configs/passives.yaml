@@ -1,0 +1,80 @@
+# Passives Configuration
+# =====================
+#
+# Controls the tiered passive evaluation system.
+#
+# Tier System:
+#   CORE     - Sentinel passives that run on every checkpoint save.
+#              These catch catastrophic forgetting quickly.
+#   EXTENDED - Full library of passives run on-demand for
+#              comprehensive capability assessment.
+
+version: "1.0"
+
+# Core passive settings (run on checkpoint save)
+core:
+  # Maximum number of core passives to run per checkpoint
+  # Set to -1 for no limit (run all core-tagged passives)
+  max_count: 5
+
+  # Problems per passive in LITE mode (quick check)
+  lite_problems: 5
+
+  # Problems per passive in FULL mode (thorough check)
+  full_problems: 30
+
+  # Timeout per problem in seconds
+  timeout_per_problem: 10
+
+# Extended passive settings (run on demand)
+extended:
+  # Maximum concurrent extended passives to run
+  max_concurrent: 3
+
+  # Problems per passive
+  lite_problems: 5
+  full_problems: 30
+
+  # Timeout per problem in seconds
+  timeout_per_problem: 15
+
+# Queue settings
+queue:
+  # How long to retain completed results in queue (hours)
+  retention_hours: 168  # 7 days
+
+  # Skip passives already evaluated at this checkpoint
+  deduplicate: true
+
+  # Priority ordering (lower = runs first)
+  # "tier_priority" = core first, then by priority within tier
+  # "priority_only" = ignore tiers, just use priority
+  ordering: "tier_priority"
+
+# Drift detection thresholds
+drift:
+  # Accuracy drop threshold for WARNING (e.g., 0.1 = 10% drop)
+  warning_threshold: 0.15
+
+  # Accuracy drop threshold for CRITICAL (e.g., 0.3 = 30% drop)
+  critical_threshold: 0.30
+
+  # Compare against: "base_model", "best_checkpoint", "previous_checkpoint"
+  compare_against: "best_checkpoint"
+
+# Categories to include/exclude
+# Leave empty to include all
+categories:
+  include: []  # Empty = all categories
+  exclude: []  # Categories to skip
+
+# Logging
+logging:
+  # Log level for passive evaluation
+  level: "INFO"
+
+  # Log individual problem results (verbose)
+  log_problems: false
+
+  # Save problem/answer pairs to file for debugging
+  save_debug_output: false

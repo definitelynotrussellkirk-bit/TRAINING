@@ -1,7 +1,7 @@
 {
   "skills": {
-    "syllo": {
-      "current_level": 1,
+    "sy": {
+      "current_level": 11,
       "accuracy_history": [
         {
           "step": 176508,
@@ -134,18 +134,887 @@
             "problems": 20,
             "correct": 0
           }
+        },
+        {
+          "step": 184018,
+          "accuracy": 0.0,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T02:20:25.346921",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 184000,
+          "accuracy": 0.0,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T02:21:10.594057",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 183980,
+          "accuracy": 0.0,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T02:21:52.915738",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 184798,
+          "accuracy": 0.0,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T05:17:59.003701",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 184798,
+          "accuracy": 1.0,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T05:19:12.015787",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 184798,
+          "accuracy": 1.0,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T05:19:58.110089",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 184798,
+          "accuracy": 1.0,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T05:34:37.272832",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 184875,
+          "accuracy": 1.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T05:40:39.380672",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 184837,
+          "accuracy": 0.8,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T05:41:23.056121",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 4
+          }
+        },
+        {
+          "step": 185538,
+          "accuracy": 1.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T08:06:36.141569",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 185499,
+          "accuracy": 1.0,
+          "training_level": 4,
+          "mastered_level": 3,
+          "timestamp": "2025-11-30T08:07:21.235455",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 185460,
+          "accuracy": 1.0,
+          "training_level": 4,
+          "mastered_level": 3,
+          "timestamp": "2025-11-30T08:08:06.686851",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 185551,
+          "accuracy": 0.0,
+          "training_level": 4,
+          "mastered_level": 3,
+          "timestamp": "2025-11-30T08:18:06.816130",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 185632,
+          "accuracy": 1.0,
+          "training_level": 4,
+          "mastered_level": 3,
+          "timestamp": "2025-11-30T08:45:40.505904",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 185632,
+          "accuracy": 0.4,
+          "training_level": 5,
+          "mastered_level": 4,
+          "timestamp": "2025-11-30T08:45:53.184602",
+          "metadata": {
+            "level": 5,
+            "problems": 5,
+            "correct": 2
+          }
+        },
+        {
+          "step": 186369,
+          "accuracy": 1.0,
+          "training_level": 5,
+          "mastered_level": 4,
+          "timestamp": "2025-11-30T11:22:50.189415",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 186369,
+          "accuracy": 0.4,
+          "training_level": 6,
+          "mastered_level": 5,
+          "timestamp": "2025-11-30T11:22:59.090698",
+          "metadata": {
+            "level": 6,
+            "problems": 5,
+            "correct": 2
+          }
+        },
+        {
+          "step": 186335,
+          "accuracy": 0.8,
+          "training_level": 6,
+          "mastered_level": 5,
+          "timestamp": "2025-11-30T11:23:35.325969",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 4
+          }
+        },
+        {
+          "step": 186369,
+          "accuracy": 0.2,
+          "training_level": 7,
+          "mastered_level": 6,
+          "timestamp": "2025-11-30T11:23:42.507058",
+          "metadata": {
+            "level": 7,
+            "problems": 5,
+            "correct": 1
+          }
+        },
+        {
+          "step": 186301,
+          "accuracy": 1.0,
+          "training_level": 7,
+          "mastered_level": 6,
+          "timestamp": "2025-11-30T11:24:21.141296",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 186369,
+          "accuracy": 0.4,
+          "training_level": 8,
+          "mastered_level": 7,
+          "timestamp": "2025-11-30T11:24:28.244036",
+          "metadata": {
+            "level": 8,
+            "problems": 5,
+            "correct": 2
+          }
+        },
+        {
+          "step": 189395,
+          "accuracy": 1.0,
+          "training_level": 8,
+          "mastered_level": 7,
+          "timestamp": "2025-11-30T21:48:16.193045",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 189395,
+          "accuracy": 0.4,
+          "training_level": 9,
+          "mastered_level": 8,
+          "timestamp": "2025-11-30T21:48:22.809700",
+          "metadata": {
+            "level": 9,
+            "problems": 5,
+            "correct": 2
+          }
+        },
+        {
+          "step": 189361,
+          "accuracy": 0.8,
+          "training_level": 9,
+          "mastered_level": 8,
+          "timestamp": "2025-11-30T21:48:58.522438",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 4
+          }
+        },
+        {
+          "step": 189395,
+          "accuracy": 0.2,
+          "training_level": 10,
+          "mastered_level": 9,
+          "timestamp": "2025-11-30T21:49:03.440748",
+          "metadata": {
+            "level": 10,
+            "problems": 5,
+            "correct": 1
+          }
+        },
+        {
+          "step": 189327,
+          "accuracy": 1.0,
+          "training_level": 10,
+          "mastered_level": 9,
+          "timestamp": "2025-11-30T21:49:46.681576",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 189395,
+          "accuracy": 0.0,
+          "training_level": 11,
+          "mastered_level": 10,
+          "timestamp": "2025-11-30T21:49:52.018882",
+          "metadata": {
+            "level": 11,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 190653,
+          "accuracy": 1.0,
+          "training_level": 11,
+          "mastered_level": 10,
+          "timestamp": "2025-12-01T02:29:41.675764",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 190653,
+          "accuracy": 0.0,
+          "training_level": 12,
+          "mastered_level": 11,
+          "timestamp": "2025-12-01T02:29:53.317920",
+          "metadata": {
+            "level": 12,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 190743,
+          "accuracy": 0.0,
+          "training_level": 12,
+          "mastered_level": 11,
+          "timestamp": "2025-12-01T02:45:11.234032",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 201740,
+          "accuracy": 0.6,
+          "training_level": 12,
+          "mastered_level": 11,
+          "timestamp": "2025-12-02T03:53:53.636935",
+          "metadata": {
+            "level": 15,
+            "problems": 5,
+            "correct": 3
+          }
         }
       ],
-      "progression_history": []
+      "progression_history": [
+        {
+          "earned_level": 2,
+          "old_mastered": 1,
+          "new_mastered": 2,
+          "timestamp": "2025-11-30T05:34:37.273180"
+        },
+        {
+          "earned_level": 3,
+          "old_mastered": 2,
+          "new_mastered": 3,
+          "timestamp": "2025-11-30T08:06:36.141985"
+        },
+        {
+          "earned_level": 4,
+          "old_mastered": 3,
+          "new_mastered": 4,
+          "timestamp": "2025-11-30T08:45:40.506345"
+        },
+        {
+          "earned_level": 5,
+          "old_mastered": 4,
+          "new_mastered": 5,
+          "timestamp": "2025-11-30T11:22:50.189883"
+        },
+        {
+          "earned_level": 6,
+          "old_mastered": 5,
+          "new_mastered": 6,
+          "timestamp": "2025-11-30T11:23:35.326343"
+        },
+        {
+          "earned_level": 7,
+          "old_mastered": 6,
+          "new_mastered": 7,
+          "timestamp": "2025-11-30T11:24:21.141679"
+        },
+        {
+          "earned_level": 8,
+          "old_mastered": 7,
+          "new_mastered": 8,
+          "timestamp": "2025-11-30T21:48:16.193557"
+        },
+        {
+          "earned_level": 9,
+          "old_mastered": 8,
+          "new_mastered": 9,
+          "timestamp": "2025-11-30T21:48:58.522887"
+        },
+        {
+          "earned_level": 10,
+          "old_mastered": 9,
+          "new_mastered": 10,
+          "timestamp": "2025-11-30T21:49:46.682051"
+        },
+        {
+          "earned_level": 11,
+          "old_mastered": 10,
+          "new_mastered": 11,
+          "timestamp": "2025-12-01T02:29:41.676274"
+        }
+      ]
     },
-    "binary": {
-      "current_level": 1,
-      "accuracy_history": [],
-      "progression_history": []
+    "bin": {
+      "current_level": 10,
+      "accuracy_history": [
+        {
+          "step": 183609,
+          "accuracy": 1.0,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T01:28:26.839644",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 183700,
+          "accuracy": 0.8,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T01:28:26.839917",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 4
+          }
+        },
+        {
+          "step": 183713,
+          "accuracy": 0.8,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T01:28:26.840801",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 4
+          }
+        },
+        {
+          "step": 183726,
+          "accuracy": 0.8,
+          "training_level": 2,
+          "mastered_level": 1,
+          "timestamp": "2025-11-30T01:28:26.841052",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 4
+          }
+        },
+        {
+          "step": 184018,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T02:20:34.186614",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 184000,
+          "accuracy": 0.2,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T02:21:17.275953",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 1
+          }
+        },
+        {
+          "step": 183980,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T02:21:59.243403",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 184875,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T05:40:46.843888",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 184837,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T05:41:30.192251",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 185538,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T08:06:45.198280",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 185499,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T08:07:29.538862",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 185460,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T08:08:14.791667",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 185551,
+          "accuracy": 1.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T08:18:09.441609",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 185632,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T08:45:46.983192",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 186369,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T11:22:54.297805",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 186335,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T11:23:45.065840",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 186301,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T11:24:29.198984",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 189395,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T21:48:19.378996",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 189361,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T21:49:10.386834",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 189327,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-11-30T21:49:57.366415",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 190619,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-12-01T02:22:55.405483",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 190653,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-12-01T02:29:49.213576",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 190727,
+          "accuracy": 0.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-12-01T02:42:18.024907",
+          "metadata": {
+            "level": 1,
+            "problems": 5,
+            "correct": 0
+          }
+        },
+        {
+          "step": 201740,
+          "accuracy": 1.0,
+          "training_level": 3,
+          "mastered_level": 2,
+          "timestamp": "2025-12-02T03:53:59.251018",
+          "metadata": {
+            "level": 11,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 201740,
+          "accuracy": 1.0,
+          "training_level": 4,
+          "mastered_level": 3,
+          "timestamp": "2025-12-02T03:54:17.554650",
+          "metadata": {
+            "level": 4,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 201740,
+          "accuracy": 1.0,
+          "training_level": 5,
+          "mastered_level": 4,
+          "timestamp": "2025-12-02T03:54:23.770298",
+          "metadata": {
+            "level": 5,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 201740,
+          "accuracy": 1.0,
+          "training_level": 6,
+          "mastered_level": 5,
+          "timestamp": "2025-12-02T03:54:40.592604",
+          "metadata": {
+            "level": 6,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 201740,
+          "accuracy": 1.0,
+          "training_level": 7,
+          "mastered_level": 6,
+          "timestamp": "2025-12-02T03:54:52.628563",
+          "metadata": {
+            "level": 7,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 201740,
+          "accuracy": 1.0,
+          "training_level": 8,
+          "mastered_level": 7,
+          "timestamp": "2025-12-02T03:54:57.857452",
+          "metadata": {
+            "level": 8,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 201740,
+          "accuracy": 1.0,
+          "training_level": 9,
+          "mastered_level": 8,
+          "timestamp": "2025-12-02T03:55:02.265479",
+          "metadata": {
+            "level": 9,
+            "problems": 5,
+            "correct": 5
+          }
+        },
+        {
+          "step": 201740,
+          "accuracy": 1.0,
+          "training_level": 10,
+          "mastered_level": 9,
+          "timestamp": "2025-12-02T03:55:07.453094",
+          "metadata": {
+            "level": 10,
+            "problems": 5,
+            "correct": 5
+          }
+        }
+      ],
+      "progression_history": [
+        {
+          "earned_level": 2,
+          "old_mastered": 1,
+          "new_mastered": 2,
+          "timestamp": "2025-11-30T01:28:26.841245"
+        },
+        {
+          "earned_level": 3,
+          "old_mastered": 2,
+          "new_mastered": 3,
+          "timestamp": "2025-12-02T03:53:59.251539"
+        },
+        {
+          "earned_level": 4,
+          "old_mastered": 3,
+          "new_mastered": 4,
+          "timestamp": "2025-12-02T03:54:17.555197"
+        },
+        {
+          "earned_level": 5,
+          "old_mastered": 4,
+          "new_mastered": 5,
+          "timestamp": "2025-12-02T03:54:23.770852"
+        },
+        {
+          "earned_level": 6,
+          "old_mastered": 5,
+          "new_mastered": 6,
+          "timestamp": "2025-12-02T03:54:40.593198"
+        },
+        {
+          "earned_level": 7,
+          "old_mastered": 6,
+          "new_mastered": 7,
+          "timestamp": "2025-12-02T03:54:52.629127"
+        },
+        {
+          "earned_level": 8,
+          "old_mastered": 7,
+          "new_mastered": 8,
+          "timestamp": "2025-12-02T03:54:57.858026"
+        },
+        {
+          "earned_level": 9,
+          "old_mastered": 8,
+          "new_mastered": 9,
+          "timestamp": "2025-12-02T03:55:02.266061"
+        },
+        {
+          "earned_level": 10,
+          "old_mastered": 9,
+          "new_mastered": 10,
+          "timestamp": "2025-12-02T03:55:07.453687"
+        }
+      ]
     }
   },
-  "active_skill": "syllo",
+  "active_skill": "sy",
   "started_at": "2025-11-26T04:00:00.000000",
   "migrated_at": "2025-11-25T05:58:43.214548",
-  "last_updated": "2025-11-26T06:47:54.184583"
+  "last_updated": "2025-12-02T03:55:07.453689",
+  "skill_rotation": {
+    "enabled": true,
+    "skills": [
+      "sy",
+      "bin"
+    ],
+    "index": 0
+  }
 }

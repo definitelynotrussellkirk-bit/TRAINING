@@ -240,22 +240,27 @@ class ConfigBuilder:
         self.control_dir = self.base_dir / "control"
 
     def get_active_campaign(self) -> Optional[Dict]:
-        """Get the currently active campaign pointer."""
-        # Check symlink first
-        active_link = self.campaigns_dir / "active"
-        if active_link.exists() and active_link.is_symlink():
-            campaign_path = active_link.resolve()
-            campaign_json = campaign_path / "campaign.json"
-            if campaign_json.exists():
-                with open(campaign_json) as f:
-                    return json.load(f)
+        """
+        Get the currently active campaign pointer.
 
-        # Fall back to control file
+        Source of truth: control/active_campaign.json (JSON pointer file)
+        The campaigns/active symlink is derived from the pointer and used as fallback only.
+        """
+        # Primary: JSON pointer file (authoritative source of truth)
         pointer_path = self.control_dir / "active_campaign.json"
         if pointer_path.exists():
             with open(pointer_path) as f:
                 pointer = json.load(f)
             campaign_path = self.base_dir / pointer.get("campaign_path", "")
+            campaign_json = campaign_path / "campaign.json"
+            if campaign_json.exists():
+                with open(campaign_json) as f:
+                    return json.load(f)
+
+        # Fallback: symlink (for backwards compatibility)
+        active_link = self.campaigns_dir / "active"
+        if active_link.exists() and active_link.is_symlink():
+            campaign_path = active_link.resolve()
             campaign_json = campaign_path / "campaign.json"
             if campaign_json.exists():
                 with open(campaign_json) as f:

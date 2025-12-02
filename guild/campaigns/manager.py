@@ -93,6 +93,50 @@ class CampaignManager:
         self.archive_dir.mkdir(parents=True, exist_ok=True)
         self.control_dir.mkdir(parents=True, exist_ok=True)
 
+        # Validate and repair any pointer/symlink disagreement
+        self._validate_active_campaign()
+
+    def _validate_active_campaign(self) -> None:
+        """
+        Validate that pointer file and symlink agree.
+
+        Source of truth: control/active_campaign.json
+        If symlink disagrees, repair it to match the pointer.
+        """
+        active_link = self.campaigns_dir / "active"
+        pointer = self._load_pointer()
+
+        # Case 1: No pointer - remove symlink if exists
+        if pointer is None:
+            if active_link.exists() or active_link.is_symlink():
+                logger.warning("Removing orphan campaigns/active symlink (no pointer file)")
+                active_link.unlink()
+            return
+
+        # Case 2: Pointer exists - check symlink matches
+        expected_path = self.base_dir / pointer.campaign_path
+
+        if not active_link.exists() and not active_link.is_symlink():
+            # No symlink - create it
+            logger.info(f"Creating missing campaigns/active symlink -> {expected_path}")
+            active_link.symlink_to(expected_path)
+            return
+
+        # Check if symlink points to correct location
+        try:
+            current_target = active_link.resolve()
+            if current_target != expected_path.resolve():
+                logger.warning(
+                    f"campaigns/active symlink disagrees with pointer!\n"
+                    f"  Symlink points to: {current_target}\n"
+                    f"  Pointer says: {expected_path}\n"
+                    f"  Repairing symlink to match pointer (authoritative source)"
+                )
+                active_link.unlink()
+                active_link.symlink_to(expected_path)
+        except Exception as e:
+            logger.warning(f"Error validating active campaign symlink: {e}")
+
     # -------------------------------------------------------------------------
     # Query Operations
     # -------------------------------------------------------------------------

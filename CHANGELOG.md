@@ -4,6 +4,39 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-12-02 - Garrison Fleet Health Manager
+
+### The Problem
+Inference server disk kept filling up (100% full), breaking eval runs. No automated monitoring or cleanup for distributed fleet.
+
+### The Solution
+
+**Garrison** (`core/garrison.py`) - Fleet health manager that monitors and maintains distributed services:
+
+- **Monitors**: trainer disk/services, inference server disk/checkpoints/API/GPU
+- **Auto-maintenance**: Cleans checkpoints on inference server (keeps max 10)
+- **Alerts**: Warns on disk > 80%, critical at > 90%
+- **Daemon mode**: Checks every 5min, maintenance every 30min
+
+**Dual cleanup layers**:
+1. `eval_runner.py` cleans before each checkpoint sync (immediate)
+2. Garrison cleans every 30min (belt-and-suspenders)
+
+**SY validation fix**: Removed broken `data/validation/sy/*.json` files (had prompts but no expected answers). Now falls back to `sy_validation.json` with correct answers.
+
+### Files Created
+- `core/garrison.py` - Fleet health manager
+
+### Files Modified
+- `core/eval_runner.py` - Added auto-cleanup before checkpoint sync
+- `configs/services.json` - Added garrison service
+- `CLAUDE.md` - Added Garrison documentation
+
+### Files Removed
+- `data/validation/sy/*.json` - Broken validation files (moved to sy.broken/)
+
+---
+
 ## 2025-12-01 - Vocabulary Canonicalization
 
 ### The Problem

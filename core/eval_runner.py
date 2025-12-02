@@ -683,6 +683,20 @@ class EvalRunner:
             checkpoint_exists = False
 
         if not checkpoint_exists:
+            # Clean up old checkpoints on remote before syncing (keep max 10)
+            try:
+                cleanup_cmd = f"cd {remote_models_dir} && ls -t | tail -n +11 | xargs -r rm -rf"
+                cleanup_result = subprocess.run(
+                    ["ssh", remote_host, cleanup_cmd],
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                if cleanup_result.returncode == 0:
+                    logger.debug(f"Cleaned up old checkpoints on {remote_host}")
+            except Exception as e:
+                logger.debug(f"Remote cleanup skipped: {e}")
+
             logger.info(f"Syncing checkpoint-{checkpoint_step} to {remote_host}...")
             try:
                 sync_cmd = [

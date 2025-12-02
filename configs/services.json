@@ -195,5 +195,23 @@
       "max_restarts": 3,
       "restart_delay": 5
     }
+  },
+
+  "garrison": {
+    "name": "Garrison",
+    "description": "Fleet health manager - the watchtower",
+    "command": ["python3", "core/garrison.py", "--daemon", "--interval", "300", "--maintenance-interval", "1800"],
+    "pid_file": ".pids/garrison.pid",
+    "required": false,
+    "depends_on": [],
+    "health_check": {
+      "type": "pid",
+      "timeout": 5.0
+    },
+    "startup": {
+      "delay": 5.0,
+      "max_restarts": 3,
+      "restart_delay": 30
+    }
   }
 }

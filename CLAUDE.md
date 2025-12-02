@@ -241,6 +241,7 @@ Skills are defined in `configs/skills/*.yaml` - YAML is the single source of tru
 | **Vault** | VaultKeeper API (`vault/server.py`) | 8767 |
 | **Oracle** | Inference server (3090) | 8765 |
 | **Watchtower** | Monitoring (`watchtower/`) | 8081 |
+| **Garrison** | Fleet health manager (`core/garrison.py`) | - |
 
 ### RPG → Technical Mapping
 
@@ -753,8 +754,32 @@ Services (from `configs/services.json`):
 - `weaver` → Daemon orchestrator (optional)
 - `data_flow` → Queue feeder [task]
 - `skill_sy` (8080), `skill_bin` (8090) → Skill servers (optional)
+- `garrison` → Fleet health manager (optional)
 
 Key files: `core/service_registry.py`, `configs/services.json`
+
+### Garrison
+
+Fleet health manager - monitors distributed services and performs automatic maintenance.
+
+```bash
+python3 core/garrison.py                    # One-shot health check
+python3 core/garrison.py --json             # Output as JSON
+python3 core/garrison.py --maintenance      # Run maintenance now
+python3 core/garrison.py --dry-run          # See what maintenance would do
+python3 core/garrison.py --daemon           # Run as daemon (default: 5min checks, 30min maintenance)
+python3 core/garrison.py --daemon --interval 300 --maintenance-interval 1800
+```
+
+Monitors:
+- **Trainer**: Disk usage, services (vault, tavern, training_daemon, eval_runner)
+- **Inference server**: Disk usage, checkpoint count, API health, GPU memory
+
+Auto-maintenance:
+- Cleans old checkpoints on inference server (keeps max 10)
+- Removes stale log/PID files
+
+Key files: `core/garrison.py`, `status/garrison.json`, `config/hosts.json`
 
 ### Training Schools
 

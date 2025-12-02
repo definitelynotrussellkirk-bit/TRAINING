@@ -580,6 +580,11 @@
 
         function renderCheckpointItem(cp, isInactive) {
             const heroLabel = cp.hero_id ? cp.hero_id.split('-')[0].toUpperCase() : '';
+            const sizeStr = cp.size_gb ? cp.size_gb.toFixed(1) + ' GB' : '';
+            const ageStr = cp.age_hours != null
+                ? (cp.age_hours < 1 ? 'Just now' : cp.age_hours.toFixed(1) + 'h ago')
+                : '';
+            const statsStr = [heroLabel, sizeStr, ageStr].filter(Boolean).join(' · ');
             return `
                 <div class="checkpoint-item ${isInactive ? 'inactive' : ''}"
                      data-step="${cp.step}"
@@ -587,7 +592,7 @@
                      data-hero="${cp.hero_id || ''}"
                      style="${isInactive ? 'opacity: 0.5;' : ''}">
                     <div class="step">${cp.is_champion ? '👑' : '💾'} Step ${cp.step.toLocaleString()}</div>
-                    <div class="stats">${heroLabel} · ${cp.size_gb} GB · ${cp.age_hours < 1 ? 'Just now' : cp.age_hours.toFixed(1) + 'h ago'}</div>
+                    <div class="stats">${statsStr || 'Checkpoint'}</div>
                 </div>
             `;
         }

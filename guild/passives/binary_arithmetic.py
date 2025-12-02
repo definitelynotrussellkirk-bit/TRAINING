@@ -8,7 +8,7 @@ Matches the BIN skill primitives defined in configs/skills/bin.yaml.
 import random
 from typing import List, Dict, Any, Optional
 
-from guild.passives.base import PassiveModule
+from guild.passives.base import PassiveModule, PassiveTier
 
 
 class BinaryArithmeticPassive(PassiveModule):
@@ -19,6 +19,11 @@ class BinaryArithmeticPassive(PassiveModule):
     category = "math"
     description = "Binary add/sub, bitwise AND/OR/XOR, conversions"
     version = "1.0.0"
+
+    # Core passive - matches BIN skill, catches skill-specific regression
+    tier = PassiveTier.CORE
+    priority = 20
+
     lite_count = 5
     full_count = 30
 

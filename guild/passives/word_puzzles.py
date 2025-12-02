@@ -8,7 +8,7 @@ Designed to match the SY (Syllacrostic) skill's core competencies.
 import random
 from typing import List, Dict, Any, Optional
 
-from guild.passives.base import PassiveModule
+from guild.passives.base import PassiveModule, PassiveTier
 
 
 # Simple word database with syllable breakdowns
@@ -58,10 +58,16 @@ class WordPuzzlesPassive(PassiveModule):
     category = "reasoning"
     description = "Syllable assembly, word clues, counting"
     version = "1.0.0"
+
+    # Core passive - matches SY skill, catches skill-specific regression
+    tier = PassiveTier.CORE
+    priority = 25
+
     lite_count = 5
     full_count = 30
 
-    def generate_problems(self, count: int, seed: Optional[int] = None) -> List[Dict[str, Any]]:
+    def generate_problems(self, count: int, seed: Optional[int] = None, level: int = 1) -> List[Dict[str, Any]]:
+        """Generate word puzzles. Level parameter accepted but not yet used."""
         if seed is not None:
             random.seed(seed)
 

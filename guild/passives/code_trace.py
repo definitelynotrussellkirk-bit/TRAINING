@@ -22,7 +22,8 @@ class CodeTracePassive(PassiveModule):
     lite_count = 5
     full_count = 30
 
-    def generate_problems(self, count: int, seed: Optional[int] = None) -> List[Dict[str, Any]]:
+    def generate_problems(self, count: int, seed: Optional[int] = None, level: int = 1) -> List[Dict[str, Any]]:
+        """Generate code trace problems. Level parameter accepted but not yet used."""
         if seed is not None:
             random.seed(seed)
 

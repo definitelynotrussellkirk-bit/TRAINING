@@ -7,7 +7,7 @@ Tests: digit sum, even/odd, comparison, modulo, basic operations.
 import random
 from typing import List, Dict, Any, Optional
 
-from guild.passives.base import PassiveModule
+from guild.passives.base import PassiveModule, PassiveTier
 
 
 class ArithmeticPassive(PassiveModule):
@@ -17,10 +17,17 @@ class ArithmeticPassive(PassiveModule):
     name = "Arithmetic"
     category = "arithmetic"
     description = "Basic number sense: digit sum, even/odd, comparison, modulo"
+    version = "1.0.0"
+
+    # Core passive - catches basic math regression
+    tier = PassiveTier.CORE
+    priority = 10  # High priority (runs first)
+
     lite_count = 5
     full_count = 30
 
-    def generate_problems(self, count: int, seed: Optional[int] = None) -> List[Dict[str, Any]]:
+    def generate_problems(self, count: int, seed: Optional[int] = None, level: int = 1) -> List[Dict[str, Any]]:
+        """Generate arithmetic problems. Level parameter accepted but not yet used."""
         if seed is not None:
             random.seed(seed)
 

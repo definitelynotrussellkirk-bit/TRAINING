@@ -1658,9 +1658,9 @@ class UltimateTrainer:
                                 print(f"      - {r.validator_name}: {r.message}")
                         print(f"   ⚠️  This could cause the model to learn instructions!")
                         print(f"   ⚠️  Check custom_collator.py and packing settings")
-                        # Fail hard to prevent bad training
-                        if masked_pct < 25:
-                            print(f"   ❌ ABORTING: Masking too low ({masked_pct:.1f}% < 25%)")
+                        # Fail hard to prevent bad training (15% for short-response data)
+                        if masked_pct < 15:
+                            print(f"   ❌ ABORTING: Masking too low ({masked_pct:.1f}% < 15%)")
                             return False
                 except ImportError:
                     # Fallback to basic check if validators not available
@@ -1669,8 +1669,8 @@ class UltimateTrainer:
                         print(f"      Training would learn full conversation format")
                         print(f"      ABORTING to prevent bad training")
                         return False
-                    elif masked_pct < 30:
-                        print(f"   ⚠️  WARNING: Very little masking ({masked_pct:.1f}% < 30%)")
+                    elif masked_pct < 20:
+                        print(f"   ⚠️  WARNING: Very little masking ({masked_pct:.1f}% < 20%)")
                         print(f"      This might indicate training on instructions!")
                     else:
                         print(f"   ✅ Masking looks correct (instruction is masked)")

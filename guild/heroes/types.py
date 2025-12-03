@@ -137,16 +137,34 @@ class VRAMProfile:
     """
     VRAM usage estimates for the memory calculator.
 
-    All values calibrated at max_length=2048, bf16 precision.
+    All values calibrated at max_length=2048, bf16 precision, full fine-tuning.
 
     Attributes:
         base_memory_gb: Model weights in memory (bf16/fp16 at 2048 tokens)
         per_batch_gb: Additional memory per micro-batch sample (activations)
-        optimizer_overhead_gb: Optimizer + gradient states (AdamW-style)
+        optimizer_overhead_gb: Optimizer + gradient states (AdamW-style full FT)
     """
     base_memory_gb: float = 1.0
     per_batch_gb: float = 0.5
     optimizer_overhead_gb: float = 0.5
+
+    # Optimizer memory multipliers relative to full AdamW (optimizer_overhead_gb)
+    # These are approximate based on empirical measurements
+    OPTIMIZER_FACTORS = {
+        "adamw": 1.0,           # Full 32-bit Adam states
+        "adamw_8bit": 0.25,     # ~4x reduction from 8-bit quantization
+        "galore": 0.25,         # ~4x reduction from low-rank projection
+        "galore_8bit": 0.0625,  # ~16x reduction (GaLore + 8-bit combined)
+        "muon": 0.5,            # Momentum only (no second moment)
+    }
+
+    # Training mode factors
+    # LoRA/QLoRA train ~1-5% of params, dramatically reducing optimizer states
+    TRAINING_MODE_FACTORS = {
+        "full": {"model": 1.0, "optimizer": 1.0, "gradients": 1.0},
+        "lora": {"model": 1.0, "optimizer": 0.05, "gradients": 0.05},  # ~5% params trained
+        "qlora": {"model": 0.5, "optimizer": 0.03, "gradients": 0.03},  # 4-bit model + LoRA
+    }
 
     def estimate_breakdown(
         self,
@@ -154,27 +172,53 @@ class VRAMProfile:
         max_length: int = 2048,
         precision: str = "bf16",
         gradient_checkpointing: bool = True,
+        training_mode: str = "full",
+        optimizer_type: str = "adamw",
+        deepspeed_stage: Optional[int] = None,
     ) -> Dict[str, float]:
         """
         Estimate VRAM breakdown in GB.
 
-        Uses the documented formula from CHANGELOG:
+        Uses the documented formula from CHANGELOG with extensions for:
+        - training_mode: full, lora, qlora
+        - optimizer_type: adamw, adamw_8bit, galore, galore_8bit, muon
+        - deepspeed_stage: None, 2, or 3
 
+        Memory formula:
             activation_memory = batch_size × per_batch_gb × (max_length / 2048) × checkpoint_factor
             checkpoint_factor = 0.35 if gradient_checkpointing else 1.0
 
-        Precision scaling (approximate):
+        Precision scaling:
             - bf16 / fp16: 1.0 × baseline
             - fp32:        2.0 × baseline
+
+        Training mode scaling:
+            - full: Full model + optimizer memory
+            - lora: Full model, ~5% optimizer/gradients
+            - qlora: ~50% model (4-bit), ~3% optimizer/gradients
+
+        Optimizer scaling (relative to AdamW):
+            - adamw: 1.0x (baseline)
+            - adamw_8bit: 0.25x
+            - galore: 0.25x
+            - galore_8bit: 0.0625x (~16x reduction)
+            - muon: 0.5x
+
+        DeepSpeed ZeRO:
+            - Stage 2: Optimizer offloaded to CPU (0% GPU optimizer)
+            - Stage 3: Everything offloaded (minimal GPU, ~30% model)
 
         Args:
             batch_size: Micro-batch size
             max_length: Maximum sequence length
             precision: Floating point precision (bf16, fp16, fp32)
             gradient_checkpointing: Whether checkpointing is enabled
+            training_mode: Training mode (full, lora, qlora)
+            optimizer_type: Optimizer type (adamw, adamw_8bit, galore, galore_8bit, muon)
+            deepspeed_stage: DeepSpeed ZeRO stage (None, 2, or 3)
 
         Returns:
-            Dict with keys: model, optimizer, gradients, activations, total
+            Dict with keys: model, optimizer, gradients, activations, total, mode_info
         """
         # 1) Precision factor
         prec = (precision or "").lower()
@@ -189,9 +233,43 @@ class VRAMProfile:
         length_factor = max(max_length, 1) / 2048.0
         checkpoint_factor = 0.35 if gradient_checkpointing else 1.0
 
-        # 3) Components
-        model_mem = self.base_memory_gb * precision_factor
-        optimizer_mem = self.optimizer_overhead_gb * precision_factor
+        # 3) Training mode factors
+        mode_factors = self.TRAINING_MODE_FACTORS.get(
+            training_mode, self.TRAINING_MODE_FACTORS["full"]
+        )
+
+        # 4) Optimizer type factor
+        opt_factor = self.OPTIMIZER_FACTORS.get(optimizer_type, 1.0)
+
+        # 5) DeepSpeed factors
+        ds_model_factor = 1.0
+        ds_optimizer_factor = 1.0
+        ds_gradient_factor = 1.0
+
+        if deepspeed_stage == 2:
+            # ZeRO-2: Optimizer states offloaded to CPU
+            ds_optimizer_factor = 0.0
+        elif deepspeed_stage == 3:
+            # ZeRO-3: Everything partitioned/offloaded
+            ds_model_factor = 0.3  # Only active shard on GPU
+            ds_optimizer_factor = 0.0
+            ds_gradient_factor = 0.3
+
+        # 6) Calculate components
+        model_mem = (
+            self.base_memory_gb
+            * precision_factor
+            * mode_factors["model"]
+            * ds_model_factor
+        )
+
+        optimizer_mem = (
+            self.optimizer_overhead_gb
+            * precision_factor
+            * mode_factors["optimizer"]
+            * opt_factor
+            * ds_optimizer_factor
+        )
 
         activation_total = (
             self.per_batch_gb
@@ -201,12 +279,25 @@ class VRAMProfile:
             * precision_factor
         )
 
-        # Split activations into "gradients" vs "activations" for UI
-        # This is approximate - real split depends on model architecture
-        gradients_mem = activation_total * 0.4
+        # Gradients scale with training mode (LoRA trains fewer params)
+        gradients_mem = (
+            activation_total
+            * 0.4
+            * mode_factors["gradients"]
+            * ds_gradient_factor
+        )
         activations_mem = activation_total * 0.6
 
         total = model_mem + optimizer_mem + gradients_mem + activations_mem
+
+        # Build mode info string for UI
+        mode_info = []
+        if training_mode != "full":
+            mode_info.append(training_mode.upper())
+        if optimizer_type != "adamw":
+            mode_info.append(optimizer_type)
+        if deepspeed_stage:
+            mode_info.append(f"ZeRO-{deepspeed_stage}")
 
         return {
             "model": round(model_mem, 2),
@@ -214,6 +305,7 @@ class VRAMProfile:
             "gradients": round(gradients_mem, 2),
             "activations": round(activations_mem, 2),
             "total": round(total, 2),
+            "mode_info": " + ".join(mode_info) if mode_info else "Full FT",
         }
 
     def estimate_total(
@@ -222,18 +314,21 @@ class VRAMProfile:
         max_length: int = 2048,
         precision: str = "bf16",
         gradient_checkpointing: bool = True,
+        training_mode: str = "full",
+        optimizer_type: str = "adamw",
+        deepspeed_stage: Optional[int] = None,
     ) -> float:
         """
-        Backwards-compatible helper returning total VRAM in GB.
-
-        Older callers can continue using estimate_total(batch_size, gc)
-        if they don't care about max_length/precision.
+        Helper returning total VRAM in GB.
 
         Args:
             batch_size: Micro-batch size
             max_length: Maximum sequence length
             precision: Floating point precision (bf16, fp16, fp32)
             gradient_checkpointing: Whether checkpointing is enabled
+            training_mode: Training mode (full, lora, qlora)
+            optimizer_type: Optimizer type (adamw, adamw_8bit, galore, galore_8bit, muon)
+            deepspeed_stage: DeepSpeed ZeRO stage (None, 2, or 3)
 
         Returns:
             Estimated total VRAM in GB
@@ -243,6 +338,9 @@ class VRAMProfile:
             max_length=max_length,
             precision=precision,
             gradient_checkpointing=gradient_checkpointing,
+            training_mode=training_mode,
+            optimizer_type=optimizer_type,
+            deepspeed_stage=deepspeed_stage,
         )
         return breakdown["total"]
 
@@ -334,6 +432,9 @@ class HeroProfile:
         max_length: Optional[int] = None,
         precision: Optional[str] = None,
         gradient_checkpointing: Optional[bool] = None,
+        training_mode: Optional[str] = None,
+        optimizer_type: Optional[str] = None,
+        deepspeed_stage: Optional[int] = None,
     ) -> Dict[str, float]:
         """
         Estimate VRAM breakdown using hero's VRAM profile and training defaults.
@@ -345,9 +446,12 @@ class HeroProfile:
             max_length: Maximum sequence length (default: training_defaults.max_length)
             precision: Floating point precision (default: training_defaults.precision)
             gradient_checkpointing: Whether checkpointing is enabled (default: training_defaults)
+            training_mode: Training mode - full, lora, qlora (default: "full")
+            optimizer_type: Optimizer type - adamw, adamw_8bit, galore, galore_8bit, muon
+            deepspeed_stage: DeepSpeed ZeRO stage (None, 2, or 3)
 
         Returns:
-            Dict with keys: model, optimizer, gradients, activations, total
+            Dict with keys: model, optimizer, gradients, activations, total, mode_info
         """
         td = self.training_defaults
         return self.vram.estimate_breakdown(
@@ -358,4 +462,7 @@ class HeroProfile:
                 td.gradient_checkpointing if gradient_checkpointing is None
                 else gradient_checkpointing
             ),
+            training_mode=training_mode if training_mode is not None else "full",
+            optimizer_type=optimizer_type if optimizer_type is not None else td.optimizer,
+            deepspeed_stage=deepspeed_stage,
         )

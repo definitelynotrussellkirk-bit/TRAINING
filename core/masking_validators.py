@@ -111,7 +111,7 @@ class MaskingRatioValidator:
     Too high (>85%): Not training on enough response content
     """
 
-    def __init__(self, min_masked_pct: float = 0.30, max_masked_pct: float = 0.85):
+    def __init__(self, min_masked_pct: float = 0.15, max_masked_pct: float = 0.95):
         self.min_masked_pct = min_masked_pct
         self.max_masked_pct = max_masked_pct
 

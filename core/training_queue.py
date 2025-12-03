@@ -487,6 +487,128 @@ class TrainingQueue:
         status = self.get_queue_status()
         return status['total_queued'] + status['processing'] >= min_depth
 
+    def prune_stale_files(
+        self,
+        skill_levels: Dict[str, int],
+        dry_run: bool = False,
+    ) -> Dict[str, int]:
+        """
+        Move stale training files to deferred directory.
+
+        When curriculum advances, old-level files become stale. Training on
+        stale data (e.g., L3 problems when curriculum is at L5) wastes compute
+        and prevents the model from learning current-level content.
+
+        This method identifies files below the current training level for each
+        skill and moves them to queue/deferred_stale/ for potential later use.
+
+        Args:
+            skill_levels: Dict mapping skill name to current TRAINING level
+                          e.g., {"bin": 5, "sy": 15, "syllo": 15}
+            dry_run: If True, only count files without moving them
+
+        Returns:
+            Dict with counts: {"moved": N, "kept": M, "by_skill": {...}}
+
+        Example:
+            # Get current training levels from curriculum
+            levels = {"bin": 5, "sy": 15, "syllo": 15}
+
+            # Prune stale files
+            result = queue.prune_stale_files(levels)
+            print(f"Moved {result['moved']} stale files")
+
+        File naming convention expected:
+            train_{skill}_level{N}_*.jsonl
+            e.g., train_bin_level3_5000_20251202_103003.jsonl
+        """
+        import re
+
+        # Create deferred directory for stale files
+        deferred_dir = self.queue_dir / "deferred_stale"
+        if not dry_run:
+            deferred_dir.mkdir(parents=True, exist_ok=True)
+
+        # Normalize skill names (sy/syllo both map to sy)
+        normalized_levels = {}
+        for skill, level in skill_levels.items():
+            # Normalize syllo -> sy
+            norm_skill = "sy" if skill in ("syllo", "sy") else skill
+            # Keep the higher level if both sy and syllo provided
+            if norm_skill in normalized_levels:
+                normalized_levels[norm_skill] = max(normalized_levels[norm_skill], level)
+            else:
+                normalized_levels[norm_skill] = level
+
+        # Pattern to extract skill and level from filename
+        # Matches: train_bin_level3_... or train_syllo_level12_...
+        pattern = re.compile(r'train_(\w+)_level(\d+)_')
+
+        stats = {
+            "moved": 0,
+            "kept": 0,
+            "by_skill": {},
+            "moved_files": [],
+        }
+
+        # Check all priority queues
+        for priority_dir in [self.high_priority, self.normal_priority, self.low_priority]:
+            for file_path in list(priority_dir.glob("*.jsonl")):
+                match = pattern.match(file_path.name)
+                if not match:
+                    # File doesn't match pattern - keep it
+                    stats["kept"] += 1
+                    continue
+
+                file_skill = match.group(1)
+                file_level = int(match.group(2))
+
+                # Normalize skill name
+                norm_skill = "sy" if file_skill in ("syllo", "sy") else file_skill
+
+                # Check if this skill has a training level defined
+                if norm_skill not in normalized_levels:
+                    # Unknown skill - keep it
+                    stats["kept"] += 1
+                    continue
+
+                training_level = normalized_levels[norm_skill]
+
+                # File is stale if its level is below training level
+                if file_level < training_level:
+                    # Stale file - move to deferred
+                    if not dry_run:
+                        target = deferred_dir / file_path.name
+                        try:
+                            shutil.move(str(file_path), str(target))
+                        except Exception as e:
+                            logger.warning(f"Failed to move {file_path.name}: {e}")
+                            continue
+
+                    stats["moved"] += 1
+                    stats["moved_files"].append(file_path.name)
+
+                    # Track by skill
+                    if norm_skill not in stats["by_skill"]:
+                        stats["by_skill"][norm_skill] = {"moved": 0, "kept": 0}
+                    stats["by_skill"][norm_skill]["moved"] += 1
+
+                    logger.debug(f"{'Would move' if dry_run else 'Moved'} stale: {file_path.name} (L{file_level} < L{training_level})")
+                else:
+                    # Current level - keep it
+                    stats["kept"] += 1
+                    if norm_skill not in stats["by_skill"]:
+                        stats["by_skill"][norm_skill] = {"moved": 0, "kept": 0}
+                    stats["by_skill"][norm_skill]["kept"] += 1
+
+        if stats["moved"] > 0:
+            logger.info(f"{'Would prune' if dry_run else 'Pruned'} {stats['moved']} stale files (kept {stats['kept']})")
+            for skill, counts in stats["by_skill"].items():
+                if counts["moved"] > 0:
+                    logger.info(f"  {skill}: moved {counts['moved']}, kept {counts['kept']}")
+
+        return stats
+
     def get_next_job(
         self,
         hero_id: Optional[str] = None,

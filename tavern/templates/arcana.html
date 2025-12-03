@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcana - LISP DSL</title>
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <link rel="stylesheet" href="/static/css/game.css?v=4">
+    <style>
+        /* Arcana-specific styles */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-body), system-ui, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        /* Main Grid Layout */
+        .arcana-grid {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            grid-template-rows: auto auto 1fr;
+            gap: 1.5rem;
+            min-height: calc(100vh - 200px);
+        }
+
+        /* Section Cards */
+        .arcana-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-gold);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-body {
+            padding: 1rem;
+        }
+
+        /* World State Panel */
+        .world-state-panel {
+            grid-column: 1;
+            grid-row: 1 / 3;
+        }
+
+        .sexpr-viewer {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Syntax highlighting */
+        .sexpr-viewer .comment { color: #6a737d; font-style: italic; }
+        .sexpr-viewer .keyword { color: #ff7b72; }
+        .sexpr-viewer .symbol { color: #79c0ff; }
+        .sexpr-viewer .string { color: #a5d6ff; }
+        .sexpr-viewer .number { color: #ffa657; }
+        .sexpr-viewer .paren { color: #8b949e; }
+        .sexpr-viewer .verb { color: #7ee787; font-weight: 600; }
+        .sexpr-viewer .trend-improving { color: #3fb950; }
+        .sexpr-viewer .trend-declining { color: #f85149; }
+        .sexpr-viewer .trend-stable { color: #d29922; }
+
+        /* Skills Panel */
+        .skills-panel {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        .skill-card {
+            background: var(--bg-highlight);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .skill-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .skill-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .skill-id {
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 1.1rem;
+        }
+
+        .skill-level {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--border-gold);
+        }
+
+        .skill-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .skill-stat {
+            text-align: center;
+            padding: 0.5rem;
+            background: var(--bg-dark);
+            border-radius: 4px;
+        }
+
+        .skill-stat-value {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .skill-stat-label {
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            text-transform: uppercase;
+        }
+
+        .trend-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .trend-improving { background: rgba(63, 185, 80, 0.2); color: #3fb950; }
+        .trend-declining { background: rgba(248, 81, 73, 0.2); color: #f85149; }
+        .trend-stable { background: rgba(210, 153, 34, 0.2); color: #d29922; }
+        .trend-unknown { background: rgba(139, 148, 158, 0.2); color: #8b949e; }
+
+        /* Accuracy Bar */
+        .accuracy-bar {
+            height: 6px;
+            background: var(--bg-dark);
+            border-radius: 3px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+
+        .accuracy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-warning), var(--color-success));
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        /* REPL Panel */
+        .repl-panel {
+            grid-column: 1;
+            grid-row: 3;
+        }
+
+        .repl-input-area {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .repl-input {
+            flex: 1;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.85rem;
+            padding: 0.75rem;
+            background: #0d1117;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .repl-input:focus {
+            outline: none;
+            border-color: var(--border-gold);
+        }
+
+        .repl-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .repl-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-highlight);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .repl-btn:hover {
+            background: var(--bg-card);
+            border-color: var(--border-gold);
+        }
+
+        .repl-btn.primary {
+            background: var(--border-gold);
+            color: #000;
+            border-color: var(--border-gold);
+        }
+
+        .repl-btn.primary:hover {
+            background: #d4a520;
+        }
+
+        .repl-output {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.8rem;
+            background: #0d1117;
+            border-radius: 6px;
+            padding: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .repl-result {
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+        }
+
+        .repl-result.success {
+            background: rgba(63, 185, 80, 0.1);
+            border-left: 3px solid #3fb950;
+        }
+
+        .repl-result.error {
+            background: rgba(248, 81, 73, 0.1);
+            border-left: 3px solid #f85149;
+        }
+
+        /* Hints & Plans Panel */
+        .hints-panel {
+            grid-column: 2;
+            grid-row: 2 / 4;
+        }
+
+        .hint-item {
+            padding: 0.75rem;
+            background: var(--bg-highlight);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            border-left: 3px solid var(--color-warning);
+        }
+
+        .plan-item {
+            padding: 0.75rem;
+            background: var(--bg-highlight);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        .plan-goal {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .plan-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .plan-outcome {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .outcome-success { background: rgba(63, 185, 80, 0.2); color: #3fb950; }
+        .outcome-partial { background: rgba(210, 153, 34, 0.2); color: #d29922; }
+        .outcome-failed { background: rgba(248, 81, 73, 0.2); color: #f85149; }
+
+        /* Verb Reference */
+        .verb-category {
+            margin-bottom: 1rem;
+        }
+
+        .verb-category-title {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .verb-item {
+            padding: 0.5rem;
+            background: var(--bg-highlight);
+            border-radius: 4px;
+            margin-bottom: 0.25rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .verb-item:hover {
+            background: var(--bg-panel);
+            border-color: var(--border-gold);
+        }
+
+        .verb-syntax {
+            font-family: 'Fira Code', monospace;
+            color: #7ee787;
+            font-size: 0.75rem;
+        }
+
+        .verb-desc {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Training Status Bar */
+        .training-status-bar {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-panel);
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .status-value {
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-training { background: rgba(248, 81, 73, 0.2); color: #f85149; }
+        .status-idle { background: rgba(139, 148, 158, 0.2); color: #8b949e; }
+        .status-paused { background: rgba(210, 153, 34, 0.2); color: #d29922; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .tab {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: var(--bg-highlight);
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            background: var(--bg-highlight);
+            border-color: var(--border-gold);
+            color: var(--text-gold);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Collapsible */
+        .collapsible-header {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .collapsible-header::before {
+            content: '>';
+            font-family: monospace;
+            transition: transform 0.2s;
+        }
+
+        .collapsible-header.expanded::before {
+            transform: rotate(90deg);
+        }
+
+        .collapsible-content {
+            display: none;
+            padding-top: 0.5rem;
+        }
+
+        .collapsible-content.expanded {
+            display: block;
+        }
+
+        /* Refresh Button */
+        .refresh-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: var(--bg-highlight);
+            color: var(--text-primary);
+        }
+
+        .refresh-btn.spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Copy button */
+        .copy-btn {
+            background: var(--bg-highlight);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--border-gold);
+            color: var(--text-primary);
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Shared game header -->
+    <header class="game-header">
+        <div class="header-left">
+            <h1 class="game-title">Arcana DSL</h1>
+        </div>
+        <div class="header-center">
+            <div class="resource-bar">
+                <div class="resource steps">
+                    <span class="resource-icon">👣</span>
+                    <span class="resource-label">STEPS</span>
+                    <span class="resource-value" id="totalSteps">0</span>
+                </div>
+                <div class="resource evals">
+                    <span class="resource-icon">⚖️</span>
+                    <span class="resource-label">EVALS</span>
+                    <span class="resource-value" id="totalEvals">0</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="realm-mode-toggle" id="realmModeToggle">
+                <button class="mode-btn mode-training" id="btnTraining">TRAIN</button>
+                <button class="mode-btn mode-idle" id="btnIdle">IDLE</button>
+            </div>
+            <div class="health-indicator" id="healthIndicator">
+                <span class="health-icon" id="healthIcon"></span>
+            </div>
+            <div class="idle-indicator" id="idleIndicator">
+                <span class="idle-icon" id="modeIcon"></span>
+                <span class="idle-text" id="modeText">IDLE</span>
+            </div>
+            <div class="time-display" id="timeDisplay">--:--:--</div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Training Status Bar -->
+        <div class="training-status-bar" id="trainingStatusBar">
+            <div class="status-item">
+                <span class="status-label">Status</span>
+                <span class="status-badge status-idle" id="trainingStatus">IDLE</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Step</span>
+                <span class="status-value" id="currentStep">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Loss</span>
+                <span class="status-value" id="currentLoss">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Throughput</span>
+                <span class="status-value" id="throughput">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Model</span>
+                <span class="status-value" id="modelName">--</span>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="arcana-grid">
+            <!-- World State Panel -->
+            <div class="arcana-section world-state-panel">
+                <div class="section-header">
+                    <span class="section-title">World State (S-expressions)</span>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button class="copy-btn" onclick="copyWorldState()">Copy</button>
+                        <button class="refresh-btn" onclick="refreshWorldState()" title="Refresh">↻</button>
+                    </div>
+                </div>
+                <div class="section-body">
+                    <div class="sexpr-viewer" id="worldStateViewer">
+                        <div class="loading">Loading world state</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Skills Panel -->
+            <div class="arcana-section skills-panel">
+                <div class="section-header">
+                    <span class="section-title">Skill Progress</span>
+                    <button class="refresh-btn" onclick="refreshSkills()" title="Refresh">↻</button>
+                </div>
+                <div class="section-body" id="skillsContainer">
+                    <div class="loading">Loading skills</div>
+                </div>
+            </div>
+
+            <!-- REPL Panel -->
+            <div class="arcana-section repl-panel">
+                <div class="section-header">
+                    <span class="section-title">REPL</span>
+                    <div class="tabs">
+                        <button class="tab active" data-tab="repl">Execute</button>
+                        <button class="tab" data-tab="propose">Propose Plan</button>
+                        <button class="tab" data-tab="verbs">Verb Reference</button>
+                    </div>
+                </div>
+                <div class="section-body">
+                    <!-- REPL Tab -->
+                    <div class="tab-content active" id="tab-repl">
+                        <div class="repl-input-area">
+                            <textarea class="repl-input" id="replInput" placeholder="(status)
+(metric :name loss)
+(level-up :skill sy)"></textarea>
+                            <div class="repl-buttons">
+                                <button class="repl-btn primary" onclick="executeRepl()">Run</button>
+                                <button class="repl-btn" onclick="executeRepl(true)">Dry Run</button>
+                                <button class="repl-btn" onclick="clearRepl()">Clear</button>
+                            </div>
+                        </div>
+                        <div class="repl-output" id="replOutput">
+                            <div style="color: var(--text-muted); font-style: italic;">
+                                Output will appear here...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Propose Tab -->
+                    <div class="tab-content" id="tab-propose">
+                        <div style="margin-bottom: 1rem;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">Goal:</label>
+                            <select id="proposeGoal" style="width: 100%; padding: 0.5rem; background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); margin-top: 0.25rem;">
+                                <option value="improve_accuracy">Improve Accuracy</option>
+                                <option value="reduce_loss">Reduce Loss</option>
+                                <option value="explore_skill">Explore Skill</option>
+                                <option value="maintain">Maintain Training</option>
+                            </select>
+                        </div>
+                        <button class="repl-btn primary" onclick="proposePlan()" style="width: 100%; margin-bottom: 1rem;">Generate Prompt</button>
+                        <div class="repl-output" id="proposeOutput" style="max-height: 300px;">
+                            <div style="color: var(--text-muted); font-style: italic;">
+                                Select a goal and click "Generate Prompt" to see what would be sent to the LLM...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Verbs Tab -->
+                    <div class="tab-content" id="tab-verbs">
+                        <div id="verbsReference" style="max-height: 400px; overflow-y: auto;">
+                            <div class="loading">Loading verbs</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hints & Plans Panel -->
+            <div class="arcana-section hints-panel">
+                <div class="section-header">
+                    <span class="section-title">Hints & History</span>
+                </div>
+                <div class="section-body">
+                    <!-- Analysis Hints -->
+                    <div class="collapsible-header expanded" onclick="toggleCollapsible(this)">
+                        <span>Analysis Hints</span>
+                    </div>
+                    <div class="collapsible-content expanded" id="hintsContainer">
+                        <div class="loading">Loading hints</div>
+                    </div>
+
+                    <!-- Plan History -->
+                    <div class="collapsible-header expanded" onclick="toggleCollapsible(this)" style="margin-top: 1rem;">
+                        <span>Plan History</span>
+                    </div>
+                    <div class="collapsible-content expanded" id="plansContainer">
+                        <div class="loading">Loading plans</div>
+                    </div>
+
+                    <!-- Recent Evals -->
+                    <div class="collapsible-header" onclick="toggleCollapsible(this)" style="margin-top: 1rem;">
+                        <span>Recent Evals</span>
+                    </div>
+                    <div class="collapsible-content" id="evalsContainer">
+                        <div class="loading">Loading evals</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- NAVIGATION (dynamic) -->
+    <nav class="game-nav" id="bottomNav"></nav>
+    <script src="/static/js/nav.js"></script>
+    <script src="/static/js/events.js"></script>
+    <script src="/static/js/realm-state.js?v=1"></script>
+    <script src="/static/js/formatters.js?v=1"></script>
+
+    <script>
+        // State
+        let worldStateRaw = '';
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Collapsible sections
+        function toggleCollapsible(header) {
+            header.classList.toggle('expanded');
+            const content = header.nextElementSibling;
+            content.classList.toggle('expanded');
+        }
+
+        // Syntax highlighting for S-expressions
+        function highlightSexpr(text) {
+            return text
+                // Comments
+                .replace(/^(;.*)$/gm, '<span class="comment">$1</span>')
+                // Keywords (starting with :)
+                .replace(/:([a-zA-Z_-]+)/g, '<span class="keyword">:$1</span>')
+                // Trend values with colors
+                .replace(/:improving/g, '<span class="trend-improving">:improving</span>')
+                .replace(/:declining/g, '<span class="trend-declining">:declining</span>')
+                .replace(/:stable/g, '<span class="trend-stable">:stable</span>')
+                // Strings
+                .replace(/"([^"]*)"/g, '<span class="string">"$1"</span>')
+                // Numbers (including decimals and negatives)
+                .replace(/\b(-?\d+\.?\d*)\b/g, '<span class="number">$1</span>')
+                // Verbs (first word after opening paren)
+                .replace(/\(([a-zA-Z][a-zA-Z0-9_-]*)/g, '(<span class="verb">$1</span>')
+                // Parentheses
+                .replace(/([()])/g, '<span class="paren">$1</span>');
+        }
+
+        // Load world state
+        async function refreshWorldState() {
+            const viewer = document.getElementById('worldStateViewer');
+            const btn = event?.target;
+            if (btn) btn.classList.add('spinning');
+
+            try {
+                const res = await fetch('/api/arcana/world-state');
+                const data = await res.json();
+                worldStateRaw = data.sexpr || '';
+                viewer.innerHTML = highlightSexpr(worldStateRaw);
+            } catch (err) {
+                viewer.innerHTML = `<span class="comment">; Error loading world state: ${err.message}</span>`;
+            } finally {
+                if (btn) setTimeout(() => btn.classList.remove('spinning'), 500);
+            }
+        }
+
+        // Copy world state
+        function copyWorldState() {
+            navigator.clipboard.writeText(worldStateRaw).then(() => {
+                const btn = event.target;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy', 1500);
+            });
+        }
+
+        // Load skills
+        async function refreshSkills() {
+            const container = document.getElementById('skillsContainer');
+            try {
+                const res = await fetch('/api/arcana/skills');
+                const data = await res.json();
+
+                if (!data.skills || data.skills.length === 0) {
+                    container.innerHTML = '<div style="color: var(--text-muted);">No skill data available</div>';
+                    return;
+                }
+
+                container.innerHTML = data.skills.map(skill => `
+                    <div class="skill-card">
+                        <div class="skill-card-header">
+                            <span class="skill-id">${skill.id}</span>
+                            <span class="skill-level">L${skill.level}</span>
+                        </div>
+                        <div class="skill-stats">
+                            <div class="skill-stat">
+                                <div class="skill-stat-value">${skill.accuracy !== null ? (skill.accuracy * 100).toFixed(0) + '%' : '--'}</div>
+                                <div class="skill-stat-label">Accuracy</div>
+                            </div>
+                            <div class="skill-stat">
+                                <div class="skill-stat-value">${skill.mastered}</div>
+                                <div class="skill-stat-label">Mastered</div>
+                            </div>
+                            <div class="skill-stat">
+                                <div class="skill-stat-value">${skill.evals_at_level}</div>
+                                <div class="skill-stat-label">Evals</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                            <span class="trend-badge trend-${skill.trend}">${skill.trend}</span>
+                            <span style="font-size: 0.7rem; color: var(--text-muted);">Max: L${skill.max_level}</span>
+                        </div>
+                        ${skill.accuracy !== null ? `
+                        <div class="accuracy-bar">
+                            <div class="accuracy-fill" style="width: ${skill.accuracy * 100}%"></div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = `<div style="color: var(--color-danger);">Error: ${err.message}</div>`;
+            }
+        }
+
+        // Load hints
+        async function loadHints() {
+            const container = document.getElementById('hintsContainer');
+            try {
+                const res = await fetch('/api/arcana/hints');
+                const data = await res.json();
+
+                if (!data.hints || data.hints.length === 0) {
+                    container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem;">No analysis hints available</div>';
+                    return;
+                }
+
+                container.innerHTML = data.hints.map(hint => `
+                    <div class="hint-item">${hint}</div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = `<div style="color: var(--color-danger);">Error: ${err.message}</div>`;
+            }
+        }
+
+        // Load plan history
+        async function loadPlans() {
+            const container = document.getElementById('plansContainer');
+            try {
+                const res = await fetch('/api/arcana/plans');
+                const data = await res.json();
+
+                if (!data.plans || data.plans.length === 0) {
+                    container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem;">No plan history yet</div>';
+                    return;
+                }
+
+                container.innerHTML = data.plans.map(plan => `
+                    <div class="plan-item">
+                        <div class="plan-goal">${plan.goal}</div>
+                        <div class="plan-meta">
+                            <span class="plan-outcome outcome-${plan.outcome}">${plan.outcome}</span>
+                            <span>${plan.forms_count} forms</span>
+                            ${plan.accuracy_delta !== null ? `<span>${plan.accuracy_delta > 0 ? '+' : ''}${(plan.accuracy_delta * 100).toFixed(1)}% acc</span>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = `<div style="color: var(--color-danger);">Error: ${err.message}</div>`;
+            }
+        }
+
+        // Load evals
+        async function loadEvals() {
+            const container = document.getElementById('evalsContainer');
+            try {
+                const res = await fetch('/api/arcana/evals');
+                const data = await res.json();
+
+                if (!data.evals || data.evals.length === 0) {
+                    container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem;">No recent evals</div>';
+                    return;
+                }
+
+                container.innerHTML = data.evals.slice(-10).reverse().map(ev => `
+                    <div style="display: flex; justify-content: space-between; padding: 0.5rem; background: var(--bg-highlight); border-radius: 4px; margin-bottom: 0.25rem; font-size: 0.8rem;">
+                        <span><strong>${ev.skill.toUpperCase()}</strong> L${ev.level}</span>
+                        <span style="color: ${ev.accuracy >= 0.8 ? 'var(--color-success)' : ev.accuracy >= 0.5 ? 'var(--color-warning)' : 'var(--color-danger)'};">${(ev.accuracy * 100).toFixed(0)}%</span>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = `<div style="color: var(--color-danger);">Error: ${err.message}</div>`;
+            }
+        }
+
+        // Load verbs reference
+        async function loadVerbs() {
+            const container = document.getElementById('verbsReference');
+            try {
+                const res = await fetch('/api/arcana/verbs');
+                const data = await res.json();
+
+                const categories = {
+                    training: 'Training Control',
+                    curriculum: 'Curriculum',
+                    queries: 'Queries',
+                    control_flow: 'Control Flow',
+                    comparisons: 'Comparisons'
+                };
+
+                container.innerHTML = Object.entries(data.verbs).map(([cat, verbs]) => `
+                    <div class="verb-category">
+                        <div class="verb-category-title">${categories[cat] || cat}</div>
+                        ${verbs.map(v => `
+                            <div class="verb-item" onclick="insertVerb('${v.syntax}')">
+                                <div class="verb-syntax">${v.syntax}</div>
+                                <div class="verb-desc">${v.desc}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = `<div style="color: var(--color-danger);">Error: ${err.message}</div>`;
+            }
+        }
+
+        // Insert verb into REPL
+        function insertVerb(syntax) {
+            const input = document.getElementById('replInput');
+            input.value = input.value ? input.value + '\n' + syntax : syntax;
+            input.focus();
+            // Switch to REPL tab
+            document.querySelector('[data-tab="repl"]').click();
+        }
+
+        // Execute REPL
+        async function executeRepl(dryRun = false) {
+            const input = document.getElementById('replInput');
+            const output = document.getElementById('replOutput');
+            const code = input.value.trim();
+
+            if (!code) {
+                output.innerHTML = '<div style="color: var(--text-muted);">Enter some code to execute</div>';
+                return;
+            }
+
+            output.innerHTML = '<div class="loading">Executing</div>';
+
+            try {
+                const res = await fetch('/api/arcana/repl', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, dry_run: dryRun })
+                });
+                const data = await res.json();
+
+                let html = '';
+
+                if (data.results) {
+                    data.results.forEach(r => {
+                        html += `<div class="repl-result success">
+                            <div style="color: var(--text-muted); font-size: 0.7rem;">➜ ${r.form}</div>
+                            <div>${formatResult(r.result)}</div>
+                        </div>`;
+                    });
+                }
+
+                if (data.errors && data.errors.length > 0) {
+                    data.errors.forEach(e => {
+                        html += `<div class="repl-result error">
+                            <div style="color: var(--text-muted); font-size: 0.7rem;">✗ ${e.form}</div>
+                            <div>${e.error}</div>
+                        </div>`;
+                    });
+                }
+
+                output.innerHTML = html || '<div style="color: var(--text-muted);">No output</div>';
+
+                // Refresh world state after execution
+                if (!dryRun) {
+                    setTimeout(refreshWorldState, 500);
+                }
+            } catch (err) {
+                output.innerHTML = `<div class="repl-result error">Error: ${err.message}</div>`;
+            }
+        }
+
+        function formatResult(result) {
+            if (result === null || result === undefined) return '<span style="color: var(--text-muted);">nil</span>';
+            if (typeof result === 'object') {
+                return '<pre style="margin: 0; font-size: 0.75rem;">' + JSON.stringify(result, null, 2) + '</pre>';
+            }
+            return String(result);
+        }
+
+        function clearRepl() {
+            document.getElementById('replInput').value = '';
+            document.getElementById('replOutput').innerHTML = '<div style="color: var(--text-muted); font-style: italic;">Output will appear here...</div>';
+        }
+
+        // Propose plan
+        async function proposePlan() {
+            const goal = document.getElementById('proposeGoal').value;
+            const output = document.getElementById('proposeOutput');
+
+            output.innerHTML = '<div class="loading">Generating prompt</div>';
+
+            try {
+                const res = await fetch('/api/arcana/propose', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal })
+                });
+                const data = await res.json();
+
+                output.innerHTML = `
+                    <div style="margin-bottom: 1rem;">
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">System Prompt (truncated)</div>
+                        <div style="background: var(--bg-dark); padding: 0.5rem; border-radius: 4px; font-size: 0.75rem; max-height: 100px; overflow-y: auto;">
+                            ${data.system_prompt?.substring(0, 500)}...
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">User Prompt</div>
+                        <div style="background: var(--bg-dark); padding: 0.5rem; border-radius: 4px; font-size: 0.75rem; white-space: pre-wrap;">
+${highlightSexpr(data.user_prompt || '')}
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                output.innerHTML = `<div style="color: var(--color-danger);">Error: ${err.message}</div>`;
+            }
+        }
+
+        // Load training status
+        async function loadTrainingStatus() {
+            try {
+                const res = await fetch('/api/arcana/training');
+                const data = await res.json();
+
+                const statusEl = document.getElementById('trainingStatus');
+                statusEl.textContent = (data.status || 'unknown').toUpperCase();
+                statusEl.className = 'status-badge status-' + (data.status || 'idle');
+
+                document.getElementById('currentStep').textContent =
+                    data.step ? `${data.step.toLocaleString()} / ${data.total_steps?.toLocaleString() || '?'}` : '--';
+                document.getElementById('currentLoss').textContent =
+                    data.loss !== null && data.loss !== undefined ? data.loss.toFixed(4) : '--';
+                document.getElementById('throughput').textContent =
+                    data.throughput ? `${data.throughput.toFixed(0)} tok/s` : '--';
+                document.getElementById('modelName').textContent = data.model || '--';
+            } catch (err) {
+                console.error('Failed to load training status:', err);
+            }
+        }
+
+        // Initial load
+        async function init() {
+            await Promise.all([
+                refreshWorldState(),
+                refreshSkills(),
+                loadHints(),
+                loadPlans(),
+                loadEvals(),
+                loadVerbs(),
+                loadTrainingStatus()
+            ]);
+        }
+
+        init();
+
+        // Refresh every 10 seconds
+        setInterval(() => {
+            refreshWorldState();
+            refreshSkills();
+            loadHints();
+            loadTrainingStatus();
+        }, 10000);
+    </script>
+</body>
+</html>

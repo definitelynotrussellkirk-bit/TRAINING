@@ -1,11 +1,11 @@
 {
-  "model_name": "qwen3_0.6b",
-  "model_display_name": "PURE BASE - Qwen3-0.6B (2025-11-22)",
-  "model_path": "models/Qwen3-0.6B",
+  "model_name": "qwen3_4b",
+  "model_display_name": "🐕 GOU - Qwen3-4B (狗)",
+  "model_path": "models/Qwen3-4B-Instruct-2507",
   "current_model_dir": "models/current_model",
   "batch_size": 1,
-  "gradient_accumulation": 16,
-  "learning_rate": 0.0004,
+  "gradient_accumulation": 8,
+  "learning_rate": 0.0001,
   "warmup_steps": 100,
   "epochs": 1,
   "load_in_4bit": false,
@@ -16,7 +16,7 @@
   "poll_interval": 30,
   "snapshot_time": "03:00",
   "max_length": 2048,
-  "base_model": "models/Qwen3-0.6B",
+  "base_model": "models/Qwen3-4B-Instruct-2507",
   "eval_max_tokens": 4096,
   "eval_timeout_seconds": 120,
   "self_correction": {
@@ -32,7 +32,7 @@
   "auto_generate": {
     "enabled": true,
     "_comment": "Quest Master maintains at least min_queue_depth items on Quest Board",
-    "count": 5000,
+    "count": 10000,
     "priority": "normal",
     "threshold": 0,
     "cooldown_sec": 180,
@@ -72,17 +72,21 @@
   },
   "hyperparams": {
     "fp_precision": "bf16",
-    "max_length": 2048,
+    "max_length": 384,
     "batch_size": 1,
-    "gradient_accumulation": 16,
-    "learning_rate": 0.0004,
+    "gradient_accumulation": 8,
+    "learning_rate": 0.0001,
     "use_gradient_checkpointing": true
   },
+  "environment": {
+    "deepspeed_config": null
+  },
+  "training_mode": "full",
   "optimizer": {
-    "type": "adamw",
-    "_comment": "Options: 'adamw' (default) or 'muon' (orthogonalized momentum)",
+    "type": "galore_8bit",
+    "_comment": "Options: 'adamw', 'adamw_8bit', 'galore', 'galore_8bit', 'muon'",
     "adamw": {
-      "lr": 0.0004,
+      "lr": 0.0001,
       "betas": [
         0.9,
         0.999
@@ -100,7 +104,19 @@
         0.95
       ],
       "aux_eps": 1e-10
+    },
+    "galore": {
+      "rank": 128,
+      "update_proj_gap": 200,
+      "scale": 0.25,
+      "proj_type": "std"
     }
+  },
+  "lora": {
+    "r": 16,
+    "alpha": 32,
+    "dropout": 0.05,
+    "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
   },
   "performance_baselines": {
     "_comment": "POLICY 2: Expected performance metrics. Alert if degraded >50%.",
@@ -120,7 +136,7 @@
     "alert_threshold_seconds": 60
   },
   "locked": {
-    "base_model": "Qwen/Qwen3-0.6B",
+    "base_model": "Qwen/Qwen3-4B",
     "model_architecture": "Qwen3ForCausalLM",
     "max_context_length": 4096,
     "vocab_size": 151936

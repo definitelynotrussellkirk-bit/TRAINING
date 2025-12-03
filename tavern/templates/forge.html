@@ -3,46 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Forge | Realm of Training</title>
-    <link rel="stylesheet" href="/static/css/common.css">
+    <title>Forge | Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <link rel="stylesheet" href="/static/css/game.css?v=8">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        body {
-            background: #1a1a2e;
-            color: #e0e0e0;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            margin: 0;
+        .forge-page {
+            max-width: 1400px;
+            margin: 0 auto;
             padding: 20px;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid #333;
-        }
-
-        h1 {
-            margin: 0;
-            color: #ffd700;
-            font-size: 1.8rem;
-        }
-
-        .nav-links a {
-            color: #888;
-            text-decoration: none;
-            margin-left: 16px;
-            transition: color 0.2s;
-        }
-
-        .nav-links a:hover {
-            color: #ffd700;
+        body {
+            padding-bottom: 80px;
         }
 
         /* Stats cards */
@@ -54,7 +27,8 @@
         }
 
         .stat-card {
-            background: #252538;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 16px;
             text-align: center;
@@ -63,7 +37,7 @@
         .stat-value {
             font-size: 1.8rem;
             font-weight: bold;
-            color: #ffd700;
+            color: var(--color-gold);
         }
 
         .stat-value.success { color: #4CAF50; }
@@ -71,14 +45,15 @@
         .stat-value.danger { color: #f44336; }
 
         .stat-label {
-            color: #888;
+            color: var(--text-muted);
             font-size: 0.85rem;
             margin-top: 4px;
         }
 
         /* Sections */
         .section {
-            background: #252538;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 24px;
@@ -86,19 +61,21 @@
 
         .section h2 {
             margin: 0 0 16px 0;
-            color: #ffd700;
+            color: var(--color-gold);
             font-size: 1.2rem;
+            font-family: var(--font-title);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .section h2 .badge {
-            background: #333;
+            background: var(--bg-panel);
             padding: 4px 10px;
             border-radius: 12px;
             font-size: 0.8rem;
-            color: #888;
+            color: var(--text-muted);
+            font-family: var(--font-body);
         }
 
         /* Two column layout */
@@ -124,18 +101,18 @@
         .data-table td {
             text-align: left;
             padding: 10px 12px;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .data-table th {
-            color: #888;
+            color: var(--text-muted);
             font-weight: 500;
             font-size: 0.8rem;
             text-transform: uppercase;
         }
 
         .data-table tr:hover {
-            background: #1a1a2e;
+            background: var(--bg-panel);
         }
 
         /* Status badges */
@@ -147,11 +124,11 @@
             font-weight: 500;
         }
 
-        .status-badge.ready { background: #4CAF50; color: white; }
-        .status-badge.rejected { background: #f44336; color: white; }
-        .status-badge.pending { background: #ff9800; color: white; }
-        .status-badge.skill { background: #2196F3; color: white; }
-        .status-badge.leakage { background: #9c27b0; color: white; }
+        .status-badge.ready { background: #1b5e20; color: #a5d6a7; }
+        .status-badge.rejected { background: #b71c1c; color: #ef9a9a; }
+        .status-badge.pending { background: #e65100; color: #ffcc80; }
+        .status-badge.skill { background: #1565c0; color: #90caf9; }
+        .status-badge.leakage { background: #6a1b9a; color: #ce93d8; }
 
         /* Contract cards */
         .contract-grid {
@@ -161,21 +138,21 @@
         }
 
         .contract-card {
-            background: #1a1a2e;
+            background: var(--bg-panel);
             border-radius: 8px;
             padding: 16px;
-            border-left: 3px solid #ffd700;
+            border-left: 3px solid var(--color-gold);
         }
 
         .contract-card .title {
             font-weight: bold;
-            color: #ffd700;
+            color: var(--color-gold);
             margin-bottom: 8px;
         }
 
         .contract-card .description {
             font-size: 0.85rem;
-            color: #888;
+            color: var(--text-muted);
             margin-bottom: 12px;
             line-height: 1.4;
         }
@@ -196,14 +173,14 @@
         .queue-bar {
             flex: 1;
             min-width: 120px;
-            background: #1a1a2e;
+            background: var(--bg-panel);
             border-radius: 6px;
             padding: 12px;
         }
 
         .queue-bar-label {
             font-size: 0.8rem;
-            color: #888;
+            color: var(--text-muted);
             margin-bottom: 4px;
         }
 
@@ -214,14 +191,14 @@
 
         .queue-bar.high .queue-bar-value { color: #f44336; }
         .queue-bar.normal .queue-bar-value { color: #4CAF50; }
-        .queue-bar.low .queue-bar-value { color: #888; }
+        .queue-bar.low .queue-bar-value { color: var(--text-muted); }
         .queue-bar.processing .queue-bar-value { color: #2196F3; }
 
         /* Empty state */
         .empty-state {
             text-align: center;
             padding: 30px;
-            color: #666;
+            color: var(--text-muted);
         }
 
         .empty-state small {
@@ -230,48 +207,92 @@
             font-size: 0.8rem;
         }
 
-        /* Refresh button */
-        .refresh-btn {
-            background: transparent;
-            border: 1px solid #555;
-            color: #888;
-            padding: 6px 14px;
+        /* Buttons */
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s;
-            font-size: 0.85rem;
         }
 
-        .refresh-btn:hover {
-            border-color: #ffd700;
-            color: #ffd700;
+        .btn-sm:hover {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: rgba(255, 215, 0, 0.4);
+        }
+
+        .header-right {
+            display: flex;
+            gap: 8px;
+            align-items: center;
         }
 
         /* Loading */
         .loading {
             text-align: center;
             padding: 40px;
-            color: #888;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--color-gold);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Data Forge</h1>
-            <div class="nav-links">
-                <a href="/">Tavern</a>
-                <a href="/jobs">Jobs</a>
-                <a href="/quests">Quests</a>
-                <a href="/vault">Vault</a>
-                <a href="/settings">Settings</a>
+    <!-- TITLE BAR -->
+    <header class="game-header">
+        <div class="header-left">
+            <h1 class="game-title">🔥 Forge</h1>
+        </div>
+        <div class="header-center">
+            <div class="resource-bar">
+                <div class="resource">
+                    <span class="resource-icon">📦</span>
+                    <span class="resource-label">QUEUE</span>
+                    <span class="resource-value" id="queueTotal">0</span>
+                </div>
+                <div class="resource">
+                    <span class="resource-icon">✅</span>
+                    <span class="resource-label">READY</span>
+                    <span class="resource-value" id="readyTotal">0</span>
+                </div>
+                <div class="resource">
+                    <span class="resource-icon">❌</span>
+                    <span class="resource-label">REJECTED</span>
+                    <span class="resource-value" id="rejectedTotal">0</span>
+                </div>
             </div>
-        </header>
+        </div>
+        <div class="header-right">
+            <button class="btn-sm" onclick="loadForgeStatus()" title="Refresh status">🔄</button>
+        </div>
+    </header>
 
+    <div class="forge-page">
         <div id="app">
-            <div class="loading">Loading forge status...</div>
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading forge status...</p>
+            </div>
         </div>
     </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="game-nav" id="bottomNav"></nav>
+    <script src="/static/js/nav.js"></script>
 
     <script>
         const app = document.getElementById('app');
@@ -304,40 +325,18 @@
             const rejectedCount = rejected.count || 0;
             const totalReady = datasets.reduce((sum, d) => sum + (d.ready || 0), 0);
 
-            app.innerHTML = `
-                <!-- Stats Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value success">${totalQueue}</div>
-                        <div class="stat-label">Queue Total</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${contracts.length}</div>
-                        <div class="stat-label">Contracts</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value success">${totalReady}</div>
-                        <div class="stat-label">Ready Shards</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value ${rejectedCount > 0 ? 'danger' : ''}">${rejectedCount}</div>
-                        <div class="stat-label">Rejected</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${evalBanks.length}</div>
-                        <div class="stat-label">Eval Banks</div>
-                    </div>
-                    <div class="stat-card">
-                        <button class="refresh-btn" onclick="loadForgeStatus()">Refresh</button>
-                    </div>
-                </div>
+            // Update header stats
+            document.getElementById('queueTotal').textContent = totalQueue;
+            document.getElementById('readyTotal').textContent = totalReady;
+            document.getElementById('rejectedTotal').textContent = rejectedCount;
 
+            app.innerHTML = `
                 <!-- Queue Status -->
                 <div class="section">
                     <h2>Queue Status</h2>
                     <div class="queue-bars">
                         <div class="queue-bar high">
-                            <div class="queue-bar-label">High</div>
+                            <div class="queue-bar-label">High Priority</div>
                             <div class="queue-bar-value">${queue.high || 0}</div>
                         </div>
                         <div class="queue-bar normal">
@@ -345,7 +344,7 @@
                             <div class="queue-bar-value">${queue.normal || 0}</div>
                         </div>
                         <div class="queue-bar low">
-                            <div class="queue-bar-label">Low</div>
+                            <div class="queue-bar-label">Low Priority</div>
                             <div class="queue-bar-value">${queue.low || 0}</div>
                         </div>
                         <div class="queue-bar processing">

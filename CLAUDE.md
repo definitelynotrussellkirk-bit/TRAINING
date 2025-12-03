@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-12-02 (RealmState SSE & Ledger Cleanup)
+**Last Updated:** 2025-12-03 (Training Modes: DeepSpeed, GaLore, LoRA/QLoRA)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 **Philosophy:** This repo is the method, not the results (see META section)
 
@@ -87,6 +87,23 @@ python3 -m training stop-all
 |------|---------|-------------|
 | **DIO Training** | `./scripts/start_all.sh` | Full daemon system - Tavern, VaultKeeper, queue |
 | **4B Experiments** | `python3 scripts/train_4b_full.py` | Standalone script - no daemon needed |
+
+### Memory Optimization Options
+
+For training 4B models on 24GB VRAM, configure in `config.json`:
+
+| Option | GPU Memory | Config |
+|--------|------------|--------|
+| **DeepSpeed ZeRO-3** | ~8-12GB | `environment.deepspeed_config: "configs/ds_zero3_offload.json"` |
+| **DeepSpeed ZeRO-2** | ~17GB | `environment.deepspeed_config: "configs/ds_zero2_offload.json"` |
+| **GaLore 8-bit** | ~17GB | `optimizer.type: "galore_8bit"` |
+| **8-bit Adam** | ~22GB | `optimizer.type: "adamw_8bit"` |
+| **QLoRA** | ~6GB | `training_mode: "qlora"`, `load_in_4bit: true` |
+| **LoRA** | ~12GB | `training_mode: "lora"` |
+
+**Optimizer Types:** `adamw`, `adamw_8bit`, `galore`, `galore_8bit`, `muon`
+
+**Training Modes:** `full` (all params), `lora` (adapters), `qlora` (4-bit + adapters)
 
 ---
 

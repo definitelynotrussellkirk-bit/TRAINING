@@ -43,6 +43,10 @@ import os
 import logging
 import gc
 
+# Configure CUDA memory allocator BEFORE importing torch
+# This prevents OOM from memory fragmentation by using expandable segments
+os.environ.setdefault('PYTORCH_ALLOC_CONF', 'expandable_segments:True')
+
 # Set up module logger
 logger = logging.getLogger(__name__)
 
@@ -124,6 +128,17 @@ try:
 except ImportError:
     LAYER_MONITOR_AVAILABLE = False
     LayerMonitor = None
+
+# Optional: PEFT for LoRA/QLoRA
+try:
+    from peft import LoraConfig, get_peft_model, TaskType, prepare_model_for_kbit_training
+    PEFT_AVAILABLE = True
+except ImportError:
+    PEFT_AVAILABLE = False
+    LoraConfig = None
+    get_peft_model = None
+    TaskType = None
+    prepare_model_for_kbit_training = None
 
 
 @dataclass
@@ -303,7 +318,16 @@ class TrainerEngine:
             # 3. Load model & tokenizer (enhanced)
             self._log("Step 3: Loading model and tokenizer")
             self.model, self.tokenizer = self._load_model_and_tokenizer(config)
-            self._log("   Model and tokenizer loaded\n")
+            self._log("   Model and tokenizer loaded")
+
+            # 3.5. Apply LoRA if training_mode is lora or qlora
+            training_mode = getattr(config, 'training_mode', 'full')
+            if training_mode in ('lora', 'qlora'):
+                self._log(f"   Applying {training_mode.upper()} adapters...")
+                is_quantized = (training_mode == 'qlora') or config.model.load_in_4bit
+                self.model = self._apply_lora(self.model, config, is_quantized=is_quantized)
+                self._log(f"   {training_mode.upper()} adapters applied")
+            self._log("")
 
             # 4. Prepare datasets (with packing)
             self._log("Step 4: Preparing datasets")
@@ -650,6 +674,74 @@ class TrainerEngine:
             self._log("   Gradient checkpointing disabled")
 
         return model, tokenizer
+
+    def _apply_lora(
+        self,
+        model: torch.nn.Module,
+        config: TrainerConfig,
+        is_quantized: bool = False
+    ) -> torch.nn.Module:
+        """
+        Apply LoRA adapters to the model.
+
+        Args:
+            model: The base model
+            config: TrainerConfig with LoRA settings
+            is_quantized: Whether model is 4-bit quantized (for QLoRA)
+
+        Returns:
+            Model with LoRA adapters
+        """
+        if not PEFT_AVAILABLE:
+            raise ImportError(
+                "peft is required for LoRA training. "
+                "Install with: pip install peft"
+            )
+
+        # Get LoRA config from config or use defaults
+        lora_config = getattr(config, 'lora', None) or {}
+
+        lora_r = lora_config.get('r', 16)
+        lora_alpha = lora_config.get('alpha', 32)
+        lora_dropout = lora_config.get('dropout', 0.05)
+        target_modules = lora_config.get('target_modules', [
+            "q_proj", "k_proj", "v_proj", "o_proj",
+            "gate_proj", "up_proj", "down_proj"
+        ])
+
+        self._log(f"   Applying LoRA: r={lora_r}, alpha={lora_alpha}, dropout={lora_dropout}")
+        self._log(f"   Target modules: {target_modules}")
+
+        # Prepare model for k-bit training if quantized
+        if is_quantized:
+            model = prepare_model_for_kbit_training(
+                model,
+                use_gradient_checkpointing=True
+            )
+            self._log("   Prepared model for k-bit training")
+
+        # Create LoRA config
+        peft_config = LoraConfig(
+            task_type=TaskType.CAUSAL_LM,
+            r=lora_r,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=target_modules,
+            bias="none",
+        )
+
+        # Apply LoRA
+        model = get_peft_model(model, peft_config)
+
+        # Log trainable parameters
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        total_params = sum(p.numel() for p in model.parameters())
+        self._log(
+            f"   LoRA applied: {trainable_params/1e6:.2f}M trainable / "
+            f"{total_params/1e6:.2f}M total ({100*trainable_params/total_params:.2f}%)"
+        )
+
+        return model
 
     # ========================================================================
     # Dataset Preparation (Enhanced with Packing)
@@ -1086,6 +1178,51 @@ class TrainerEngine:
         opt_config = config_dict.get("optimizer", {})
         optimizer_type = opt_config.get("type", "adamw") if isinstance(opt_config, dict) else "adamw"
 
+        # Handle 8-bit Adam (saves ~8GB VRAM for 4B models)
+        if optimizer_type == "adamw_8bit":
+            self._log("\n" + "=" * 60)
+            self._log("8-BIT ADAM OPTIMIZER - Memory Efficient")
+            self._log("=" * 60)
+
+            optimizer, scheduler, opt_info = create_custom_optimizer(
+                self.model,
+                config_dict,
+                optimizer_type="adamw_8bit",
+                num_training_steps=num_training_steps,
+                num_warmup_steps=num_warmup_steps,
+            )
+
+            self._log(f"  Learning rate: {opt_info.learning_rate}")
+            self._log(f"  Trainable params: {opt_info.trainable_params:,}")
+            self._log(f"  Saves ~8GB VRAM vs regular AdamW")
+            self._log("=" * 60 + "\n")
+
+            return optimizer, scheduler
+
+        # Handle GaLore (low-rank gradient projection - full fine-tune with less memory)
+        if optimizer_type in ("galore", "galore_8bit"):
+            self._log("\n" + "=" * 60)
+            self._log(f"GALORE OPTIMIZER - Low-Rank Gradient Projection")
+            self._log("=" * 60)
+
+            optimizer, scheduler, opt_info = create_custom_optimizer(
+                self.model,
+                config_dict,
+                optimizer_type=optimizer_type,
+                num_training_steps=num_training_steps,
+                num_warmup_steps=num_warmup_steps,
+            )
+
+            self._log(f"  Learning rate: {opt_info.learning_rate}")
+            self._log(f"  Projection rank: {opt_info.galore_rank}")
+            self._log(f"  Trainable params: {opt_info.trainable_params:,}")
+            is_8bit = "8bit" in optimizer_type
+            self._log(f"  Mode: {'8-bit quantized' if is_8bit else 'full precision'}")
+            self._log(f"  Saves ~{'8x' if is_8bit else '4x'} optimizer memory vs AdamW")
+            self._log("=" * 60 + "\n")
+
+            return optimizer, scheduler
+
         if optimizer_type != "muon":
             return None, None
 
@@ -1155,11 +1292,20 @@ class TrainerEngine:
         trained_pct = 100 * trained_count / total_count
 
         # Validate masking looks reasonable
-        if masked_pct < 25:
+        # Note: 15% threshold accommodates short-response data (binary arithmetic, etc.)
+        if masked_pct < 15:
             raise ValueError(
-                f"Masking too low ({masked_pct:.1f}% < 25%). "
+                f"Masking too low ({masked_pct:.1f}% < 15%). "
                 "This may indicate training on instructions. "
                 "Check collator configuration."
+            )
+
+        # Check for too much masking (not training on enough content)
+        if masked_pct > 95:
+            raise ValueError(
+                f"Masking too high ({masked_pct:.1f}% > 95%). "
+                "Not training on enough response content. "
+                "Check data format - responses may be empty or very short."
             )
 
         return {
@@ -1205,7 +1351,8 @@ class TrainerEngine:
         use_fp16 = config.hyperparams.fp_precision == "fp16"
         use_bf16 = config.hyperparams.fp_precision == "bf16"
 
-        return TrainingArguments(
+        # Build base args
+        args_kwargs = dict(
             output_dir=config.output.output_dir,
             max_steps=max_steps,
             per_device_train_batch_size=config.hyperparams.batch_size,
@@ -1232,6 +1379,18 @@ class TrainerEngine:
             save_safetensors=config.output.save_safetensors,
             max_grad_norm=config.environment.max_grad_norm,
         )
+
+        # Add DeepSpeed config if specified (enables CPU offloading for large models)
+        if config.environment.deepspeed_config:
+            from pathlib import Path
+            ds_path = Path(config.environment.deepspeed_config)
+            if ds_path.exists():
+                args_kwargs["deepspeed"] = str(ds_path)
+                logger.info(f"🚀 DeepSpeed enabled: {ds_path}")
+            else:
+                logger.warning(f"⚠️  DeepSpeed config not found: {ds_path}")
+
+        return TrainingArguments(**args_kwargs)
 
 
 __all__ = ["TrainerEngine", "TrainingResult", "DryRunResult", "MonitorContext"]

@@ -231,6 +231,9 @@ class EnvironmentConfig:
     local_rank: int = -1
     world_size: int = 1
 
+    # DeepSpeed - CPU offloading for large models
+    deepspeed_config: Optional[str] = None  # Path to DeepSpeed JSON config (e.g., "configs/ds_zero2_offload.json")
+
     # Logging
     report_to: List[str] = field(default_factory=lambda: ["none"])
     logging_steps: int = 10
@@ -238,6 +241,55 @@ class EnvironmentConfig:
     # Safety
     max_grad_norm: float = 1.0
     nan_detection: bool = True
+
+
+@dataclass
+class LoRAConfig:
+    """
+    LoRA (Low-Rank Adaptation) configuration.
+
+    Used for parameter-efficient fine-tuning when training_mode is 'lora' or 'qlora'.
+    """
+
+    # LoRA rank (r) - higher = more parameters but better quality
+    r: int = 16
+
+    # LoRA alpha - typically set to 2*r for good results
+    alpha: int = 32
+
+    # Dropout for LoRA layers
+    dropout: float = 0.05
+
+    # Target modules for LoRA (Qwen/Llama style by default)
+    target_modules: List[str] = field(default_factory=lambda: [
+        "q_proj", "k_proj", "v_proj", "o_proj",
+        "gate_proj", "up_proj", "down_proj"
+    ])
+
+    # Bias mode: "none", "all", or "lora_only"
+    bias: str = "none"
+
+
+@dataclass
+class GaLoreConfig:
+    """
+    GaLore (Gradient Low-Rank Projection) configuration.
+
+    Reduces optimizer memory by projecting gradients to lower rank.
+    Used when optimizer type is 'galore' or 'galore_8bit'.
+    """
+
+    # Projection rank (lower = less memory, higher = better quality)
+    rank: int = 128
+
+    # Steps between projection updates (higher = faster but less accurate)
+    update_proj_gap: int = 200
+
+    # Gradient scaling factor
+    scale: float = 0.25
+
+    # Projection type: "std", "reverse_std", "right", "left"
+    proj_type: str = "std"
 
 
 @dataclass
@@ -285,6 +337,18 @@ class TrainerConfig:
     environment: EnvironmentConfig
     fortune_teller: FortuneTellerConfig = field(default_factory=FortuneTellerConfig)
 
+    # Training mode: determines how the model is trained
+    # - "full": Full fine-tuning (all parameters)
+    # - "lora": LoRA adapters (parameter-efficient)
+    # - "qlora": QLoRA (4-bit quantization + LoRA)
+    training_mode: Literal["full", "lora", "qlora"] = "full"
+
+    # LoRA configuration (used when training_mode is "lora" or "qlora")
+    lora: LoRAConfig = field(default_factory=LoRAConfig)
+
+    # GaLore configuration (used when optimizer type is "galore" or "galore_8bit")
+    galore: GaLoreConfig = field(default_factory=GaLoreConfig)
+
     # Metadata
     config_version: str = "2.0"
     description: str = ""
@@ -321,6 +385,8 @@ class TrainerConfig:
         output = OutputConfig(**data.get('output', {}))
         environment = EnvironmentConfig(**data.get('environment', {}))
         fortune_teller = FortuneTellerConfig(**data.get('fortune_teller', {}))
+        lora = LoRAConfig(**data.get('lora', {}))
+        galore = GaLoreConfig(**data.get('galore', {}))
 
         return cls(
             hyperparams=hyperparams,
@@ -332,6 +398,9 @@ class TrainerConfig:
             output=output,
             environment=environment,
             fortune_teller=fortune_teller,
+            training_mode=data.get('training_mode', 'full'),
+            lora=lora,
+            galore=galore,
             config_version=data.get('config_version', '2.0'),
             description=data.get('description', '')
         )

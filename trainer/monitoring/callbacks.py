@@ -578,12 +578,14 @@ class LiveMonitorCallback(TrainerCallback):
                 # Battle Log - checkpoint saved event
                 try:
                     from core.battle_log import log_training
+                    from core.hero import get_hero_name
+                    hero_name = get_hero_name()
                     loss_str = f" (loss: {train_loss:.4f})" if train_loss else ""
                     log_training(
                         f"Checkpoint {state.global_step:,} saved{loss_str}",
                         severity="success",
                         source="training.callback",
-                        hero_id="DIO",
+                        hero_id=hero_name,
                         details={
                             "step": state.global_step,
                             "loss": train_loss,

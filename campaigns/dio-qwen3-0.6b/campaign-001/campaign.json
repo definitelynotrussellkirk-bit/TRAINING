@@ -28,5 +28,13 @@
       "metrics": null
     }
   ],
+  "peak_skill_levels": {},
+  "peak_metrics": {
+    "highest_accuracy": 1.0,
+    "lowest_loss": 0.0,
+    "lowest_val_loss": 2.0274397684261203e-05
+  },
+  "skill_effort": {},
+  "level_transitions": [],
   "archived_at": null
 }

@@ -64,6 +64,12 @@ Usage:
 
 import os
 import sys
+
+# Configure CUDA memory allocator BEFORE importing torch
+# This prevents OOM from memory fragmentation by using expandable segments
+# See: https://pytorch.org/docs/stable/notes/cuda.html#environment-variables
+os.environ.setdefault('PYTORCH_ALLOC_CONF', 'expandable_segments:True')
+
 import time
 import json
 import shutil
@@ -176,6 +182,14 @@ except ImportError:
     def realm_update_queue(**kwargs): pass
     def realm_update_hero(**kwargs): pass
     def realm_set_mode(mode, reason=""): pass
+
+# Campaign management - track step/eval counts per campaign
+try:
+    from guild.campaigns import get_active_campaign
+    CAMPAIGNS_AVAILABLE = True
+except ImportError:
+    CAMPAIGNS_AVAILABLE = False
+    def get_active_campaign(base_dir=None): return None
 
 # Add format variety support
 import random
@@ -362,6 +376,19 @@ class TrainingDaemon:
             model_name=self.config.get("model_display_name", self.config.get("model_name", "unknown"))
         )
 
+        # Campaign tracking - load active campaign for step/eval counting
+        self.campaign = None
+        self._campaign_save_interval = 100  # Save campaign every N steps
+        self._steps_since_campaign_save = 0
+        if CAMPAIGNS_AVAILABLE:
+            try:
+                self.campaign = get_active_campaign(self.base_dir)
+                if self.campaign:
+                    self.logger.info(f"📜 Active campaign: {self.campaign.hero_id}/{self.campaign.id}")
+                    self.logger.info(f"   Campaign step: {self.campaign.current_step}")
+            except Exception as e:
+                self.logger.warning(f"Could not load campaign: {e}")
+
         # Register signal handlers
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -391,6 +418,38 @@ class TrainingDaemon:
         )
 
         self.logger = logging.getLogger(__name__)
+
+    def _update_campaign_step(self, global_step: int):
+        """Update campaign step count and persist periodically.
+
+        The campaign tracks cumulative training steps (XP) across the entire
+        campaign journey. This updates campaign.current_step and saves to disk
+        every _campaign_save_interval steps to avoid excessive writes.
+        """
+        if not self.campaign:
+            return
+
+        try:
+            # Update in-memory step count
+            self.campaign.current_step = global_step
+            self._steps_since_campaign_save += 1
+
+            # Save periodically (every N steps) or on significant milestones
+            if self._steps_since_campaign_save >= self._campaign_save_interval:
+                self.campaign.save()
+                self._steps_since_campaign_save = 0
+                self.logger.debug(f"Campaign step updated to {global_step}")
+        except Exception as e:
+            self.logger.warning(f"Could not update campaign step: {e}")
+
+    def _save_campaign(self):
+        """Force save campaign state (call on shutdown)."""
+        if self.campaign and self._steps_since_campaign_save > 0:
+            try:
+                self.campaign.save()
+                self.logger.info(f"📜 Campaign saved at step {self.campaign.current_step}")
+            except Exception as e:
+                self.logger.warning(f"Could not save campaign: {e}")
 
     def load_config(self) -> dict:
         """Load training configuration"""
@@ -1170,6 +1229,9 @@ class TrainingDaemon:
                 self.logger.info("✅ Training successful")
                 self.logger.info(f"   Final loss: {result.final_loss:.4f}")
                 self.logger.info(f"   Global step: {result.global_step}")
+
+                # Update campaign step count
+                self._update_campaign_step(result.global_step)
 
                 # Clean up GPU memory after training
                 self.cleanup_gpu_memory()
@@ -2028,6 +2090,7 @@ class TrainingDaemon:
             self.logger.error("   Daemon crashed - check logs for details")
         finally:
             self.logger.info("Shutting down daemon...")
+            self._save_campaign()  # Save campaign state before exit
             self.release_lock()
 
     def maybe_auto_generate(self, queue_status: dict):
@@ -2036,6 +2099,9 @@ class TrainingDaemon:
 
         Maintains minimum queue depth (default: 2 items) so the Forge
         never runs dry. Quest Master proactively generates new quests.
+
+        Strategy: Generate 1 batch per skill at current training level.
+        This ensures balanced training across all skills.
 
         Data Manager handles:
         - Skill API communication (Sy/Bin via singleSKILL)
@@ -2059,24 +2125,48 @@ class TrainingDaemon:
             if total_queued >= min_queue_depth:
                 return  # Quest Board has enough items
 
-            # Generate enough files to reach min_queue_depth
-            files_needed = min_queue_depth - total_queued
-            self.logger.info(f"📜 Quest Board low ({total_queued} < {min_queue_depth}), generating {files_needed} batches...")
+            # Generate 1 batch per skill at current training level
+            # This ensures balanced training across all skills
+            skills = list(self.data_manager.curriculum.state.get("skills", {}).keys())
+            if not skills:
+                skills = ["sy", "bin"]  # Default skills
+
+            self.logger.info(f"📜 Quest Board low ({total_queued} < {min_queue_depth}), generating 1 batch per skill...")
 
             generated = 0
-            for i in range(files_needed):
-                # Data Manager handles all generation logic (and emits its own events)
-                # Use force=True to bypass threshold/cooldown checks since we're filling queue
-                success = self.data_manager.generate_and_queue(force=True)
-                if success:
-                    generated += 1
-                    self.logger.info(f"🤖 Quest Master: Generated batch {generated}/{files_needed}")
+            for skill in skills:
+                # Generate batch for this specific skill
+                level_info = self.data_manager.curriculum.get_current_level(skill)
+                level = level_info.get("level", 1)
+
+                self.logger.info(f"🤖 Quest Master: Generating {skill.upper()} L{level} batch...")
+
+                # Generate batch for specific skill
+                success, data, metadata = self.data_manager.generate_batch(
+                    count=auto_cfg.get("count", 5000),
+                    skill=skill
+                )
+
+                if success and data:
+                    # Test quality and queue
+                    approved, report = self.data_manager.test_quality(data, skill=skill)
+                    if approved:
+                        queued = self.data_manager.queue_data(
+                            data, metadata,
+                            priority=auto_cfg.get("priority", "normal")
+                        )
+                        if queued:
+                            generated += 1
+                            self.logger.info(f"🤖 Quest Master: Queued {skill.upper()} L{level} batch ({len(data)} examples)")
+                        else:
+                            self.logger.warning(f"Quest Master: Failed to queue {skill} batch")
+                    else:
+                        self.logger.warning(f"Quest Master: {skill} batch failed quality checks")
                 else:
-                    self.logger.warning(f"Quest Master: Generation {i+1} failed, stopping")
-                    break
+                    self.logger.warning(f"Quest Master: {skill} generation failed")
 
             if generated > 0:
-                self.logger.info(f"🤖 Quest Master: Successfully queued {generated} new batches")
+                self.logger.info(f"🤖 Quest Master: Successfully queued {generated} new batches (1 per skill)")
 
         except Exception as e:
             self.logger.error(f"Data Manager auto-generation failed: {e}")

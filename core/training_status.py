@@ -856,14 +856,21 @@ class TrainingStatusWriter:
         return THINKING_PREFIX + stripped
 
     def write(self, status: TrainingStatus):
-        """Write status to file (atomic write)."""
-        temp_file = self.status_file.with_suffix('.tmp')
+        """Write status to file (atomic write).
+
+        Resolves symlinks to write to the actual target file, preserving
+        campaign-specific status file symlinks.
+        """
+        # Resolve symlink to get actual target path
+        # This preserves symlinks - rename goes to real file, symlink stays intact
+        target_file = self.status_file.resolve() if self.status_file.is_symlink() else self.status_file
+        temp_file = target_file.with_suffix('.tmp')
 
         with open(temp_file, 'w') as f:
             json.dump(asdict(status), f, indent=2)
 
-        # Atomic rename
-        temp_file.rename(self.status_file)
+        # Atomic rename to resolved target (not the symlink)
+        temp_file.rename(target_file)
 
     def _dedup_recents(self, recent_list, max_items: int = 5):
         """Deduplicate recent examples by (step, current_file, model_output) preserving order."""

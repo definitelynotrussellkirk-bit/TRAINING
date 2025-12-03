@@ -1224,6 +1224,12 @@ function processGameData(data) {
         showNotification('Training Complete!', 'The Skeptic rests', 'success');
     }
 
+    // Move "Run Steps" card to bottom when training is active
+    const nextActionCard = document.getElementById('nextActionSection');
+    if (nextActionCard) {
+        nextActionCard.classList.toggle('training-active', GameState.isTraining);
+    }
+
     // Skill level up detection
     if (GameState.totalLevel > prevTotalLevel && prevTotalLevel > 0) {
         showNotification('Skill Level Up!', `Total level is now ${GameState.totalLevel}!`, 'success');

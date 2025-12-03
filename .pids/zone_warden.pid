@@ -1,1 +1,0 @@
- sleep 2 curl -s http://localhost:8760/health

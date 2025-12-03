@@ -357,13 +357,15 @@ class SkillEngine:
         # Battle Log - eval result event
         try:
             from core.battle_log import log_eval
+            from core.hero import get_hero_name
+            hero_name = get_hero_name()
             acc_pct = result.accuracy * 100
             severity = "success" if result.accuracy >= 0.8 else ("warning" if result.accuracy >= 0.5 else "error")
             log_eval(
                 f"Eval {skill_id} L{level}: {acc_pct:.1f}% ({result.correct}/{result.total})",
                 severity=severity,
                 source="guild.skills.engine",
-                hero_id="DIO",
+                hero_id=hero_name,
                 details={
                     "skill_id": skill_id,
                     "level": level,

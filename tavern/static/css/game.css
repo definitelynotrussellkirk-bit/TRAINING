@@ -1267,6 +1267,38 @@ body {
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
 }
 
+/* When training is active, move to bottom and collapse */
+.next-action-card.training-active {
+    order: 99;
+    margin-bottom: 0;
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    box-shadow: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.next-action-card.training-active:hover {
+    opacity: 1;
+}
+
+.next-action-card.training-active .next-action-title {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.next-action-card.training-active .next-action-body {
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.next-action-card.training-active .next-action-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+}
+
 .next-action-title {
     font-family: var(--font-title);
     font-size: 1.1rem;

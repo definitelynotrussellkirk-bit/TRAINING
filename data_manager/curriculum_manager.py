@@ -222,14 +222,21 @@ class CurriculumManager:
             }
 
         skill_state = self.state["skills"][skill]
-        training_level = self.get_training_level(skill)
         mastered_level = self.get_mastered_level(skill)
+
+        # CRITICAL: Use the ACTUAL level tested from metadata, not current training_level.
+        # This prevents the runaway level-up bug where lower-level evals get counted
+        # as higher-level evals after a level-up modifies the state.
+        if metadata and "level" in metadata:
+            actual_level_tested = metadata["level"]
+        else:
+            actual_level_tested = self.get_training_level(skill)
 
         record = {
             "step": step,
             "accuracy": accuracy,
-            "training_level": training_level,  # Level being tested
-            "mastered_level": mastered_level,  # Level already earned
+            "training_level": actual_level_tested,  # ACTUAL level tested (from eval)
+            "mastered_level": mastered_level,  # Level already earned at time of record
             "timestamp": datetime.now().isoformat()
         }
         if metadata:
@@ -242,7 +249,7 @@ class CurriculumManager:
             skill_state["accuracy_history"] = skill_state["accuracy_history"][-100:]
 
         self._save_state()
-        logger.info(f"[{skill}] Recorded accuracy: {accuracy:.1%} at step {step} (Training L{training_level}, Mastered L{mastered_level})")
+        logger.info(f"[{skill}] Recorded accuracy: {accuracy:.1%} at step {step} (Training L{actual_level_tested}, Mastered L{mastered_level})")
 
         # Sync to RealmState for real-time UI updates
         try:
@@ -250,7 +257,7 @@ class CurriculumManager:
             update_skill(
                 skill,
                 mastered_level=mastered_level,
-                training_level=training_level,
+                training_level=actual_level_tested,
                 accuracy=accuracy,
                 last_eval_step=step,
             )
@@ -342,6 +349,23 @@ class CurriculumManager:
         new_training_config = self.get_current_level(skill)
         new_training_level = self.get_training_level(skill)
         logger.info(f"[{skill}] LEVEL EARNED! Mastered L{current_mastered} -> L{new_mastered}. Now training on L{new_training_level}")
+
+        # Prune stale training files from queue
+        # Old-level files are now below training level and waste compute
+        try:
+            from core.training_queue import TrainingQueue
+            queue = TrainingQueue(self.base_dir)
+
+            # Get training levels for all skills
+            skill_levels = {}
+            for s in self.state["skills"]:
+                skill_levels[s] = self.get_training_level(s)
+
+            result = queue.prune_stale_files(skill_levels)
+            if result["moved"] > 0:
+                logger.info(f"[{skill}] Pruned {result['moved']} stale queue files after level up")
+        except Exception as e:
+            logger.warning(f"[{skill}] Failed to prune stale queue files: {e}")
 
         # Sync to RealmState for real-time UI updates
         try:

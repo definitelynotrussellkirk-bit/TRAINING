@@ -599,10 +599,21 @@ if __name__ == "__main__":
     import argparse
     import json
 
+    # Get default hero from active campaign
+    def _get_active_hero_id():
+        try:
+            from core.hero import get_active_campaign
+            campaign = get_active_campaign()
+            return campaign.get("hero_id", "dio-qwen3-0.6b")
+        except Exception:
+            return "dio-qwen3-0.6b"
+
+    default_hero = _get_active_hero_id()
+
     parser = argparse.ArgumentParser(description="Run layer stats analysis")
     parser.add_argument("checkpoint", help="Checkpoint path")
     parser.add_argument("--campaign", default="campaign-001")
-    parser.add_argument("--hero", default="dio-qwen3-0.6b")
+    parser.add_argument("--hero", default=default_hero)
     parser.add_argument("--model-ref", default="qwen3-0.6b")
     parser.add_argument("--reference", help="Reference checkpoint for drift")
     parser.add_argument("--device", default="cuda")

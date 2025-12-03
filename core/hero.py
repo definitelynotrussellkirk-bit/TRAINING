@@ -129,7 +129,7 @@ def get_active_hero() -> Dict[str, Any]:
         # Fallback map for heroes without display.emoji
         icon_map = {
             "dio-qwen3-0.6b": "🧔🏽",
-            "titan-qwen3-4b": "👩",
+            "gou-qwen3-4b": "🐕",
         }
         icon = icon_map.get(hero_id, "🦸")
 

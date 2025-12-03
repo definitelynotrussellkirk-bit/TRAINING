@@ -530,6 +530,46 @@
                     </div>
                 </div>
 
+                <div class="form-section">
+                    <div class="form-section__title">Memory Optimization</div>
+                    <div class="form-section__subtitle">Training mode and optimizer affect VRAM usage significantly.</div>
+
+                    <div class="form-row">
+                        <div class="form-row__label">Training Mode<small>Full FT vs parameter-efficient</small></div>
+                        <div class="form-row__value">
+                            <select class="form-select" id="training_mode">
+                                <option value="full">Full Fine-Tuning</option>
+                                <option value="lora">LoRA (Adapters)</option>
+                                <option value="qlora">QLoRA (4-bit + LoRA)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-row__label">Optimizer<small>Memory vs quality trade-off</small></div>
+                        <div class="form-row__value">
+                            <select class="form-select" id="optimizer_type">
+                                <option value="adamw">AdamW (Standard)</option>
+                                <option value="adamw_8bit">AdamW 8-bit</option>
+                                <option value="galore">GaLore</option>
+                                <option value="galore_8bit">GaLore 8-bit</option>
+                                <option value="muon">Muon</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-row__label">DeepSpeed<small>CPU offloading for large models</small></div>
+                        <div class="form-row__value">
+                            <select class="form-select" id="deepspeed_stage">
+                                <option value="">Disabled</option>
+                                <option value="2">ZeRO-2 (Optimizer to CPU)</option>
+                                <option value="3">ZeRO-3 (Full offload)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- VRAM Calculator -->
                 <div class="vram-calculator">
                     <div class="vram-header">
@@ -1005,6 +1045,19 @@
             $('#eval_steps').value = config.eval_steps || 500;
             $('#save_steps').value = config.save_steps || 1000;
 
+            // Memory optimization
+            $('#training_mode').value = config.training_mode || 'full';
+            $('#optimizer_type').value = config.optimizer?.type || 'adamw';
+            // DeepSpeed stage from config path
+            const dsConfig = config.environment?.deepspeed_config || '';
+            if (dsConfig.includes('zero3')) {
+                $('#deepspeed_stage').value = '3';
+            } else if (dsConfig.includes('zero2')) {
+                $('#deepspeed_stage').value = '2';
+            } else {
+                $('#deepspeed_stage').value = '';
+            }
+
             // Auto-generate
             setToggle('#auto_generate_enabled', config.auto_generate?.enabled);
             $('#auto_generate_count').value = config.auto_generate?.count || 100;
@@ -1164,6 +1217,22 @@
             config.hyperparams.fp_precision = $('#fp_precision').value;
             config.hyperparams.use_gradient_checkpointing = getToggle('#use_gradient_checkpointing');
 
+            // Memory optimization
+            config.training_mode = $('#training_mode').value;
+            config.optimizer = config.optimizer || {};
+            config.optimizer.type = $('#optimizer_type').value;
+
+            // DeepSpeed config path
+            config.environment = config.environment || {};
+            const dsStage = $('#deepspeed_stage').value;
+            if (dsStage === '3') {
+                config.environment.deepspeed_config = 'configs/ds_zero3_offload.json';
+            } else if (dsStage === '2') {
+                config.environment.deepspeed_config = 'configs/ds_zero2_offload.json';
+            } else {
+                config.environment.deepspeed_config = null;
+            }
+
             // Auto-generate
             config.auto_generate = config.auto_generate || {};
             config.auto_generate.enabled = getToggle('#auto_generate_enabled');
@@ -1276,11 +1345,27 @@
         let heroSizeB = null;
         let selectedGpuVram = 24;
 
+        // Optimizer memory factors (relative to full AdamW)
+        const OPTIMIZER_FACTORS = {
+            adamw: 1.0,
+            adamw_8bit: 0.25,
+            galore: 0.25,
+            galore_8bit: 0.0625,  // ~16x reduction
+            muon: 0.5
+        };
+
+        // Training mode factors
+        const TRAINING_MODE_FACTORS = {
+            full: { model: 1.0, optimizer: 1.0, gradients: 1.0 },
+            lora: { model: 1.0, optimizer: 0.05, gradients: 0.05 },
+            qlora: { model: 0.5, optimizer: 0.03, gradients: 0.03 }
+        };
+
         /**
          * Estimate VRAM breakdown using hero's VRAM profile.
          * Matches the formula in guild/heroes/types.py VRAMProfile.estimate_breakdown()
          */
-        function estimateVramBreakdown(batchSize, maxLength, precision, gradientCheckpointing) {
+        function estimateVramBreakdown(batchSize, maxLength, precision, gradientCheckpointing, trainingMode, optimizerType, deepspeedStage) {
             if (!vramProfile) {
                 // Fallback to hardcoded 0.6B model defaults if no profile loaded
                 vramProfile = {
@@ -1303,23 +1388,49 @@
             const lengthFactor = Math.max(maxLength, 1) / 2048.0;
             const checkpointFactor = gradientCheckpointing ? 0.35 : 1.0;
 
+            // Training mode factors
+            const modeFactors = TRAINING_MODE_FACTORS[trainingMode] || TRAINING_MODE_FACTORS.full;
+
+            // Optimizer type factor
+            const optFactor = OPTIMIZER_FACTORS[optimizerType] || 1.0;
+
+            // DeepSpeed factors
+            let dsModelFactor = 1.0;
+            let dsOptimizerFactor = 1.0;
+            let dsGradientFactor = 1.0;
+
+            if (deepspeedStage === 2 || deepspeedStage === '2') {
+                dsOptimizerFactor = 0.0;  // ZeRO-2 offloads optimizer to CPU
+            } else if (deepspeedStage === 3 || deepspeedStage === '3') {
+                dsModelFactor = 0.3;
+                dsOptimizerFactor = 0.0;
+                dsGradientFactor = 0.3;
+            }
+
             // Components
-            const modelMem = base * precisionFactor;
-            const optimizerMem = opt * precisionFactor;
+            const modelMem = base * precisionFactor * modeFactors.model * dsModelFactor;
+            const optimizerMem = opt * precisionFactor * modeFactors.optimizer * optFactor * dsOptimizerFactor;
             const activationTotal = perBatch * batchSize * lengthFactor * checkpointFactor * precisionFactor;
 
-            // Split activations into gradients vs activations (approximate)
-            const gradientsMem = activationTotal * 0.4;
+            // Split activations into gradients vs activations
+            const gradientsMem = activationTotal * 0.4 * modeFactors.gradients * dsGradientFactor;
             const activationsMem = activationTotal * 0.6;
 
             const total = modelMem + optimizerMem + gradientsMem + activationsMem;
+
+            // Build mode info string
+            const modeInfo = [];
+            if (trainingMode !== 'full') modeInfo.push(trainingMode.toUpperCase());
+            if (optimizerType !== 'adamw') modeInfo.push(optimizerType);
+            if (deepspeedStage) modeInfo.push(`ZeRO-${deepspeedStage}`);
 
             return {
                 model: modelMem,
                 optimizer: optimizerMem,
                 gradients: gradientsMem,
                 activations: activationsMem,
-                total: total
+                total: total,
+                modeInfo: modeInfo.length > 0 ? modeInfo.join(' + ') : 'Full FT'
             };
         }
 
@@ -1328,8 +1439,11 @@
             const maxLength = parseInt($('#max_length')?.value) || 2048;
             const precision = $('#fp_precision')?.value || 'bf16';
             const gradCheckpoint = getToggle('#use_gradient_checkpointing');
+            const trainingMode = $('#training_mode')?.value || 'full';
+            const optimizerType = $('#optimizer_type')?.value || 'adamw';
+            const deepspeedStage = $('#deepspeed_stage')?.value || '';
 
-            const vram = estimateVramBreakdown(batchSize, maxLength, precision, gradCheckpoint);
+            const vram = estimateVramBreakdown(batchSize, maxLength, precision, gradCheckpoint, trainingMode, optimizerType, deepspeedStage);
             updateVramUI(vram);
         }
 
@@ -1356,27 +1470,34 @@
             setText('#vramGradientsVal', `${vram.gradients.toFixed(1)}GB`);
             setText('#vramActivationsVal', `${vram.activations.toFixed(1)}GB`);
 
-            // Enhanced tips based on hero size and VRAM usage
+            // Enhanced tips based on mode and VRAM usage
             const tip = $('#vramTip');
             const headroom = selectedGpuVram - vram.total;
             const ratio = selectedGpuVram > 0 ? vram.total / selectedGpuVram : 0;
 
+            // Mode info header
+            let tipContent = vram.modeInfo ? `<strong style="color: var(--color-gold);">${vram.modeInfo}</strong><br>` : '';
+
             if (vram.total > selectedGpuVram) {
-                tip.innerHTML = `<strong>DANGER</strong> – Over limit! Enable gradient checkpointing or reduce batch size.`;
+                tipContent += `<strong>DANGER</strong> – Over limit! Try GaLore 8-bit, QLoRA, or ZeRO-3.`;
             } else if (ratio > 0.9) {
-                tip.innerHTML = `<strong>WARNING</strong> – Very tight fit. May OOM during training spikes.`;
+                tipContent += `<strong>WARNING</strong> – Very tight fit. May OOM during training spikes.`;
             } else if (ratio > 0.7) {
-                tip.innerHTML = `<strong>CAUTION</strong> – Leave ~2GB for CUDA kernels. ~${headroom.toFixed(1)}GB headroom.`;
+                tipContent += `<strong>CAUTION</strong> – Leave ~2GB for CUDA kernels. ~${headroom.toFixed(1)}GB headroom.`;
             } else if (headroom > 10) {
-                tip.innerHTML = `<strong>SAFE</strong> – Plenty of headroom (~${headroom.toFixed(1)}GB). Consider larger batch size.`;
+                tipContent += `<strong>SAFE</strong> – Plenty of headroom (~${headroom.toFixed(1)}GB). Consider larger batch size.`;
             } else {
-                tip.innerHTML = `<strong>GOOD</strong> – Comfortable fit with ~${headroom.toFixed(1)}GB headroom.`;
+                tipContent += `<strong>GOOD</strong> – Comfortable fit with ~${headroom.toFixed(1)}GB headroom.`;
             }
 
-            // Add model-specific tip for 4B+ models
-            if (heroSizeB && heroSizeB >= 4 && vram.total < 18) {
-                tip.innerHTML += `<br><small style="color: var(--text-muted);">4B models typically need 18-20GB for full FT.</small>`;
+            // Add model-specific tip for 4B+ models when using full FT
+            const trainingMode = $('#training_mode')?.value || 'full';
+            const optimizerType = $('#optimizer_type')?.value || 'adamw';
+            if (heroSizeB && heroSizeB >= 4 && trainingMode === 'full' && optimizerType === 'adamw') {
+                tipContent += `<br><small style="color: var(--text-muted);">4B+ full FT with AdamW needs ~32GB. Try GaLore 8-bit or QLoRA.</small>`;
             }
+
+            tip.innerHTML = tipContent;
         }
 
         /**
@@ -1414,7 +1535,7 @@
             });
         });
 
-        ['batch_size', 'max_length', 'fp_precision'].forEach(id => {
+        ['batch_size', 'max_length', 'fp_precision', 'training_mode', 'optimizer_type', 'deepspeed_stage'].forEach(id => {
             const el = $(`#${id}`);
             if (el) {
                 el.addEventListener('input', calculateVram);

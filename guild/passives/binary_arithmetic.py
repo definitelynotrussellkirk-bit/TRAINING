@@ -17,8 +17,8 @@ class BinaryArithmeticPassive(PassiveModule):
     id = "binary_arithmetic"
     name = "Binary Arithmetic"
     category = "math"
-    description = "Binary add/sub, bitwise AND/OR/XOR, conversions"
-    version = "1.0.0"
+    description = "Binary add/sub, increment/decrement, bitwise AND/OR/XOR, conversions"
+    version = "1.1.0"
 
     # Core passive - matches BIN skill, catches skill-specific regression
     tier = PassiveTier.CORE
@@ -49,6 +49,8 @@ class BinaryArithmeticPassive(PassiveModule):
             self._binary_add_with_carry,
             self._binary_sub_no_borrow,
             self._binary_sub_with_borrow,
+            self._increment,
+            self._decrement,
             self._bitwise_and,
             self._bitwise_or,
             self._bitwise_xor,
@@ -206,6 +208,50 @@ class BinaryArithmeticPassive(PassiveModule):
             "result": result,
         }
 
+    def _to_circled(self, binary_str: str) -> str:
+        """Convert binary string to circled notation (①⓪)."""
+        return binary_str.replace('1', '①').replace('0', '⓪')
+
+    def _increment(self) -> Dict[str, Any]:
+        """Generate increment problem (add 1)."""
+        bits = self._get_bits_for_level()
+        # Pick a number that won't overflow (leave room for +1)
+        n = random.randint(0, (1 << bits) - 2)
+        result = n + 1
+
+        n_circled = self._to_circled(self._format_binary(n, bits))
+        # Result may need extra bit if we hit power of 2
+        result_bits = max(bits, result.bit_length())
+        result_circled = self._to_circled(self._format_binary(result, result_bits))
+
+        return {
+            "prompt": f"Compute: increment({n_circled})",
+            "expected": f"increment({n_circled}) = {result_circled}",
+            "primitive_id": "increment",
+            "type": "increment",
+            "n": n,
+            "result": result,
+        }
+
+    def _decrement(self) -> Dict[str, Any]:
+        """Generate decrement problem (subtract 1)."""
+        bits = self._get_bits_for_level()
+        # Pick a number > 0 so we can subtract 1
+        n = random.randint(1, (1 << bits) - 1)
+        result = n - 1
+
+        n_circled = self._to_circled(self._format_binary(n, bits))
+        result_circled = self._to_circled(self._format_binary(result, bits))
+
+        return {
+            "prompt": f"Compute: decrement({n_circled})",
+            "expected": f"decrement({n_circled}) = {result_circled}",
+            "primitive_id": "decrement",
+            "type": "decrement",
+            "n": n,
+            "result": result,
+        }
+
     def _bitwise_and(self) -> Dict[str, Any]:
         """Generate bitwise AND problem."""
         bits = self._get_bits_for_level()
@@ -323,6 +369,10 @@ class BinaryArithmeticPassive(PassiveModule):
             "binary": n_bin,
         }
 
+    def _from_circled(self, circled_str: str) -> str:
+        """Convert circled notation (①⓪) to binary string."""
+        return circled_str.replace('①', '1').replace('⓪', '0')
+
     def check_answer(self, expected: str, got: str) -> bool:
         """
         Check if model's answer matches expected.
@@ -330,13 +380,24 @@ class BinaryArithmeticPassive(PassiveModule):
         Handles various binary formats:
         - With or without leading zeros
         - With or without 0b prefix
+        - Circled notation (①⓪)
         - Decimal equivalent in response
         """
+        # Convert circled notation if present
+        expected_clean = self._from_circled(expected)
+        got_clean = self._from_circled(got)
+
+        # For increment/decrement format: "increment(x) = y", extract the result
+        if '=' in expected_clean:
+            expected_clean = expected_clean.split('=')[-1].strip()
+        if '=' in got_clean:
+            got_clean = got_clean.split('=')[-1].strip()
+
         # Normalize expected
-        expected_norm = expected.strip().lower().replace('0b', '').lstrip('0') or '0'
+        expected_norm = expected_clean.strip().lower().replace('0b', '').lstrip('0') or '0'
 
         # Normalize got
-        got_norm = got.strip().lower()
+        got_norm = got_clean.strip().lower()
 
         # Remove 0b prefix if present
         if '0b' in got_norm:

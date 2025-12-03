@@ -26,7 +26,7 @@ presets:
   flo:
     name: FLO
     vibe: analytical helper
-    emoji: "\U0001F4CA"  # Reserved - current 4B hero
+    emoji: "\U0001F4CA"
     native_form: "Florentia / Firenze"
     root: "Latin origin of Florence / Italian city name"
     notes: "Flourishing, growth-oriented"
@@ -92,7 +92,7 @@ presets:
   gou:
     name: GOU
     vibe: loyal companion
-    emoji: "\U0001F415"
+    emoji: "\U0001F415"  # Reserved - current 4B hero
     native_form: "狗"
     root: "gǒu - 'dog' in Chinese"
     notes: "Faithful, reliable assistant models"
@@ -649,7 +649,7 @@ considerations:
 
   reserved:
     dio: "Current 0.6B hero - skeptical cynic 🧐"
-    flo: "Current 4B hero - analytical helper 📊"
+    gou: "Current 4B hero - loyal companion 🐕"
 
   torchbearer_theme:
     discovery: >

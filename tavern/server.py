@@ -62,6 +62,7 @@ from tavern.api import setup as setup_api
 from tavern.api import run_context as run_context_api
 from tavern.api import temple as temple_api
 from tavern.api import fleet as fleet_api
+from tavern.api import arcana as arcana_api
 
 # Import events system
 try:
@@ -653,6 +654,26 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/heroes":
             heroes_api.serve_heroes_data(self)
 
+        # Arcana - LISP DSL Panel
+        elif path == "/arcana" or path == "/arcana.html":
+            self._serve_template("arcana.html")
+        elif path == "/api/arcana/world-state":
+            self._send_json(arcana_api.get_world_state())
+        elif path == "/api/arcana/skills":
+            self._send_json(arcana_api.get_skill_progress())
+        elif path == "/api/arcana/evals":
+            self._send_json(arcana_api.get_eval_history())
+        elif path == "/api/arcana/plans":
+            self._send_json(arcana_api.get_plan_history())
+        elif path == "/api/arcana/verbs":
+            self._send_json(arcana_api.get_verb_reference())
+        elif path == "/api/arcana/training":
+            self._send_json(arcana_api.get_training_status())
+        elif path == "/api/arcana/hints":
+            self._send_json(arcana_api.get_analysis_hints())
+        elif path == "/api/arcana/summary":
+            self._send_json(arcana_api.handle_arcana_api("/api/arcana/summary", "GET"))
+
         # Momentum Engine - Forward progress + blockers
         elif path == "/api/momentum":
             momentum_api.serve_momentum(self)
@@ -796,6 +817,11 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Training API - Start training from UI
         elif path == "/api/train":
             train_api.serve_train_post(self)
+        # Arcana - REPL and Plan Proposal
+        elif path == "/api/arcana/repl":
+            self._handle_arcana_repl()
+        elif path == "/api/arcana/propose":
+            self._handle_arcana_propose()
         # Generate API - Generate training data from UI
         elif path == "/api/generate":
             generate_api.serve_generate_post(self)
@@ -3578,8 +3604,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
                         if "dio" in primary_path.lower() or "current_model" in primary_path:
                             hero_id = "dio-qwen3-0.6b"
                             campaign_id = "campaign-001"
-                        elif "titan" in primary_path.lower() or "4b" in primary_path.lower():
-                            hero_id = "titan-qwen3-4b"
+                        elif "gou" in primary_path.lower() or "4b" in primary_path.lower():
+                            hero_id = "gou-qwen3-4b"
                             campaign_id = "campaign-001"
 
                     checkpoint = {
@@ -5399,6 +5425,37 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": f"Skill Engine not available: {e}"}, 503)
         except Exception as e:
             logger.error(f"Skill state error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _handle_arcana_repl(self):
+        """Execute Arcana DSL code via REPL."""
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length).decode())
+
+            code = body.get("code", "")
+            dry_run = body.get("dry_run", False)
+
+            result = arcana_api.execute_repl(code, dry_run=dry_run)
+            self._send_json(result)
+
+        except Exception as e:
+            logger.error(f"Arcana REPL error: {e}")
+            self._send_json({"error": str(e)}, 500)
+
+    def _handle_arcana_propose(self):
+        """Generate an Arcana plan proposal for a goal."""
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length).decode())
+
+            goal = body.get("goal", "maintain")
+
+            result = arcana_api.propose_plan(goal)
+            self._send_json(result)
+
+        except Exception as e:
+            logger.error(f"Arcana propose error: {e}")
             self._send_json({"error": str(e)}, 500)
 
     def _handle_oracle_load(self):

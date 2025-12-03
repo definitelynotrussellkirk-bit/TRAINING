@@ -1,6 +1,24 @@
 {
   "bf16": {
-    "enabled": true
+    "enabled": "auto"
+  },
+  "optimizer": {
+    "type": "AdamW",
+    "params": {
+      "lr": "auto",
+      "betas": "auto",
+      "eps": "auto",
+      "weight_decay": "auto"
+    }
+  },
+  "scheduler": {
+    "type": "WarmupDecayLR",
+    "params": {
+      "total_num_steps": "auto",
+      "warmup_min_lr": "auto",
+      "warmup_max_lr": "auto",
+      "warmup_num_steps": "auto"
+    }
   },
   "zero_optimization": {
     "stage": 3,
@@ -20,12 +38,13 @@
     "stage3_param_persistence_threshold": "auto",
     "stage3_max_live_parameters": 1e9,
     "stage3_max_reuse_distance": 1e9,
-    "stage3_gather_16bit_weights_on_model_save": true
+    "gather_16bit_weights_on_model_save": true
   },
   "gradient_accumulation_steps": "auto",
   "gradient_clipping": "auto",
-  "steps_per_print": 10,
   "train_batch_size": "auto",
   "train_micro_batch_size_per_gpu": "auto",
-  "wall_clock_breakdown": false
+  "comms_logger": {
+    "enabled": false
+  }
 }

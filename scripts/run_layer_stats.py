@@ -258,7 +258,20 @@ def show_results(args):
     return 0
 
 
+def _get_active_hero_id():
+    """Get the active hero_id from campaign, or fallback."""
+    try:
+        from core.hero import get_active_campaign
+        campaign = get_active_campaign()
+        return campaign.get("hero_id", "dio-qwen3-0.6b")
+    except Exception:
+        return "dio-qwen3-0.6b"
+
+
 def main():
+    # Get default hero from active campaign
+    default_hero = _get_active_hero_id()
+
     parser = argparse.ArgumentParser(
         description="Model Archaeology - Layer Stats Analysis",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -271,7 +284,7 @@ def main():
     submit_parser.add_argument("--checkpoint", "-c", required=True, help="Checkpoint path")
     submit_parser.add_argument("--reference", "-r", help="Reference checkpoint for drift")
     submit_parser.add_argument("--campaign", default="campaign-001")
-    submit_parser.add_argument("--hero", default="dio-qwen3-0.6b")
+    submit_parser.add_argument("--hero", default=default_hero)
     submit_parser.add_argument("--model-ref", default="qwen3-0.6b")
     submit_parser.add_argument("--server", default="http://localhost:8767")
     submit_parser.add_argument("--priority", default="normal", choices=["low", "normal", "high"])
@@ -282,7 +295,7 @@ def main():
     local_parser.add_argument("--checkpoint", "-c", required=True, help="Checkpoint path")
     local_parser.add_argument("--reference", "-r", help="Reference checkpoint for drift")
     local_parser.add_argument("--campaign", default="campaign-001")
-    local_parser.add_argument("--hero", default="dio-qwen3-0.6b")
+    local_parser.add_argument("--hero", default=default_hero)
     local_parser.add_argument("--model-ref", default="qwen3-0.6b")
     local_parser.add_argument("--device", default="cuda")
     local_parser.add_argument("--output", "-o", help="Output path")
@@ -291,13 +304,13 @@ def main():
     # List command
     list_parser = subparsers.add_parser("list", help="List checkpoints")
     list_parser.add_argument("--campaign", default="campaign-001")
-    list_parser.add_argument("--hero", default="dio-qwen3-0.6b")
+    list_parser.add_argument("--hero", default=default_hero)
 
     # Show command
     show_parser = subparsers.add_parser("show", help="Show analysis results")
     show_parser.add_argument("checkpoint", help="Checkpoint step or path")
     show_parser.add_argument("--campaign", default="campaign-001")
-    show_parser.add_argument("--hero", default="dio-qwen3-0.6b")
+    show_parser.add_argument("--hero", default=default_hero)
     show_parser.add_argument("--verbose", "-v", action="store_true")
 
     args = parser.parse_args()

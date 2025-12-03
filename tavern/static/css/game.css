@@ -426,6 +426,21 @@ body {
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
 }
 
+.battle-status.no-campaign {
+    border-color: var(--color-warning);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.05), rgba(30, 30, 30, 0.95));
+}
+
+.battle-status.no-campaign .battle-title {
+    color: var(--color-warning);
+}
+
+.battle-status.no-campaign .quest-name {
+    color: var(--color-warning);
+    font-style: italic;
+}
+
 .battle-header {
     display: flex;
     align-items: center;
@@ -1470,6 +1485,32 @@ body {
 
 .idle-indicator.mode-idle .idle-text {
     color: var(--color-warning);
+}
+
+.idle-indicator.error {
+    border-color: var(--color-warning);
+    background: rgba(245, 158, 11, 0.15);
+    animation: error-pulse 2s ease-in-out infinite;
+}
+
+.idle-indicator.error .idle-text {
+    color: var(--color-warning);
+    font-weight: 700;
+}
+
+.idle-indicator.error .idle-icon {
+    animation: error-shake 0.5s ease-in-out infinite;
+}
+
+@keyframes error-pulse {
+    0%, 100% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.3); }
+    50% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.6); }
+}
+
+@keyframes error-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
 }
 
 .idle-indicator.is-running {

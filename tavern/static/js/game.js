@@ -72,6 +72,8 @@ const GameState = {
 
     // State flags
     realmSyncActive: false,
+    noCampaign: true,  // True until we confirm a campaign is active
+    heroId: null,
 };
 
 // ============================================
@@ -562,9 +564,32 @@ function updateBattleStatus() {
     const battleStatus = document.querySelector('#battleStatus');
     const idleIndicator = document.querySelector('#idleIndicator');
 
-    if (GameState.isTraining) {
-        // Training mode
+    // Priority 1: No campaign active - show error/setup state
+    if (GameState.noCampaign) {
+        battleStatus.classList.remove('fighting');
+        battleStatus.classList.add('no-campaign');
+        idleIndicator.classList.remove('active');
+        idleIndicator.classList.add('error');
+        setText('.idle-icon', '⚠️');
+        setText('.idle-text', 'NO CAMPAIGN');
+
+        setText('#battleIcon', '🚫');
+        setText('#battleTitle', 'No Campaign Active');
+        setText('#questName', 'Start a campaign to begin training');
+
+        setWidth('#questProgressBar', 0);
+        setText('#questProgressText', '--');
+
+        setText('#battleStep', '--');
+        setText('#battleSpeed', '--');
+        setText('#battleStrain', '--');
+        setText('#battleETA', '--');
+
+    } else if (GameState.isTraining) {
+        // Priority 2: Training mode
+        battleStatus.classList.remove('no-campaign');
         battleStatus.classList.add('fighting');
+        idleIndicator.classList.remove('error');
         idleIndicator.classList.add('active');
         setText('.idle-icon', '⚔️');
         setText('.idle-text', 'TRAINING');
@@ -584,9 +609,11 @@ function updateBattleStatus() {
         setText('#battleETA', formatETA(GameState.etaSeconds));
 
     } else {
-        // Idle mode
+        // Priority 3: Idle mode (campaign active but not training)
         battleStatus.classList.remove('fighting');
+        battleStatus.classList.remove('no-campaign');
         idleIndicator.classList.remove('active');
+        idleIndicator.classList.remove('error');
         setText('.idle-icon', '💤');
         setText('.idle-text', 'IDLE');
 
@@ -1265,7 +1292,18 @@ async function fetchCampaignData() {
         const hero = heroResp.ok ? await heroResp.json() : null;
         const titles = titlesResp.ok ? await titlesResp.json() : null;
 
-        if (!hero || !hero.name) return;
+        // Check if we have an active campaign
+        if (!hero || !hero.hero_id) {
+            GameState.noCampaign = true;
+            GameState.heroId = null;
+            updateBattleStatus();  // Refresh UI to show NO CAMPAIGN state
+            return;
+        }
+
+        GameState.noCampaign = false;
+        GameState.heroId = hero.hero_id;
+
+        if (!hero.name) return;
 
         // Update hero display
         const nameEl = document.getElementById('heroName');

@@ -717,7 +717,34 @@ class ResetManager:
             })
             cur.execute('UPDATE state SET data = ? WHERE section = ?', (reset_data, 'training'))
 
-            # Also clear workers
+            # Reset mode_info to idle (no campaign)
+            mode_data = json.dumps({
+                "mode": "idle",
+                "mode_reason": "No campaign active",
+                "mode_changed_at": None,
+                "updated_at": None
+            })
+            cur.execute('UPDATE state SET data = ? WHERE section = ?', (mode_data, 'mode_info'))
+
+            # Reset skills state
+            skills_data = json.dumps({
+                "skills": {},
+                "updated_at": None
+            })
+            cur.execute('UPDATE state SET data = ? WHERE section = ?', (skills_data, 'skills'))
+
+            # Reset queue state
+            queue_data = json.dumps({
+                "depth": 0,
+                "high_priority": 0,
+                "normal_priority": 0,
+                "low_priority": 0,
+                "status": "empty",
+                "updated_at": None
+            })
+            cur.execute('UPDATE state SET data = ? WHERE section = ?', (queue_data, 'queue'))
+
+            # Clear workers
             cur.execute('DELETE FROM workers')
 
             # Clear events
@@ -746,6 +773,24 @@ class ResetManager:
                     "eta_seconds": 0,
                     "updated_at": None
                 }
+                # Reset mode_info
+                data["state"]["mode_info"] = {
+                    "mode": "idle",
+                    "mode_reason": "No campaign active",
+                    "mode_changed_at": None,
+                    "updated_at": None
+                }
+                # Reset skills
+                data["state"]["skills"] = {"skills": {}, "updated_at": None}
+                # Reset queue
+                data["state"]["queue"] = {
+                    "depth": 0,
+                    "high_priority": 0,
+                    "normal_priority": 0,
+                    "low_priority": 0,
+                    "status": "empty",
+                    "updated_at": None
+                }
                 # Clear workers
                 data["state"]["workers"] = {}
 
@@ -768,9 +813,22 @@ class ResetManager:
                         "eta_seconds": 0,
                         "updated_at": None
                     },
+                    "mode_info": {
+                        "mode": "idle",
+                        "mode_reason": "No campaign active",
+                        "mode_changed_at": None,
+                        "updated_at": None
+                    },
+                    "skills": {"skills": {}, "updated_at": None},
                     "workers": {},
-                    "queue": {"depth": 0, "high_priority": 0, "normal_priority": 0, "low_priority": 0},
-                    "mode": "idle",
+                    "queue": {
+                        "depth": 0,
+                        "high_priority": 0,
+                        "normal_priority": 0,
+                        "low_priority": 0,
+                        "status": "empty",
+                        "updated_at": None
+                    },
                 },
                 "events": []
             }

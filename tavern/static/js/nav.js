@@ -4,18 +4,30 @@
  */
 
 const NAV_ITEMS = [
-    { href: '/', icon: '⚔️', label: 'Battle', id: 'battle' },
-    { href: '/guild', icon: '🏰', label: 'Guild', id: 'guild' },
-    { href: '/campaign', icon: '🗺️', label: 'Campaign', id: 'campaign' },
-    { href: '/quests', icon: '📜', label: 'Quests', id: 'quests' },
-    { href: '/forge', icon: '🔥', label: 'Forge', id: 'forge' },
-    { href: '/vault', icon: '🗝️', label: 'Vault', id: 'vault' },
-    { href: '/ledger', icon: '📖', label: 'Ledger', id: 'ledger' },
-    { href: '/oracle', icon: '🔮', label: 'Oracle', id: 'oracle' },
-    { href: '/arcana', icon: '🌀', label: 'Arcana', id: 'arcana' },
-    { href: '/temple', icon: '🏛️', label: 'Temple', id: 'temple' },
-    { href: '/garrison', icon: '🛡️', label: 'Garrison', id: 'garrison' },
-    { href: '/settings', icon: '⚙️', label: 'Settings', id: 'settings' },
+    { href: '/', icon: '⚔️', label: 'Battle', id: 'battle',
+      desc: 'Watch training progress, see live loss/speed stats, control training runs' },
+    { href: '/guild', icon: '🏰', label: 'Guild', id: 'guild',
+      desc: 'View skill progression (SY, BIN), level status, and curriculum state' },
+    { href: '/campaign', icon: '🗺️', label: 'Campaign', id: 'campaign',
+      desc: 'Manage campaigns - create new, select active, view journey history' },
+    { href: '/quests', icon: '📜', label: 'Quests', id: 'quests',
+      desc: 'Training queue - see pending files, priorities, generate new data' },
+    { href: '/forge', icon: '🔥', label: 'Forge', id: 'forge',
+      desc: 'Data generation tools - create training examples for skills' },
+    { href: '/vault', icon: '🗝️', label: 'Vault', id: 'vault',
+      desc: 'Asset catalog - browse models, checkpoints, storage zones' },
+    { href: '/ledger', icon: '📖', label: 'Ledger', id: 'ledger',
+      desc: 'Checkpoint history - all saved checkpoints with loss, locations, timestamps' },
+    { href: '/oracle', icon: '🔮', label: 'Oracle', id: 'oracle',
+      desc: 'Chat with your hero - test any checkpoint via inference server' },
+    { href: '/arcana', icon: '🌀', label: 'Arcana', id: 'arcana',
+      desc: 'Advanced DSL panel - custom training scripts and experiments' },
+    { href: '/temple', icon: '🏛️', label: 'Temple', id: 'temple',
+      desc: 'Validation rituals - run health checks, verify training quality' },
+    { href: '/garrison', icon: '🛡️', label: 'Garrison', id: 'garrison',
+      desc: 'Fleet health - monitor all services, disk usage, connections' },
+    { href: '/settings', icon: '⚙️', label: 'Settings', id: 'settings',
+      desc: 'Configuration - training params, VRAM calc, scheduler, mantra' },
 ];
 
 // Weaver status (shown as indicator, not a nav destination)
@@ -36,6 +48,7 @@ function renderBottomNav(activeId, containerId = 'bottomNav') {
         return `
             <button class="nav-btn${isActive ? ' active' : ''}"
                     onclick="${isActive ? '' : `window.location.href='${item.href}'`}"
+                    title="${item.desc || item.label}"
                     ${isActive ? 'disabled' : ''}>
                 <span class="nav-icon">${item.icon}</span>
                 <span class="nav-label">${item.label}</span>

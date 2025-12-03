@@ -1602,13 +1602,17 @@ class TavernHandler(SimpleHTTPRequestHandler):
                             last_acc = last_entry.get("accuracy", 0) * 100
                             last_eval_time = last_entry.get("timestamp")
 
-                        # Get mastered/training from last eval entry (more accurate)
+                        # Get mastered/training from curriculum state
+                        # mastered_level = levels fully completed (0 means none mastered yet)
+                        # training_level = the level currently being trained
                         if history:
-                            mastered = last_entry.get("mastered_level", skill_state.get("current_level", 0))
-                            training = last_entry.get("training_level", mastered + 1)
+                            # Use last eval entry if available
+                            mastered = last_entry.get("mastered_level", skill_state.get("mastered_level", 0))
+                            training = last_entry.get("training_level", skill_state.get("training_level", 1))
                         else:
-                            mastered = skill_state.get("current_level", 0)
-                            training = mastered + 1
+                            # Use curriculum state directly
+                            mastered = skill_state.get("mastered_level", 0)
+                            training = skill_state.get("training_level", 1)
 
                         skills_data[skill_id] = {
                             "current_level": skill_state.get("current_level", 0),

@@ -1488,23 +1488,51 @@ function updateNextActionUI(campaign, momentum) {
     const rec = campaign.recommendation;
     const queueFiles = campaign.queue_files || 0;
 
+    // Check auto-queue status for smarter guidance
+    let autoQueueEnabled = false;
+    try {
+        const configRes = await fetch('/config');
+        if (configRes.ok) {
+            const config = await configRes.json();
+            autoQueueEnabled = config.auto_generate?.enabled || false;
+        }
+    } catch (e) { /* ignore */ }
+
     // Handle different recommendation kinds
     if (!rec || rec.kind === 'train_steps') {
         // Training recommendation (default)
         if (queueFiles === 0) {
-            // Override: No queue data, must generate first
+            // Override: No queue data
             section.classList.add('needs-data');
-            titleEl.textContent = 'Generate Training Data';
-            bodyEl.innerHTML = `
-                <div style="margin-bottom: 0.75rem;">The quest board is empty. Generate training quests to begin.</div>
-                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
-                    <button class="action-btn secondary" onclick="toggleAutoQueue(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
-                        Enable Auto-Queue
-                    </button>
-                </div>
-            `;
-            btnEl.textContent = 'Generate 5,000 Examples';
-            btnEl.onclick = () => generateTrainingData(btnEl, 5000);
+
+            if (autoQueueEnabled) {
+                // Auto-queue is on - it should be generating
+                titleEl.textContent = 'Generating Training Data...';
+                bodyEl.innerHTML = `
+                    <div style="margin-bottom: 0.75rem;">Auto-queue is enabled. Data should generate automatically.</div>
+                    <div style="font-size: 0.85rem; opacity: 0.8;">If this persists, check the daemon status or generate manually.</div>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                        <button class="action-btn secondary" onclick="toggleAutoQueue(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                            Disable Auto-Queue
+                        </button>
+                    </div>
+                `;
+                btnEl.textContent = 'Generate Now';
+                btnEl.onclick = () => generateTrainingData(btnEl, 5000);
+            } else {
+                // Auto-queue is off - prompt to generate or enable
+                titleEl.textContent = 'Generate Training Data';
+                bodyEl.innerHTML = `
+                    <div style="margin-bottom: 0.75rem;">The quest board is empty. Generate training quests to begin.</div>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                        <button class="action-btn secondary" onclick="toggleAutoQueue(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                            Enable Auto-Queue
+                        </button>
+                    </div>
+                `;
+                btnEl.textContent = 'Generate 5,000 Examples';
+                btnEl.onclick = () => generateTrainingData(btnEl, 5000);
+            }
             checkAutoQueueStatus();
         } else {
             // Has data, show training option
@@ -1528,17 +1556,34 @@ function updateNextActionUI(campaign, momentum) {
     } else if (rec.kind === 'create_quest') {
         // Need to generate data
         section.classList.add('needs-data');
-        titleEl.textContent = rec.title;
-        bodyEl.innerHTML = `
-            <div style="margin-bottom: 0.75rem;">${rec.description}</div>
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
-                <button class="action-btn secondary" onclick="toggleAutoQueue(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
-                    Enable Auto-Queue
-                </button>
-            </div>
-        `;
-        btnEl.textContent = 'Generate 5,000 Examples';
-        btnEl.onclick = () => generateTrainingData(btnEl, 5000);
+
+        if (autoQueueEnabled) {
+            // Auto-queue is on - it should be generating
+            titleEl.textContent = 'Generating Training Data...';
+            bodyEl.innerHTML = `
+                <div style="margin-bottom: 0.75rem;">Auto-queue is enabled. Data should generate automatically.</div>
+                <div style="font-size: 0.85rem; opacity: 0.8;">If this persists, check the daemon status or generate manually.</div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                    <button class="action-btn secondary" onclick="toggleAutoQueue(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                        Disable Auto-Queue
+                    </button>
+                </div>
+            `;
+            btnEl.textContent = 'Generate Now';
+            btnEl.onclick = () => generateTrainingData(btnEl, 5000);
+        } else {
+            titleEl.textContent = rec.title;
+            bodyEl.innerHTML = `
+                <div style="margin-bottom: 0.75rem;">${rec.description}</div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                    <button class="action-btn secondary" onclick="toggleAutoQueue(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                        Enable Auto-Queue
+                    </button>
+                </div>
+            `;
+            btnEl.textContent = 'Generate 5,000 Examples';
+            btnEl.onclick = () => generateTrainingData(btnEl, 5000);
+        }
         checkAutoQueueStatus();
     } else if (rec.kind === 'wait') {
         // Training in progress

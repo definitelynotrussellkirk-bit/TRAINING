@@ -550,6 +550,15 @@ class DeploymentOrchestrator:
         record['verified_at'] = datetime.now().isoformat()
         self.log_deployment(record)
 
+        # Record in ledger that checkpoint now exists on inference server
+        try:
+            from core.checkpoint_ledger import get_ledger
+            ledger = get_ledger()
+            ledger.record_usage(ckpt_info['step'], "inference3090")
+            logger.info(f"📖 Ledger updated: checkpoint {ckpt_info['step']} → inference3090")
+        except Exception as e:
+            logger.warning(f"Failed to update ledger: {e}")
+
         logger.info("="*80)
         logger.info(f"✅ DEPLOYMENT SUCCESSFUL: {deployment_id}")
         logger.info("="*80)

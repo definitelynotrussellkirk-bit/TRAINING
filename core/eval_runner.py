@@ -1218,7 +1218,13 @@ def run_daemon(
     inference_port: Optional[int] = None,
 ):
     """Run eval runner as daemon."""
-    logger.info(f"Starting eval runner daemon (interval={interval}s)")
+    import os
+
+    # Write PID file for service registry
+    pid_file = base_dir / ".pids" / "eval_runner.pid"
+    pid_file.parent.mkdir(parents=True, exist_ok=True)
+    pid_file.write_text(str(os.getpid()))
+    logger.info(f"Starting eval runner daemon (interval={interval}s, pid={os.getpid()})")
 
     # Prune stale queue entries on startup
     pruned = prune_stale_queues(base_dir)

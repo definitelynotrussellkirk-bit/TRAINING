@@ -186,10 +186,14 @@ def serve_active_campaign(handler: "TavernHandler"):
                     pdir = queue_dir / priority
                     if pdir.exists():
                         queue_files += len(list(pdir.glob("*.jsonl")))
-                # Check if training is active
-                from core.realm_store import get_realm_state
-                state = get_realm_state()
-                is_training = state.get("training", {}).get("status") == "training"
+
+                # Check if training is active - use training_status.json (most reliable)
+                status_file = paths.get_status_dir() / "training_status.json"
+                if status_file.exists():
+                    import json
+                    with open(status_file) as f:
+                        training_status = json.load(f)
+                    is_training = training_status.get("status") == "training"
             except Exception:
                 pass
 

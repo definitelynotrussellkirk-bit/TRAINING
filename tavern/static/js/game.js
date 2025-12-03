@@ -1484,42 +1484,76 @@ function updateNextActionUI(campaign, momentum) {
         return;
     }
 
-    // Show recommendation
+    // Show recommendation based on kind
     const rec = campaign.recommendation;
-    if (!rec) {
-        titleEl.textContent = 'Ready to Train';
+    const queueFiles = campaign.queue_files || 0;
+
+    // Handle different recommendation kinds
+    if (!rec || rec.kind === 'train_steps') {
+        // Training recommendation (default)
+        if (queueFiles === 0) {
+            // Override: No queue data, must generate first
+            section.classList.add('needs-data');
+            titleEl.textContent = 'Generate Training Data';
+            bodyEl.innerHTML = `
+                <div style="margin-bottom: 0.75rem;">The quest board is empty. Generate training quests to begin.</div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                    <button class="action-btn secondary" onclick="toggleAutoQueue(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                        Enable Auto-Queue
+                    </button>
+                </div>
+            `;
+            btnEl.textContent = 'Generate 5,000 Examples';
+            btnEl.onclick = () => generateTrainingData(btnEl, 5000);
+            checkAutoQueueStatus();
+        } else {
+            // Has data, show training option
+            titleEl.textContent = rec?.title || 'Ready to Train';
+            const desc = rec?.description || 'Run a training session to push your hero further.';
+            const reason = rec?.reason ? ` (${rec.reason})` : '';
+            bodyEl.innerHTML = `
+                <div style="margin-bottom: 0.75rem;">${desc}${reason}</div>
+                <div style="margin-bottom: 0.5rem; font-size: 0.85rem; opacity: 0.8;">📋 ${queueFiles} quest${queueFiles !== 1 ? 's' : ''} in queue</div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                    <button class="action-btn secondary" onclick="toggleAutoRun(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                        Enable Auto-Run
+                    </button>
+                </div>
+            `;
+            const steps = rec?.suggested_steps || 2000;
+            btnEl.textContent = `Run ${steps.toLocaleString()} Steps`;
+            btnEl.onclick = () => startTraining(steps);
+            checkAutoRunStatus();
+        }
+    } else if (rec.kind === 'create_quest') {
+        // Need to generate data
+        section.classList.add('needs-data');
+        titleEl.textContent = rec.title;
         bodyEl.innerHTML = `
-            <div style="margin-bottom: 0.75rem;">Run a training session to push your hero further.</div>
+            <div style="margin-bottom: 0.75rem;">${rec.description}</div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
-                <button class="action-btn secondary" onclick="toggleAutoRun(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
-                    Enable Auto-Run
+                <button class="action-btn secondary" onclick="toggleAutoQueue(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                    Enable Auto-Queue
                 </button>
             </div>
         `;
-        btnEl.textContent = 'Run 2,000 Steps';
-        btnEl.onclick = () => startTraining(2000);
-
-        // Check auto-run status and update button
-        checkAutoRunStatus();
-        return;
+        btnEl.textContent = 'Generate 5,000 Examples';
+        btnEl.onclick = () => generateTrainingData(btnEl, 5000);
+        checkAutoQueueStatus();
+    } else if (rec.kind === 'wait') {
+        // Training in progress
+        section.classList.add('training-active');
+        titleEl.textContent = rec.title;
+        bodyEl.innerHTML = `<div style="margin-bottom: 0.75rem;">${rec.description}</div>`;
+        btnEl.textContent = 'Training...';
+        btnEl.disabled = true;
+    } else {
+        // Unknown kind, fallback
+        titleEl.textContent = rec.title || 'Next Step';
+        bodyEl.innerHTML = `<div style="margin-bottom: 0.75rem;">${rec.description || 'Continue your journey.'}</div>`;
+        btnEl.textContent = 'Continue';
+        btnEl.onclick = () => { window.location.href = '/campaign'; };
     }
-
-    titleEl.textContent = rec.title;
-    bodyEl.innerHTML = `
-        <div style="margin-bottom: 0.75rem;">${rec.description}${rec.reason ? ` (${rec.reason})` : ''}</div>
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
-            <button class="action-btn secondary" onclick="toggleAutoRun(this)" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
-                Enable Auto-Run
-            </button>
-        </div>
-    `;
-
-    const steps = rec.suggested_steps || 2000;
-    btnEl.textContent = `Run ${steps.toLocaleString()} Steps`;
-    btnEl.onclick = () => startTraining(steps);
-
-    // Check auto-run status and update button
-    checkAutoRunStatus();
 }
 
 /**

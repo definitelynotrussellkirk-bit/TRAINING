@@ -158,7 +158,7 @@ def serve_active_campaign(handler: "TavernHandler"):
     """
     try:
         from guild.campaigns import get_active_campaign
-        from guild.campaigns.recommendations import compute_recommendation
+        from guild.campaigns.recommendations import compute_recommendation_with_context
 
         base_dir = paths.get_base_dir()
         active = get_active_campaign(base_dir)
@@ -176,9 +176,33 @@ def serve_active_campaign(handler: "TavernHandler"):
                 data["effort_summary"] = active.get_effort_summary()
             except Exception:
                 data["effort_summary"] = None
-            # Add recommendation: "What should I do next?"
+
+            # Get queue status for smarter recommendations
+            queue_files = 0
+            is_training = False
             try:
-                data["recommendation"] = compute_recommendation(active)
+                queue_dir = paths.get_queue_dir()
+                for priority in ["high", "normal", "low"]:
+                    pdir = queue_dir / priority
+                    if pdir.exists():
+                        queue_files += len(list(pdir.glob("*.jsonl")))
+                # Check if training is active
+                from core.realm_store import get_realm_state
+                state = get_realm_state()
+                is_training = state.get("training", {}).get("status") == "training"
+            except Exception:
+                pass
+
+            # Add recommendation with full context
+            try:
+                data["recommendation"] = compute_recommendation_with_context(
+                    active,
+                    queue_files=queue_files,
+                    is_training=is_training,
+                )
+                # Also include queue info for UI
+                data["queue_files"] = queue_files
+                data["is_training"] = is_training
             except Exception as e:
                 logger.warning(f"Failed to compute recommendation: {e}")
                 data["recommendation"] = None

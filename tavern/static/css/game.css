@@ -1282,6 +1282,16 @@ body {
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
 }
 
+.next-action-card.needs-data {
+    border-color: var(--color-info);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), var(--bg-card));
+}
+
+.next-action-card.needs-data .next-action-title {
+    color: var(--color-info);
+}
+
 /* When training is active, move to bottom and collapse */
 .next-action-card.training-active {
     order: 99;

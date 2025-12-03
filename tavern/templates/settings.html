@@ -394,6 +394,101 @@
             color: var(--text-muted);
         }
 
+        /* Mantra Editor */
+        .mantra-editor {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+        }
+
+        .mantra-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .mantra-input {
+            width: 100%;
+            padding: var(--space-md);
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .mantra-input:focus {
+            outline: none;
+            border-color: var(--color-gold);
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+        }
+
+        .mantra-preview {
+            padding: var(--space-md);
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid var(--border-gold);
+            border-radius: var(--radius-md);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .mantra-actions {
+            display: flex;
+            gap: var(--space-sm);
+        }
+
+        .mantra-status {
+            font-size: 0.8rem;
+            padding: var(--space-xs);
+        }
+
+        .mantra-explainer {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .mantra-explainer p {
+            margin-bottom: var(--space-sm);
+        }
+
+        .mantra-explainer ul {
+            margin: var(--space-sm) 0;
+            padding-left: var(--space-lg);
+        }
+
+        .mantra-explainer li {
+            margin-bottom: var(--space-xs);
+        }
+
+        .mantra-explainer strong {
+            color: var(--color-gold);
+        }
+
+        .mantra-file {
+            margin-top: var(--space-md);
+            padding-top: var(--space-sm);
+            border-top: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .mantra-file code {
+            background: var(--bg-dark);
+            padding: 0.2rem 0.4rem;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+        }
+
         @media (max-width: 1200px) {
             .settings-layout {
                 grid-template-columns: 180px 1fr 240px;
@@ -455,6 +550,9 @@
             </button>
             <button class="settings-nav-item" data-section="data">
                 🔄 Data & Skills
+            </button>
+            <button class="settings-nav-item" data-section="mantra">
+                📜 Mantra
             </button>
             <button class="settings-nav-item" data-section="scheduler">
                 📚 Scheduler
@@ -709,6 +807,46 @@
                         <div class="form-row__value">
                             <input type="number" class="form-input form-input--number" id="self_correction_max" min="10" max="1000" value="200">
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MANTRA SECTION -->
+            <section class="settings-section" data-section="mantra">
+                <div class="settings-section__header">
+                    <h2 class="settings-section__title">The Mantra</h2>
+                    <p class="settings-section__desc">System prompt injected into every training example. Shapes the hero's core personality.</p>
+                </div>
+
+                <div class="form-section">
+                    <div class="form-section__title">Current Mantra</div>
+                    <div class="form-section__subtitle">This text is automatically prepended to all training data with the current date.</div>
+
+                    <div class="mantra-editor">
+                        <label class="mantra-label">Base Prompt (without date)</label>
+                        <textarea class="mantra-input" id="mantra_base_prompt" placeholder="Loading..." rows="3"></textarea>
+
+                        <label class="mantra-label">Preview (with date)</label>
+                        <div class="mantra-preview" id="mantra_preview">Loading...</div>
+
+                        <div class="mantra-actions">
+                            <button class="btn btn--primary" id="btn-save-mantra" disabled>Save Mantra</button>
+                            <button class="btn" id="btn-reset-mantra" disabled>Discard Changes</button>
+                        </div>
+                        <div class="mantra-status" id="mantraStatus"></div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="form-section__title">How It Works</div>
+                    <div class="mantra-explainer">
+                        <p>The Mantra provides:</p>
+                        <ul>
+                            <li><strong>Temporal Grounding</strong> - Date reference helps the model reconcile information changes over time</li>
+                            <li><strong>Positive Framing</strong> - Activates helpful and cooperative patterns in the model's latent space</li>
+                            <li><strong>Prosocial Bias</strong> - Encourages behaviors aligned with helping others</li>
+                        </ul>
+                        <p class="mantra-file">Source: <code>core/prompts.py</code></p>
                     </div>
                 </div>
             </section>
@@ -1648,6 +1786,114 @@
         }
 
         // ============================================
+        // MANTRA EDITOR
+        // ============================================
+
+        let originalMantra = null;
+        let currentMantra = null;
+        let mantraHasChanges = false;
+
+        async function loadMantra() {
+            try {
+                const res = await fetch('/mantra');
+                if (!res.ok) throw new Error('Failed to load mantra');
+                const data = await res.json();
+
+                originalMantra = data.base_prompt || '';
+                currentMantra = originalMantra;
+
+                $('#mantra_base_prompt').value = originalMantra;
+                updateMantraPreview();
+
+                mantraHasChanges = false;
+                $('#btn-save-mantra').disabled = true;
+                $('#btn-reset-mantra').disabled = true;
+            } catch (error) {
+                console.error('Failed to load mantra:', error);
+                $('#mantra_base_prompt').placeholder = 'Error loading mantra';
+                $('#mantra_preview').textContent = 'Error loading mantra';
+            }
+        }
+
+        function updateMantraPreview() {
+            const basePrompt = $('#mantra_base_prompt').value.trim();
+            const today = new Date().toISOString().split('T')[0];
+            const preview = basePrompt ? `Today is ${today}. ${basePrompt}` : '(empty)';
+            $('#mantra_preview').textContent = preview;
+        }
+
+        function checkMantraChanges() {
+            currentMantra = $('#mantra_base_prompt').value.trim();
+            mantraHasChanges = currentMantra !== originalMantra;
+
+            $('#btn-save-mantra').disabled = !mantraHasChanges || !currentMantra;
+            $('#btn-reset-mantra').disabled = !mantraHasChanges;
+
+            if (mantraHasChanges) {
+                setText('#mantraStatus', 'Unsaved changes');
+                $('#mantraStatus').style.color = 'var(--color-warning)';
+            } else {
+                setText('#mantraStatus', '');
+            }
+
+            updateMantraPreview();
+        }
+
+        async function saveMantra() {
+            const status = $('#mantraStatus');
+            const newPrompt = $('#mantra_base_prompt').value.trim();
+
+            if (!newPrompt) {
+                status.textContent = 'Mantra cannot be empty';
+                status.style.color = 'var(--color-danger)';
+                return;
+            }
+
+            status.textContent = 'Saving...';
+            status.style.color = 'var(--color-warning)';
+
+            try {
+                const res = await fetch('/mantra', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ base_prompt: newPrompt })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to save mantra');
+                }
+
+                originalMantra = newPrompt;
+                mantraHasChanges = false;
+                $('#btn-save-mantra').disabled = true;
+                $('#btn-reset-mantra').disabled = true;
+
+                status.textContent = 'Saved!';
+                status.style.color = 'var(--color-success)';
+                setTimeout(() => setText('#mantraStatus', ''), 2000);
+            } catch (error) {
+                status.textContent = `Error: ${error.message}`;
+                status.style.color = 'var(--color-danger)';
+            }
+        }
+
+        function resetMantra() {
+            $('#mantra_base_prompt').value = originalMantra;
+            mantraHasChanges = false;
+            $('#btn-save-mantra').disabled = true;
+            $('#btn-reset-mantra').disabled = true;
+            setText('#mantraStatus', '');
+            updateMantraPreview();
+        }
+
+        // Attach mantra event listeners
+        $('#mantra_base_prompt')?.addEventListener('input', checkMantraChanges);
+        $('#btn-save-mantra')?.addEventListener('click', saveMantra);
+        $('#btn-reset-mantra')?.addEventListener('click', resetMantra);
+
+        // ============================================
         // TIME DISPLAY
         // ============================================
 
@@ -1666,6 +1912,7 @@
             loadConfig().then(() => calculateVram());
         });
         loadScheduler();
+        loadMantra();
     </script>
 </body>
 </html>

@@ -100,12 +100,12 @@ stats = manager.get_stats()
 print(f"Approval rate: {stats['approval_rate']*100:.1f}%")
 ```
 
-## Integration with Training Daemon
+## Integration with Hero Loop
 
-The Data Manager is integrated into `core/training_daemon.py`:
+The Data Manager is integrated into `arena/hero_loop.py`:
 
 ```python
-# In training_daemon.py
+# In hero_loop.py
 from data_manager import DataManager
 
 manager = DataManager(base_dir, config)

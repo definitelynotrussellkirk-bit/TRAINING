@@ -1,0 +1,123 @@
+# =============================================================================
+# HERO: DANA - The Wise One
+# =============================================================================
+# DANA (دانا) means "wise, knowing" in Persian. Microsoft's Phi-3.5-mini
+# embodies compact wisdom - small size, impressive reasoning.
+# =============================================================================
+
+id: dana-phi3.5-mini
+name: "DANA"
+rpg_name: "The Wise One"
+description: >
+  A sage who packs centuries of wisdom into a small frame.
+  DANA proves that knowledge need not be vast to be profound,
+  offering clear insight and reasoned judgment in compact form.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "models/Phi-3.5-mini"
+  family: "phi"
+  architecture: "Phi3ForCausalLM"
+  size_b: 3.8
+  vocab_size: 32064
+  context_length: 128000  # 128K context!
+  rope_scaling: "longrope"
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+training_defaults:
+  precision: "bf16"
+  load_in_4bit: false
+  batch_size: 1
+  gradient_accumulation: 16
+  learning_rate: 0.0001
+  warmup_steps: 100
+  max_length: 2048
+  gradient_checkpointing: true
+  save_steps: 3000
+  save_total_limit: 25
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+qlora:
+  enabled: false
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "phi3_chat"
+  system_token: "<|system|>"
+  user_token: "<|user|>"
+  assistant_token: "<|assistant|>"
+  end_token: "<|end|>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+vram:
+  base_memory_gb: 7.5
+  per_batch_gb: 2.0
+  optimizer_overhead_gb: 15.0
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/dana.png"
+  color: "#6366F1"  # Indigo - wisdom and depth
+  emoji: "🦉"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin
+  - sy
+
+# =============================================================================
+# IDLE BEHAVIOR
+# =============================================================================
+idle_behavior:
+  enabled: true
+  skill_priorities:
+    bin: 0.6  # Strong at reasoning
+    sy: 0.4
+  generation:
+    batch_size: 2000
+    levels: [1, 2, 3]
+    min_queue_depth: 1
+
+# =============================================================================
+# TRAINER TYPE
+# =============================================================================
+trainer:
+  type: "ultimate"
+  optimizer: "adamw"
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  DANA (Phi-3.5-mini) Training Notes:
+
+  Etymology: دانا (dana) means "wise, knowing" in Persian
+
+  Family: Microsoft Phi-3.5 - optimized for reasoning
+
+  Strengths:
+  - Exceptional reasoning for its size
+  - Native 128K context (!)
+  - Strong math and logic capabilities
+  - Microsoft's training data curation
+
+  Architecture:
+  - Different attention patterns than Qwen/Llama
+  - Smaller vocabulary (32K)
+  - LongRoPE for extended context
+
+  Note: Chat template may need adjustment for best results

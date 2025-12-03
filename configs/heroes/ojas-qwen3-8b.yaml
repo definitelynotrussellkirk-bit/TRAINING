@@ -1,0 +1,136 @@
+# =============================================================================
+# HERO: OJAS - The Vital Force
+# =============================================================================
+# OJAS (ओजस्) means "vitality, vigor, life force" in Sanskrit.
+# A powerful hero requiring memory optimization to train on 24GB.
+# =============================================================================
+
+id: ojas-qwen3-8b
+name: "OJAS"
+rpg_name: "The Vital Force"
+description: >
+  A powerful spirit brimming with energy and potential.
+  OJAS brings raw capability to complex challenges, though
+  channeling such power requires careful resource management.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "models/Qwen3-8B"
+  family: "qwen3"
+  architecture: "Qwen3ForCausalLM"
+  size_b: 8.0
+  vocab_size: 151936
+  context_length: 4096
+  rope_scaling: "dynamic"
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+# Requires memory optimization for 24GB VRAM
+training_defaults:
+  precision: "bf16"
+  load_in_4bit: false
+  batch_size: 1
+  gradient_accumulation: 8
+  learning_rate: 0.00005
+  warmup_steps: 200
+  max_length: 1024  # Reduced for memory
+  gradient_checkpointing: true
+  save_steps: 1000
+  save_total_limit: 15
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+# Consider enabling for 24GB training
+qlora:
+  enabled: false
+  r: 64
+  alpha: 16
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "qwen3_chat"
+  system_token: "<|im_start|>system"
+  user_token: "<|im_start|>user"
+  assistant_token: "<|im_start|>assistant"
+  end_token: "<|im_end|>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+vram:
+  base_memory_gb: 16.0
+  per_batch_gb: 4.0
+  optimizer_overhead_gb: 32.0  # Full AdamW - use GaLore!
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/ojas.png"
+  color: "#EF4444"  # Red - power and energy
+  emoji: "⚡"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin
+  - sy
+
+# =============================================================================
+# IDLE BEHAVIOR
+# =============================================================================
+idle_behavior:
+  enabled: true
+  skill_priorities:
+    bin: 0.5
+    sy: 0.5
+  generation:
+    batch_size: 1000
+    levels: [1, 2, 3, 4, 5]
+    min_queue_depth: 1
+
+# =============================================================================
+# TRAINER TYPE
+# =============================================================================
+trainer:
+  type: "ultimate"
+  optimizer: "galore_8bit"  # Required for 24GB!
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  OJAS (Qwen3-8B) Training Notes:
+
+  Etymology: ओजस् (ojas) means "vitality, vigor, life force" in Sanskrit
+
+  IMPORTANT: Requires memory optimization for 24GB VRAM!
+  - Use GaLore 8-bit optimizer (16x memory reduction)
+  - Or enable QLoRA for adapter-only training
+  - Or use DeepSpeed ZeRO-3 offload
+
+  Strengths:
+  - Highest capacity in Qwen3 series (trainable on 24GB)
+  - Best for complex reasoning tasks
+  - Can achieve higher skill levels
+
+  Constraints:
+  - Slow training speed
+  - Reduced max_length (1024) for memory
+  - Requires careful hyperparameter tuning

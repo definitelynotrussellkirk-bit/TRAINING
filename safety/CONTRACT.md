@@ -13,7 +13,7 @@
 ### 1. daemon_watchdog.py
 
 **What it does:**
-- Monitors training_daemon.py health continuously
+- Monitors hero_loop.py health continuously
 - Auto-restarts daemon on crash or hang
 - Tracks restart attempts (max 3 in 5 min window)
 - Logs all events to logs/watchdog.log
@@ -109,7 +109,7 @@ python3 safety/crash_detector.py [--last-n-lines 1000]
 - `status/training_status.json`: Status file
 - `.daemon.pid`: Daemon PID
 - Directories: inbox, logs, status, queue, current_model
-- Files: config.json, train.py, training_daemon.py
+- Files: config.json, train.py, hero_loop.py
 
 **Thresholds:**
 - Min disk space: 50GB
@@ -201,7 +201,7 @@ $TRAINING_BASE_DIR/
 ├── .crash_history.json          # Crash history
 ├── core/
 │   ├── train.py
-│   └── training_daemon.py
+│   └── hero_loop.py
 ├── status/
 │   └── training_status.json     # Current training state
 ├── logs/
@@ -233,7 +233,7 @@ $TRAINING_BASE_DIR/
 ## 🚀 When to Use
 
 **Use daemon_watchdog.py when:**
-- training_daemon.py keeps crashing
+- hero_loop.py keeps crashing
 - Need auto-restart functionality
 - Monitoring daemon health manually
 
@@ -280,7 +280,7 @@ $TRAINING_BASE_DIR/
 
 **Last verified:** 2025-11-24
 **Training architecture:** Full model fine-tuning (no LoRA)
-**Daemon location:** core/training_daemon.py
+**Daemon location:** arena/hero_loop.py
 **Config location:** $TRAINING_BASE_DIR/config.json
 
 **Action items:**

@@ -700,7 +700,7 @@ python3 monitoring/api/server.py &
 ## 🤝 RELATED MODULES
 
 - **core/train.py** - Training loop (writes checkpoints)
-- **core/training_daemon.py** - Orchestrates training
+- **arena/hero_loop.py** - Autonomous training daemon
 - **core/training_status.py** - Status tracking
 - **management/** - Checkpoint management
 - **safety/** - Health checks & watchdogs

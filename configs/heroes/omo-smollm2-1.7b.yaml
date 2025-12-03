@@ -1,0 +1,121 @@
+# =============================================================================
+# HERO: OMO - The Curious Child
+# =============================================================================
+# OMO (ọmọ) means "child" in Yoruba. A small but eager learner
+# from HuggingFace's SmolLM2 family, embodying the joy of discovery.
+# =============================================================================
+
+id: omo-smollm2-1.7b
+name: "OMO"
+rpg_name: "The Curious Child"
+description: >
+  A bright young spirit approaching every lesson with wonder.
+  OMO learns quickly and asks the questions others overlook,
+  finding insight through innocent curiosity and tireless enthusiasm.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "models/SmolLM2-1.7B"
+  family: "smollm"
+  architecture: "LlamaForCausalLM"
+  size_b: 1.7
+  vocab_size: 49152
+  context_length: 8192
+  rope_scaling: null
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+training_defaults:
+  precision: "bf16"
+  load_in_4bit: false
+  batch_size: 2
+  gradient_accumulation: 8
+  learning_rate: 0.0003
+  warmup_steps: 100
+  max_length: 2048
+  gradient_checkpointing: true
+  save_steps: 5000
+  save_total_limit: 30
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+qlora:
+  enabled: false
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "llama_chat"
+  system_token: "<|begin_of_text|><|start_header_id|>system<|end_header_id|>"
+  user_token: "<|start_header_id|>user<|end_header_id|>"
+  assistant_token: "<|start_header_id|>assistant<|end_header_id|>"
+  end_token: "<|eot_id|>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+vram:
+  base_memory_gb: 3.5
+  per_batch_gb: 1.0
+  optimizer_overhead_gb: 7.0
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/omo.png"
+  color: "#FBBF24"  # Yellow - youthful energy
+  emoji: "🧒"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin
+  - sy
+
+# =============================================================================
+# IDLE BEHAVIOR
+# =============================================================================
+idle_behavior:
+  enabled: true
+  skill_priorities:
+    bin: 0.5
+    sy: 0.5
+  generation:
+    batch_size: 3000
+    levels: [1, 2]
+    min_queue_depth: 1
+
+# =============================================================================
+# TRAINER TYPE
+# =============================================================================
+trainer:
+  type: "ultimate"
+  optimizer: "adamw"
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  OMO (SmolLM2-1.7B) Training Notes:
+
+  Etymology: ọmọ (omo) means "child" in Yoruba
+
+  Family: HuggingFace SmolLM2 - optimized small language models
+
+  Strengths:
+  - Very fast training (small model)
+  - Efficient for iteration and prototyping
+  - 8K context length
+  - Can run batch_size > 1 on 24GB
+
+  Architecture:
+  - Llama-style architecture
+  - Different tokenizer than Qwen (49K vocab)
+  - Uses Llama chat template

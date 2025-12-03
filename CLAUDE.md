@@ -254,7 +254,7 @@ Skills are defined in `configs/skills/*.yaml` - YAML is the single source of tru
 |--------------|------------------|------|
 | **The Weaver** | Daemon orchestrator (`weaver/weaver.py`) | - |
 | **Tavern** | Game UI (`tavern/`) | 8888 |
-| **Arena** | Training daemon (`core/training_daemon.py`) | - |
+| **Arena** | Hero Loop (`arena/hero_loop.py`) | - |
 | **Guild** | Skills & progression (`guild/`) | - |
 | **Vault** | VaultKeeper API (`vault/server.py`) | 8767 |
 | **RealmState** | Real-time state service (`realm/server.py`) | 8866 |
@@ -500,6 +500,303 @@ Key files: `configs/domains/`, `configs/physics/`, `trainer/techniques.py`
 
 ---
 
+## 📦 QUEST MODULES (Shareable Content Packs)
+
+**Quest Modules** are shareable packages that extend the Hero's training curriculum.
+
+### The Vision
+
+Like "mods" for the training system:
+- Download quest packs from a registry
+- Create your own and share with the community
+- Compose multiple modules for custom curricula
+- Each module is self-contained and versioned
+
+### Module Structure
+
+```
+quests/modules/pattern-master/
+├── manifest.yaml          # Module metadata and dependencies
+├── skills/
+│   └── pattern_recognition.yaml
+├── data/
+│   ├── level1.jsonl
+│   ├── level2.jsonl
+│   └── level3.jsonl
+├── eval/
+│   └── test.jsonl
+└── README.md
+```
+
+### Manifest Format
+
+```yaml
+# manifest.yaml
+id: pattern-master
+name: "The Pattern Master's Challenge"
+version: "1.0.0"
+author: "questmaker"
+license: "CC-BY-4.0"
+
+description: |
+  A beginner-friendly quest module for learning basic pattern recognition.
+  Teaches the hero to identify, continue, and transform sequences.
+
+# What primitives this module exercises
+primitives:
+  required: [seq_continue, seq_transform, attn_select]
+  optional: [mem_context]
+
+# Minimum hero requirements
+requirements:
+  min_level: 5
+  prerequisites: []  # Other module IDs
+
+# Skills this module teaches
+skills:
+  - id: pattern_recognition
+    levels: [1, 2, 3]
+    max_level: 10
+
+# Data files with curriculum structure
+data:
+  - path: data/level1.jsonl
+    skill_level: 1
+    examples: 100
+    difficulty: 0.3
+  - path: data/level2.jsonl
+    skill_level: 2
+    examples: 100
+    difficulty: 0.5
+  - path: data/level3.jsonl
+    skill_level: 3
+    examples: 100
+    difficulty: 0.7
+
+# Evaluation configuration
+evaluation:
+  type: accuracy
+  threshold: 0.8
+  eval_set: eval/test.jsonl
+  evals_required: 3
+
+# Curriculum progression rules
+curriculum:
+  progression: accuracy_gated
+  min_accuracy_to_advance: 0.8
+  cooldown_on_fail: 100  # steps before retry
+```
+
+### Module Commands
+
+```bash
+# List installed modules
+python3 -m guild.modules list
+
+# Install from URL or local path
+python3 -m guild.modules install https://example.com/pattern-master.zip
+python3 -m guild.modules install ./my-module/
+
+# Validate module structure
+python3 -m guild.modules validate ./my-module/
+
+# Export module from existing skill
+python3 -m guild.modules export sy --output sy-module.zip
+
+# Show module info
+python3 -m guild.modules info pattern-master
+```
+
+### Composing Modules
+
+```yaml
+# configs/curriculum.yaml
+modules:
+  - id: pattern-master
+    priority: 1
+    weight: 0.4
+  - id: logic-basics
+    priority: 2
+    weight: 0.3
+  - id: format-json
+    priority: 3
+    weight: 0.3
+
+# Training will interleave quests from all modules by weight
+```
+
+---
+
+## 🧬 UNIFIED PRIMITIVES (Atomic Cognitive Operations)
+
+**Primitives** are the atomic cognitive operations that underlie all skills.
+
+### The Insight
+
+Skills are *composed* of primitives:
+- Primitives = Base stats (STR, DEX, INT)
+- Skills = Abilities that use combinations of stats
+- Transfer learning happens at the primitive level
+- Measuring primitives reveals *why* a skill is weak
+
+### The Primitive Categories
+
+| Category | Prefix | Description |
+|----------|--------|-------------|
+| **Sequence** | `seq_` | Pattern operations |
+| **Logic** | `logic_` | Deductive reasoning |
+| **Memory** | `mem_` | Context and recall |
+| **Format** | `fmt_` | Output structure |
+| **Attention** | `attn_` | Selection and counting |
+| **Transform** | `xfm_` | Data manipulation |
+
+### Primitive Definitions
+
+#### Sequence Operations (`seq_`)
+
+| Primitive | Description | Example |
+|-----------|-------------|---------|
+| `seq_continue` | Continue a pattern | `1, 2, 3, ?` → `4` |
+| `seq_reverse` | Reverse a sequence | `abc` → `cba` |
+| `seq_transform` | Apply transformation rule | `A→a, B→b, C→?` → `c` |
+| `seq_interleave` | Merge two sequences | `[1,2], [a,b]` → `[1,a,2,b]` |
+| `seq_extract` | Pull subsequence by rule | Every 3rd char of `abcdefghi` → `cfi` |
+
+#### Logic Operations (`logic_`)
+
+| Primitive | Description | Example |
+|-----------|-------------|---------|
+| `logic_deduce` | Modus ponens | `A→B, A ∴ B` |
+| `logic_contrapose` | Modus tollens | `A→B, ¬B ∴ ¬A` |
+| `logic_chain` | Transitive inference | `A→B, B→C ∴ A→C` |
+| `logic_disjunct` | Disjunctive syllogism | `A∨B, ¬A ∴ B` |
+| `logic_biconditional` | If and only if | `A↔B, A ∴ B` |
+
+#### Memory Operations (`mem_`)
+
+| Primitive | Description | Example |
+|-----------|-------------|---------|
+| `mem_recall` | Retrieve stated fact | "Bob is tall. Who is tall?" → "Bob" |
+| `mem_context` | Use context window | Multi-turn dialogue consistency |
+| `mem_compose` | Combine multiple facts | "A>B, B>C. Compare A and C" → "A>C" |
+| `mem_update` | Override previous info | "X=5. Now X=7. What is X?" → "7" |
+
+#### Format Operations (`fmt_`)
+
+| Primitive | Description | Example |
+|-----------|-------------|---------|
+| `fmt_json` | Output valid JSON | `{"key": "value"}` |
+| `fmt_table` | Output tabular data | Markdown table |
+| `fmt_code` | Syntactically correct code | Python function |
+| `fmt_list` | Numbered/bulleted list | `1. First\n2. Second` |
+| `fmt_structured` | Follow output template | Fill-in-the-blank |
+
+#### Attention Operations (`attn_`)
+
+| Primitive | Description | Example |
+|-----------|-------------|---------|
+| `attn_select` | Pick relevant from noise | Find the number in text |
+| `attn_count` | Count occurrences | "How many 'a's in 'banana'?" → 3 |
+| `attn_compare` | Compare two items | "Which is larger: 7 or 12?" |
+| `attn_filter` | Filter by condition | "List only even numbers" |
+| `attn_rank` | Order by criterion | "Sort by length" |
+
+#### Transform Operations (`xfm_`)
+
+| Primitive | Description | Example |
+|-----------|-------------|---------|
+| `xfm_encode` | Apply encoding scheme | Base64, ROT13 |
+| `xfm_decode` | Reverse encoding | Decode Base64 |
+| `xfm_map` | Apply function to each | Uppercase each word |
+| `xfm_reduce` | Aggregate to single value | Sum of list |
+| `xfm_substitute` | Replace by rule | `s/foo/bar/g` |
+
+### How Skills Map to Primitives
+
+```yaml
+# configs/skills/sy.yaml (extended)
+id: sy
+name: Syllacrostic
+primitives:
+  primary:
+    - seq_transform    # Apply degradation rules
+    - attn_select      # Find the hidden word
+  secondary:
+    - mem_context      # Remember the pattern
+    - fmt_structured   # Follow output format
+```
+
+```yaml
+# configs/skills/bin.yaml (extended)
+id: bin
+name: Binary Arithmetic
+primitives:
+  primary:
+    - logic_chain      # Multi-step arithmetic
+    - xfm_encode       # Circled notation encoding
+  secondary:
+    - attn_count       # Digit counting
+    - fmt_code         # Notation formatting
+```
+
+### Primitive Tracking
+
+```python
+from guild.primitives import PrimitiveTracker
+
+tracker = PrimitiveTracker()
+
+# Record primitive performance from evals
+tracker.record("seq_transform", accuracy=0.85, skill="sy", level=5)
+tracker.record("logic_chain", accuracy=0.72, skill="bin", level=3)
+
+# Get primitive profile
+profile = tracker.get_profile()
+# {
+#   "seq_transform": {"accuracy": 0.85, "samples": 150, "skills": ["sy"]},
+#   "logic_chain": {"accuracy": 0.72, "samples": 80, "skills": ["bin"]},
+#   ...
+# }
+
+# Find weak primitives
+weak = tracker.get_weak_primitives(threshold=0.75)
+# ["logic_chain"]
+
+# Suggest skills to strengthen a primitive
+suggestions = tracker.suggest_training("logic_chain")
+# ["bin", "logic-basics"]  # modules that exercise this primitive
+```
+
+### Primitive-Aware Curriculum
+
+The curriculum engine can use primitive profiles to:
+1. **Diagnose** - "SY accuracy is low because `seq_transform` is weak"
+2. **Prescribe** - "Train on `seq_transform` drills before continuing SY"
+3. **Transfer** - "Strong `attn_select` from SY should help with BIN filtering"
+4. **Compose** - "This new module requires `logic_chain` + `fmt_json` - hero is ready"
+
+### Creating Primitive Drills
+
+```yaml
+# quests/modules/seq-drills/manifest.yaml
+id: seq-drills
+name: "Sequence Primitive Drills"
+description: "Pure primitive training - no skill context"
+
+primitives:
+  required: [seq_continue, seq_reverse, seq_transform]
+
+# These are pure drills, not skill quests
+drill_mode: true
+```
+
+Drills are short, focused exercises that target a single primitive. They're used for:
+- Remediation when a primitive is identified as weak
+- Warming up before a complex skill
+- Testing primitive transfer between skills
+
+---
+
 ## 🎯 GAME ROADMAP (What's Missing)
 
 ### Phase 1: Actions from the Game
@@ -531,6 +828,15 @@ Key files: `configs/domains/`, `configs/physics/`, `trainer/techniques.py`
 - [ ] **Curriculum Hint** - Show suggested action based on strain analysis
 - [ ] **Efficiency Dashboard** - Compare skills by plastic_gain / effort
 - [ ] **Level Transition Log** - Effort spent per level-up
+
+### Phase 6: Quest Modules & Primitives
+- [ ] **Module Loader** - Install/validate quest modules from zip/URL
+- [ ] **Module Browser** - Browse available modules in Tavern
+- [ ] **Primitive Tracker** - Track per-primitive accuracy across skills
+- [ ] **Primitive Profile** - Visualize hero's cognitive strengths/weaknesses
+- [ ] **Module Composer** - Combine modules with weight/priority in UI
+- [ ] **Module Export** - Package existing skill as shareable module
+- [ ] **Community Registry** - Optional: browse/share modules online
 
 ---
 
@@ -614,8 +920,9 @@ Previous (2025-11-27):
 
 ### Documentation Policies
 
-1. **7 Canonical Docs** - Only write to these 7 files:
+1. **8 Canonical Docs** - Only write to these 8 files:
    - `README.md` - System overview
+   - `LORE.md` - Complete RPG vocabulary and metaphors
    - `QUICKSTART.md` - Getting started guide
    - `ARCHITECTURE.md` - How the system works
    - `TROUBLESHOOTING.md` - Common problems and solutions
@@ -891,7 +1198,7 @@ python3 core/garrison.py --daemon --interval 300 --maintenance-interval 1800
 ```
 
 Monitors:
-- **Trainer**: Disk usage, services (vault, tavern, training_daemon, eval_runner)
+- **Trainer**: Disk usage, services (vault, tavern, hero_loop, eval_runner)
 - **Inference server**: Disk usage, checkpoint count, API health, GPU memory
 
 Auto-maintenance:
@@ -1004,7 +1311,7 @@ $TRAINING_BASE_DIR/
 ├── vault/           # VaultKeeper API (port 8767)
 ├── guild/           # Skills, quests, progression
 ├── arena/           # Training execution
-├── core/            # Training system (train.py, training_daemon.py)
+├── core/            # Training system (train.py, training_queue.py)
 ├── trainer/         # TrainerEngine, optimizers, callbacks
 ├── workers/         # Distributed job workers
 ├── weaver/          # Daemon orchestrator

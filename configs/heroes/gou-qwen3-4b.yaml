@@ -1,0 +1,171 @@
+# =============================================================================
+# HERO: GOU - The Loyal Companion
+# =============================================================================
+# GOU (狗) is a Qwen3-4B model - faithful, reliable, and determined.
+# Named for the Chinese word for "dog" - representing loyalty and dedication
+# to learning through persistent effort.
+#
+# Started training: 2025-12-03
+# Current campaign: campaign-001 (Binary/Syllacrostic training)
+# =============================================================================
+
+id: gou-qwen3-4b
+name: "GOU"
+rpg_name: "The Loyal Companion"
+description: >
+  A faithful assistant who never gives up on a problem.
+  GOU brings the larger capacity of 4B parameters to tackle more complex
+  reasoning tasks while maintaining the same dedication to Binary Alchemy
+  and Word Weaving as his smaller companion DIO.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "models/Qwen3-4B-Instruct-2507"  # Local path
+  family: "qwen3"
+  architecture: "Qwen3ForCausalLM"
+  size_b: 4.0
+  vocab_size: 151936
+  context_length: 4096
+  rope_scaling: "dynamic"
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+# Calibrated for RTX 4090 (24GB VRAM) - more constrained than 0.6B
+training_defaults:
+  # Precision
+  precision: "bf16"
+  load_in_4bit: true  # 4-bit quantization for QLoRA
+
+  # Batch configuration - smaller due to model size
+  batch_size: 1
+  gradient_accumulation: 8    # Effective batch = 8
+
+  # Learning rate - slightly lower for larger model
+  learning_rate: 0.0001
+  warmup_steps: 100
+
+  # Context
+  max_length: 2048
+
+  # Memory optimization
+  gradient_checkpointing: true
+
+  # Checkpointing
+  save_steps: 1000
+  save_total_limit: 20
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+# GOU uses QLoRA for memory-efficient training on 24GB VRAM
+qlora:
+  enabled: true
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "qwen3_chat"
+  system_token: "<|im_start|>system"
+  user_token: "<|im_start|>user"
+  assistant_token: "<|im_start|>assistant"
+  end_token: "<|im_end|>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+# Calibrated for RTX 4090 (24GB)
+#
+# 4B model memory breakdown (full AdamW):
+#   - Model weights (bf16): ~8GB (4B × 2 bytes)
+#   - Optimizer states (fp32): ~16GB (4B × 4 bytes × 2 for m,v)
+#   - Activations: ~2.5GB per batch sample
+#
+# IMPORTANT: optimizer_overhead_gb is for FULL ADAMW.
+# The VRAM calculator applies multipliers for efficient optimizers:
+#   - adamw_8bit: 0.25x
+#   - galore: 0.25x
+#   - galore_8bit: 0.0625x (~16x reduction)
+#   - muon: 0.5x
+vram:
+  base_memory_gb: 8.0       # Model weights in bf16
+  per_batch_gb: 2.5         # Activations per batch sample
+  optimizer_overhead_gb: 16.0  # Full AdamW optimizer states (fp32)
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/gou.png"
+  color: "#F59E0B"             # Amber/gold - loyal and warm
+  emoji: "🐕"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin                        # Binary Alchemy - computational reasoning
+  - sy                         # Word Weaving - syllacrostic puzzles
+
+# =============================================================================
+# AUTONOMOUS HERO LOOP
+# =============================================================================
+idle_behavior:
+  enabled: true
+  skill_priorities:
+    bin: 0.5                   # 50% binary problems
+    sy: 0.5                    # 50% syllacrostic puzzles
+  generation:
+    batch_size: 2000           # Samples per generation run
+    levels: [1, 2]             # Skill levels to include
+    min_queue_depth: 1         # Generate when queue has fewer files
+
+# =============================================================================
+# TRAINER TYPE
+# =============================================================================
+trainer:
+  type: "ultimate"             # flo | ultimate | deepspeed
+  optimizer: "adamw"           # galore | muon | adamw
+
+# =============================================================================
+# LOCKED CONFIG (Required for TrainerConfig)
+# =============================================================================
+locked:
+  base_model: "models/Qwen3-4B-Instruct-2507"
+  model_architecture: "Qwen3ForCausalLM"
+  max_context_length: 4096
+  vocab_size: 151936
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  GOU (Qwen3-4B) Training Notes:
+
+  Strengths:
+  - Higher capacity than DIO (4B vs 0.6B parameters)
+  - Better at complex reasoning and longer sequences
+  - More headroom for learning advanced skill levels
+
+  Quirks:
+  - Slower training speed (~0.05 steps/sec at batch=1, grad_accum=8)
+  - Tighter VRAM constraints on 24GB card
+  - May need careful tuning for high-level skills
+
+  Historical:
+  - Training started 2025-12-03 from Qwen3-4B-Instruct-2507
+  - Focused on Binary (L1-2) and Syllacrostic (L1) skills

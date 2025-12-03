@@ -1,0 +1,137 @@
+# =============================================================================
+# HERO: MIRO - The Peace Broker
+# =============================================================================
+# MIRO (мир) means "peace, world" in Russian. Mistral 7B represents
+# the French AI renaissance - balanced, capable, and diplomatic.
+# =============================================================================
+
+id: miro-mistral-7b
+name: "MIRO"
+rpg_name: "The Peace Broker"
+description: >
+  A diplomat who finds harmony in conflict and balance in chaos.
+  MIRO brings measured wisdom to heated problems, mediating between
+  competing approaches to find solutions that serve all parties.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "models/Mistral-7B-v0.3"
+  family: "mistral"
+  architecture: "MistralForCausalLM"
+  size_b: 7.0
+  vocab_size: 32768
+  context_length: 32768
+  rope_scaling: null
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+# Requires memory optimization for 24GB VRAM
+training_defaults:
+  precision: "bf16"
+  load_in_4bit: false
+  batch_size: 1
+  gradient_accumulation: 8
+  learning_rate: 0.0001
+  warmup_steps: 150
+  max_length: 1536
+  gradient_checkpointing: true
+  save_steps: 1000
+  save_total_limit: 20
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+qlora:
+  enabled: false
+  r: 64
+  alpha: 16
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "mistral_chat"
+  system_token: "[INST]"
+  user_token: "[INST]"
+  assistant_token: "[/INST]"
+  end_token: "</s>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+vram:
+  base_memory_gb: 14.0
+  per_batch_gb: 3.5
+  optimizer_overhead_gb: 28.0  # Full AdamW - use GaLore!
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/miro.png"
+  color: "#14B8A6"  # Teal - balance and diplomacy
+  emoji: "🕊️"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin
+  - sy
+
+# =============================================================================
+# IDLE BEHAVIOR
+# =============================================================================
+idle_behavior:
+  enabled: true
+  skill_priorities:
+    bin: 0.5
+    sy: 0.5
+  generation:
+    batch_size: 1500
+    levels: [1, 2, 3, 4]
+    min_queue_depth: 1
+
+# =============================================================================
+# TRAINER TYPE
+# =============================================================================
+trainer:
+  type: "ultimate"
+  optimizer: "galore_8bit"  # Recommended for 24GB
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  MIRO (Mistral-7B-v0.3) Training Notes:
+
+  Etymology: мир (mir) means "peace, world" in Russian
+
+  Family: Mistral AI (French company)
+
+  IMPORTANT: Requires memory optimization for 24GB VRAM
+  - Use GaLore 8-bit optimizer
+  - Or enable QLoRA
+
+  Strengths:
+  - Strong general capabilities
+  - Efficient sliding window attention
+  - Good instruction following
+  - 32K context length
+
+  Architecture:
+  - Sliding window attention (4096)
+  - Grouped-query attention
+  - Different from Qwen/Llama patterns

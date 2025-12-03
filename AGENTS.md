@@ -4,13 +4,13 @@ Orientation for LLM/code agents working in this TRAINING repo. Two-GPU split sta
 
 ## Snapshot (2025-11-27)
 - Active hero: DIO (Qwen3-0.6B) campaign-001 (Binary+SY) ~184k steps; `control/state.json` shows idle (recovered) with active pointer in `control/active_campaign.json` → `campaigns/active/`.
-- Daemons run under The Weaver (`.pids/`): training_daemon, Tavern UI (8888), VaultKeeper (8767), data flow/autogen; start via `scripts/start_all.sh`, stop via `scripts/stop_all.sh`.
+- Daemons run under The Weaver (`.pids/`): hero_loop, Tavern UI (8888), VaultKeeper (8767), data flow/autogen; start via `scripts/start_all.sh`, stop via `scripts/stop_all.sh`.
 - Host registry: `config/hosts.json` v3 (4090 trainer trainer.local, 3090 inference inference.local, NAS storage) with zone warden on 8760; use `core/hosts.py` instead of hardcoded IPs.
 - Models/checkpoints: base `models/Qwen3-0.6B/`; active checkpoints in `current_model/` with `.ledger.json` sidecars and index at `status/checkpoint_ledger.json` (do not delete). TITAN (Qwen3-4B) hero available via `configs/heroes/titan-qwen3-4b.yaml` + `scripts/train_4b_full.py` (paged 8-bit Adam + Liger).
 - Data lineage + baselines: generator/validator versions tracked in `status/data_lineage.json` (requires `.meta.json` sidecars); transfer/skill baselines live in `status/baselines/` for dashboards and `skill_metrics`.
 
 ## Directory Map (what matters)
-- `core/` – Training stack (`train.py`, `training_daemon.py`, training_queue/controller, validation/spec + masking_validators, prompts), config_builder (hero→campaign merge), checkpoint_ledger, hosts.
+- `core/` – Training stack (`train.py`, training_queue/controller, validation/spec + masking_validators, prompts), config_builder (hero→campaign merge), checkpoint_ledger, hosts; hero_loop lives in `arena/`.
 - `guild/` – Skills/progression (sparring, task_master, quests), hero registry (`guild/heroes/*` + `configs/heroes/*.yaml`), campaign CLI; `campaigns/` holds per-hero runs (campaign.json, checkpoints/status/logs).
 - `data_manager/` – Curriculum-based autogen via local skill APIs (syllo 8080, binary 8090), quality checks, queueing; state in `data_manager/curriculum_state.json`.
 - `tavern/` – Game UI (port 8888: quests/oracle/settings/VRAM calc/scheduler/guild hall); `weaver/` orchestrates daemons (status/restart/shutdown).

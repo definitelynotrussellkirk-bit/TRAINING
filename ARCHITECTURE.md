@@ -8,7 +8,7 @@ Two-GPU architecture with distinct responsibilities:
 
 | GPU | Host ID | Role | Key Processes |
 |-----|---------|------|---------------|
-| **RTX 4090** | `4090` (trainer) | Training, evaluation, orchestration | training_daemon, model_comparison_engine, deployment_orchestrator |
+| **RTX 4090** | `4090` (trainer) | Training, evaluation, orchestration | hero_loop, model_comparison_engine, deployment_orchestrator |
 | **RTX 3090** | `3090` (inference) | Inference only | FastAPI server (port 8765) |
 
 **Note:** Concrete IPs, ports, and SSH users are defined in `config/hosts.json` and must not be hardcoded in code.
@@ -24,7 +24,7 @@ Two-GPU architecture with distinct responsibilities:
 │            (schema)          (content)                     │    │        │        │
 │                                  │                         │    │        ▼        │
 │                                  ▼                         │    │  Deployed Model │
-│                         training_daemon                    │    │  (checkpoint-N) │
+│                           hero_loop                        │    │  (checkpoint-N) │
 │                              │                             │    │                 │
 │                              ▼                             │    └────────▲────────┘
 │                    checkpoints/checkpoint-N                │             │
@@ -141,8 +141,8 @@ curl http://localhost:8081/api/lineage | jq .summary
 ├──────────────────────────────────────────────────────────────────┤
 │  Layer 2: ORCHESTRATION (decide what/when, never how)           │
 │                                                                  │
-│   core/training_daemon.py          core/training_queue.py       │
-│   (long-running scheduler)         (priority queue)              │
+│   arena/hero_loop.py               core/training_queue.py       │
+│   (autonomous trainer)             (priority queue)              │
 │         │                                │                       │
 │         └────────────────┬───────────────┘                       │
 │                          ▼                                       │
@@ -208,7 +208,7 @@ class TrainerEngine:
 
 ### Layer 2: Orchestration (Schedule Only)
 
-**Location:** `core/training_daemon.py`, `core/training_queue.py`
+**Location:** `arena/hero_loop.py`, `core/training_queue.py`
 
 **Responsibilities:**
 - Monitor inbox for new files
@@ -274,9 +274,8 @@ from transformers import Trainer  # NO! Don't import HF here
 |-----------|---------------|--------------|
 | `trainer/core/engine.py` | ✅ Canonical engine | ✅ Done |
 | `core/train.py` | ✅ Delegates to engine (legacy deprecated) | ✅ Done |
-| `core/training_daemon.py` | ✅ Uses TrainerEngine directly | ✅ Done |
+| `arena/hero_loop.py` | ✅ Uses TrainerEngine via factory | ✅ Done |
 | `training/cli.py` | ✅ Spawns hero loops (clean interface) | ✅ Done |
-| `arena/hero_loop.py` | ✅ Uses factory → engine trainers | ✅ Done |
 | `arena/trainers/*.py` | ✅ Delegates to TrainerEngine | ✅ Done |
 
 ### Verification Checklist
@@ -285,7 +284,7 @@ You've "done it right" when:
 
 1. ✅ Exactly one file implements the training loop: `trainer/core/engine.py`
 2. ✅ `training/cli.py` does not import model/dataset libs directly (spawns hero loops)
-3. ✅ `core/training_daemon.py` uses `TrainerEngine.run_job()` directly (no training inner loops)
+3. ✅ `arena/hero_loop.py` uses `TrainerEngine.run_job()` directly (no training inner loops)
 4. ✅ Arena trainers (`arena/trainers/*.py`) delegate to TrainerEngine
 5. ⬜ Swapping optimizers or models requires editing only `trainer/core/engine.py`
 
@@ -300,7 +299,7 @@ You've "done it right" when:
 | ConfigLoader | `trainer/config/loader.py` | JSON + CLI config merging |
 | DataProfile | `trainer/profiles/base.py` | Data transformation interface |
 | UltimateTrainer | `core/train.py` | Legacy wrapper → delegates to engine |
-| training_daemon | `core/training_daemon.py` | Queue processing orchestrator (Layer 2) |
+| hero_loop | `arena/hero_loop.py` | Autonomous trainer (Layer 2) |
 
 ### Job System (First-Class Job Abstraction)
 

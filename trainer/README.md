@@ -463,7 +463,7 @@ python3 -m pydoc trainer.core.engine
 ## 🤝 RELATED MODULES
 
 - **core/train.py** - Production training script (uses trainer/ internally)
-- **core/training_daemon.py** - Daemon that orchestrates training
+- **arena/hero_loop.py** - Autonomous training daemon
 - **core/training_status.py** - Status tracking (copied to trainer/monitoring/)
 - **core/custom_collator.py** - ChatML data collation
 - **core/logit_penalty.py** - Penalty system (used by profiles)

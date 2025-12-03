@@ -218,11 +218,11 @@ class TestStatusFileParsing:
 class TestKeyModulesImportable:
     """Test that key modules can be imported without errors"""
 
-    def test_import_training_daemon(self):
-        """Training daemon should be importable"""
+    def test_import_hero_loop(self):
+        """Hero loop module should be importable"""
         try:
-            from core.training_daemon import TrainingDaemon
-            assert TrainingDaemon is not None
+            import arena.hero_loop
+            assert arena.hero_loop is not None
         except ImportError as e:
             # May fail due to optional dependencies
             pytest.skip(f"Optional dependency missing: {e}")

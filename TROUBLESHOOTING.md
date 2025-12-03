@@ -19,7 +19,7 @@ Common problems and solutions for the training system.
 **Diagnosis:**
 ```bash
 # Check masking ratio in training logs
-grep "Masking verification" logs/training_daemon.log | tail -5
+grep "Masking verification" logs/hero_loop.log | tail -5
 
 # Should show 30-70% masked. If < 20%, training is broken!
 ```
@@ -48,12 +48,12 @@ python3 core/training_controller.py stop
 find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null
 
 # 3. Restart daemon (picks up fixed collator)
-pkill -f training_daemon
-nohup python3 core/training_daemon.py >> logs/training_daemon.log 2>&1 &
+pkill -f hero_loop
+nohup python3 arena/hero_loop.py >> logs/hero_loop.log 2>&1 &
 
 # 4. Verify masking is correct (should be 30-70% masked)
 sleep 30
-grep "Masking verification" logs/training_daemon.log | tail -3
+grep "Masking verification" logs/hero_loop.log | tail -3
 ```
 
 **Prevention:**
@@ -69,21 +69,21 @@ The masking validators now check:
 
 ### Daemon Not Running
 
-**Symptom:** No training happening, `ps aux | grep training_daemon` shows nothing
+**Symptom:** No training happening, `ps aux | grep hero_loop` shows nothing
 
 **Check:**
 ```bash
-ps aux | grep training_daemon | grep -v grep
+ps aux | grep hero_loop | grep -v grep
 ```
 
 **Solution:**
 ```bash
 # Restart daemon
-nohup python3 core/training_daemon.py > training_output.log 2>&1 &
+nohup python3 arena/hero_loop.py > training_output.log 2>&1 &
 
 # Verify it started
 sleep 2
-ps aux | grep training_daemon | grep -v grep
+ps aux | grep hero_loop | grep -v grep
 ```
 
 **Root causes:**
@@ -131,20 +131,20 @@ tail -100 logs/daemon_$(date +%Y%m%d).log
 
 **Check:**
 ```bash
-ps aux | grep "python3.*training_daemon" | grep -v grep | wc -l
+ps aux | grep "python3.*hero_loop" | grep -v grep | wc -l
 # Should return 1, not 2+
 ```
 
 **Solution:**
 ```bash
 # Kill all daemons
-pkill -f training_daemon
+pkill -f hero_loop
 
 # Wait for processes to die
 sleep 3
 
 # Start single daemon
-nohup python3 core/training_daemon.py > training_output.log 2>&1 &
+nohup python3 arena/hero_loop.py > training_output.log 2>&1 &
 ```
 
 ## Out of Memory (OOM) Errors
@@ -173,14 +173,14 @@ python3 tools/config/edit_config.py batch_size 8
 **Solution 2: Check for multiple processes**
 ```bash
 # Kill all training processes
-pkill -f training_daemon
+pkill -f hero_loop
 pkill -f "python.*train.py"
 
 # Clear GPU memory
 sleep 5
 
 # Restart daemon
-nohup python3 core/training_daemon.py > training_output.log 2>&1 &
+nohup python3 arena/hero_loop.py > training_output.log 2>&1 &
 ```
 
 **Solution 3: Reduce max_length (if data allows)**
@@ -231,16 +231,16 @@ cat status/training_status.json | jq .current_file
 **Solution:**
 ```bash
 # Check if daemon is running
-ps aux | grep training_daemon | grep -v grep
+ps aux | grep hero_loop | grep -v grep
 
 # If daemon running but stuck, kill it
-pkill -f training_daemon
+pkill -f hero_loop
 
 # Move file back to normal queue
 mv queue/processing/* queue/normal/
 
 # Restart daemon
-nohup python3 core/training_daemon.py > training_output.log 2>&1 &
+nohup python3 arena/hero_loop.py > training_output.log 2>&1 &
 ```
 
 ### Files Stuck in Failed Queue
@@ -290,11 +290,11 @@ cat logs/daemon_$(date +%Y%m%d).log | grep "inbox"
 1. **Daemon not polling:**
    ```bash
    # Check daemon running
-   ps aux | grep training_daemon | grep -v grep
+   ps aux | grep hero_loop | grep -v grep
 
    # Restart if needed
-   pkill -f training_daemon
-   nohup python3 core/training_daemon.py > training_output.log 2>&1 &
+   pkill -f hero_loop
+   nohup python3 arena/hero_loop.py > training_output.log 2>&1 &
    ```
 
 2. **File permissions:**
@@ -407,8 +407,8 @@ touch status/test.json && rm status/test.json
 **Solution:**
 ```bash
 # If daemon running but status not updating, restart
-pkill -f training_daemon
-nohup python3 core/training_daemon.py > training_output.log 2>&1 &
+pkill -f hero_loop
+nohup python3 arena/hero_loop.py > training_output.log 2>&1 &
 ```
 
 ## Disk Space Issues
@@ -496,7 +496,7 @@ ls .config_lock.json  # Should not exist
 nano config.json
 
 # Restart training
-nohup python3 core/training_daemon.py > training_output.log 2>&1 &
+nohup python3 arena/hero_loop.py > training_output.log 2>&1 &
 ```
 
 ### Invalid Config JSON
@@ -631,9 +631,9 @@ htop
 python3 tools/config/edit_config.py num_eval_samples 2
 
 # Restart daemon to clear memory
-pkill -f training_daemon
+pkill -f hero_loop
 sleep 5
-nohup python3 core/training_daemon.py > training_output.log 2>&1 &
+nohup python3 arena/hero_loop.py > training_output.log 2>&1 &
 ```
 
 ## Remote Connection Issues
@@ -660,7 +660,7 @@ ssh "${INFERENCE_SSH_USER}@${INFERENCE_HOST}" 'nvidia-smi'
 
 ```bash
 # 1. Stop everything
-pkill -f training_daemon
+pkill -f hero_loop
 pkill -f live_monitor
 pkill -f memory_stats
 pkill -f auto_disk_manager

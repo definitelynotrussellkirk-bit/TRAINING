@@ -1,0 +1,133 @@
+# =============================================================================
+# HERO: KAVI - The Creative Sage
+# =============================================================================
+# KAVI (कवि) means "poet, sage" in Sanskrit. A larger Qwen 2.5 model
+# with the eloquence of a poet and the wisdom of a sage.
+# =============================================================================
+
+id: kavi-qwen2.5-7b
+name: "KAVI"
+rpg_name: "The Creative Sage"
+description: >
+  A wordsmith who weaves wisdom into elegant expression.
+  KAVI approaches problems with both analytical rigor and
+  creative flair, crafting solutions that are as beautiful as they are effective.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "models/Qwen2.5-7B"
+  family: "qwen2.5"
+  architecture: "Qwen2ForCausalLM"
+  size_b: 7.0
+  vocab_size: 152064
+  context_length: 32768
+  rope_scaling: "dynamic"
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+# Requires memory optimization for 24GB VRAM
+training_defaults:
+  precision: "bf16"
+  load_in_4bit: false
+  batch_size: 1
+  gradient_accumulation: 8
+  learning_rate: 0.0001
+  warmup_steps: 150
+  max_length: 1536
+  gradient_checkpointing: true
+  save_steps: 1000
+  save_total_limit: 20
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+qlora:
+  enabled: false
+  r: 64
+  alpha: 16
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "qwen2_chat"
+  system_token: "<|im_start|>system"
+  user_token: "<|im_start|>user"
+  assistant_token: "<|im_start|>assistant"
+  end_token: "<|im_end|>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+vram:
+  base_memory_gb: 14.0
+  per_batch_gb: 3.5
+  optimizer_overhead_gb: 28.0  # Full AdamW - use GaLore!
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/kavi.png"
+  color: "#EC4899"  # Pink - creativity and expression
+  emoji: "✍️"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin
+  - sy
+
+# =============================================================================
+# IDLE BEHAVIOR
+# =============================================================================
+idle_behavior:
+  enabled: true
+  skill_priorities:
+    bin: 0.4
+    sy: 0.6  # Slightly prefers word puzzles (poet!)
+  generation:
+    batch_size: 1500
+    levels: [1, 2, 3, 4]
+    min_queue_depth: 1
+
+# =============================================================================
+# TRAINER TYPE
+# =============================================================================
+trainer:
+  type: "ultimate"
+  optimizer: "galore_8bit"  # Recommended for 24GB
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  KAVI (Qwen2.5-7B) Training Notes:
+
+  Etymology: कवि (kavi) means "poet, sage" in Sanskrit
+
+  IMPORTANT: May require memory optimization for 24GB VRAM
+  - Use GaLore 8-bit optimizer
+  - Or enable QLoRA
+
+  Strengths:
+  - Long native context (32K)
+  - Strong creative and analytical abilities
+  - Qwen 2.5 generation improvements
+
+  Positioning:
+  - Larger than GOU (4B) but with Qwen 2.5 improvements
+  - Good for creative and linguistic tasks

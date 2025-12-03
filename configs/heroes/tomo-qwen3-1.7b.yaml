@@ -1,0 +1,117 @@
+# =============================================================================
+# HERO: TOMO - The Social Connector
+# =============================================================================
+# TOMO (友) means "friend" in Japanese. A balanced hero between the tiny DIO
+# and the larger GOU, perfect for medium-complexity tasks with a friendly vibe.
+# =============================================================================
+
+id: tomo-qwen3-1.7b
+name: "TOMO"
+rpg_name: "The Social Connector"
+description: >
+  A friendly companion who builds bridges between ideas.
+  TOMO brings the warmth of connection to every problem,
+  finding common ground where others see only difference.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "models/Qwen3-1.7B"
+  family: "qwen3"
+  architecture: "Qwen3ForCausalLM"
+  size_b: 1.7
+  vocab_size: 151936
+  context_length: 4096
+  rope_scaling: "dynamic"
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+training_defaults:
+  precision: "bf16"
+  load_in_4bit: false
+  batch_size: 1
+  gradient_accumulation: 16
+  learning_rate: 0.0003
+  warmup_steps: 100
+  max_length: 2048
+  gradient_checkpointing: true
+  save_steps: 5000
+  save_total_limit: 30
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+qlora:
+  enabled: false
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "qwen3_chat"
+  system_token: "<|im_start|>system"
+  user_token: "<|im_start|>user"
+  assistant_token: "<|im_start|>assistant"
+  end_token: "<|im_end|>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+vram:
+  base_memory_gb: 3.5
+  per_batch_gb: 1.2
+  optimizer_overhead_gb: 7.0
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/tomo.png"
+  color: "#10B981"  # Green - friendship and growth
+  emoji: "🤝"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin
+  - sy
+
+# =============================================================================
+# IDLE BEHAVIOR
+# =============================================================================
+idle_behavior:
+  enabled: true
+  skill_priorities:
+    bin: 0.5
+    sy: 0.5
+  generation:
+    batch_size: 2000
+    levels: [1, 2, 3]
+    min_queue_depth: 1
+
+# =============================================================================
+# TRAINER TYPE
+# =============================================================================
+trainer:
+  type: "ultimate"
+  optimizer: "adamw"
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  TOMO (Qwen3-1.7B) Training Notes:
+
+  Etymology: 友 (tomo) means "friend" in Japanese, as in 友達 (tomodachi)
+
+  Strengths:
+  - Good balance between speed and capability
+  - Fits comfortably in 24GB VRAM with full fine-tuning
+  - Faster than 4B, more capable than 0.6B
+
+  Positioning:
+  - Middle ground between DIO (0.6B) and GOU (4B)
+  - Good for prototyping before scaling up

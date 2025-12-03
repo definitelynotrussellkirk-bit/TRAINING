@@ -1,0 +1,120 @@
+# =============================================================================
+# HERO: NEKO - The Curious Cat
+# =============================================================================
+# NEKO (猫) means "cat" in Japanese. A curious explorer from the
+# Qwen 2.5 generation, bringing fresh perspectives to familiar problems.
+# =============================================================================
+
+id: neko-qwen2.5-3b
+name: "NEKO"
+rpg_name: "The Curious Cat"
+description: >
+  An inquisitive spirit who explores every corner of a problem.
+  NEKO approaches challenges with feline curiosity, often finding
+  unexpected solutions through patient observation and pouncing insight.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "models/Qwen2.5-3B"
+  family: "qwen2.5"
+  architecture: "Qwen2ForCausalLM"
+  size_b: 3.0
+  vocab_size: 152064
+  context_length: 32768
+  rope_scaling: "dynamic"
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+training_defaults:
+  precision: "bf16"
+  load_in_4bit: false
+  batch_size: 1
+  gradient_accumulation: 16
+  learning_rate: 0.0002
+  warmup_steps: 100
+  max_length: 2048
+  gradient_checkpointing: true
+  save_steps: 3000
+  save_total_limit: 25
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+qlora:
+  enabled: false
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "qwen2_chat"
+  system_token: "<|im_start|>system"
+  user_token: "<|im_start|>user"
+  assistant_token: "<|im_start|>assistant"
+  end_token: "<|im_end|>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+vram:
+  base_memory_gb: 6.0
+  per_batch_gb: 1.8
+  optimizer_overhead_gb: 12.0
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/neko.png"
+  color: "#8B5CF6"  # Purple - curiosity and mystery
+  emoji: "🐈"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin
+  - sy
+
+# =============================================================================
+# IDLE BEHAVIOR
+# =============================================================================
+idle_behavior:
+  enabled: true
+  skill_priorities:
+    bin: 0.5
+    sy: 0.5
+  generation:
+    batch_size: 2000
+    levels: [1, 2, 3]
+    min_queue_depth: 1
+
+# =============================================================================
+# TRAINER TYPE
+# =============================================================================
+trainer:
+  type: "ultimate"
+  optimizer: "adamw"
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  NEKO (Qwen2.5-3B) Training Notes:
+
+  Etymology: 猫 (neko) means "cat" in Japanese
+
+  Generation: Qwen 2.5 (newer than Qwen 3 despite numbering!)
+
+  Strengths:
+  - Longer native context (32K vs 4K)
+  - Improved instruction following
+  - Good balance of size and capability
+
+  Differences from Qwen3:
+  - Different architecture (Qwen2ForCausalLM)
+  - Larger vocabulary (152064 vs 151936)
+  - Better at longer contexts

@@ -1,344 +1,271 @@
 # Quick Start Guide
 
-Get up and running with the training system in 5 minutes.
+Get up and running with the Realm of Training in 10 minutes.
 
 ## Prerequisites
 
 - **GPU:** 24GB VRAM (RTX 3090, RTX 4090, A5000, etc.)
 - **OS:** Linux (tested on Ubuntu)
 - **Python:** 3.10+
-- **Disk:** 50GB+ free space
+- **Disk:** 50GB+ free space (more for larger models)
 
-## Installation
+## Step 1: Clone & Bootstrap
 
 ```bash
-# Clone or navigate to training directory
-cd /path/to/TRAINING
+# Clone the repository
+git clone <repo-url> TRAINING
+cd TRAINING
 
-# Optional: set base dir for all commands
-export TRAINING_BASE_DIR="$(pwd)"
+# Run bootstrap to set up directories and configs
+./scripts/bootstrap_dev.sh
 
-# Install dependencies (if not already installed)
-pip install torch transformers datasets peft accelerate
-pip install bitsandbytes  # For potential 4-bit quantization
-pip install jq  # For JSON parsing in shell
+# Verify environment
+python3 -m training doctor
 ```
 
-## First-Time Setup
+The doctor will show what's ready and what needs attention.
 
-### 1. Verify Base Model Exists
+## Step 2: Download a Base Model
+
+Models go in the `models/` directory. Download using HuggingFace CLI:
 
 ```bash
-ls -lh models/Qwen3-0.6B/
-# Should show model.safetensors (~1.5GB)
-```
+# Install huggingface-cli if needed
+pip install huggingface_hub
 
-If missing, download from HuggingFace:
-```bash
-# Download Qwen3-0.6B
+# Download a model (choose one based on your GPU)
+# Small (fits any 24GB GPU easily):
 huggingface-cli download Qwen/Qwen3-0.6B --local-dir models/Qwen3-0.6B
+
+# Medium (good balance):
+huggingface-cli download Qwen/Qwen3-1.7B --local-dir models/Qwen3-1.7B
+
+# Larger (requires memory optimization):
+huggingface-cli download Qwen/Qwen3-4B --local-dir models/Qwen3-4B
 ```
 
-### 2. Initialize Current Model
+**Model recommendations by VRAM:**
+
+| VRAM | Recommended Models |
+|------|-------------------|
+| 24GB | Qwen3-0.6B, Qwen3-1.7B (full fine-tuning) |
+| 24GB | Qwen3-4B, Qwen3-8B (with GaLore/LoRA/QLoRA) |
+
+## Step 3: Create Your Hero
+
+Heroes are defined in `configs/heroes/`. Two heroes are pre-configured:
+
+| Hero | Model | Description |
+|------|-------|-------------|
+| **DIO** | Qwen3-0.6B | The Skeptic - fast training, good for learning |
+| **GOU** | Qwen3-4B | The Hound - larger model, more capable |
+
+To create a new hero, copy the template:
 
 ```bash
-# Copy base model to current_model/ for first training
+# Copy template
+cp configs/heroes/_template.yaml configs/heroes/my-hero.yaml
+# Edit to match your downloaded model
+```
+
+## Step 4: Start a Campaign
+
+A campaign links your hero to a model and tracks training progress.
+
+**Option A: Activate an existing hero (recommended for first run)**
+
+```bash
+# Create the active campaign file
+cat > control/active_campaign.json << 'EOF'
+{
+  "hero_id": "dio-qwen3-0.6b",
+  "campaign_id": "campaign-001",
+  "campaign_path": "campaigns/dio-qwen3-0.6b/campaign-001",
+  "started_at": "2025-12-03T00:00:00"
+}
+EOF
+
+# Create campaign directory
+mkdir -p campaigns/dio-qwen3-0.6b/campaign-001
+```
+
+**Option B: Use GOU (4B model)**
+
+```bash
+cat > control/active_campaign.json << 'EOF'
+{
+  "hero_id": "gou-qwen3-4b",
+  "campaign_id": "campaign-001",
+  "campaign_path": "campaigns/gou-qwen3-4b/campaign-001",
+  "started_at": "2025-12-03T00:00:00"
+}
+EOF
+
+mkdir -p campaigns/gou-qwen3-4b/campaign-001
+```
+
+## Step 5: Configure the Model Path
+
+Edit `config.json` to point to your model:
+
+```bash
+# For DIO (Qwen3-0.6B):
+python3 -c "
+import json
+with open('config.json') as f:
+    cfg = json.load(f)
+cfg['model_path'] = 'models/Qwen3-0.6B'
+cfg['base_model'] = 'models/Qwen3-0.6B'
+cfg['model_name'] = 'qwen3_0.6b'
+cfg['model_display_name'] = 'DIO - Qwen3-0.6B'
+with open('config.json', 'w') as f:
+    json.dump(cfg, f, indent=2)
+"
+```
+
+Or manually edit `config.json`:
+```json
+{
+  "model_name": "qwen3_0.6b",
+  "model_display_name": "DIO - Qwen3-0.6B",
+  "model_path": "models/Qwen3-0.6B",
+  "base_model": "models/Qwen3-0.6B",
+  ...
+}
+```
+
+## Step 6: Initialize Current Model
+
+Copy the base model to the training directory:
+
+```bash
+# Create current_model from base model
 cp -r models/Qwen3-0.6B/* models/current_model/
 ```
 
-### 3. Review Configuration
-
-```bash
-cat config.json
-```
-
-Key settings (values from `config.json`):
-- `batch_size`: 1 (with gradient_accumulation: 16)
-- `max_length`: 2048 (max tokens per example)
-- `eval_steps`: 500 (validation frequency)
-- `save_steps`: 1000 (checkpoint frequency)
-- `profile.name`: "emoji_think" (data transformation profile)
-
-## Basic Usage
-
-### Start Training System
+## Step 7: Start the Realm
 
 ```bash
 # Start all services
-scripts/start_all.sh
+python3 -m training start-all
 ```
 
 This launches:
-1. Training daemon (watches inbox/, processes queue)
-2. Auto disk manager (monitors disk space)
-3. Live monitor (web UI on port 8080)
-4. Unified monitoring API (port 8081) - aggregates all system metrics
+- **Tavern** (port 8888) - Game UI
+- **VaultKeeper** (port 8767) - Asset registry
+- **RealmState** (port 8866) - Real-time state
+- **Training Daemon** - Watches queue, runs training
 
-### Verify Services Running
+## Step 8: Visit the Tavern
 
+Open your browser to **http://localhost:8888**
+
+You should see:
+- **Hero Card** - Your hero with Level 1, 0 XP
+- **Status** - "Ready to train" (or "Idle" if no quests)
+- **Quest Board** - Empty (drop files in inbox to create quests)
+- **Vault** - Your base model checkpoint
+
+## Step 9: Start Training
+
+Training data goes in the `inbox/` directory as JSONL files.
+
+**Format:**
+```json
+{"messages": [{"role": "user", "content": "Question"}, {"role": "assistant", "content": "Answer"}]}
+```
+
+**Add training data:**
 ```bash
-# Check processes
-ps aux | grep -E "training_daemon|auto_disk_manager|live_monitor" | grep -v grep
+# Copy a training file
+cp /path/to/your/training_data.jsonl inbox/
 
-# Check daemon status
+# Or generate skill data (requires skill server running)
+python3 guild/data_gen.py --skill sy --level 1 --count 1000
+```
+
+The daemon will:
+1. Detect new files in inbox
+2. Move them to the queue
+3. Start training automatically
+
+Watch training in the Tavern UI or via command line:
+```bash
 python3 core/training_controller.py status
 ```
 
-### Add Training Data
-
-**Option 1: Drop file in inbox**
-```bash
-# Copy .jsonl file to inbox
-cp /path/to/your/training_data.jsonl inbox/
-
-# Daemon will auto-detect within 30 seconds
-```
-
-**Option 2: Add directly to queue**
-```bash
-# Add with priority
-python3 core/training_queue.py add /path/to/data.jsonl --priority high
-
-# Check queue
-python3 core/training_queue.py status
-```
-
-### Monitor Training
-
-**Web UI (recommended):**
-```
-Open browser: http://localhost:8080/live_monitor_ui_v2.html
-```
-
-Shows:
-- Real-time loss charts
-- GPU/RAM usage
-- Training progress
-- Time remaining
-
-**Command line:**
-```bash
-# Watch status
-watch -n 5 'cat status/training_status.json | jq .'
-
-# Tail logs
-tail -f logs/daemon_$(date +%Y%m%d).log
-
-# GPU monitoring
-watch -n 1 nvidia-smi
-```
-
-## Data Format
-
-Training files must be JSONL (JSON Lines) with OpenAI chat format:
-
-```json
-{"messages": [{"role": "user", "content": "What is 2+2?"}, {"role": "assistant", "content": "4"}]}
-{"messages": [{"role": "user", "content": "What is 3+3?"}, {"role": "assistant", "content": "6"}]}
-```
-
-**With system prompt:**
-```json
-{"messages": [{"role": "system", "content": "You are a math tutor."}, {"role": "user", "content": "What is 2+2?"}, {"role": "assistant", "content": "4"}]}
-```
-
-**Multi-turn conversations:**
-```json
-{"messages": [{"role": "user", "content": "Hi"}, {"role": "assistant", "content": "Hello! How can I help?"}, {"role": "user", "content": "What's 2+2?"}, {"role": "assistant", "content": "4"}]}
-```
-
-## Common Operations
-
-### Control Training
-
-```bash
-# Pause (finishes current step, then waits)
-python3 core/training_controller.py pause
-
-# Resume
-python3 core/training_controller.py resume
-
-# Stop (finishes current file, then exits)
-python3 core/training_controller.py stop
-
-# Emergency stop
-touch .stop
-```
-
-### Check Queue Status
-
-```bash
-# View queue
-python3 core/training_queue.py list
-
-# Check counts
-python3 core/training_queue.py status
-```
-
-### Create Model Snapshot
-
-```bash
-# After training milestone, create versioned snapshot
-python3 management/consolidate_model.py \
-  --description "Trained on 100k syllogistic examples"
-```
-
-This creates:
-- Numbered version (v001, v002, etc.)
-- Timestamped backup
-- Description file for tracking
-
-### Validate Data Before Training
-
-```bash
-# Check if data fits in max_length
-python3 tools/data/validate_data.py --file my_data.jsonl
-
-# Auto-adjust config if needed
-python3 tools/data/validate_data.py --auto-adjust
-```
-
-## Typical Workflow
-
-### 1. Prepare Training Data
-
-```bash
-# Example: Generate syllogistic logic data (requires remote inference)
-# This would be done on remote machine, then transferred here
-cp /from/remote/machine/syllo_data.jsonl inbox/
-```
-
-### 2. Start Training
-
-```bash
-# Start system if not running
-scripts/start_all.sh
-
-# Data auto-trains within 30 seconds
-```
-
-### 3. Monitor Progress
-
-```bash
-# Open web UI
-xdg-open http://localhost:8080/live_monitor_ui_v2.html
-
-# Or watch logs
-tail -f logs/daemon_$(date +%Y%m%d).log
-```
-
-### 4. Check Metrics
-
-```bash
-# Current training metrics
-cat status/training_status.json | jq '{step: .current_step, loss: .loss, val_loss: .validation_loss, gap: .val_train_gap}'
-
-# Interpret gap (validation_loss - training_loss):
-# < 0.3: Good generalization
-# 0.3-0.5: Monitor closely
-# > 0.5: Possible overfitting
-```
-
-### 5. Create Checkpoint
-
-```bash
-# After significant training (e.g., 10k steps)
-python3 management/consolidate_model.py \
-  --description "10k steps on logic data"
-```
-
-### 6. Test Model (on remote machine)
-
-Transfer latest checkpoint to remote inference server for testing:
-
-```bash
-# Copy to remote (see config/hosts.json for inference host details)
-rsync -avz models/current_model/ "${INFERENCE_HOST}:${INFERENCE_MODELS_DIR}/latest/"
-
-# Run inference on remote machine (not on this training machine)
-```
-
-## Health Checks
-
-### System Health
-
-```bash
-# Comprehensive check
-python3 safety/comprehensive_health_check.py
-
-# Quick check
-scripts/check_health.sh
-
-# State tracker
-python3 tools/analysis/state_tracker.py --check
-```
-
-### Common Issues
-
-**Daemon not running:**
-```bash
-ps aux | grep training_daemon | grep -v grep
-# If not found, restart:
-nohup python3 core/training_daemon.py > training_output.log 2>&1 &
-```
-
-**OOM errors:**
-```bash
-# Reduce batch size
-python3 tools/config/edit_config.py batch_size 16
-
-# Restart daemon
-pkill -f training_daemon
-sleep 3
-nohup python3 core/training_daemon.py > training_output.log 2>&1 &
-```
-
-**Queue stuck:**
-```bash
-# Check for stuck files
-ls -lh queue/processing/
-ls -lh queue/failed/
-
-# Move back to normal queue (if safe)
-mv queue/processing/* queue/normal/
-mv queue/failed/* queue/normal/
-```
-
-## Next Steps
-
-- Read **ARCHITECTURE.md** for deep dive into system design
-- Read **TROUBLESHOOTING.md** for detailed problem solving
-- Check **DEVELOPMENT.md** for contributing to the codebase
-- Track changes in **CHANGELOG.md**
+---
 
 ## Quick Reference
 
-**Key Directories:**
-- `inbox/` - Drop training files here
-- `queue/` - Priority queues (high/normal/low)
-- `models/current_model/` - Active training checkpoint
-- `logs/` - Training logs
-- `status/` - Real-time status JSON
+### Key Directories
 
-**Key Commands:**
+| Directory | Purpose |
+|-----------|---------|
+| `models/` | Downloaded base models |
+| `models/current_model/` | Active training checkpoint |
+| `configs/heroes/` | Hero definitions (YAML) |
+| `campaigns/` | Campaign data and analysis |
+| `control/` | Active campaign, state files |
+| `inbox/` | Drop training files here |
+| `queue/` | Training queue (high/normal/low) |
+| `status/` | Runtime status JSON |
+| `logs/` | Training logs |
+
+### Key Commands
+
 ```bash
-# Start system
-scripts/start_all.sh
+# System health
+python3 -m training doctor
+
+# Start/stop services
+python3 -m training start-all
+python3 -m training stop-all
 
 # Control training
-python3 core/training_controller.py [pause|resume|stop|status]
+python3 core/training_controller.py status
+python3 core/training_controller.py pause
+python3 core/training_controller.py resume
+python3 core/training_controller.py stop
 
 # Queue management
-python3 core/training_queue.py [add|list|status]
-
-# Health check
-python3 safety/comprehensive_health_check.py
-
-# Create snapshot
-python3 management/consolidate_model.py --description "..."
+python3 core/training_queue.py status
+python3 core/training_queue.py list
 ```
 
-**Key URLs:**
-- Main UI: http://localhost:8080/live_monitor_ui_v2.html
-- Unified API: http://localhost:8081/api/unified
-- Status JSON: http://localhost:8080/status/training_status.json
+### Key URLs
+
+| URL | Description |
+|-----|-------------|
+| http://localhost:8888 | Tavern - Main game UI |
+| http://localhost:8888/quests | Quest Board |
+| http://localhost:8888/oracle | Oracle - Chat with model |
+| http://localhost:8888/vault | Vault - Checkpoint browser |
+| http://localhost:8888/guild | Guild Hall - Skill progress |
+| http://localhost:8888/settings | Settings & VRAM calculator |
+
+### Common Issues
+
+**"No Hero" in Tavern:**
+- Check `control/active_campaign.json` exists
+- Verify hero config exists in `configs/heroes/`
+
+**"No model" or training errors:**
+- Verify `models/current_model/` contains model files
+- Check `config.json` model_path is correct
+
+**Training not starting:**
+- Check daemon is running: `ps aux | grep hero_loop`
+- Check queue has files: `python3 core/training_queue.py status`
+- Check inbox for stuck files: `ls inbox/`
+
+---
+
+## Next Steps
+
+1. **Add training data** - Drop JSONL files in `inbox/`
+2. **Watch progress** - Tavern UI shows real-time stats
+3. **Level up** - As accuracy improves, skills level up
+4. **Experiment** - Try different skills, models, techniques
+
+Read **CLAUDE.md** for the full game design document and system reference.

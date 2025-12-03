@@ -1381,7 +1381,7 @@ async function refreshNextAction() {
 /**
  * Update the Next Action UI based on campaign and momentum state
  */
-function updateNextActionUI(campaign, momentum) {
+async function updateNextActionUI(campaign, momentum) {
     const section = document.getElementById('nextActionSection');
     const titleEl = document.getElementById('nextActionTitle');
     const bodyEl = document.getElementById('nextActionBody');

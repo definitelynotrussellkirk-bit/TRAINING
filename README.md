@@ -288,7 +288,7 @@ When you open http://localhost:8888:
 - **Training Status** - Current battle progress, loss, step count
 - **Strain Zone** - Recovery/Productive/Stretch/Overload indicator
 - **GPU Monitor** - VRAM usage, temperature
-- **Navigation** - Battle, Guild, Quests, Vault, Oracle, Temple, Settings
+- **Navigation** - Battle, Guild, Campaign, Quests, Forge, Vault, Ledger, Oracle, Arcana, Temple, Garrison, Archaeology, Settings
 
 ### Quick Commands
 
@@ -301,18 +301,23 @@ python3 -m training status      # Show current status
 
 ---
 
-## Key URLs
+## Key URLs (Tavern Navigation)
 
-| Location | URL | Purpose |
-|----------|-----|---------|
-| **Tavern** | http://localhost:8888 | Main game UI |
-| **Quests** | http://localhost:8888/quests | Quest board |
-| **Jobs** | http://localhost:8888/jobs | Distributed job queue |
-| **Oracle** | http://localhost:8888/oracle | Chat with DIO |
-| **Vault** | http://localhost:8888/vault | Checkpoint browser |
-| **Guild** | http://localhost:8888/guild | Skill progression |
-| **Temple** | http://localhost:8888/temple | Validation rituals |
-| **Settings** | http://localhost:8888/settings | Config, VRAM calc |
+| Location | Icon | URL | Purpose |
+|----------|------|-----|---------|
+| **Battle** | ⚔️ | http://localhost:8888 | Watch training progress, live stats |
+| **Guild** | 🏰 | http://localhost:8888/guild | Skill progression (SY, BIN), curriculum |
+| **Campaign** | 🗺️ | http://localhost:8888/campaign | Manage campaigns, journey history |
+| **Quests** | 📜 | http://localhost:8888/quests | Training queue, priorities, data gen |
+| **Forge** | 🔥 | http://localhost:8888/forge | Data generation tools |
+| **Vault** | 🗝️ | http://localhost:8888/vault | Asset catalog, checkpoints, zones |
+| **Ledger** | 📖 | http://localhost:8888/ledger | Checkpoint history with timestamps |
+| **Oracle** | 🔮 | http://localhost:8888/oracle | Chat with any checkpoint |
+| **Arcana** | 🌀 | http://localhost:8888/arcana | Advanced DSL, experiments |
+| **Temple** | 🏛️ | http://localhost:8888/temple | Validation rituals, health checks |
+| **Garrison** | 🛡️ | http://localhost:8888/garrison | Fleet health, service monitoring |
+| **Archaeology** | 🔬 | http://localhost:8888/analysis | Layer drift, weight analysis |
+| **Settings** | ⚙️ | http://localhost:8888/settings | Config, VRAM calc, scheduler |
 
 ---
 

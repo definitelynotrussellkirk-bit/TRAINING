@@ -10,6 +10,7 @@ const NAV_ITEMS = [
     { href: '/quests', icon: '📜', label: 'Quests', id: 'quests' },
     { href: '/forge', icon: '🔥', label: 'Forge', id: 'forge' },
     { href: '/vault', icon: '🗝️', label: 'Vault', id: 'vault' },
+    { href: '/ledger', icon: '📖', label: 'Ledger', id: 'ledger' },
     { href: '/oracle', icon: '🔮', label: 'Oracle', id: 'oracle' },
     { href: '/arcana', icon: '🌀', label: 'Arcana', id: 'arcana' },
     { href: '/temple', icon: '🏛️', label: 'Temple', id: 'temple' },
@@ -347,6 +348,8 @@ function autoRenderNav() {
         activeId = 'forge';
     } else if (path.startsWith('/vault') || path.startsWith('/checkpoint')) {
         activeId = 'vault';
+    } else if (path.startsWith('/ledger')) {
+        activeId = 'ledger';
     } else if (path.startsWith('/oracle')) {
         activeId = 'oracle';
     } else if (path.startsWith('/arcana')) {

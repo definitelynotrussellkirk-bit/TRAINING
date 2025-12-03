@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkpoint Ledger - Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <link rel="stylesheet" href="/static/css/game.css?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .ledger-main {
+            padding: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .ledger-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .ledger-title {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .ledger-summary {
+            display: flex;
+            gap: 2rem;
+            background: var(--bg-card);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .summary-stat {
+            text-align: center;
+        }
+
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-gold);
+        }
+
+        .summary-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .ledger-filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filter-group label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .filter-group select, .filter-group input {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0.4rem 0.6rem;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .ledger-table-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .ledger-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .ledger-table th {
+            background: var(--bg-dark);
+            color: var(--text-muted);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .ledger-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .ledger-table tr:hover {
+            background: rgba(212, 165, 116, 0.05);
+        }
+
+        .ledger-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .step-link {
+            color: var(--color-gold);
+            text-decoration: none;
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+
+        .step-link:hover {
+            text-decoration: underline;
+        }
+
+        .loss-value {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        .loss-value.good { color: var(--color-success); }
+        .loss-value.medium { color: var(--color-warning); }
+        .loss-value.high { color: var(--color-danger); }
+
+        .location-badge {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            background: var(--bg-dark);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-right: 0.25rem;
+        }
+
+        .location-badge.primary {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--color-success);
+        }
+
+        .timestamp {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .best-badge {
+            background: linear-gradient(135deg, var(--color-gold), #b8860b);
+            color: var(--bg-dark);
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            margin-left: 0.5rem;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .pagination button {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            border-color: var(--color-gold);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            padding: 0.4rem 0.8rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <header class="game-header">
+        <div class="header-left">
+            <h1 class="game-title">Realm of Training</h1>
+        </div>
+        <div class="header-center">
+            <span class="realm-subtitle">Checkpoint Ledger</span>
+        </div>
+        <div class="header-right">
+            <span id="timeDisplay" class="time-display"></span>
+        </div>
+    </header>
+
+    <main class="ledger-main">
+        <div class="ledger-header">
+            <h2 class="ledger-title">
+                <span>📖</span> Checkpoint Ledger
+            </h2>
+            <div class="ledger-summary" id="ledgerSummary">
+                <div class="summary-stat">
+                    <div class="summary-value" id="totalCheckpoints">--</div>
+                    <div class="summary-label">Checkpoints</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="summary-value" id="bestStep">--</div>
+                    <div class="summary-label">Best Step</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="summary-value" id="bestLoss">--</div>
+                    <div class="summary-label">Best Loss</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="summary-value" id="totalLocations">--</div>
+                    <div class="summary-label">Locations</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ledger-filters">
+            <div class="filter-group">
+                <label>Sort by:</label>
+                <select id="sortBy" onchange="loadLedger()">
+                    <option value="step_desc">Step (newest)</option>
+                    <option value="step_asc">Step (oldest)</option>
+                    <option value="loss_asc">Loss (best)</option>
+                    <option value="loss_desc">Loss (worst)</option>
+                    <option value="created_desc">Created (recent)</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Device:</label>
+                <select id="filterDevice" onchange="loadLedger()">
+                    <option value="">All devices</option>
+                    <option value="trainer4090">trainer4090</option>
+                    <option value="inference3090">inference3090</option>
+                    <option value="synology_data">synology_data</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Show:</label>
+                <select id="pageSize" onchange="loadLedger()">
+                    <option value="25">25</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="ledger-table-container">
+            <table class="ledger-table">
+                <thead>
+                    <tr>
+                        <th>Step</th>
+                        <th>Loss</th>
+                        <th>LR</th>
+                        <th>Locations</th>
+                        <th>Created</th>
+                        <th>Last Used</th>
+                    </tr>
+                </thead>
+                <tbody id="ledgerBody">
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <div class="empty-state-icon">📖</div>
+                            <div>Loading checkpoint ledger...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination" id="pagination" style="display: none;">
+                <button id="prevPage" onclick="changePage(-1)">← Prev</button>
+                <span class="page-info" id="pageInfo">Page 1</span>
+                <button id="nextPage" onclick="changePage(1)">Next →</button>
+            </div>
+        </div>
+    </main>
+
+    <nav class="game-nav" id="bottomNav"></nav>
+    <script src="/static/js/nav.js"></script>
+
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+        let bestStep = null;
+
+        async function loadLedger() {
+            const sortBy = document.getElementById('sortBy').value;
+            const device = document.getElementById('filterDevice').value;
+            const pageSize = parseInt(document.getElementById('pageSize').value);
+
+            try {
+                // Load summary first
+                const summaryRes = await fetch('/ledger/summary');
+                const summary = await summaryRes.json();
+
+                document.getElementById('totalCheckpoints').textContent = summary.total_checkpoints?.toLocaleString() || '0';
+                document.getElementById('totalLocations').textContent = Object.keys(summary.by_device || {}).length;
+
+                // Load best checkpoint
+                const bestRes = await fetch('/ledger/best?metric=train_loss');
+                const best = await bestRes.json();
+
+                if (best && best.step) {
+                    bestStep = best.step;
+                    document.getElementById('bestStep').textContent = best.step.toLocaleString();
+                    document.getElementById('bestLoss').textContent = best.train_loss?.toFixed(4) || '--';
+                }
+
+                // Load checkpoint list
+                let url = `/ledger?limit=${pageSize}&offset=${(currentPage - 1) * pageSize}`;
+                if (device) url += `&device=${device}`;
+
+                const res = await fetch(url);
+                const data = await res.json();
+
+                const checkpoints = data.checkpoints || [];
+                totalPages = Math.ceil((data.total || checkpoints.length) / pageSize);
+
+                renderTable(checkpoints);
+                updatePagination();
+
+            } catch (err) {
+                console.error('Failed to load ledger:', err);
+                document.getElementById('ledgerBody').innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <div class="empty-state-icon">⚠️</div>
+                            <div>Failed to load ledger: ${err.message}</div>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function renderTable(checkpoints) {
+            const tbody = document.getElementById('ledgerBody');
+
+            if (!checkpoints.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <div class="empty-state-icon">📖</div>
+                            <div>No checkpoints recorded yet</div>
+                            <div style="margin-top: 0.5rem; font-size: 0.85rem;">
+                                Start training to create checkpoints
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = checkpoints.map(ckpt => {
+                const step = ckpt.step;
+                const isBest = step === bestStep;
+                const loss = ckpt.train_loss;
+                const lossClass = loss ? (loss < 0.5 ? 'good' : loss < 1.0 ? 'medium' : 'high') : '';
+
+                const locations = ckpt.locations || [];
+                const primaryDevice = ckpt.device_id;
+
+                const locationsHtml = locations.map(loc => {
+                    const isPrimary = loc === primaryDevice;
+                    return `<span class="location-badge${isPrimary ? ' primary' : ''}">${loc}</span>`;
+                }).join('');
+
+                const created = ckpt.created_at ? new Date(ckpt.created_at).toLocaleString() : '--';
+                const lastUsed = ckpt.last_used ? new Date(ckpt.last_used).toLocaleString() : '--';
+
+                return `
+                    <tr>
+                        <td>
+                            <a href="/checkpoint/${step}" class="step-link">${step.toLocaleString()}</a>
+                            ${isBest ? '<span class="best-badge">BEST</span>' : ''}
+                        </td>
+                        <td class="loss-value ${lossClass}">${loss?.toFixed(4) || '--'}</td>
+                        <td class="loss-value">${ckpt.learning_rate?.toExponential(2) || '--'}</td>
+                        <td>${locationsHtml || '<span class="location-badge">unknown</span>'}</td>
+                        <td class="timestamp">${created}</td>
+                        <td class="timestamp">${lastUsed}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updatePagination() {
+            const pagination = document.getElementById('pagination');
+            const pageInfo = document.getElementById('pageInfo');
+            const prevBtn = document.getElementById('prevPage');
+            const nextBtn = document.getElementById('nextPage');
+
+            if (totalPages > 1) {
+                pagination.style.display = 'flex';
+                pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+                prevBtn.disabled = currentPage <= 1;
+                nextBtn.disabled = currentPage >= totalPages;
+            } else {
+                pagination.style.display = 'none';
+            }
+        }
+
+        function changePage(delta) {
+            currentPage = Math.max(1, Math.min(totalPages, currentPage + delta));
+            loadLedger();
+        }
+
+        // Update time display
+        function updateTime() {
+            const el = document.getElementById('timeDisplay');
+            if (el) el.textContent = new Date().toLocaleTimeString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Initial load
+        loadLedger();
+    </script>
+</body>
+</html>

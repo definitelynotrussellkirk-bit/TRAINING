@@ -430,8 +430,17 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/vault/zones/refresh":
             self._serve_vault_zones(refresh=True)
 
+        # Ledger HTML page
+        elif path == "/ledger" or path == "/ledger.html":
+            # Check if requesting HTML (browser) or JSON (API)
+            accept = self.headers.get("Accept", "")
+            if "text/html" in accept or path.endswith(".html"):
+                self._serve_template("ledger.html")
+            else:
+                vault_api.serve_ledger_list(self, query)
+
         # Ledger API - checkpoint stats and history (uses vault_api)
-        elif path == "/ledger":
+        elif path == "/ledger/list":
             vault_api.serve_ledger_list(self, query)
         elif path == "/ledger/summary":
             vault_api.serve_ledger_summary(self)

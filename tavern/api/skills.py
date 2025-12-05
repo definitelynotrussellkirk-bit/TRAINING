@@ -63,6 +63,81 @@ def _get_passives_summary():
         return {}
 
 
+def _get_level_accuracy(skill_id: str, max_level: int = 20) -> dict:
+    """Get per-level accuracy breakdown from eval ledger.
+
+    Returns dict like: {1: 0.95, 2: 0.88, 3: 0.72, ...}
+    Only includes levels that have been evaluated.
+    """
+    try:
+        from core.evaluation_ledger import get_eval_ledger
+        base_dir = paths.get_base_dir()
+        ledger = get_eval_ledger(base_dir)
+
+        level_acc = {}
+        for level in range(1, max_level + 1):
+            evals = ledger.get_by_skill(skill_id, level=level)
+            if evals:
+                # Use the latest eval for this level
+                latest = evals[-1]
+                level_acc[level] = round(latest.accuracy, 2)
+
+        return level_acc
+    except Exception as e:
+        logger.debug(f"Could not load level accuracy for {skill_id}: {e}")
+        return {}
+
+
+def _get_strain_zone(accuracy: float) -> dict:
+    """Get strain zone based on recent accuracy.
+
+    Strain zones based on accuracy:
+    - Recovery: Accuracy > 90% (too easy, under-challenged)
+    - Productive: Accuracy 75-90% (optimal learning zone)
+    - Stretch: Accuracy 50-75% (challenging but sustainable)
+    - Overload: Accuracy < 50% (too hard)
+
+    Returns zone info with color, icon, and hint.
+    """
+    if accuracy is None or accuracy == 0:
+        return {
+            "zone": "unknown",
+            "zone_color": "#6b7280",
+            "zone_icon": "?",
+            "zone_hint": "No evaluation data"
+        }
+
+    # Accuracy is already a percentage (0-100)
+    if accuracy > 90:
+        return {
+            "zone": "recovery",
+            "zone_color": "#3b82f6",  # Blue
+            "zone_icon": "↓",
+            "zone_hint": "Under-challenged - ready to level up"
+        }
+    elif accuracy >= 75:
+        return {
+            "zone": "productive",
+            "zone_color": "#22c55e",  # Green
+            "zone_icon": "✓",
+            "zone_hint": "Optimal learning zone"
+        }
+    elif accuracy >= 50:
+        return {
+            "zone": "stretch",
+            "zone_color": "#f59e0b",  # Amber
+            "zone_icon": "↑",
+            "zone_hint": "Challenging - keep pushing"
+        }
+    else:
+        return {
+            "zone": "overload",
+            "zone_color": "#ef4444",  # Red
+            "zone_icon": "⚠",
+            "zone_hint": "Struggling - may need remediation"
+        }
+
+
 def _get_skills_data():
     """Load skill data from CurriculumManager, falling back to passives when empty."""
     try:
@@ -130,6 +205,12 @@ def _get_skills_data():
                     if ledger_count == 0 and passive_count > 0:
                         from_passives = True
 
+                    # Get per-level accuracy breakdown
+                    level_accuracy = _get_level_accuracy(skill_id, max_level=config.max_level)
+
+                    # Get strain zone based on recent accuracy
+                    strain_zone = _get_strain_zone(recent_acc)
+
                     skills.append({
                         "id": config.id,
                         "name": config.name,
@@ -148,6 +229,8 @@ def _get_skills_data():
                         "from_passives": from_passives,
                         "category": config.category.value if hasattr(config.category, 'value') else str(config.category),
                         "description": config.description or "",
+                        "level_accuracy": level_accuracy,
+                        **strain_zone,  # zone, zone_color, zone_icon, zone_hint
                     })
                 except Exception as e:
                     logger.warning(f"Failed to load skill {skill_id}: {e}")
@@ -175,6 +258,12 @@ def _get_skills_data():
                             effective_level = 1 + int((best_acc - 0.80) / 0.05)
                         effective_level = min(effective_level, config.max_level)
 
+                        # Get per-level accuracy breakdown (may be empty for passives-only)
+                        level_accuracy = _get_level_accuracy(skill_id, max_level=config.max_level)
+
+                        # Get strain zone based on recent accuracy
+                        strain_zone = _get_strain_zone(recent_acc)
+
                         skills.append({
                             "id": config.id,
                             "name": config.name,
@@ -193,6 +282,8 @@ def _get_skills_data():
                             "category": config.category.value if hasattr(config.category, 'value') else str(config.category),
                             "description": config.description or "",
                             "from_passives": True,  # Indicate data source
+                            "level_accuracy": level_accuracy,
+                            **strain_zone,  # zone, zone_color, zone_icon, zone_hint
                         })
                     except Exception as e:
                         logger.debug(f"Skipping skill {skill_id}: {e}")
@@ -314,6 +405,9 @@ def serve_skill_data(handler: "TavernHandler", skill_id: str):
         # Use passive_history if curriculum history is empty
         final_history = history[-20:] if history else passive_history[-20:]
 
+        # Get per-level accuracy breakdown
+        level_accuracy = _get_level_accuracy(skill_id, max_level=max_level)
+
         response = {
             "id": skill_id,
             "config": config,
@@ -325,6 +419,7 @@ def serve_skill_data(handler: "TavernHandler", skill_id: str):
                 "total_evals": total_evals,
                 "passive_evals": passive_count,  # Include passive count separately
                 "accuracy_history": final_history,
+                "level_accuracy": level_accuracy,
             },
             "is_active": cm.state.get("active_skill") == skill_id,
         }

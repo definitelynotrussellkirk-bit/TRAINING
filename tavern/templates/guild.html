@@ -163,6 +163,65 @@
             text-transform: uppercase;
         }
 
+        /* Level Accuracy Breakdown */
+        .level-accuracy-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            margin: 0.75rem 0;
+            padding: 0.5rem;
+            background: var(--bg-dark);
+            border-radius: 6px;
+        }
+
+        .level-accuracy-row .level-title {
+            width: 100%;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+        }
+
+        .level-block {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: bold;
+            color: rgba(0,0,0,0.7);
+            cursor: default;
+            transition: transform 0.1s;
+        }
+
+        .level-block:hover {
+            transform: scale(1.2);
+            z-index: 1;
+        }
+
+        .level-block.mastered { background: var(--color-success); }
+        .level-block.training { background: var(--color-warning); }
+        .level-block.struggling { background: var(--color-danger); }
+        .level-block.unknown { background: var(--bg-highlight); color: var(--text-secondary); }
+
+        /* Strain Zone Badge */
+        .strain-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .strain-badge .zone-icon {
+            font-size: 0.85rem;
+        }
+
         /* Passives Section */
         .passives-section {
             margin-top: 2rem;
@@ -549,7 +608,53 @@
                 return;
             }
 
-            grid.innerHTML = skills.map(skill => `
+            grid.innerHTML = skills.map(skill => {
+                // Build level accuracy blocks
+                const levelAccuracy = skill.level_accuracy || {};
+                const masteredLevel = skill.mastered_level || 0;
+                const trainingLevel = skill.training_level || masteredLevel + 1;
+                const maxLevel = skill.max_level || 30;
+
+                // Generate level blocks (show up to 20 or max_level, whichever is smaller)
+                const showLevels = Math.min(maxLevel, 20);
+                let levelBlocks = '';
+                for (let lvl = 1; lvl <= showLevels; lvl++) {
+                    const acc = levelAccuracy[lvl];
+                    let blockClass = 'unknown';
+                    let tooltip = `L${lvl}: Not evaluated`;
+
+                    if (acc !== undefined) {
+                        if (acc >= 0.8) {
+                            blockClass = 'mastered';
+                            tooltip = `L${lvl}: ${(acc * 100).toFixed(0)}% (mastered)`;
+                        } else if (acc >= 0.5) {
+                            blockClass = 'training';
+                            tooltip = `L${lvl}: ${(acc * 100).toFixed(0)}% (training)`;
+                        } else {
+                            blockClass = 'struggling';
+                            tooltip = `L${lvl}: ${(acc * 100).toFixed(0)}% (struggling)`;
+                        }
+                    }
+
+                    levelBlocks += `<div class="level-block ${blockClass}" title="${tooltip}">${lvl}</div>`;
+                }
+
+                // Only show level accuracy row if there's any data
+                const hasLevelData = Object.keys(levelAccuracy).length > 0;
+                const levelAccuracyRow = hasLevelData ? `
+                    <div class="level-accuracy-row">
+                        <div class="level-title">Level Accuracy</div>
+                        ${levelBlocks}
+                    </div>
+                ` : '';
+
+                // Build strain zone badge
+                const zoneColor = skill.zone_color || '#6b7280';
+                const zoneIcon = skill.zone_icon || '?';
+                const zoneName = skill.zone || 'unknown';
+                const zoneHint = skill.zone_hint || '';
+
+                return `
                 <div class="skill-card" onclick="window.location.href='/skill/${skill.id}'">
                     <div class="skill-header">
                         <div style="display: flex; align-items: center; gap: 1rem;">
@@ -561,28 +666,35 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="skill-level">L${skill.current_level}</div>
+                        <div style="text-align: right;">
+                            <div class="skill-level">L${skill.mastered_level || 0}</div>
+                            <div class="strain-badge" title="${zoneHint}" style="background: ${zoneColor}20; color: ${zoneColor}; border: 1px solid ${zoneColor}40;">
+                                <span class="zone-icon">${zoneIcon}</span>
+                                <span>${zoneName}</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="skill-progress">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                             <span style="font-size: 0.75rem; color: var(--text-secondary);">
-                                Training L${skill.training_level || skill.current_level + 1}
+                                Training L${skill.training_level || (skill.mastered_level || 0) + 1}
                             </span>
                             <span style="font-size: 0.75rem;">
-                                ${skill.progress_pct || 0}%
+                                ${skill.accuracy || 0}%
                             </span>
                         </div>
                         <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${skill.progress_pct || 0}%"></div>
+                            <div class="progress-fill" style="width: ${Math.min(skill.accuracy || 0, 100)}%"></div>
                         </div>
                     </div>
+                    ${levelAccuracyRow}
                     <div class="skill-stats">
                         <div class="stat">
-                            <div class="stat-value">${((skill.accuracy || 0) * 100).toFixed(0)}%</div>
-                            <div class="stat-label">Accuracy</div>
+                            <div class="stat-value">${skill.accuracy || 0}%</div>
+                            <div class="stat-label">Recent Acc</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-value">${skill.evals_at_level || 0}/3</div>
+                            <div class="stat-value">${skill.eval_count || 0}</div>
                             <div class="stat-label">Evals</div>
                         </div>
                         <div class="stat">
@@ -591,7 +703,7 @@
                         </div>
                     </div>
                 </div>
-            `).join('');
+            `;}).join('');
         }
 
         function renderPassives(data) {

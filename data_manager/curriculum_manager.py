@@ -102,6 +102,10 @@ class CurriculumManager:
         self.enabled = self.curriculum_config.get("enabled", True)
         self.min_evals = self.curriculum_config.get("min_evals_for_progression", 1)
 
+        # Level override: bypass curriculum progression for training
+        # Values: null (normal), "max" (always max level), or int (specific level)
+        self.level_override = self.curriculum_config.get("level_override", None)
+
     def _load_state(self) -> Dict:
         """Load curriculum state from disk"""
         if self.state_file.exists():
@@ -165,10 +169,28 @@ class CurriculumManager:
         return self.state["skills"][skill]["current_level"]
 
     def get_training_level(self, skill: str) -> int:
-        """Get the level currently being trained on (mastered + 1)."""
-        mastered = self.get_mastered_level(skill)
+        """
+        Get the level currently being trained on.
+
+        Normally: mastered + 1 (progressive curriculum)
+        With level_override:
+            - "max": Always return max level for skill
+            - int: Return that specific level
+        """
         skill_config = self.get_skill_config(skill)
         max_level = skill_config["total_levels"]
+
+        # Check for level override
+        if self.level_override == "max":
+            logger.debug(f"[{skill}] Level override: max ({max_level})")
+            return max_level
+        elif isinstance(self.level_override, int):
+            level = min(self.level_override, max_level)
+            logger.debug(f"[{skill}] Level override: {level}")
+            return level
+
+        # Normal: mastered + 1
+        mastered = self.get_mastered_level(skill)
         return min(mastered + 1, max_level)
 
     def get_current_level(self, skill: str) -> Dict[str, Any]:
@@ -417,6 +439,79 @@ class CurriculumManager:
             return True, new_level
 
         return False, None
+
+    def sync_mastery_from_evals(
+        self,
+        skill: str,
+        eval_results: List[Dict[str, Any]],
+        threshold: float = 0.8
+    ) -> int:
+        """
+        Sync mastery level based on evaluation results.
+
+        Used after full skill evaluation to catch up mastery level
+        when backfill evals show capability at higher levels.
+
+        Args:
+            skill: Skill ID
+            eval_results: List of {"level": int, "accuracy": float} dicts
+            threshold: Minimum accuracy to consider level mastered (default 0.8)
+
+        Returns:
+            New mastered level (may be unchanged if no improvement)
+        """
+        if skill not in self.state["skills"]:
+            self.state["skills"][skill] = {
+                "current_level": 0,
+                "accuracy_history": [],
+                "progression_history": []
+            }
+
+        skill_state = self.state["skills"][skill]
+        current_mastered = skill_state["current_level"]
+
+        # Group results by level
+        by_level = {}
+        for result in eval_results:
+            level = result.get("level")
+            accuracy = result.get("accuracy", 0)
+            if level is not None:
+                by_level[level] = accuracy
+
+        # Find highest CONSECUTIVE level passing threshold
+        # Must pass all levels 1..N to claim mastery at N
+        new_mastered = 0
+        for level in range(1, max(by_level.keys(), default=0) + 1):
+            if by_level.get(level, 0) >= threshold:
+                new_mastered = level
+            else:
+                break  # Gap found - can't claim higher mastery
+
+        # Only advance, never regress
+        if new_mastered > current_mastered:
+            skill_state["current_level"] = new_mastered
+            skill_state["progression_history"].append({
+                "earned_level": new_mastered,
+                "old_mastered": current_mastered,
+                "new_mastered": new_mastered,
+                "source": "sync_from_evals",
+                "timestamp": datetime.now().isoformat()
+            })
+            self._save_state()
+            logger.info(f"[{skill}] MASTERY SYNC: L{current_mastered} -> L{new_mastered}")
+
+            # Sync to RealmState
+            try:
+                from core.realm_store import update_skill
+                update_skill(
+                    skill,
+                    mastered_level=new_mastered,
+                    training_level=new_mastered + 1,
+                )
+            except Exception as e:
+                logger.debug(f"[{skill}] Failed to sync to RealmState: {e}")
+
+        return skill_state["current_level"]
 
     def get_status(self, skill: Optional[str] = None) -> Dict[str, Any]:
         """Get curriculum status for one or all skills."""

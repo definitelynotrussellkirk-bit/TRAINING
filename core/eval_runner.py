@@ -59,6 +59,61 @@ from core.battle_log import log_eval, format_eval_result
 import re
 
 
+def sync_skills_to_realm_state(base_dir: Path) -> bool:
+    """
+    Sync curriculum_state.json to RealmState service.
+
+    This ensures the Tavern UI shows current skill progress.
+    Returns True if sync successful, False otherwise.
+    """
+    try:
+        from core.realm_store import update_skills
+
+        curriculum_file = base_dir / "data_manager" / "curriculum_state.json"
+        if not curriculum_file.exists():
+            logger.debug("No curriculum_state.json to sync")
+            return False
+
+        with open(curriculum_file) as f:
+            curriculum = json.load(f)
+
+        # Extract skill data in format RealmState expects
+        # IMPORTANT: CurriculumManager uses 'current_level' as the mastered level.
+        # training_level is CALCULATED as mastered + 1, not stored.
+        # Ignore any spurious 'training_level' or 'mastered_level' fields in the JSON
+        # (these come from arcana/verbs which has a different data model).
+        skills_data = {}
+        for skill_id, skill_info in curriculum.get("skills", {}).items():
+            # current_level IS the mastered level in CurriculumManager
+            mastered = skill_info.get("current_level", 0)
+            training = mastered + 1  # Calculate, don't read from file
+
+            skills_data[skill_id] = {
+                "id": skill_id,
+                "current_level": mastered,  # For backward compat
+                "training_level": training,
+                "mastered_level": mastered,
+            }
+
+            # Get latest accuracy from history if available
+            history = skill_info.get("accuracy_history", [])
+            if history:
+                latest = history[-1]
+                skills_data[skill_id]["last_accuracy"] = latest.get("accuracy", 0)
+                skills_data[skill_id]["last_eval_step"] = latest.get("step")
+
+        active_skill = curriculum.get("active_skill")
+
+        # Push to RealmState
+        update_skills(skills=skills_data, active_skill=active_skill)
+        logger.debug(f"Synced {len(skills_data)} skills to RealmState")
+        return True
+
+    except Exception as e:
+        logger.warning(f"Failed to sync skills to RealmState: {e}")
+        return False
+
+
 def strip_thinking_tags(text: str) -> str:
     """Strip Qwen3 <think>...</think> tags from model output.
 
@@ -417,6 +472,9 @@ class EvalRunner:
             except Exception as e:
                 logger.debug(f"Failed to log to battle log: {e}")
 
+            # Sync skills to RealmState for Tavern UI
+            sync_skills_to_realm_state(self.base_dir)
+
             return self.eval_ledger.get(checkpoint_step, skill, level)
         else:
             logger.warning(f"Failed to record evaluation")
@@ -460,6 +518,18 @@ class EvalRunner:
                 results.append(result)
 
         logger.info(f"FULL eval complete: {skill} {len(results)}/{max_level} levels")
+
+        # Sync mastery level based on full eval results
+        if results:
+            try:
+                from data_manager.curriculum_manager import CurriculumManager
+                cm = CurriculumManager(self.base_dir, {})
+                eval_data = [{"level": r.level, "accuracy": r.accuracy} for r in results]
+                new_mastered = cm.sync_mastery_from_evals(skill, eval_data)
+                logger.info(f"[{skill}] Mastery synced to L{new_mastered} after full eval")
+            except Exception as e:
+                logger.warning(f"[{skill}] Failed to sync mastery: {e}")
+
         return results
 
     def run_passive_evaluation(
@@ -1167,10 +1237,12 @@ class EvalRunner:
 
         return processed
 
-    def process_all(self) -> Dict[str, int]:
+    def process_all(self, skills_only: bool = False) -> Dict[str, int]:
         """Process all pending evaluations."""
         skills_processed = self.process_skill_queue(limit=100)
-        passives_processed = self.process_passive_queue(limit=100)
+        passives_processed = 0
+        if not skills_only:
+            passives_processed = self.process_passive_queue(limit=100)
 
         return {
             "skills": skills_processed,
@@ -1280,6 +1352,7 @@ def run_daemon(
     interval: int = 60,
     inference_host: Optional[str] = None,
     inference_port: Optional[int] = None,
+    skills_only: bool = False,
 ):
     """Run eval runner as daemon."""
     import os
@@ -1289,7 +1362,8 @@ def run_daemon(
     pid_file = base_dir / ".pids" / "eval_runner.pid"
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     pid_file.write_text(str(os.getpid()))
-    logger.info(f"Starting eval runner daemon (interval={interval}s, pid={os.getpid()})")
+    mode_str = "skills-only" if skills_only else "full"
+    logger.info(f"Starting eval runner daemon (interval={interval}s, mode={mode_str}, pid={os.getpid()})")
 
     # Prune stale queue entries on startup (with full ledger cleanup)
     pruned = prune_stale_queues(base_dir, also_clean_ledger=True)
@@ -1301,6 +1375,9 @@ def run_daemon(
         inference_host=inference_host,
         inference_port=inference_port,
     )  # EvalRunner uses hosts.json if host/port not provided
+
+    # Initial sync of skills to RealmState
+    sync_skills_to_realm_state(base_dir)
 
     # Periodic cleanup settings
     cycle_count = 0
@@ -1338,11 +1415,11 @@ def run_daemon(
 
             # Check queues
             skill_pending = len(get_pending_evaluations())
-            passive_pending = len(get_pending_passives())
+            passive_pending = 0 if skills_only else len(get_pending_passives())
 
             if skill_pending > 0 or passive_pending > 0:
                 logger.info(f"Pending: {skill_pending} skills, {passive_pending} passives")
-                results = runner.process_all()
+                results = runner.process_all(skills_only=skills_only)
                 logger.info(f"Processed: {results['skills']} skills, {results['passives']} passives")
             else:
                 logger.debug("No pending evaluations")
@@ -1378,6 +1455,7 @@ Examples:
     parser.add_argument("--once", action="store_true", help="Process pending and exit")
     parser.add_argument("--status", action="store_true", help="Show detailed status")
     parser.add_argument("--backfill", action="store_true", help="Scan and queue missing evals")
+    parser.add_argument("--skills-only", action="store_true", help="Skip passive evals, only run skill evals")
 
     # Eval type filtering
     parser.add_argument("--type", choices=["quick", "full"], help="Filter by eval type")
@@ -1402,6 +1480,7 @@ Examples:
             interval=args.interval,
             inference_host=args.inference_host,
             inference_port=args.inference_port,
+            skills_only=args.skills_only,
         )
 
     elif args.once:

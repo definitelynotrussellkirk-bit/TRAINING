@@ -635,6 +635,7 @@ class LiveMonitorCallback(TrainerCallback):
                 # =========================================================
                 # QUEUE EVALUATIONS - Quick eval + LITE passives
                 # Also queue FULL eval every 5000 steps
+                # Skip if recent checkpoint already queued (min 100 steps gap)
                 # =========================================================
                 try:
                     from core.evaluation_ledger import queue_evaluation, queue_full_evaluation
@@ -649,17 +650,35 @@ class LiveMonitorCallback(TrainerCallback):
                         with open(curriculum_state_file) as f:
                             curriculum = json.load(f)
 
-                        # Queue QUICK eval for each active skill at current level
-                        for skill_id, skill_state in curriculum.get("skills", {}).items():
-                            current_level = skill_state.get("current_level", 1)
-                            queue_evaluation(
-                                checkpoint_step=state.global_step,
-                                skill=skill_id,
-                                level=current_level,
-                                eval_type="quick",
-                                priority=10,
-                            )
-                            print(f"📋 Queued quick eval: {skill_id} L{current_level}")
+                        # Check if we should skip (too close to last queued checkpoint)
+                        MIN_STEPS_BETWEEN_EVALS = 100
+                        should_queue = True
+                        queue_file = base_dir / "status" / "eval_queue.json"
+                        if queue_file.exists():
+                            try:
+                                with open(queue_file) as f:
+                                    queue_data = json.load(f)
+                                queued_steps = [e.get("checkpoint_step", 0) for e in queue_data.get("queue", [])]
+                                if queued_steps:
+                                    max_queued = max(queued_steps)
+                                    if state.global_step - max_queued < MIN_STEPS_BETWEEN_EVALS:
+                                        should_queue = False
+                                        print(f"⏭️  Skipping eval queue (step {state.global_step} too close to {max_queued})")
+                            except Exception:
+                                pass  # Queue if we can't read the file
+
+                        if should_queue:
+                            # Queue QUICK eval for each active skill at current level
+                            for skill_id, skill_state in curriculum.get("skills", {}).items():
+                                current_level = skill_state.get("current_level", 1)
+                                queue_evaluation(
+                                    checkpoint_step=state.global_step,
+                                    skill=skill_id,
+                                    level=current_level,
+                                    eval_type="quick",
+                                    priority=10,
+                                )
+                                print(f"📋 Queued quick eval: {skill_id} L{current_level}")
 
                         # Queue FULL eval every 5000 steps (all levels)
                         if state.global_step % 5000 == 0:

@@ -41,6 +41,10 @@ def verb_level_up(engine, *args):
     """Advance skill to next level.
 
     (level-up :skill sy)
+
+    Uses CurriculumManager's canonical data model:
+    - current_level = mastered level (highest level passed)
+    - training_level = current_level + 1 (calculated, not stored)
     """
     kwargs = _parse_kwargs(args)
     skill_id = kwargs.get('skill')
@@ -56,16 +60,17 @@ def verb_level_up(engine, *args):
     state = _get_curriculum_state(base_dir)
 
     if skill_id not in state.get('skills', {}):
+        # Initialize with canonical schema (current_level only, no spurious fields)
         state.setdefault('skills', {})[skill_id] = {
-            'current_level': 1,
-            'training_level': 1,
-            'mastered_level': 0,
-            'accuracy_history': []
+            'current_level': 0,  # 0 = nothing mastered yet
+            'accuracy_history': [],
+            'progression_history': []
         }
 
     skill = state['skills'][skill_id]
-    old_level = skill.get('training_level', 1)
-    new_level = old_level + 1
+    # current_level IS the mastered level in canonical schema
+    old_mastered = skill.get('current_level', 0)
+    new_mastered = old_mastered + 1
 
     # Check max level from skill config
     skill_entity = engine.world.get('skill', skill_id)
@@ -73,11 +78,12 @@ def verb_level_up(engine, *args):
     if skill_entity:
         max_level = skill_entity.get('max_level', 50)
 
-    if new_level > max_level:
+    if new_mastered > max_level:
         return {'error': f'{skill_id} already at max level {max_level}'}
 
-    skill['training_level'] = new_level
-    skill['current_level'] = new_level
+    # Only update current_level (the mastered level)
+    # Do NOT write training_level or mastered_level - these are calculated
+    skill['current_level'] = new_mastered
     state['last_updated'] = datetime.now().isoformat()
 
     _save_curriculum_state(base_dir, state)
@@ -85,8 +91,9 @@ def verb_level_up(engine, *args):
     return {
         'skill': skill_id,
         'action': 'level_up',
-        'old_level': old_level,
-        'new_level': new_level
+        'old_mastered': old_mastered,
+        'new_mastered': new_mastered,
+        'training_level': new_mastered + 1  # For display only
     }
 
 
@@ -94,6 +101,10 @@ def verb_level_down(engine, *args):
     """Regress skill to previous level.
 
     (level-down :skill sy)
+
+    Uses CurriculumManager's canonical data model:
+    - current_level = mastered level (highest level passed)
+    - Decreasing current_level means forgetting the highest mastered level
     """
     kwargs = _parse_kwargs(args)
     skill_id = kwargs.get('skill')
@@ -111,14 +122,15 @@ def verb_level_down(engine, *args):
         return {'error': f'{skill_id} not found'}
 
     skill = state['skills'][skill_id]
-    old_level = skill.get('training_level', 1)
-    new_level = max(1, old_level - 1)
+    # current_level IS the mastered level in canonical schema
+    old_mastered = skill.get('current_level', 0)
+    new_mastered = max(0, old_mastered - 1)  # 0 = nothing mastered
 
-    if new_level == old_level:
-        return {'error': f'{skill_id} already at level 1'}
+    if new_mastered == old_mastered:
+        return {'error': f'{skill_id} already at mastered level 0 (training on L1)'}
 
-    skill['training_level'] = new_level
-    skill['current_level'] = new_level
+    # Only update current_level (the mastered level)
+    skill['current_level'] = new_mastered
     state['last_updated'] = datetime.now().isoformat()
 
     _save_curriculum_state(base_dir, state)
@@ -126,15 +138,20 @@ def verb_level_down(engine, *args):
     return {
         'skill': skill_id,
         'action': 'level_down',
-        'old_level': old_level,
-        'new_level': new_level
+        'old_mastered': old_mastered,
+        'new_mastered': new_mastered,
+        'training_level': new_mastered + 1  # For display only
     }
 
 
 def verb_set_level(engine, *args):
-    """Set skill to specific level.
+    """Set skill to specific mastered level.
 
     (set-level :skill sy :level 3)
+
+    Uses CurriculumManager's canonical data model:
+    - current_level = mastered level (highest level passed)
+    - :level N means "set mastered level to N" (will train on N+1)
     """
     kwargs = _parse_kwargs(args)
     skill_id = kwargs.get('skill')
@@ -149,18 +166,19 @@ def verb_set_level(engine, *args):
     base_dir = engine.world.base_dir
     state = _get_curriculum_state(base_dir)
 
+    # Initialize with canonical schema if needed
     state.setdefault('skills', {}).setdefault(skill_id, {
-        'current_level': 1,
-        'training_level': 1,
-        'mastered_level': 0,
-        'accuracy_history': []
+        'current_level': 0,  # 0 = nothing mastered
+        'accuracy_history': [],
+        'progression_history': []
     })
 
     skill = state['skills'][skill_id]
-    old_level = skill.get('training_level', 1)
+    old_mastered = skill.get('current_level', 0)
+    new_mastered = max(0, int(level))  # Can't be negative
 
-    skill['training_level'] = int(level)
-    skill['current_level'] = int(level)
+    # Only update current_level (the mastered level)
+    skill['current_level'] = new_mastered
     state['last_updated'] = datetime.now().isoformat()
 
     _save_curriculum_state(base_dir, state)
@@ -168,8 +186,9 @@ def verb_set_level(engine, *args):
     return {
         'skill': skill_id,
         'action': 'set_level',
-        'old_level': old_level,
-        'new_level': int(level)
+        'old_mastered': old_mastered,
+        'new_mastered': new_mastered,
+        'training_level': new_mastered + 1  # For display only
     }
 
 
@@ -286,6 +305,10 @@ def verb_skill_status(engine, *args):
     """Get detailed skill status.
 
     (skill-status :skill sy)
+
+    Uses CurriculumManager's canonical data model:
+    - current_level = mastered level
+    - training_level = current_level + 1 (calculated)
     """
     kwargs = _parse_kwargs(args)
     skill_id = kwargs.get('skill')
@@ -302,14 +325,19 @@ def verb_skill_status(engine, *args):
     skill_state = state.get('skills', {}).get(skill_id, {})
     skill_entity = engine.world.get('skill', skill_id)
 
+    # Read from canonical schema
+    # current_level IS the mastered level
+    mastered_level = skill_state.get('current_level', 0)
+    training_level = mastered_level + 1  # Calculate, don't read
+
     # Compute stats
     history = skill_state.get('accuracy_history', [])
     recent = history[-5:] if history else []
 
     return {
         'skill': skill_id,
-        'training_level': skill_state.get('training_level', 1),
-        'mastered_level': skill_state.get('mastered_level', 0),
+        'mastered_level': mastered_level,
+        'training_level': training_level,
         'max_level': skill_entity.get('max_level', 50) if skill_entity else 50,
         'recent_evals': len(recent),
         'recent_accuracy': [h.get('accuracy', 0) for h in recent],
@@ -321,6 +349,10 @@ def verb_compare_skills(engine):
     """Compare all skills and identify which needs attention.
 
     (compare-skills)
+
+    Uses CurriculumManager's canonical data model:
+    - current_level = mastered level
+    - training_level = current_level + 1 (calculated)
     """
     base_dir = engine.world.base_dir
     state = _get_curriculum_state(base_dir)
@@ -333,11 +365,16 @@ def verb_compare_skills(engine):
         skill_entity = engine.world.get('skill', skill_id)
         max_level = skill_entity.get('max_level', 50) if skill_entity else 50
 
+        # Use canonical schema: current_level IS mastered level
+        mastered = skill_state.get('current_level', 0)
+        training = mastered + 1
+
         results.append({
             'skill': skill_id,
-            'level': skill_state.get('training_level', 1),
+            'mastered_level': mastered,
+            'training_level': training,
             'max_level': max_level,
-            'progress_pct': (skill_state.get('training_level', 1) / max_level) * 100,
+            'progress_pct': (mastered / max_level) * 100,
             'recent_accuracy': recent_acc,
             'evals': len(history),
         })

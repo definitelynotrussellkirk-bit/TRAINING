@@ -1155,14 +1155,11 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
     def _proxy_realm_sse(self):
         """Proxy SSE stream from RealmState service to client."""
-        import urllib.request
-        import urllib.error
-
-        # Get RealmState service URL
+        # Get RealmState service URL (urllib.request/error imported at module level)
         try:
             from core.hosts import get_service_url
             realm_url = get_service_url("realm_state") or "http://localhost:8866"
-        except:
+        except Exception:
             realm_url = "http://localhost:8866"
 
         sse_url = f"{realm_url}/api/stream"
@@ -1201,8 +1198,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
                 error_msg = f"event: error\ndata: {{\"message\": \"RealmState service unavailable\"}}\n\n"
                 self.wfile.write(error_msg.encode())
                 self.wfile.flush()
-            except:
-                pass
+            except Exception:
+                pass  # Client disconnected
         except Exception as e:
             logger.error(f"SSE proxy error: {e}")
 
@@ -2478,8 +2475,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
                     current_step = status_data.get("current_step", 0)
                     current_file = status_data.get("current_file")
                     last_update = status_data.get("timestamp")
-                except:
-                    pass
+                except Exception:
+                    pass  # Status file unreadable
 
             # Get control signals
             control_dir = BASE_DIR / "control"
@@ -3124,8 +3121,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
                     with open(self_corr_status) as f:
                         sc_data = json.load(f)
                         last_self_corr = sc_data.get("last_run")
-                except:
-                    pass
+                except Exception:
+                    pass  # Status file unreadable
             generators["self_correction"] = {
                 "enabled": self_corr.get("enabled", False),
                 "last_run": last_self_corr,
@@ -3146,8 +3143,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
                     with open(discrim_status) as f:
                         disc_data = json.load(f)
                         last_discrim = disc_data.get("last_run")
-                except:
-                    pass
+                except Exception:
+                    pass  # Status file unreadable
             generators["discrimination"] = {
                 "enabled": True,  # No config toggle currently
                 "last_run": last_discrim,

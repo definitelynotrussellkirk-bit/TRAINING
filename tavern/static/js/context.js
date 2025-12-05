@@ -228,5 +228,3 @@ window.formatMetric = function(name, value) {
         return value.toLocaleString();
     }
 };
-
-console.log('Context helpers loaded');

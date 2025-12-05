@@ -87,6 +87,11 @@ class CheckpointRecord:
     skill_level: Optional[int] = None
     total_examples_trained: Optional[int] = None
 
+    # === HERO TRACKING (v1.2.0) ===
+    # Which hero owns this checkpoint
+    hero_id: Optional[str] = None  # e.g., "ojas-qwen3-8b", "dio-qwen3-0.6b"
+    campaign_id: Optional[str] = None  # e.g., "campaign-001"
+
     # Physical properties
     size_bytes: Optional[int] = None
     has_optimizer: bool = True
@@ -95,9 +100,26 @@ class CheckpointRecord:
     last_used: Optional[str] = None  # ISO timestamp of last use (inference, eval, etc.)
     locations: List[str] = field(default_factory=list)  # device_ids where this checkpoint exists
 
+    # === SKILL METRICS (v1.1.0) ===
+    # Per-skill metrics at checkpoint time for curriculum decisions
+    # Format: {"sy": {"accuracy": 0.85, "level": 8, "eval_count": 3}, "bin": {...}}
+    skill_metrics: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+
+    # Current skill levels at save time (snapshot for curriculum)
+    # Format: {"sy": 8, "bin": 5}
+    skill_levels_at_save: Dict[str, int] = field(default_factory=dict)
+
+    # Linked eval IDs - references to EvaluationLedger records
+    # Format: ["checkpoint_step:skill:level", ...]
+    linked_eval_ids: List[str] = field(default_factory=list)
+
+    # Cumulative effort per skill at checkpoint time (from StrainTracker)
+    # Format: {"sy": 150.5, "bin": 89.2}
+    skill_effort_at_save: Dict[str, float] = field(default_factory=dict)
+
     # Metadata
     created_by: str = "training_daemon"
-    ledger_version: str = "1.0.0"
+    ledger_version: str = "1.2.0"  # Added hero_id, campaign_id
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -495,7 +517,48 @@ class CheckpointLedger:
         # Sync to VaultKeeper catalog (outside lock)
         self._sync_to_vault(record)
 
+        # Capture curriculum state at save time (v1.1.0)
+        self._capture_curriculum_state_at_save(record)
+
         return record
+
+    def _capture_curriculum_state_at_save(self, record: CheckpointRecord) -> None:
+        """
+        Capture curriculum state (skill levels, effort) at checkpoint save.
+
+        Non-fatal: errors are logged but don't affect checkpoint saving.
+        """
+        try:
+            skill_levels: Dict[str, int] = {}
+            skill_effort: Dict[str, float] = {}
+
+            # Get skill levels from curriculum state
+            curriculum_state_file = self.base_dir / "data_manager" / "curriculum_state.json"
+            if curriculum_state_file.exists():
+                with open(curriculum_state_file) as f:
+                    state = json.load(f)
+                for skill_id, skill_state in state.get("skills", {}).items():
+                    skill_levels[skill_id] = skill_state.get("current_level", 1)
+
+            # Get effort from active campaign
+            try:
+                from guild.campaigns.loader import load_active_campaign
+                campaign = load_active_campaign()
+                if campaign:
+                    skill_effort = dict(campaign.skill_effort)
+            except Exception:
+                pass
+
+            # Update record (no lock needed - we just created it)
+            if skill_levels or skill_effort:
+                record.skill_levels_at_save = skill_levels
+                record.skill_effort_at_save = skill_effort
+                # Re-save to include the new data
+                with self._lock:
+                    self._save_index()
+
+        except Exception as e:
+            logger.debug(f"Could not capture curriculum state at save: {e}")
 
     def _update_campaign_peak_loss(
         self,
@@ -681,13 +744,19 @@ class CheckpointLedger:
         max_step = max(self._index.keys())
         return self._index[max_step]
 
-    def get_best(self, metric: str = "train_loss", lower_is_better: bool = True) -> Optional[CheckpointRecord]:
+    def get_best(
+        self,
+        metric: str = "train_loss",
+        lower_is_better: bool = True,
+        hero_id: Optional[str] = None,
+    ) -> Optional[CheckpointRecord]:
         """
         Get the best checkpoint by a metric.
 
         Args:
             metric: Metric name (train_loss, val_loss, accuracy, perplexity)
             lower_is_better: Whether lower values are better
+            hero_id: Only consider checkpoints for this hero (optional)
 
         Returns:
             Best checkpoint record or None
@@ -695,6 +764,17 @@ class CheckpointLedger:
         self._ensure_fresh()
         candidates = []
         for record in self._index.values():
+            # Filter by hero_id if specified
+            if hero_id is not None and record.hero_id != hero_id:
+                # Also check path-based inference for legacy records
+                if record.hero_id is None:
+                    from core.eval_dynamics import infer_hero_from_path
+                    inferred = infer_hero_from_path(record.path)
+                    if inferred != hero_id:
+                        continue
+                else:
+                    continue
+
             value = getattr(record, metric, None)
             if value is not None:
                 candidates.append((value, record))
@@ -704,6 +784,37 @@ class CheckpointLedger:
 
         candidates.sort(key=lambda x: x[0], reverse=not lower_is_better)
         return candidates[0][1]
+
+    def list_by_hero(self, hero_id: str, limit: Optional[int] = None) -> List[CheckpointRecord]:
+        """
+        List checkpoints for a specific hero, newest first.
+
+        Args:
+            hero_id: Hero ID to filter by
+            limit: Maximum number of records to return
+
+        Returns:
+            List of checkpoint records for that hero
+        """
+        self._ensure_fresh()
+        records = []
+        for record in self._index.values():
+            # Direct match
+            if record.hero_id == hero_id:
+                records.append(record)
+                continue
+
+            # Legacy records: infer from path
+            if record.hero_id is None:
+                from core.eval_dynamics import infer_hero_from_path
+                inferred = infer_hero_from_path(record.path)
+                if inferred == hero_id:
+                    records.append(record)
+
+        records.sort(key=lambda r: r.step, reverse=True)
+        if limit:
+            records = records[:limit]
+        return records
 
     def list_all(self, limit: Optional[int] = None) -> List[CheckpointRecord]:
         """List all checkpoint records, newest first."""
@@ -1077,6 +1188,312 @@ class CheckpointLedger:
             "total_size_gb": round(sum(sizes) / (1024 ** 3), 2) if sizes else 0,
             "skills_trained": list(set(r.skill_name for r in records if r.skill_name)),
         }
+
+    def run_health_check(self, fix_issues: bool = True) -> Dict[str, Any]:
+        """
+        Run health check on the ledger and optionally fix issues.
+
+        Checks for:
+        1. Orphan checkpoints (on disk but not in ledger)
+        2. Stale entries (in ledger but path doesn't exist)
+
+        Args:
+            fix_issues: If True, adopt orphans and remove stale entries
+
+        Returns:
+            Dict with health check results
+        """
+        result = {
+            "healthy": True,
+            "orphans_found": 0,
+            "orphans_adopted": 0,
+            "stale_found": 0,
+            "stale_removed": 0,
+            "ledger_count": len(self._index),
+            "issues": [],
+        }
+
+        # Check for orphans
+        orphans = self.scan_orphans()
+        result["orphans_found"] = len(orphans)
+
+        if orphans:
+            result["healthy"] = False
+            result["issues"].append(f"{len(orphans)} orphan checkpoints found")
+
+            if fix_issues:
+                for orphan in orphans:
+                    try:
+                        record = self.adopt_orphan(orphan)
+                        if record:
+                            result["orphans_adopted"] += 1
+                            logger.info(f"Adopted orphan checkpoint: {orphan.name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to adopt orphan {orphan}: {e}")
+
+        # Check for stale entries (path doesn't exist)
+        stale = []
+        for step, record in list(self._index.items()):
+            if record.path and not Path(record.path).exists():
+                # Check if it has other known locations
+                if not record.locations:
+                    stale.append(step)
+
+        result["stale_found"] = len(stale)
+
+        if stale:
+            result["healthy"] = False
+            result["issues"].append(f"{len(stale)} stale ledger entries found")
+
+            if fix_issues:
+                for step in stale:
+                    # Use cleanup method to properly remove
+                    with self._lock:
+                        if step in self._index:
+                            del self._index[step]
+                            result["stale_removed"] += 1
+
+                if result["stale_removed"] > 0:
+                    self._save_index_direct()
+                    logger.info(f"Removed {result['stale_removed']} stale entries")
+
+        result["ledger_count"] = len(self._index)
+
+        if result["healthy"]:
+            logger.info(f"Ledger health check passed ({result['ledger_count']} checkpoints)")
+        else:
+            logger.warning(f"Ledger health check: {', '.join(result['issues'])}")
+
+        return result
+
+    # =========================================================================
+    # SKILL METRICS INTEGRATION (v1.1.0)
+    # =========================================================================
+
+    def sync_skill_metrics(self, step: int) -> bool:
+        """
+        Sync skill metrics from EvaluationLedger to this checkpoint.
+
+        Aggregates all eval results for this checkpoint and updates:
+        - skill_metrics: per-skill accuracy, level, eval_count
+        - linked_eval_ids: list of eval keys
+
+        Args:
+            step: Checkpoint step number
+
+        Returns:
+            True if updated, False if checkpoint not found
+        """
+        from core.evaluation_ledger import get_eval_ledger
+
+        self._ensure_fresh()
+        record = self._index.get(step)
+        if not record:
+            return False
+
+        eval_ledger = get_eval_ledger()
+        evals = eval_ledger.get_by_checkpoint(step)
+
+        if not evals:
+            return True  # No evals to sync, but checkpoint exists
+
+        # Aggregate by skill
+        skill_metrics: Dict[str, Dict[str, Any]] = {}
+        linked_ids: List[str] = []
+
+        for eval_rec in evals:
+            skill = eval_rec.skill
+            linked_ids.append(eval_rec.key)
+
+            if skill not in skill_metrics:
+                skill_metrics[skill] = {
+                    "accuracy": 0.0,
+                    "best_accuracy": 0.0,
+                    "level": 0,
+                    "max_level": 0,
+                    "eval_count": 0,
+                    "correct": 0,
+                    "total": 0,
+                }
+
+            sm = skill_metrics[skill]
+            sm["eval_count"] += 1
+            sm["correct"] += eval_rec.correct
+            sm["total"] += eval_rec.total
+            sm["max_level"] = max(sm["max_level"], eval_rec.level)
+            sm["best_accuracy"] = max(sm["best_accuracy"], eval_rec.accuracy)
+
+            # Track level with highest accuracy for this skill
+            if eval_rec.accuracy >= sm["accuracy"]:
+                sm["accuracy"] = eval_rec.accuracy
+                sm["level"] = eval_rec.level
+
+        with self._lock:
+            record.skill_metrics = skill_metrics
+            record.linked_eval_ids = linked_ids
+            self._save_index()
+
+        logger.info(f"Synced skill metrics for step {step}: {list(skill_metrics.keys())}")
+        return True
+
+    def capture_curriculum_state(self, step: int) -> bool:
+        """
+        Capture current curriculum state (skill levels, effort) at checkpoint.
+
+        Reads from:
+        - CurriculumManager for current skill levels
+        - Campaign for skill effort
+
+        Args:
+            step: Checkpoint step number
+
+        Returns:
+            True if updated, False if checkpoint not found
+        """
+        self._ensure_fresh()
+        record = self._index.get(step)
+        if not record:
+            return False
+
+        skill_levels: Dict[str, int] = {}
+        skill_effort: Dict[str, float] = {}
+
+        # Get skill levels from curriculum state
+        try:
+            curriculum_state_file = self.base_dir / "data_manager" / "curriculum_state.json"
+            if curriculum_state_file.exists():
+                with open(curriculum_state_file) as f:
+                    state = json.load(f)
+                for skill_id, skill_state in state.get("skills", {}).items():
+                    skill_levels[skill_id] = skill_state.get("current_level", 1)
+        except Exception as e:
+            logger.debug(f"Could not read curriculum state: {e}")
+
+        # Get effort from active campaign
+        try:
+            from guild.campaigns.loader import load_active_campaign
+            campaign = load_active_campaign()
+            if campaign:
+                skill_effort = dict(campaign.skill_effort)
+        except Exception as e:
+            logger.debug(f"Could not read campaign effort: {e}")
+
+        with self._lock:
+            record.skill_levels_at_save = skill_levels
+            record.skill_effort_at_save = skill_effort
+            self._save_index()
+
+        logger.debug(f"Captured curriculum state for step {step}: levels={skill_levels}")
+        return True
+
+    def link_eval(self, step: int, skill: str, level: int, accuracy: float) -> bool:
+        """
+        Link an evaluation result to a checkpoint.
+
+        Called after recording an eval to update the checkpoint's skill_metrics.
+        More lightweight than full sync_skill_metrics().
+
+        Args:
+            step: Checkpoint step
+            skill: Skill ID
+            level: Skill level
+            accuracy: Eval accuracy
+
+        Returns:
+            True if linked, False if checkpoint not found
+        """
+        self._ensure_fresh()
+        record = self._index.get(step)
+        if not record:
+            return False
+
+        eval_key = f"{step}:{skill}:{level}"
+
+        with self._lock:
+            # Initialize skill_metrics if needed
+            if skill not in record.skill_metrics:
+                record.skill_metrics[skill] = {
+                    "accuracy": 0.0,
+                    "best_accuracy": 0.0,
+                    "level": 0,
+                    "max_level": 0,
+                    "eval_count": 0,
+                    "correct": 0,
+                    "total": 0,
+                }
+
+            sm = record.skill_metrics[skill]
+            sm["eval_count"] += 1
+            sm["max_level"] = max(sm["max_level"], level)
+            sm["best_accuracy"] = max(sm["best_accuracy"], accuracy)
+
+            if accuracy >= sm["accuracy"]:
+                sm["accuracy"] = accuracy
+                sm["level"] = level
+
+            # Add to linked_eval_ids if not present
+            if eval_key not in record.linked_eval_ids:
+                record.linked_eval_ids.append(eval_key)
+
+            self._save_index()
+
+        return True
+
+    def get_skill_metrics_summary(self, step: int) -> Dict[str, Any]:
+        """
+        Get a summary of skill metrics for a checkpoint.
+
+        Returns:
+            Dict with skill metrics or empty dict if checkpoint not found
+        """
+        record = self.get(step)
+        if not record:
+            return {}
+
+        return {
+            "step": step,
+            "skill_metrics": record.skill_metrics,
+            "skill_levels": record.skill_levels_at_save,
+            "skill_effort": record.skill_effort_at_save,
+            "eval_count": len(record.linked_eval_ids),
+        }
+
+    def get_best_for_skill(
+        self,
+        skill: str,
+        metric: str = "accuracy",
+        min_level: Optional[int] = None,
+    ) -> Optional[CheckpointRecord]:
+        """
+        Get the best checkpoint for a specific skill.
+
+        Args:
+            skill: Skill ID (e.g., "sy", "bin")
+            metric: Metric to compare ("accuracy" or "best_accuracy")
+            min_level: Only consider checkpoints at or above this level
+
+        Returns:
+            Best checkpoint record or None
+        """
+        self._ensure_fresh()
+        candidates = []
+
+        for record in self._index.values():
+            if skill not in record.skill_metrics:
+                continue
+
+            sm = record.skill_metrics[skill]
+            if min_level and sm.get("max_level", 0) < min_level:
+                continue
+
+            value = sm.get(metric, 0.0)
+            candidates.append((value, record))
+
+        if not candidates:
+            return None
+
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        return candidates[0][1]
 
 
 # =============================================================================

@@ -2,24 +2,116 @@
 """
 GPU Inference Worker - Multi-Model Pool
 Manages multiple models in VRAM with explicit model selection
+
+Supports:
+- Full model checkpoints (model.safetensors)
+- PEFT/LoRA adapters (adapter_model.safetensors)
 """
 
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Tuple
 from collections import OrderedDict
 import json
+
+# Optional PEFT support
+try:
+    from peft import PeftModel, PeftConfig
+    PEFT_AVAILABLE = True
+except ImportError:
+    PEFT_AVAILABLE = False
+    PeftModel = None
+    PeftConfig = None
+
+
+# ============================================================
+# Base Model Path Remapping
+# ============================================================
+# Maps trainer machine paths → inference machine paths
+# This allows PEFT adapters trained on 4090 to load on 3090
+
+# Search paths for base models (in priority order)
+# 1. Local SSD for hot models
+# 2. Synology NAS mount for overflow (55TB available)
+BASE_MODEL_SEARCH_PATHS = [
+    "/home/russ/llm/models",
+    "/mnt/synology/data/models",
+]
+
+# Direct path mappings (trainer → inference)
+BASE_MODEL_MAPPING = {
+    # Trainer 4090 paths → preferred Inference 3090 paths
+    "/home/russ/Desktop/TRAINING/models/Qwen3-4B-Instruct-2507": "/home/russ/llm/models/Qwen3-4B-Instruct-2507",
+    "/home/russ/Desktop/TRAINING/models/Qwen3-0.6B": "/home/russ/llm/models/Qwen3-0.6B",
+    "/home/russ/Desktop/TRAINING/models/Qwen3-1.7B": "/home/russ/llm/models/Qwen3-1.7B",
+    "/home/russ/Desktop/TRAINING/models/Qwen3-4B": "/home/russ/llm/models/Qwen3-4B",
+    "/home/russ/Desktop/TRAINING/models/Qwen3-8B": "/home/russ/llm/models/Qwen3-8B",
+    "/home/russ/Desktop/TRAINING/models/Qwen2.5-3B": "/home/russ/llm/models/Qwen2.5-3B",
+    "/home/russ/Desktop/TRAINING/models/Qwen2.5-7B": "/home/russ/llm/models/Qwen2.5-7B",
+}
+
+def resolve_base_model_path(path: str) -> str:
+    """
+    Resolve a base model path, remapping trainer paths to local paths if needed.
+
+    Search order:
+    1. Direct mapping from BASE_MODEL_MAPPING (if path exists)
+    2. Original path (if exists - same machine scenario)
+    3. Search in BASE_MODEL_SEARCH_PATHS by model name
+    4. Fallback to HuggingFace model ID
+    """
+    # Check direct mapping first
+    if path in BASE_MODEL_MAPPING:
+        resolved = BASE_MODEL_MAPPING[path]
+        if Path(resolved).exists():
+            print(f"   📍 Remapped base model path: {path} → {resolved}")
+            return resolved
+
+    # Check if original path exists (same machine)
+    if Path(path).exists():
+        return path
+
+    # Search in known base model locations by model name
+    model_name = Path(path).name
+    for search_path in BASE_MODEL_SEARCH_PATHS:
+        candidate = Path(search_path) / model_name
+        if candidate.exists():
+            print(f"   📍 Found base model in search path: {candidate}")
+            return str(candidate)
+
+    # Try HuggingFace model ID as last resort
+    hf_mapping = {
+        "Qwen3-0.6B": "Qwen/Qwen3-0.6B",
+        "Qwen3-1.7B": "Qwen/Qwen3-1.7B",
+        "Qwen3-4B": "Qwen/Qwen3-4B",
+        "Qwen3-4B-Instruct-2507": "Qwen/Qwen3-4B-Instruct",  # Local variant → HF base
+        "Qwen3-8B": "Qwen/Qwen3-8B",
+        "Qwen2.5-3B": "Qwen/Qwen2.5-3B",
+        "Qwen2.5-7B": "Qwen/Qwen2.5-7B",
+    }
+
+    if model_name in hf_mapping:
+        hf_id = hf_mapping[model_name]
+        print(f"   🌐 Using HuggingFace model: {hf_id} (local path not found: {path})")
+        return hf_id
+
+    # Return original path (will likely fail, but with clear error)
+    print(f"   ⚠️ Base model path not found and no mapping: {path}")
+    return path
 
 
 class ModelEntry:
     """Single model entry in the pool"""
-    def __init__(self, model_id: str, model, tokenizer, path: str):
+    def __init__(self, model_id: str, model, tokenizer, path: str,
+                 is_peft: bool = False, base_model_path: Optional[str] = None):
         self.model_id = model_id
         self.model = model
         self.tokenizer = tokenizer
         self.path = path
+        self.is_peft = is_peft
+        self.base_model_path = base_model_path
         self.loaded_at = datetime.now().isoformat()
         self.last_used = datetime.now()
         self.request_count = 0
@@ -62,19 +154,42 @@ class ModelPool:
                 "loaded_at": entry.loaded_at,
                 "last_used": entry.last_used.isoformat(),
                 "request_count": entry.request_count,
-                "vram_mb": round(vram_mb, 1)
+                "vram_mb": round(vram_mb, 1),
+                "is_peft": entry.is_peft,
+                "base_model_path": entry.base_model_path
             })
 
         return {
             "loaded_count": len(self.pool),
             "max_models": self.max_models,
             "total_vram_mb": round(total_vram, 1),
+            "peft_available": PEFT_AVAILABLE,
             "models": models
         }
 
     def is_loaded(self, model_id: str) -> bool:
         """Check if model is loaded"""
         return model_id in self.pool
+
+    def _is_peft_checkpoint(self, model_path: Path) -> Tuple[bool, Optional[str]]:
+        """
+        Check if a model path is a PEFT/LoRA adapter checkpoint.
+
+        Returns:
+            Tuple of (is_peft, base_model_path)
+        """
+        adapter_config_path = model_path / "adapter_config.json"
+        if not adapter_config_path.exists():
+            return False, None
+
+        try:
+            with open(adapter_config_path) as f:
+                adapter_config = json.load(f)
+            base_model_path = adapter_config.get("base_model_name_or_path")
+            return True, base_model_path
+        except Exception as e:
+            print(f"Warning: Could not read adapter_config.json: {e}")
+            return False, None
 
     def _evict_lru(self):
         """Evict least recently used model"""
@@ -92,13 +207,18 @@ class ModelPool:
         del entry.tokenizer
         torch.cuda.empty_cache()
 
-    def load_model(self, model_id: str, path: Optional[str] = None) -> bool:
+    def load_model(self, model_id: str, path: Optional[str] = None,
+                   load_in_4bit: bool = False) -> bool:
         """
         Load a model into the pool.
+
+        Supports both full model checkpoints and PEFT/LoRA adapters.
+        PEFT adapters are automatically detected via adapter_config.json.
 
         Args:
             model_id: Unique identifier (e.g., "checkpoint-175000", "Qwen3-0.6B")
             path: Full path to model. If None, uses models_dir/model_id
+            load_in_4bit: Force 4-bit quantization (auto-detected for QLoRA adapters)
 
         Returns:
             True if loaded (or already loaded), False on error
@@ -122,7 +242,18 @@ class ModelPool:
             print(f"❌ Model path not found: {model_path}")
             return False
 
-        print(f"📦 Loading model: {model_id} from {model_path}")
+        # Check if this is a PEFT adapter checkpoint
+        is_peft, base_model_path = self._is_peft_checkpoint(model_path)
+
+        if is_peft:
+            return self._load_peft_model(model_id, model_path, base_model_path, load_in_4bit)
+        else:
+            return self._load_full_model(model_id, model_path, load_in_4bit)
+
+    def _load_full_model(self, model_id: str, model_path: Path,
+                         load_in_4bit: bool = False) -> bool:
+        """Load a full model checkpoint."""
+        print(f"📦 Loading full model: {model_id} from {model_path}")
 
         try:
             tokenizer = AutoTokenizer.from_pretrained(
@@ -130,23 +261,124 @@ class ModelPool:
                 trust_remote_code=True
             )
 
-            model = AutoModelForCausalLM.from_pretrained(
-                model_path,
-                trust_remote_code=True,
-                torch_dtype=torch.bfloat16,
-                device_map='auto'
-            )
+            load_kwargs = {
+                "trust_remote_code": True,
+                "torch_dtype": torch.bfloat16,
+                "device_map": "auto"
+            }
 
-            entry = ModelEntry(model_id, model, tokenizer, str(model_path))
+            if load_in_4bit:
+                load_kwargs["quantization_config"] = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4"
+                )
+
+            model = AutoModelForCausalLM.from_pretrained(model_path, **load_kwargs)
+
+            entry = ModelEntry(model_id, model, tokenizer, str(model_path),
+                             is_peft=False, base_model_path=None)
             self.pool[model_id] = entry
 
             vram_mb = sum(p.numel() * p.element_size() for p in model.parameters()) / 1e6
-            print(f"✓ Model loaded: {model_id} ({vram_mb:.0f}MB VRAM)")
+            print(f"✓ Full model loaded: {model_id} ({vram_mb:.0f}MB VRAM)")
 
             return True
 
         except Exception as e:
-            print(f"❌ Failed to load {model_id}: {e}")
+            print(f"❌ Failed to load full model {model_id}: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _load_peft_model(self, model_id: str, adapter_path: Path,
+                         base_model_path: Optional[str],
+                         load_in_4bit: bool = False) -> bool:
+        """
+        Load a PEFT/LoRA adapter checkpoint.
+
+        This loads the base model first, then applies the adapter.
+        For QLoRA adapters, the base model is loaded in 4-bit.
+        """
+        if not PEFT_AVAILABLE:
+            print(f"❌ PEFT not available. Install with: pip install peft")
+            print(f"   Attempting to load {model_id} as full model instead...")
+            # Fall back to trying to load as full model (will fail for pure adapters)
+            return self._load_full_model(model_id, adapter_path, load_in_4bit)
+
+        if not base_model_path:
+            print(f"❌ No base_model_name_or_path in adapter_config.json for {model_id}")
+            return False
+
+        print(f"📦 Loading PEFT adapter: {model_id}")
+        print(f"   Adapter: {adapter_path}")
+        print(f"   Base model (original): {base_model_path}")
+
+        # Resolve base model path (handles remapping between machines)
+        resolved_base_path = resolve_base_model_path(base_model_path)
+        if resolved_base_path != base_model_path:
+            print(f"   Base model (resolved): {resolved_base_path}")
+
+        try:
+            # Load tokenizer from adapter path (has any custom tokens)
+            # Fall back to base model if adapter doesn't have tokenizer
+            tokenizer_path = adapter_path if (adapter_path / "tokenizer_config.json").exists() else resolved_base_path
+            tokenizer = AutoTokenizer.from_pretrained(
+                tokenizer_path,
+                trust_remote_code=True
+            )
+
+            # Check if this was a QLoRA adapter (trained with 4-bit base)
+            # We detect this by checking the adapter_config for quantization hints
+            adapter_config_path = adapter_path / "adapter_config.json"
+            use_4bit = load_in_4bit
+            if adapter_config_path.exists():
+                with open(adapter_config_path) as f:
+                    adapter_config = json.load(f)
+                # If adapter was trained with quantized base, we should load the same way
+                # Common indicators: presence of certain fields or naming conventions
+                if "qlora" in str(adapter_path).lower() or adapter_config.get("use_qalora", False):
+                    use_4bit = True
+                    print(f"   Detected QLoRA adapter, loading base model in 4-bit")
+
+            # Load base model
+            load_kwargs = {
+                "trust_remote_code": True,
+                "torch_dtype": torch.bfloat16,
+                "device_map": "auto"
+            }
+
+            if use_4bit:
+                load_kwargs["quantization_config"] = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4"
+                )
+
+            base_model = AutoModelForCausalLM.from_pretrained(resolved_base_path, **load_kwargs)
+
+            # Load PEFT adapter on top of base model
+            model = PeftModel.from_pretrained(base_model, adapter_path)
+
+            # Put model in eval mode
+            model.eval()
+
+            entry = ModelEntry(model_id, model, tokenizer, str(adapter_path),
+                             is_peft=True, base_model_path=base_model_path)
+            self.pool[model_id] = entry
+
+            # Calculate VRAM (includes both base and adapter)
+            vram_mb = sum(p.numel() * p.element_size() for p in model.parameters()) / 1e6
+            print(f"✓ PEFT adapter loaded: {model_id} ({vram_mb:.0f}MB VRAM, 4-bit={use_4bit})")
+
+            return True
+
+        except Exception as e:
+            print(f"❌ Failed to load PEFT adapter {model_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def unload_model(self, model_id: str) -> bool:

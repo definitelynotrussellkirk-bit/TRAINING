@@ -75,11 +75,21 @@ class UltimateTrainerWrapper(BaseTrainer):
             # Build training config
             training_defaults = self.hero_config.get("training_defaults", {})
 
-            # Look for campaign-specific config.json first, fall back to base
-            campaign_config = self.campaign_path / "config.json"
+            # Always use base config.json for training settings
+            # Campaign config.json contains campaign metadata (hero_id, etc.), not training config
             base_config = base_dir / "config.json"
+            config_path = str(base_config)
 
-            config_path = str(campaign_config) if campaign_config.exists() else str(base_config)
+            # Determine training mode based on hero config
+            load_in_4bit = training_defaults.get("load_in_4bit", False)
+            qlora_config = self.hero_config.get("qlora", {})
+            qlora_enabled = qlora_config.get("enabled", False)
+
+            # Infer training_mode: qlora if 4bit or qlora enabled, else full
+            if load_in_4bit or qlora_enabled:
+                training_mode = "qlora"
+            else:
+                training_mode = "full"
 
             # Create TrainerConfig from config file + overrides
             config, config_dict = ConfigLoader.from_file_and_defaults_with_raw(
@@ -87,23 +97,34 @@ class UltimateTrainerWrapper(BaseTrainer):
                 base_config=config_path,
                 validate_lock=False,  # Campaigns may have different lock requirements
                 **{
+                    # Model paths
                     "model.model_path": str(model_path),
                     "output.output_dir": str(self.checkpoints_dir),
-                    # Apply hero-specific training defaults
+
+                    # Critical: 4-bit loading for QLoRA
+                    "model.load_in_4bit": load_in_4bit,
+
+                    # Training mode (full, lora, qlora)
+                    "training_mode": training_mode,
+
+                    # Hyperparams from hero config
                     "hyperparams.batch_size": training_defaults.get("batch_size", 1),
                     "hyperparams.gradient_accumulation": training_defaults.get("gradient_accumulation", 16),
                     "hyperparams.learning_rate": training_defaults.get("learning_rate", 4e-4),
                     "hyperparams.max_length": training_defaults.get("max_length", 2048),
                     "hyperparams.save_steps": training_defaults.get("save_steps", 10000),
                     "hyperparams.warmup_steps": training_defaults.get("warmup_steps", 100),
+                    "hyperparams.fp_precision": training_defaults.get("precision", "bf16"),
+                    "hyperparams.use_gradient_checkpointing": training_defaults.get("gradient_checkpointing", True),
+                    "hyperparams.save_total_limit": training_defaults.get("save_total_limit", 5),
                 }
             )
 
             # Create MonitorContext (minimal for campaign training)
+            from trainer.monitoring.context import ProgressContext
             monitors = MonitorContext(
                 live_monitor=None,
-                controller=None,  # Campaigns don't use daemon controller
-                current_file=data_path.name,
+                progress=ProgressContext(current_file=data_path.name),
                 status_writer=self.status_writer,
             )
 

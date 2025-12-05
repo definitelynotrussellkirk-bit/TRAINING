@@ -507,6 +507,7 @@ class EvalRunner:
                 results.append({
                     "problem_idx": i,
                     "correct": False,
+                    "prompt": prompt,
                     "expected": expected,
                     "got": None,
                     "error": "no_response",
@@ -521,6 +522,7 @@ class EvalRunner:
             results.append({
                 "problem_idx": i,
                 "correct": is_correct,
+                "prompt": prompt,
                 "expected": expected,
                 "got": response,
             })
@@ -601,13 +603,13 @@ class EvalRunner:
             response = self._get_model_response(prompt)
 
             if response is None:
-                results.append({"problem_idx": i, "correct": False, "expected": expected, "got": None})
+                results.append({"problem_idx": i, "correct": False, "prompt": prompt, "expected": expected, "got": None})
                 continue
 
             is_correct = self._check_passive_answer(passive_id, expected, response)
             if is_correct:
                 correct += 1
-            results.append({"problem_idx": i, "correct": is_correct, "expected": expected, "got": response})
+            results.append({"problem_idx": i, "correct": is_correct, "prompt": prompt, "expected": expected, "got": response})
 
         accuracy = correct / len(problems) if problems else 0
 
@@ -1140,15 +1142,41 @@ class EvalRunner:
         }
 
 
-def prune_stale_queues(base_dir: Path) -> dict:
+def prune_stale_queues(base_dir: Path, also_clean_ledger: bool = False) -> dict:
     """
     Remove queue entries for checkpoints that no longer exist.
+
+    Args:
+        base_dir: Base directory for the training project
+        also_clean_ledger: If True, also clean stale entries from checkpoint ledger
 
     Returns dict with counts of pruned items.
     """
     from core.checkpoint_ledger import get_ledger
+    from vault.device_mapping import get_local_device_id
 
-    pruned = {"skill_evals": 0, "passives": 0}
+    pruned = {"skill_evals": 0, "passives": 0, "ledger_paths": 0, "ledger_entries": 0}
+
+    # Optionally clean ledger first (this is the root cause of stale queue entries)
+    if also_clean_ledger:
+        try:
+            ledger = get_ledger()
+            local_device = get_local_device_id()
+
+            # Remove this device from paths that don't exist
+            paths_removed = ledger.verify_local_checkpoints(local_device, dry_run=False)
+            if paths_removed:
+                logger.info(f"Removed {local_device} from {paths_removed} non-existent checkpoint paths")
+                pruned["ledger_paths"] = paths_removed
+
+            # Remove entries with no valid locations left
+            entries_removed = ledger.cleanup_stale_entries(dry_run=False)
+            if entries_removed:
+                logger.info(f"Removed {entries_removed} stale entries from checkpoint ledger")
+                pruned["ledger_entries"] = entries_removed
+
+        except Exception as e:
+            logger.warning(f"Failed to clean ledger: {e}")
 
     # Get existing checkpoint steps
     try:
@@ -1219,6 +1247,7 @@ def run_daemon(
 ):
     """Run eval runner as daemon."""
     import os
+    import random
 
     # Write PID file for service registry
     pid_file = base_dir / ".pids" / "eval_runner.pid"
@@ -1226,10 +1255,10 @@ def run_daemon(
     pid_file.write_text(str(os.getpid()))
     logger.info(f"Starting eval runner daemon (interval={interval}s, pid={os.getpid()})")
 
-    # Prune stale queue entries on startup
-    pruned = prune_stale_queues(base_dir)
-    if pruned["skill_evals"] or pruned["passives"]:
-        logger.info(f"Startup prune: {pruned['skill_evals']} skills, {pruned['passives']} passives removed")
+    # Prune stale queue entries on startup (with full ledger cleanup)
+    pruned = prune_stale_queues(base_dir, also_clean_ledger=True)
+    if any(pruned.values()):
+        logger.info(f"Startup cleanup: {pruned}")
 
     runner = EvalRunner(
         base_dir=base_dir,
@@ -1237,8 +1266,40 @@ def run_daemon(
         inference_port=inference_port,
     )  # EvalRunner uses hosts.json if host/port not provided
 
+    # Periodic cleanup settings
+    cycle_count = 0
+    CLEANUP_INTERVAL = 10  # Full cleanup every N cycles
+    RANDOM_CLEANUP_CHANCE = 0.15  # 15% chance per cycle for quick prune
+    last_full_cleanup = time.time()
+    FULL_CLEANUP_MIN_INTERVAL = 300  # Minimum 5 minutes between full cleanups
+
     while True:
         try:
+            cycle_count += 1
+
+            # Periodic random cleanup to prevent stale entry buildup
+            do_full_cleanup = False
+            do_quick_prune = False
+
+            # Full cleanup: every N cycles OR random chance (but not too often)
+            time_since_last = time.time() - last_full_cleanup
+            if cycle_count % CLEANUP_INTERVAL == 0 and time_since_last >= FULL_CLEANUP_MIN_INTERVAL:
+                do_full_cleanup = True
+            elif random.random() < RANDOM_CLEANUP_CHANCE:
+                do_quick_prune = True
+
+            if do_full_cleanup:
+                logger.info(f"[Cycle {cycle_count}] Running periodic full cleanup...")
+                pruned = prune_stale_queues(base_dir, also_clean_ledger=True)
+                if any(pruned.values()):
+                    logger.info(f"Periodic cleanup: {pruned}")
+                last_full_cleanup = time.time()
+            elif do_quick_prune:
+                # Quick prune: just queues, not ledger (faster)
+                pruned = prune_stale_queues(base_dir, also_clean_ledger=False)
+                if pruned["skill_evals"] or pruned["passives"]:
+                    logger.info(f"[Cycle {cycle_count}] Quick prune: {pruned['skill_evals']} skills, {pruned['passives']} passives")
+
             # Check queues
             skill_pending = len(get_pending_evaluations())
             passive_pending = len(get_pending_passives())

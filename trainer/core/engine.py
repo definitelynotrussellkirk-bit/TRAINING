@@ -699,15 +699,28 @@ class TrainerEngine:
             )
 
         # Get LoRA config from config or use defaults
-        lora_config = getattr(config, 'lora', None) or {}
+        lora_config = getattr(config, 'lora', None)
 
-        lora_r = lora_config.get('r', 16)
-        lora_alpha = lora_config.get('alpha', 32)
-        lora_dropout = lora_config.get('dropout', 0.05)
-        target_modules = lora_config.get('target_modules', [
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj"
-        ])
+        # Handle both dataclass (LoRAConfig) and dict formats
+        if lora_config is None:
+            lora_r = 16
+            lora_alpha = 32
+            lora_dropout = 0.05
+            target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+        elif hasattr(lora_config, 'r'):  # It's a dataclass
+            lora_r = lora_config.r
+            lora_alpha = lora_config.alpha
+            lora_dropout = lora_config.dropout
+            target_modules = lora_config.target_modules or [
+                "q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"
+            ]
+        else:  # It's a dict
+            lora_r = lora_config.get('r', 16)
+            lora_alpha = lora_config.get('alpha', 32)
+            lora_dropout = lora_config.get('dropout', 0.05)
+            target_modules = lora_config.get('target_modules', [
+                "q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"
+            ])
 
         self._log(f"   Applying LoRA: r={lora_r}, alpha={lora_alpha}, dropout={lora_dropout}")
         self._log(f"   Target modules: {target_modules}")
@@ -1369,7 +1382,7 @@ class TrainerEngine:
             bf16=use_bf16,
             tf32=True,  # Enable TF32 for speedup
             gradient_checkpointing=True,
-            optim="adamw_torch_fused",  # Faster than default
+            optim=config.environment.optimizer_type,  # Configurable: adamw_torch_fused, paged_adamw_32bit, etc.
             dataloader_num_workers=4,  # Reduced from 16 - too many workers causes I/O contention
             dataloader_pin_memory=True,
             logging_steps=config.environment.logging_steps,

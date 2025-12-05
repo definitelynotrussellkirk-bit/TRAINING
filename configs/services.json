@@ -43,25 +43,26 @@
   },
 
   "training": {
-    "name": "Training Daemon",
-    "description": "Training orchestrator - the heart",
-    "command": ["python3", "core/training_daemon.py"],
-    "pid_file": ".daemon.pid",
-    "required": true,
+    "name": "Hero Loop",
+    "description": "Autonomous hero training - the heart",
+    "command": ["python3", "scripts/start_hero_loop.py"],
+    "pid_file": ".pids/hero_loop.pid",
+    "required": false,
     "depends_on": ["vault", "tavern"],
     "health_check": {
       "type": "pid",
-      "timeout": 5.0
+      "timeout": 10.0
     },
     "startup": {
-      "delay": 5.0,
+      "delay": 10.0,
       "max_restarts": 3,
-      "restart_delay": 5
+      "restart_delay": 30
     },
     "monitoring": {
       "level2_check": "data_flow_health",
       "level3_check": "performance_health"
-    }
+    },
+    "_note": "Starts hero_loop for active campaign from control/active_campaign.json"
   },
 
   "realm_state": {

@@ -49,6 +49,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import yaml
+
 from .types import Campaign, ActiveCampaignPointer, CampaignStatus
 
 logger = logging.getLogger("campaign_manager")
@@ -163,18 +165,30 @@ class CampaignManager:
 
     def list_heroes(self) -> List[str]:
         """
-        List all heroes that have campaigns.
+        List all heroes that have campaigns (including archived).
 
         Returns:
             List of hero IDs with at least one campaign
         """
-        heroes = []
+        heroes = set()
+
+        # Check active campaign directories
         for item in self.campaigns_dir.iterdir():
             if item.is_dir() and not item.name.startswith((".", "archive")):
                 # Check if it has any campaigns
                 campaigns = list(item.glob("campaign-*"))
                 if campaigns:
-                    heroes.append(item.name)
+                    heroes.add(item.name)
+
+        # Also check archive directory for heroes with only archived campaigns
+        if self.archive_dir.exists():
+            for item in self.archive_dir.iterdir():
+                if item.is_dir() and not item.name.startswith("."):
+                    # Check if it has any archived campaigns
+                    campaigns = list(item.glob("campaign-*"))
+                    if campaigns:
+                        heroes.add(item.name)
+
         return sorted(heroes)
 
     def list_campaigns(self, hero_id: str, include_archived: bool = False) -> List[Campaign]:
@@ -421,6 +435,9 @@ class CampaignManager:
             # Update status file symlinks
             self._update_status_symlinks(campaign)
 
+            # Sync config.json from hero config
+            self._sync_config_from_hero(campaign)
+
             # Update campaign status
             campaign.status = CampaignStatus.ACTIVE
             campaign.save()
@@ -468,6 +485,97 @@ class CampaignManager:
             # Create symlink to campaign
             status_file.symlink_to(campaign_file)
             logger.debug(f"Symlinked {filename} -> {campaign_file}")
+
+    def _sync_config_from_hero(self, campaign: Campaign) -> None:
+        """
+        Sync config.json model settings from the hero's config.
+
+        This ensures training uses the correct model when switching campaigns.
+        Updates: model_name, model_display_name, model_path, base_model,
+                 training_mode, load_in_4bit, lora settings, etc.
+        """
+        hero_config_path = self.base_dir / "configs" / "heroes" / f"{campaign.hero_id}.yaml"
+        if not hero_config_path.exists():
+            logger.warning(f"Hero config not found: {hero_config_path}")
+            return
+
+        config_path = self.base_dir / "config.json"
+        if not config_path.exists():
+            logger.warning("config.json not found - cannot sync")
+            return
+
+        try:
+            # Load hero config
+            with open(hero_config_path) as f:
+                hero = yaml.safe_load(f)
+
+            # Load existing config.json
+            with open(config_path) as f:
+                config = json.load(f)
+
+            # Extract hero settings
+            model = hero.get("model", {})
+            training_defaults = hero.get("training_defaults", {})
+            qlora = hero.get("qlora", {})
+            display = hero.get("display", {})
+
+            # Build model display name
+            emoji = display.get("emoji", "")
+            name = hero.get("name", campaign.hero_id)
+            rpg_name = hero.get("rpg_name", "")
+            display_name = f"{emoji} {name} - {rpg_name}".strip() if rpg_name else f"{emoji} {name}".strip()
+
+            # Update model settings
+            config["model_name"] = hero.get("id", campaign.hero_id).replace("-", "_")
+            config["model_display_name"] = display_name
+            config["model_path"] = model.get("hf_name", "")
+            config["base_model"] = model.get("hf_name", "")
+
+            # Update training settings from hero defaults
+            if training_defaults.get("batch_size"):
+                config["batch_size"] = training_defaults["batch_size"]
+            if training_defaults.get("gradient_accumulation"):
+                config["gradient_accumulation"] = training_defaults["gradient_accumulation"]
+            if training_defaults.get("learning_rate"):
+                config["learning_rate"] = training_defaults["learning_rate"]
+            if training_defaults.get("warmup_steps"):
+                config["warmup_steps"] = training_defaults["warmup_steps"]
+            if training_defaults.get("max_length"):
+                config["max_length"] = training_defaults["max_length"]
+            if "load_in_4bit" in training_defaults:
+                config["load_in_4bit"] = training_defaults["load_in_4bit"]
+
+            # Update QLoRA settings if hero has them
+            if qlora.get("enabled"):
+                config["training_mode"] = "qlora"
+                config["lora"] = {
+                    "r": qlora.get("r", 16),
+                    "alpha": qlora.get("alpha", 32),
+                    "dropout": qlora.get("dropout", 0.05),
+                    "target_modules": qlora.get("target_modules", [
+                        "q_proj", "k_proj", "v_proj", "o_proj",
+                        "gate_proj", "up_proj", "down_proj"
+                    ]),
+                }
+
+            # Update locked section
+            if "locked" in config:
+                config["locked"]["base_model"] = f"Qwen/{model.get('hf_name', '').split('/')[-1]}"
+
+            # Apply campaign config_overrides on top
+            for key, value in campaign.config_overrides.items():
+                config[key] = value
+
+            # Save updated config
+            with open(config_path, "w") as f:
+                json.dump(config, f, indent=2)
+
+            logger.info(f"Synced config.json from hero: {campaign.hero_id}")
+            logger.info(f"  base_model: {config.get('base_model')}")
+            logger.info(f"  training_mode: {config.get('training_mode')}")
+
+        except Exception as e:
+            logger.error(f"Error syncing config from hero: {e}")
 
     def deactivate(self) -> None:
         """

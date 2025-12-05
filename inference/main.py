@@ -294,12 +294,17 @@ async def get_model_info():
 
 class ReloadRequest(BaseModel):
     model_path: str  # Full path to checkpoint, e.g. ~/llm/models/checkpoint-175000
+    load_in_4bit: bool = False  # Force 4-bit quantization (auto-detected for QLoRA)
 
 @app.post("/models/reload", dependencies=[Depends(require_admin)])
 async def reload_model(req: ReloadRequest):
     """
     Load a specific checkpoint by path into the model pool.
     Now uses multi-model pool - model will be added alongside existing models.
+
+    Supports:
+    - Full model checkpoints (model.safetensors)
+    - PEFT/LoRA adapters (adapter_model.safetensors) - auto-detected
     """
     try:
         from inference_worker import get_pool
@@ -314,17 +319,23 @@ async def reload_model(req: ReloadRequest):
                 status_code=404,
                 detail=f"Model path not found: {req.model_path}"
             )
-        if not (model_path / "config.json").exists():
+
+        # Check for either model config or adapter config (PEFT)
+        has_model_config = (model_path / "config.json").exists()
+        has_adapter_config = (model_path / "adapter_config.json").exists()
+
+        if not has_model_config and not has_adapter_config:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid model directory (no config.json): {req.model_path}"
+                detail=f"Invalid model directory (no config.json or adapter_config.json): {req.model_path}"
             )
 
         # Extract model_id from path (e.g., "checkpoint-175000" from full path)
         model_id = model_path.name
 
         # Load into pool (will evict LRU if at capacity)
-        success = pool.load_model(model_id, path=str(model_path))
+        # PEFT adapters are auto-detected via adapter_config.json
+        success = pool.load_model(model_id, path=str(model_path), load_in_4bit=req.load_in_4bit)
 
         if not success:
             raise HTTPException(status_code=500, detail=f"Failed to load model: {model_id}")
@@ -342,12 +353,19 @@ async def reload_model(req: ReloadRequest):
         # Get VRAM usage
         vram_gb = round(torch.cuda.memory_allocated(0) / 1e9, 2) if torch.cuda.is_available() else 0
 
+        # Get entry info
+        entry = pool.pool.get(model_id)
+        is_peft = entry.is_peft if entry else False
+        base_model_path = entry.base_model_path if entry else None
+
         return {
             "status": "reloaded",
             "model_id": model_id,
             "checkpoint_step": checkpoint_step,
             "loaded_from": str(model_path),
-            "loaded_at": pool.pool[model_id].loaded_at if model_id in pool.pool else None,
+            "loaded_at": entry.loaded_at if entry else None,
+            "is_peft": is_peft,
+            "base_model_path": base_model_path,
             "vram_usage_gb": vram_gb,
             "pool": pool.get_pool_status()
         }

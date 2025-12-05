@@ -1,0 +1,154 @@
+# =============================================================================
+# MEMORY PROFILE: 24GB QLoRA
+# =============================================================================
+# Optimized for 7B-8B models on 24GB VRAM using QLoRA + Paged Optimizer
+# This is the gold standard for consumer GPU fine-tuning.
+# =============================================================================
+
+id: 24gb_qlora
+name: "24GB QLoRA Profile"
+rpg_name: "The Frugal Forge"
+icon: "🔧"
+description: |
+  Maximum efficiency for 24GB VRAM. Combines:
+  - QLoRA (4-bit quantization + low-rank adapters)
+  - Paged optimizer (offloads memory spikes to CPU)
+  - Gradient checkpointing (trades compute for memory)
+
+  Enables training 7B-8B models that would normally require 48GB+.
+
+target_vram_gb: 24
+
+# =============================================================================
+# PEFT CONFIGURATION
+# Parameter-Efficient Fine-Tuning: Train only a small set of adapter weights
+# =============================================================================
+peft:
+  # Method: none | lora | qlora | galore
+  method: "qlora"
+
+  # LoRA/QLoRA Configuration
+  # Injects low-rank matrices into attention layers
+  lora:
+    r: 64                    # Rank of the low-rank matrices (higher = more capacity)
+    alpha: 128               # Scaling factor (typically 2x rank)
+    dropout: 0.05            # Dropout for regularization
+    target_modules:          # Which layers to adapt
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+      - gate_proj
+      - up_proj
+      - down_proj
+    bias: "none"             # none | all | lora_only
+    task_type: "CAUSAL_LM"
+
+  # GaLore Configuration (alternative PEFT method)
+  # Projects gradients to low-rank subspace for memory efficiency
+  galore:
+    rank: 1024               # Projection rank
+    update_proj_gap: 200     # Steps between projection updates
+    scale: 0.25              # Gradient scaling factor
+    proj_type: "std"         # std | random | orthogonal
+
+# =============================================================================
+# QUANTIZATION
+# Compress frozen weights to 4-bit to reduce static memory footprint
+# =============================================================================
+quantization:
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: "bfloat16"  # Compute in bf16 for quality
+  bnb_4bit_quant_type: "nf4"          # nf4 (NormalFloat) or fp4
+  bnb_4bit_use_double_quant: true     # Nested quantization for extra savings
+
+# =============================================================================
+# MEMORY-EFFICIENT IMPLEMENTATIONS
+# Optimize underlying operations to reduce VRAM usage
+# =============================================================================
+memory:
+  # Gradient Checkpointing: Trade compute for memory
+  # Recomputes activations during backward pass instead of storing them
+  # Reduces activation memory from O(n) to O(sqrt(n)) layers
+  # Trade-off: ~20-30% slower training
+  gradient_checkpointing: true
+
+  # Flash Attention 2: Optimized attention implementation
+  # Reduces attention memory from O(N^2) to O(N) for sequence length N
+  # Also provides ~2-3x speedup
+  flash_attention: true      # Use if available (requires flash-attn package)
+
+  # Paged Optimizer: Offload optimizer states to CPU
+  # AdamW stores 2 states per parameter (momentum + variance)
+  # Paging moves these to CPU RAM, retrieving on demand
+  # Critical for fitting large models in limited VRAM
+  paged_optimizer: true
+
+  # CPU Offload: Offload model weights to CPU when not in use
+  # More aggressive than paged optimizer, higher latency
+  cpu_offload: false
+
+# =============================================================================
+# OPTIMIZER CONFIGURATION
+# Choose optimizer based on memory/speed trade-offs
+# =============================================================================
+optimizer:
+  # Available types:
+  # - adamw_torch_fused    : Standard fused AdamW (fast, high memory)
+  # - adamw_8bit           : 8-bit Adam (bitsandbytes, ~50% memory reduction)
+  # - paged_adamw_32bit    : Paged 32-bit AdamW (offloads to CPU)
+  # - paged_adamw_8bit     : Paged 8-bit AdamW (best memory efficiency)
+  # - muon                 : Geometry-aware optimizer (experimental)
+  # - galore_adamw         : AdamW with GaLore projection
+  # - galore_adamw_8bit    : 8-bit AdamW with GaLore
+  type: "paged_adamw_32bit"
+
+  # AdamW parameters (used by adamw variants)
+  adamw:
+    lr: 5e-5                 # Learning rate (QLoRA typically uses lower LR)
+    betas: [0.9, 0.999]      # Momentum coefficients
+    eps: 1e-8                # Numerical stability
+    weight_decay: 0.01       # L2 regularization
+
+  # Muon parameters (if using muon optimizer)
+  muon:
+    hidden_lr: 0.02
+    aux_lr: 3e-4
+    momentum: 0.95
+    weight_decay: 0
+
+# =============================================================================
+# TRAINING CONSTRAINTS
+# Recommended limits for this memory profile
+# =============================================================================
+constraints:
+  max_batch_size: 1          # Per-device batch size
+  recommended_grad_accum: 8  # Effective batch = 1 * 8 = 8
+  max_sequence_length: 1024  # Token limit per sequence
+  precision: "bf16"          # bf16 | fp16 | fp32
+
+# =============================================================================
+# MODEL SIZE RECOMMENDATIONS
+# =============================================================================
+recommendations:
+  max_model_size_b: 8
+  optimal_model_sizes:
+    - "7B"
+    - "8B"
+  tested_models:
+    - "Qwen3-8B"
+    - "Llama-3-8B"
+    - "Mistral-7B"
+  notes: |
+    This profile is optimized for 7B-8B models on RTX 3090/4090 (24GB).
+
+    Expected VRAM usage:
+    - Model (4-bit): ~5GB
+    - LoRA adapters: ~1GB
+    - Activations: ~8GB (with gradient checkpointing)
+    - Optimizer states: ~4GB (paged to CPU on spikes)
+    - Total: ~18-20GB peak
+
+    For larger models (13B+), consider:
+    - Multi-GPU with DeepSpeed ZeRO-3
+    - 48GB+ GPU (A6000, RTX 6000)

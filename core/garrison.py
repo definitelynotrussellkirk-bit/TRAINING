@@ -448,10 +448,15 @@ class Garrison:
         return None
 
     def _cleanup_checkpoints(self, host: str, path: str, keep: int = 10) -> tuple[bool, int]:
-        """Remove old checkpoints, keeping the most recent ones."""
+        """Remove old checkpoints, keeping the most recent ones.
+
+        Only deletes directories matching checkpoint-* pattern.
+        Base models (Qwen*, etc.) are preserved.
+        """
+        # Only count checkpoint-* directories, not base models
         success, output = self._ssh_command(
             host,
-            f"cd {path} && ls -t 2>/dev/null | tail -n +{keep + 1} | wc -l"
+            f"cd {path} && ls -dt checkpoint-* 2>/dev/null | tail -n +{keep + 1} | wc -l"
         )
 
         if not success:
@@ -465,7 +470,8 @@ class Garrison:
         if to_delete == 0:
             return True, 0
 
-        cleanup_cmd = f"cd {path} && ls -t | tail -n +{keep + 1} | xargs -r rm -rf"
+        # Only delete checkpoint-* directories, preserving base models
+        cleanup_cmd = f"cd {path} && ls -dt checkpoint-* 2>/dev/null | tail -n +{keep + 1} | xargs -r rm -rf"
         success, _ = self._ssh_command(host, cleanup_cmd, timeout=120)
 
         if success:

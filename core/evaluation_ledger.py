@@ -400,7 +400,8 @@ class EvaluationLedger:
         self,
         skill: Optional[str] = None,
         level: Optional[int] = None,
-        run_id: Optional[str] = None,
+        campaign_id: Optional[str] = None,
+        hero_id: Optional[str] = None,
     ) -> int:
         """
         Get canonical evaluation count.
@@ -415,7 +416,8 @@ class EvaluationLedger:
         Args:
             skill: Filter by skill ID (e.g., "bin", "sy")
             level: Filter by level (requires skill)
-            run_id: Filter by campaign run_id (not yet implemented)
+            campaign_id: Filter by campaign ID (e.g., "campaign-001")
+            hero_id: Filter by hero ID (e.g., "ojas-qwen3-8b")
 
         Returns:
             Integer count of matching evaluations
@@ -428,19 +430,24 @@ class EvaluationLedger:
             records = [r for r in records if r.skill == skill]
         if level is not None:
             records = [r for r in records if r.level == level]
-        # run_id filtering would go here when implemented
+        if campaign_id is not None:
+            records = [r for r in records if r.campaign_id == campaign_id]
+        if hero_id is not None:
+            records = [r for r in records if r.hero_id == hero_id]
 
         return len(records)
 
     def get_eval_breakdown(
         self,
-        run_id: Optional[str] = None,
+        campaign_id: Optional[str] = None,
+        hero_id: Optional[str] = None,
     ) -> Dict[str, int]:
         """
         Get evaluation count breakdown by skill.
 
         Args:
-            run_id: Filter by campaign run_id (not yet implemented)
+            campaign_id: Filter by campaign ID
+            hero_id: Filter by hero ID
 
         Returns:
             Dict mapping skill_id to count
@@ -449,9 +456,98 @@ class EvaluationLedger:
 
         breakdown: Dict[str, int] = {}
         for record in self._cache.values():
+            # Apply campaign/hero filters
+            if campaign_id is not None and record.campaign_id != campaign_id:
+                continue
+            if hero_id is not None and record.hero_id != hero_id:
+                continue
             breakdown[record.skill] = breakdown.get(record.skill, 0) + 1
 
         return breakdown
+
+    def get_campaign_summary(
+        self,
+        campaign_id: str,
+        hero_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get comprehensive evaluation summary for a campaign.
+
+        Returns:
+            Dict with total_evals, by_skill breakdown, best per skill/level,
+            accuracy trends, and skill coverage.
+        """
+        self._ensure_loaded()
+
+        # Filter to campaign
+        records = [
+            r for r in self._cache.values()
+            if r.campaign_id == campaign_id
+        ]
+        if hero_id:
+            records = [r for r in records if r.hero_id == hero_id]
+
+        if not records:
+            return {
+                "campaign_id": campaign_id,
+                "hero_id": hero_id,
+                "total_evals": 0,
+                "by_skill": {},
+                "best_per_skill": {},
+                "skill_coverage": 0.0,
+                "avg_accuracy": 0.0,
+            }
+
+        # Group by skill
+        by_skill: Dict[str, List[EvalRecord]] = {}
+        for r in records:
+            if r.skill not in by_skill:
+                by_skill[r.skill] = []
+            by_skill[r.skill].append(r)
+
+        # Compute per-skill stats
+        skill_stats = {}
+        best_per_skill = {}
+        for skill, evals in by_skill.items():
+            accuracies = [e.accuracy for e in evals]
+            best = max(evals, key=lambda e: e.accuracy)
+            levels_evaluated = set(e.level for e in evals)
+
+            skill_stats[skill] = {
+                "count": len(evals),
+                "avg_accuracy": sum(accuracies) / len(accuracies),
+                "best_accuracy": best.accuracy,
+                "best_checkpoint": best.checkpoint_step,
+                "levels_evaluated": sorted(levels_evaluated),
+                "max_level_passed": max(
+                    (e.level for e in evals if e.accuracy >= 0.8),
+                    default=0
+                ),
+            }
+            best_per_skill[skill] = {
+                "accuracy": best.accuracy,
+                "checkpoint": best.checkpoint_step,
+                "level": best.level,
+            }
+
+        # Overall stats
+        all_accuracies = [r.accuracy for r in records]
+        avg_accuracy = sum(all_accuracies) / len(all_accuracies)
+
+        # Skill coverage (assume 2 skills: sy, bin)
+        known_skills = ["sy", "bin"]
+        skill_coverage = len(by_skill) / max(len(known_skills), 1)
+
+        return {
+            "campaign_id": campaign_id,
+            "hero_id": hero_id,
+            "total_evals": len(records),
+            "by_skill": skill_stats,
+            "best_per_skill": best_per_skill,
+            "skill_coverage": skill_coverage,
+            "avg_accuracy": avg_accuracy,
+            "skills_evaluated": list(by_skill.keys()),
+        }
 
     def get_unique_key(self, checkpoint_step: int, skill: str, level: int) -> str:
         """
@@ -732,6 +828,14 @@ def record_evaluation(
     if recorded:
         _update_campaign_peak_accuracy(accuracy)
 
+        # Link eval to checkpoint ledger for skill metrics aggregation
+        try:
+            from core.checkpoint_ledger import get_ledger
+            checkpoint_ledger = get_ledger()
+            checkpoint_ledger.link_eval(checkpoint_step, skill, level, accuracy)
+        except Exception as e:
+            logger.debug(f"Could not link eval to checkpoint ledger: {e}")
+
         # Also record to curriculum manager for progression tracking
         try:
             from data_manager.curriculum_manager import CurriculumManager
@@ -890,6 +994,14 @@ def record_job_eval(
     # Update campaign peak metrics if recorded successfully
     if recorded and not error:
         _update_campaign_peak_accuracy(accuracy)
+
+        # Link eval to checkpoint ledger for skill metrics aggregation
+        try:
+            from core.checkpoint_ledger import get_ledger
+            checkpoint_ledger = get_ledger()
+            checkpoint_ledger.link_eval(checkpoint_step, skill_id, level, accuracy)
+        except Exception as e:
+            logger.debug(f"Could not link job eval to checkpoint ledger: {e}")
 
     return recorded
 

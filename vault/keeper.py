@@ -169,6 +169,22 @@ class VaultKeeper:
         # Sync from ledger on startup (catch up any missed checkpoints)
         self._sync_from_ledger()
 
+        # Cleanup stale entries that no longer exist in ledger
+        self._startup_cleanup()
+
+    def _startup_cleanup(self):
+        """Run cleanup tasks on startup - remove stale checkpoint entries."""
+        try:
+            result = self.cleanup_stale_checkpoints(dry_run=False)
+            if result.get("deleted", 0) > 0:
+                import logging
+                logging.getLogger("vault.keeper").info(
+                    f"Startup cleanup: removed {result['deleted']} stale checkpoint entries"
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger("vault.keeper").debug(f"Startup cleanup skipped: {e}")
+
     # =========================================================================
     # DATABASE MANAGEMENT
     # =========================================================================
@@ -513,6 +529,111 @@ class VaultKeeper:
                 (asset_id, stronghold, path)
             )
         return True
+
+    def delete_asset(self, asset_id: str) -> bool:
+        """
+        Delete an asset and all its locations from the catalog.
+
+        Args:
+            asset_id: Asset identifier to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        with self._get_conn() as conn:
+            # Check if exists
+            row = conn.execute(
+                "SELECT asset_id FROM assets WHERE asset_id = ?",
+                (asset_id,)
+            ).fetchone()
+
+            if not row:
+                return False
+
+            # Delete locations first (foreign key)
+            conn.execute(
+                "DELETE FROM locations WHERE asset_id = ?",
+                (asset_id,)
+            )
+
+            # Delete asset
+            conn.execute(
+                "DELETE FROM assets WHERE asset_id = ?",
+                (asset_id,)
+            )
+
+        return True
+
+    def cleanup_stale_checkpoints(self, dry_run: bool = False) -> Dict[str, Any]:
+        """
+        Remove checkpoint entries that don't exist in the Ledger.
+
+        This cleans up the catalog when checkpoints have been deleted
+        from the Ledger (e.g., after a reset or cleanup).
+
+        Args:
+            dry_run: If True, only report what would be deleted
+
+        Returns:
+            Dict with cleanup statistics
+        """
+        import logging
+        logger = logging.getLogger("vault.keeper")
+
+        try:
+            from core.checkpoint_ledger import get_ledger
+            ledger = get_ledger()
+        except Exception as e:
+            logger.warning(f"Cannot access ledger: {e}")
+            return {"error": str(e)}
+
+        # Get all checkpoint asset_ids from catalog
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT asset_id, name FROM assets WHERE asset_type = 'checkpoint'"
+            ).fetchall()
+
+        catalog_checkpoints = {r["asset_id"]: r["name"] for r in rows}
+
+        # Get all steps from ledger
+        ledger_steps = set()
+        for record in ledger.list_all():
+            ledger_steps.add(record.step)
+
+        # Find stale entries (in catalog but not in ledger)
+        stale = []
+        for asset_id, name in catalog_checkpoints.items():
+            # Extract step from asset_id (format: checkpoint_NNNNNN)
+            try:
+                step = int(asset_id.replace("checkpoint_", ""))
+            except ValueError:
+                continue
+
+            if step not in ledger_steps:
+                stale.append({"asset_id": asset_id, "name": name, "step": step})
+
+        # Delete stale entries
+        deleted = 0
+        if not dry_run:
+            for entry in stale:
+                if self.delete_asset(entry["asset_id"]):
+                    deleted += 1
+                    logger.debug(f"Deleted stale checkpoint: {entry['name']}")
+
+        result = {
+            "catalog_checkpoints": len(catalog_checkpoints),
+            "ledger_checkpoints": len(ledger_steps),
+            "stale_found": len(stale),
+            "deleted": deleted if not dry_run else 0,
+            "dry_run": dry_run,
+            "stale_entries": stale[:20] if dry_run else [],  # Show first 20 in dry run
+        }
+
+        if stale:
+            action = "Would delete" if dry_run else "Deleted"
+            logger.info(f"{action} {len(stale)} stale checkpoint entries from catalog")
+
+        return result
 
     # =========================================================================
     # LOOKUP OPERATIONS

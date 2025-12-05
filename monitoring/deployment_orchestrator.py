@@ -28,8 +28,16 @@ from typing import Optional, Dict, Any
 ADMIN_KEY = os.environ.get("INFERENCE_ADMIN_KEY", "")
 READ_KEY = os.environ.get("INFERENCE_READ_KEY", "")
 
-# Protected directories - never delete
-PROTECTED_MODEL_DIRS = {"Qwen3-0.6B"}  # Never delete base model
+# Protected directories - never delete (base models needed for PEFT loading)
+PROTECTED_MODEL_DIRS = {
+    "Qwen3-0.6B",
+    "Qwen3-1.7B",
+    "Qwen3-4B",
+    "Qwen3-4B-Instruct-2507",
+    "Qwen3-8B",
+    "Qwen2.5-3B",
+    "Qwen2.5-7B",
+}  # Never delete base models - needed for PEFT adapter loading
 
 def _get_remote_models_dir() -> str:
     """Get remote models directory from hosts.json."""
@@ -71,6 +79,12 @@ logger = logging.getLogger(__name__)
 class DeploymentOrchestrator:
     """
     Orchestrates automated checkpoint deployment from 4090 to 3090.
+
+    Smart Push Logic:
+    - Only push if checkpoint is significantly different from last pushed
+    - Push immediately if it's a NEW best (better loss than last pushed)
+    - Minimum steps between pushes to avoid spam (unless new best)
+    - Persist state across restarts via deployment log
     """
 
     def __init__(
@@ -78,7 +92,9 @@ class DeploymentOrchestrator:
         base_dir: str = None,
         remote_host: str = None,
         remote_api_url: str = None,
-        check_interval: int = 600  # 10 minutes
+        check_interval: int = 600,  # 10 minutes
+        min_steps_between_push: int = 5000,  # Don't push more often than this (unless new best)
+        push_on_improvement: bool = True,  # Always push if loss improved
     ):
         if base_dir is None:
             from core.paths import require_base_dir
@@ -100,22 +116,98 @@ class DeploymentOrchestrator:
         self.remote_api_url = remote_api_url.rstrip('/')
         self.check_interval = check_interval
 
+        # Smart push settings
+        self.min_steps_between_push = min_steps_between_push
+        self.push_on_improvement = push_on_improvement
+
         # Paths
         self.deployment_log = self.base_dir / "status" / "deployment_status.json"
         self.checkpoint_dir = self.base_dir / "models" / "current_model"
 
-        # State
+        # State - restored from deployment log for persistence
         self.last_deployed_step = None
+        self.last_deployed_loss = None
+        self._restore_last_deployment()
 
         logger.info("Deployment Orchestrator initialized")
         logger.info(f"Base dir: {self.base_dir}")
         logger.info(f"Remote: {self.remote_host}")
         logger.info(f"API: {self.remote_api_url}")
         logger.info(f"Check interval: {self.check_interval}s")
+        logger.info(f"Min steps between push: {self.min_steps_between_push}")
+        logger.info(f"Push on improvement: {self.push_on_improvement}")
+        if self.last_deployed_step:
+            logger.info(f"Last deployed: step {self.last_deployed_step} (loss: {self.last_deployed_loss})")
+
+    def _restore_last_deployment(self):
+        """Restore last deployment state from log file for persistence across restarts."""
+        if not self.deployment_log.exists():
+            return
+
+        try:
+            with open(self.deployment_log) as f:
+                log_data = json.load(f)
+
+            if log_data and isinstance(log_data, list):
+                # Get most recent successful deployment
+                for entry in reversed(log_data):
+                    if entry.get("status") == "success":
+                        self.last_deployed_step = entry.get("step")
+                        self.last_deployed_loss = entry.get("metrics", {}).get("train_loss")
+                        break
+        except Exception as e:
+            logger.warning(f"Could not restore last deployment state: {e}")
+
+    def should_deploy(self, candidate: Dict[str, Any]) -> tuple[bool, str]:
+        """
+        Decide whether to deploy a checkpoint using smart push logic.
+
+        Args:
+            candidate: Checkpoint info dict with 'step' and 'loss' keys
+
+        Returns:
+            Tuple of (should_deploy, reason)
+        """
+        step = candidate.get('step')
+        loss = candidate.get('loss')
+
+        # First deployment - always deploy
+        if self.last_deployed_step is None:
+            return True, "first_deployment"
+
+        # Same checkpoint - skip
+        if step == self.last_deployed_step:
+            return False, "already_deployed"
+
+        # Check if this is a new best (better loss)
+        is_new_best = False
+        if loss is not None and self.last_deployed_loss is not None:
+            is_new_best = loss < self.last_deployed_loss
+
+        # Always push if it's a new best and push_on_improvement is enabled
+        if self.push_on_improvement and is_new_best:
+            return True, f"new_best_loss ({loss:.4f} < {self.last_deployed_loss:.4f})"
+
+        # Check minimum steps between pushes
+        steps_since_last = step - self.last_deployed_step
+        if steps_since_last < self.min_steps_between_push:
+            return False, f"too_soon ({steps_since_last} < {self.min_steps_between_push} steps)"
+
+        # Enough steps have passed - deploy
+        return True, f"step_threshold ({steps_since_last} >= {self.min_steps_between_push})"
+
+    def get_active_hero_context(self):
+        """Get the currently active hero context."""
+        try:
+            from core.eval_dynamics import get_active_hero_context
+            return get_active_hero_context(self.base_dir)
+        except Exception as e:
+            logger.warning(f"Could not get active hero context: {e}")
+            return None
 
     def get_best_checkpoint(self) -> Optional[Dict[str, Any]]:
         """
-        Get best checkpoint from ledger (by lowest train_loss).
+        Get best checkpoint from ledger (by lowest train_loss) for the active hero.
 
         Returns:
             {
@@ -123,33 +215,69 @@ class DeploymentOrchestrator:
                 'checkpoint_path': Path('/path/to/checkpoint-156000'),
                 'checkpoint_name': 'checkpoint-156000',
                 'loss': 0.12,
+                'hero_id': 'ojas-qwen3-8b',
             }
             or None if no valid checkpoint found
         """
         try:
             from core.checkpoint_ledger import get_ledger
+
+            # Get active hero context
+            hero_ctx = self.get_active_hero_context()
+            hero_id = hero_ctx.hero_id if hero_ctx else None
+
+            if hero_id:
+                logger.info(f"Looking for best checkpoint for hero: {hero_id}")
+
             ledger = get_ledger()
-            best = ledger.get_best(metric="train_loss")
+            best = ledger.get_best(metric="train_loss", hero_id=hero_id)
 
             if not best:
-                logger.debug("No checkpoints in ledger")
+                # Try path-based search for the hero's checkpoints
+                if hero_ctx and hero_ctx.checkpoint_dir.exists():
+                    from core.eval_dynamics import get_latest_checkpoint_for_hero
+                    latest = get_latest_checkpoint_for_hero(hero_id, self.base_dir)
+                    if latest:
+                        logger.info(f"Using latest checkpoint from hero's campaign: {latest}")
+                        return {
+                            'step': int(latest.name.split('-')[1].split('-')[0]),
+                            'checkpoint_path': latest,
+                            'checkpoint_name': latest.name,
+                            'loss': None,  # Not in ledger
+                            'hero_id': hero_id,
+                        }
+
+                logger.debug("No checkpoints in ledger for active hero")
                 return None
 
-            # Find checkpoint path
-            checkpoint_path = self.checkpoint_dir / f"checkpoint-{best.step}"
-            if not checkpoint_path.exists():
-                # Try canonical name format
-                if best.canonical_name:
+            # Find checkpoint path - check hero's campaign dir first
+            checkpoint_path = None
+            if hero_ctx and hero_ctx.checkpoint_dir.exists():
+                # Check in hero's checkpoint dir
+                checkpoint_path = hero_ctx.checkpoint_dir / f"checkpoint-{best.step}"
+                if not checkpoint_path.exists() and best.canonical_name:
+                    checkpoint_path = hero_ctx.checkpoint_dir / best.canonical_name
+
+            # Fall back to legacy location
+            if not checkpoint_path or not checkpoint_path.exists():
+                checkpoint_path = self.checkpoint_dir / f"checkpoint-{best.step}"
+                if not checkpoint_path.exists() and best.canonical_name:
                     checkpoint_path = self.checkpoint_dir / best.canonical_name
-                if not checkpoint_path.exists():
-                    logger.warning(f"Checkpoint not found: step {best.step}")
-                    return None
+
+            # Last resort: use the path from the ledger record
+            if not checkpoint_path or not checkpoint_path.exists():
+                checkpoint_path = Path(best.path)
+
+            if not checkpoint_path.exists():
+                logger.warning(f"Checkpoint not found: step {best.step}")
+                return None
 
             return {
                 'step': best.step,
                 'checkpoint_path': checkpoint_path,
                 'checkpoint_name': checkpoint_path.name,
                 'loss': best.train_loss,
+                'hero_id': hero_id,
             }
 
         except Exception as e:
@@ -571,9 +699,9 @@ class DeploymentOrchestrator:
         return True
 
     def run_continuous(self):
-        """Run continuous deployment loop"""
+        """Run continuous deployment loop with smart push logic."""
         logger.info("="*80)
-        logger.info("🚀 DEPLOYMENT ORCHESTRATOR - STARTING")
+        logger.info("🚀 DEPLOYMENT ORCHESTRATOR - STARTING (Smart Push Mode)")
         logger.info("="*80)
 
         while True:
@@ -583,23 +711,28 @@ class DeploymentOrchestrator:
 
                 if best:
                     step = best['step']
-                    score = best['score']
+                    loss = best.get('loss')
+                    loss_str = f"{loss:.4f}" if loss else "N/A"
 
-                    logger.info(f"📊 Best checkpoint: step {step}, score {score:.3f}")
+                    logger.info(f"📊 Best checkpoint: step {step}, loss {loss_str}")
 
-                    # Check if already deployed
-                    if step == self.last_deployed_step:
-                        logger.info("✓ Already deployed")
-                    else:
-                        logger.info(f"📦 New best detected - deploying...")
+                    # Use smart push logic to decide whether to deploy
+                    should_push, reason = self.should_deploy(best)
+
+                    if should_push:
+                        logger.info(f"📦 Deploying: {reason}")
 
                         # Deploy
                         success = self.deploy_full(best)
 
                         if success:
                             self.last_deployed_step = step
+                            self.last_deployed_loss = loss
+                            logger.info(f"✓ Deployed step {step}")
                         else:
                             logger.error("Deployment failed, will retry next cycle")
+                    else:
+                        logger.info(f"⏭️  Skipping deployment: {reason}")
                 else:
                     logger.info("⏳ No valid checkpoint available yet")
 
@@ -629,6 +762,12 @@ if __name__ == "__main__":
     parser.add_argument('--interval', type=int, default=600,
                        help="Check interval in seconds (default: 600)")
 
+    # Smart push options
+    parser.add_argument('--min-steps', type=int, default=5000,
+                       help="Minimum steps between pushes unless new best (default: 5000)")
+    parser.add_argument('--no-push-on-improvement', action='store_true',
+                       help="Don't push immediately on loss improvement (respect min-steps)")
+
     # Cleanup options
     parser.add_argument('--cleanup', action='store_true',
                        help="Run remote cleanup only (no deployment)")
@@ -641,7 +780,9 @@ if __name__ == "__main__":
         base_dir=args.base_dir,
         remote_host=args.remote_host,
         remote_api_url=args.api_url,
-        check_interval=args.interval
+        check_interval=args.interval,
+        min_steps_between_push=args.min_steps,
+        push_on_improvement=not args.no_push_on_improvement,
     )
 
     if args.cleanup or args.cleanup_dry_run:

@@ -1,0 +1,96 @@
+# =============================================================================
+# MEMORY PROFILE: 24GB GaLore
+# =============================================================================
+# GaLore (Gradient Low-Rank Projection) - Full-rank training with memory savings
+# Bridges the gap between PEFT and full fine-tuning.
+# =============================================================================
+
+id: 24gb_galore
+name: "24GB GaLore Profile"
+rpg_name: "The Gradient Weaver"
+icon: "🌀"
+description: |
+  GaLore projects gradients to a low-rank subspace, enabling full-parameter
+  training with VRAM usage comparable to LoRA/QLoRA.
+
+  Key insight: Instead of restricting WEIGHTS to low-rank (LoRA),
+  GaLore restricts GRADIENTS to low-rank during optimization.
+
+  Benefits:
+  - Full-parameter learning (no frozen weights)
+  - Memory similar to QLoRA
+  - Often matches full fine-tuning performance
+
+target_vram_gb: 24
+
+# =============================================================================
+# PEFT CONFIGURATION
+# =============================================================================
+peft:
+  method: "galore"  # Gradient Low-Rank Projection
+
+  # GaLore Configuration
+  galore:
+    rank: 1024               # Projection rank (~7B model uses 1024)
+    update_proj_gap: 200     # Re-project every N steps
+    scale: 0.25              # Gradient scaling factor
+    proj_type: "std"         # std | random | orthogonal
+
+# =============================================================================
+# QUANTIZATION
+# =============================================================================
+quantization:
+  load_in_4bit: false        # GaLore typically uses bf16/fp16
+  load_in_8bit: false
+
+# =============================================================================
+# MEMORY-EFFICIENT IMPLEMENTATIONS
+# =============================================================================
+memory:
+  gradient_checkpointing: true
+  flash_attention: true
+  paged_optimizer: false     # GaLore handles memory differently
+  cpu_offload: false
+
+# =============================================================================
+# OPTIMIZER CONFIGURATION
+# =============================================================================
+optimizer:
+  # GaLore uses modified AdamW with per-layer projection
+  type: "galore_adamw_8bit"  # galore_adamw | galore_adamw_8bit
+
+  adamw:
+    lr: 1e-4
+    betas: [0.9, 0.999]
+    eps: 1e-8
+    weight_decay: 0.01
+
+# =============================================================================
+# TRAINING CONSTRAINTS
+# =============================================================================
+constraints:
+  max_batch_size: 2
+  recommended_grad_accum: 4
+  max_sequence_length: 2048
+  precision: "bf16"
+
+# =============================================================================
+# MODEL SIZE RECOMMENDATIONS
+# =============================================================================
+recommendations:
+  max_model_size_b: 8
+  optimal_model_sizes:
+    - "7B"
+    - "8B"
+  notes: |
+    GaLore achieves similar memory to QLoRA while training all parameters.
+
+    When to use GaLore over QLoRA:
+    - You want full-rank training (no adapter artifacts)
+    - You're doing continued pre-training
+    - You're fine-tuning for tasks where adapter methods underperform
+
+    When to use QLoRA instead:
+    - Maximum memory efficiency needed
+    - Task-specific fine-tuning
+    - Adapter merging/swapping is desired

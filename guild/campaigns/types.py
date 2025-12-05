@@ -459,7 +459,10 @@ class ActiveCampaignPointer:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "ActiveCampaignPointer":
+    def from_dict(cls, data: Dict) -> Optional["ActiveCampaignPointer"]:
+        """Create pointer from dict. Returns None if data is empty or invalid."""
+        if not data or "hero_id" not in data:
+            return None
         return cls(
             hero_id=data["hero_id"],
             campaign_id=data["campaign_id"],

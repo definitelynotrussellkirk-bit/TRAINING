@@ -74,6 +74,164 @@
             color: var(--color-gold);
         }
 
+        .run-analysis-btn {
+            background: linear-gradient(135deg, var(--color-gold), #b8860b);
+            color: var(--bg-dark);
+            font-weight: 600;
+        }
+
+        .run-analysis-btn:hover {
+            opacity: 0.9;
+            color: var(--bg-dark);
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-gold);
+            border-radius: 12px;
+            padding: 1.5rem;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-title {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            font-size: 1.25rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .form-group select, .form-group input {
+            width: 100%;
+            padding: 0.5rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .form-group select:focus, .form-group input:focus {
+            outline: none;
+            border-color: var(--color-gold);
+        }
+
+        .checkpoint-option {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+        }
+
+        .checkpoint-option .step {
+            font-weight: 600;
+            color: var(--color-gold);
+        }
+
+        .checkpoint-option .loss {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .checkpoint-option .analyzed {
+            color: var(--color-success);
+            font-size: 0.75rem;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        .modal-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .modal-btn-cancel {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .modal-btn-cancel:hover {
+            border-color: var(--text-muted);
+        }
+
+        .modal-btn-submit {
+            background: linear-gradient(135deg, var(--color-gold), #b8860b);
+            border: none;
+            color: var(--bg-dark);
+            font-weight: 600;
+        }
+
+        .modal-btn-submit:hover {
+            opacity: 0.9;
+        }
+
+        .modal-btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         /* Summary Cards */
         .summary-row {
             display: grid;
@@ -458,6 +616,9 @@
                     <option value="">Loading heroes...</option>
                 </select>
                 <button class="refresh-btn" onclick="loadData()">Refresh</button>
+                <button class="refresh-btn run-analysis-btn" onclick="showRunAnalysisModal()" title="Run layer analysis on a checkpoint">
+                    Run Analysis
+                </button>
             </div>
         </div>
 
@@ -571,6 +732,46 @@
     <!-- Bottom Navigation -->
     <nav class="game-nav" id="bottomNav"></nav>
     <script src="/static/js/nav.js"></script>
+
+    <!-- Run Analysis Modal -->
+    <div class="modal-overlay" id="analysisModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Run Layer Analysis</h3>
+                <button class="modal-close" onclick="hideRunAnalysisModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="analysisCheckpoint">Checkpoint to Analyze</label>
+                    <select id="analysisCheckpoint">
+                        <option value="">Loading checkpoints...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="analysisReference">Reference Checkpoint (for drift comparison)</label>
+                    <select id="analysisReference">
+                        <option value="">None - Weight stats only</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="analysisActivations" checked>
+                        Compute activation statistics (slower but more detailed)
+                    </label>
+                </div>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 1rem;">
+                    Analysis will be queued as a job. GPU required for activation stats.
+                    Results will appear when the job completes.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-cancel" onclick="hideRunAnalysisModal()">Cancel</button>
+                <button class="modal-btn modal-btn-submit" id="submitAnalysisBtn" onclick="submitAnalysis()">
+                    Submit Job
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // State - initialized from active campaign, not hardcoded
@@ -1024,11 +1225,138 @@
                 <div class="empty-state">
                     <div class="empty-state-icon">🔬</div>
                     <h3>No Analysis Data Yet</h3>
-                    <p>Run the layer stats analysis script to generate drift data.</p>
-                    <code>python3 scripts/run_layer_stats.py --checkpoint checkpoint-183000</code>
+                    <p>Click "Run Analysis" to analyze a checkpoint, or run manually:</p>
+                    <code>python3 scripts/run_layer_stats.py local --checkpoint checkpoint-183000</code>
                 </div>
             `;
         }
+
+        // ===============================
+        // Run Analysis Modal Functions
+        // ===============================
+
+        let availableCheckpoints = [];
+
+        async function showRunAnalysisModal() {
+            // Show modal
+            document.getElementById('analysisModal').classList.add('active');
+
+            // Load available checkpoints
+            await loadAvailableCheckpoints();
+        }
+
+        function hideRunAnalysisModal() {
+            document.getElementById('analysisModal').classList.remove('active');
+        }
+
+        async function loadAvailableCheckpoints() {
+            const checkpointSelect = document.getElementById('analysisCheckpoint');
+            const referenceSelect = document.getElementById('analysisReference');
+
+            try {
+                const params = new URLSearchParams();
+                if (heroId) params.set('hero_id', heroId);
+                if (campaignId) params.set('campaign_id', campaignId);
+                params.set('limit', '30');
+
+                const resp = await fetch(`/api/analysis/checkpoints?${params}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+                const data = await resp.json();
+                availableCheckpoints = data.checkpoints || [];
+
+                // Populate checkpoint select
+                checkpointSelect.innerHTML = availableCheckpoints.map(c => {
+                    const lossStr = c.train_loss ? ` (loss: ${c.train_loss.toFixed(4)})` : '';
+                    const analyzedStr = c.has_analysis ? ' ✓' : '';
+                    return `<option value="${c.step}">Step ${c.step.toLocaleString()}${lossStr}${analyzedStr}</option>`;
+                }).join('');
+
+                if (availableCheckpoints.length === 0) {
+                    checkpointSelect.innerHTML = '<option value="">No checkpoints available</option>';
+                }
+
+                // Populate reference select (same options plus "None")
+                referenceSelect.innerHTML = '<option value="">None - Weight stats only</option>' +
+                    availableCheckpoints.map(c => {
+                        const lossStr = c.train_loss ? ` (loss: ${c.train_loss.toFixed(4)})` : '';
+                        return `<option value="${c.step}">Step ${c.step.toLocaleString()}${lossStr}</option>`;
+                    }).join('');
+
+            } catch (err) {
+                console.error('Failed to load checkpoints:', err);
+                checkpointSelect.innerHTML = '<option value="">Error loading checkpoints</option>';
+            }
+        }
+
+        async function submitAnalysis() {
+            const checkpointStep = document.getElementById('analysisCheckpoint').value;
+            const referenceStep = document.getElementById('analysisReference').value;
+            const computeActivations = document.getElementById('analysisActivations').checked;
+            const submitBtn = document.getElementById('submitAnalysisBtn');
+
+            if (!checkpointStep) {
+                alert('Please select a checkpoint to analyze');
+                return;
+            }
+
+            if (!campaignId || !heroId) {
+                alert('Please select a campaign and hero first');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            try {
+                const payload = {
+                    checkpoint_step: parseInt(checkpointStep),
+                    campaign_id: campaignId,
+                    hero_id: heroId,
+                    compute_activations: computeActivations,
+                };
+
+                if (referenceStep) {
+                    payload.reference_step = parseInt(referenceStep);
+                }
+
+                const resp = await fetch('/api/analysis/trigger', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await resp.json();
+
+                if (result.success) {
+                    alert(`Analysis job submitted!\n\nJob ID: ${result.job_id}\nQueue position: ${result.queue_position || 'unknown'}\n\nResults will appear when the job completes.`);
+                    hideRunAnalysisModal();
+                } else {
+                    alert(`Failed to submit job: ${result.error || 'Unknown error'}`);
+                }
+
+            } catch (err) {
+                console.error('Failed to submit analysis:', err);
+                alert(`Error: ${err.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Job';
+            }
+        }
+
+        // Close modal on backdrop click
+        document.getElementById('analysisModal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                hideRunAnalysisModal();
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                hideRunAnalysisModal();
+            }
+        });
 
         // Campaign select change handler
         document.getElementById('campaignSelect').addEventListener('change', loadData);

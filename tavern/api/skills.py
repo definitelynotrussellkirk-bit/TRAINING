@@ -24,8 +24,47 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _get_passives_summary():
+    """Get passive eval summary for deriving skill levels."""
+    try:
+        passives_file = paths.get_base_dir() / "status" / "passives_ledger.json"
+        if not passives_file.exists():
+            return {}
+
+        with open(passives_file) as f:
+            data = json.load(f)
+
+        results = data.get("results", [])
+        by_passive = {}
+        for r in results:
+            name = r.get("passive_name", r.get("passive_id", "unknown"))
+            acc = r.get("accuracy", 0)
+            if name not in by_passive:
+                by_passive[name] = {"count": 0, "best": 0, "recent": [], "history": []}
+            by_passive[name]["count"] += 1
+            by_passive[name]["best"] = max(by_passive[name]["best"], acc)
+            by_passive[name]["recent"].append(acc)
+            # Keep only last 10 for averaging
+            if len(by_passive[name]["recent"]) > 10:
+                by_passive[name]["recent"] = by_passive[name]["recent"][-10:]
+            # Build accuracy_history compatible format for charts
+            by_passive[name]["history"].append({
+                "accuracy": acc,
+                "timestamp": r.get("timestamp"),
+                "training_level": 1,  # Passives don't have levels
+            })
+            # Keep last 20 for history
+            if len(by_passive[name]["history"]) > 20:
+                by_passive[name]["history"] = by_passive[name]["history"][-20:]
+
+        return by_passive
+    except Exception as e:
+        logger.debug(f"Could not load passives summary: {e}")
+        return {}
+
+
 def _get_skills_data():
-    """Load skill data from CurriculumManager (single source of truth)."""
+    """Load skill data from CurriculumManager, falling back to passives when empty."""
     try:
         from guild.skills.loader import load_skill_config
         from data_manager.curriculum_manager import CurriculumManager
@@ -44,64 +83,133 @@ def _get_skills_data():
         except Exception as e:
             logger.debug(f"Could not load eval counts from ledger: {e}")
 
+        # Get passive eval summary for fallback
+        passives_summary = _get_passives_summary()
+
         skills = []
-        # Iterate over skills in curriculum state
-        for skill_id in cm.state.get("skills", {}).keys():
-            try:
-                config = load_skill_config(skill_id)
+        curriculum_skills = cm.state.get("skills", {})
 
-                # Get curriculum state for this skill
-                mastered = cm.get_mastered_level(skill_id)
-                training = cm.get_training_level(skill_id)
+        # If curriculum has skills, use those
+        if curriculum_skills:
+            for skill_id in curriculum_skills.keys():
+                try:
+                    config = load_skill_config(skill_id)
+                    mastered = cm.get_mastered_level(skill_id)
+                    training = cm.get_training_level(skill_id)
+                    skill_state = cm.state["skills"][skill_id]
+                    history = skill_state.get("accuracy_history", [])
 
-                # Get accuracy history
-                skill_state = cm.state["skills"][skill_id]
-                history = skill_state.get("accuracy_history", [])
+                    recent_acc = 0
+                    last_eval_time = None
+                    last_single_acc = 0
+                    if history:
+                        recent = history[-3:]
+                        recent_acc = (sum(r.get("accuracy", 0) for r in recent) / len(recent)) * 100
+                        last_entry = history[-1]
+                        last_eval_time = last_entry.get("timestamp")
+                        last_single_acc = last_entry.get("accuracy", 0) * 100
 
-                # Calculate recent accuracy (last 3 evals)
-                recent_acc = 0
-                last_eval_time = None
-                last_single_acc = 0
-                if history:
-                    recent = history[-3:]
-                    recent_acc = (sum(r.get("accuracy", 0) for r in recent) / len(recent)) * 100
-                    # Get most recent eval timestamp and accuracy
-                    last_entry = history[-1]
-                    last_eval_time = last_entry.get("timestamp")
-                    last_single_acc = last_entry.get("accuracy", 0) * 100
+                    ledger_count = eval_counts.get(skill_id, 0)
 
-                # Use ledger count for total evals (persisted, stable)
-                ledger_count = eval_counts.get(skill_id, 0)
+                    # Fallback to passive evals if ledger is empty
+                    passive_count = 0
+                    from_passives = False
+                    passive_name_map = {
+                        "bin": ["binary_arithmetic", "arithmetic", "bin"],
+                        "sy": ["syllacrostic", "syllo", "sy", "word_puzzles"],
+                    }
+                    for name in passive_name_map.get(skill_id, [skill_id]):
+                        if name in passives_summary:
+                            passive_count += passives_summary[name].get("count", 0)
+                            if not recent_acc and passives_summary[name].get("recent"):
+                                recent_accs = passives_summary[name]["recent"]
+                                recent_acc = (sum(recent_accs) / len(recent_accs)) * 100
 
-                skills.append({
-                    "id": config.id,
-                    "name": config.name,
-                    "rpg_name": config.rpg_name or config.name,
-                    "rpg_description": config.rpg_description or config.description or "",
-                    "icon": config.display.icon if config.display else "⚔️",
-                    "color": config.display.color if config.display else "#888",
-                    "short_name": config.display.short_name if config.display else config.id.upper(),
-                    "max_level": config.max_level,
-                    "mastered_level": mastered,
-                    "training_level": training,
-                    "accuracy": round(recent_acc, 1),
-                    "last_accuracy": round(last_single_acc, 1),
-                    "last_eval_time": last_eval_time,
-                    "eval_count": ledger_count,
-                    "category": config.category.value if hasattr(config.category, 'value') else str(config.category),
-                    "description": config.description or "",
-                })
-            except Exception as e:
-                logger.warning(f"Failed to load skill {skill_id}: {e}")
-                continue
+                    # Use passive count as fallback if ledger is empty
+                    final_eval_count = ledger_count if ledger_count > 0 else passive_count
+                    if ledger_count == 0 and passive_count > 0:
+                        from_passives = True
+
+                    skills.append({
+                        "id": config.id,
+                        "name": config.name,
+                        "rpg_name": config.rpg_name or config.name,
+                        "rpg_description": config.rpg_description or config.description or "",
+                        "icon": config.display.icon if config.display else "⚔️",
+                        "color": config.display.color if config.display else "#888",
+                        "short_name": config.display.short_name if config.display else config.id.upper(),
+                        "max_level": config.max_level,
+                        "mastered_level": mastered,
+                        "training_level": training,
+                        "accuracy": round(recent_acc, 1),
+                        "last_accuracy": round(last_single_acc, 1),
+                        "last_eval_time": last_eval_time,
+                        "eval_count": final_eval_count,
+                        "from_passives": from_passives,
+                        "category": config.category.value if hasattr(config.category, 'value') else str(config.category),
+                        "description": config.description or "",
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to load skill {skill_id}: {e}")
+                    continue
+        else:
+            # Fallback: Load all skill configs and use passive data
+            skills_dir = base_dir / "configs" / "skills"
+            if skills_dir.exists():
+                for yaml_file in skills_dir.glob("*.yaml"):
+                    skill_id = yaml_file.stem
+                    try:
+                        config = load_skill_config(skill_id)
+
+                        # Get passive data for this skill (passives often match skill names)
+                        passive_data = passives_summary.get(skill_id, {})
+                        best_acc = passive_data.get("best", 0)
+                        eval_count = passive_data.get("count", 0)
+                        recent_accs = passive_data.get("recent", [])
+                        recent_acc = (sum(recent_accs) / len(recent_accs) * 100) if recent_accs else 0
+
+                        # Derive "effective level" from best accuracy:
+                        # 80%+ = level 1, each additional 5% = +1 level (rough heuristic)
+                        effective_level = 0
+                        if best_acc >= 0.80:
+                            effective_level = 1 + int((best_acc - 0.80) / 0.05)
+                        effective_level = min(effective_level, config.max_level)
+
+                        skills.append({
+                            "id": config.id,
+                            "name": config.name,
+                            "rpg_name": config.rpg_name or config.name,
+                            "rpg_description": config.rpg_description or config.description or "",
+                            "icon": config.display.icon if config.display else "⚔️",
+                            "color": config.display.color if config.display else "#888",
+                            "short_name": config.display.short_name if config.display else config.id.upper(),
+                            "max_level": config.max_level,
+                            "mastered_level": effective_level,
+                            "training_level": effective_level + 1 if effective_level < config.max_level else effective_level,
+                            "accuracy": round(recent_acc, 1),
+                            "last_accuracy": round(best_acc * 100, 1),
+                            "last_eval_time": None,
+                            "eval_count": eval_count,
+                            "category": config.category.value if hasattr(config.category, 'value') else str(config.category),
+                            "description": config.description or "",
+                            "from_passives": True,  # Indicate data source
+                        })
+                    except Exception as e:
+                        logger.debug(f"Skipping skill {skill_id}: {e}")
+                        continue
 
         # Sort by name
         skills.sort(key=lambda s: s["name"])
+
+        # Calculate total from passives if no curriculum
+        total_passive_evals = sum(p.get("count", 0) for p in passives_summary.values())
 
         return {
             "skills": skills,
             "active_skill": cm.state.get("active_skill", ""),
             "total_mastered": sum(s["mastered_level"] for s in skills),
+            "total_passive_evals": total_passive_evals,
+            "passive_count": len(passives_summary),
         }
 
     except Exception as e:
@@ -146,6 +254,25 @@ def serve_skill_data(handler: "TavernHandler", skill_id: str):
         cm = CurriculumManager(base_dir, {})
         skill_state = cm.state.get("skills", {}).get(skill_id, {})
 
+        # Get passive eval counts for this skill (fallback when curriculum is empty)
+        passives_summary = _get_passives_summary()
+        # Map skill IDs to passive names (passives use different naming)
+        passive_name_map = {
+            "bin": ["binary_arithmetic", "arithmetic", "bin"],
+            "sy": ["syllacrostic", "syllo", "sy", "word_puzzles"],
+        }
+        passive_count = 0
+        passive_accuracy = 0
+        passive_history = []  # Build accuracy_history from passives
+        for name in passive_name_map.get(skill_id, [skill_id]):
+            if name in passives_summary:
+                passive_count += passives_summary[name].get("count", 0)
+                if passives_summary[name].get("recent"):
+                    passive_accuracy = sum(passives_summary[name]["recent"]) / len(passives_summary[name]["recent"]) * 100
+                # Get full history from passives ledger for accuracy chart
+                if passives_summary[name].get("history"):
+                    passive_history.extend(passives_summary[name]["history"])
+
         # Build response
         max_level = config.get("max_level", 30)
         mastered = cm.get_mastered_level(skill_id)
@@ -169,14 +296,23 @@ def serve_skill_data(handler: "TavernHandler", skill_id: str):
         # Get accuracy history
         history = skill_state.get("accuracy_history", [])
 
-        # Recent accuracy
+        # Recent accuracy - prefer curriculum, fallback to passives
         recent_acc = 0
         if history:
             recent = history[-3:]
             recent_acc = sum(r.get("accuracy", 0) for r in recent) / len(recent) * 100
+        elif passive_accuracy > 0:
+            recent_acc = passive_accuracy
 
         # Count evals at training level
         at_level = [r for r in history if r.get("training_level", r.get("level")) == training]
+
+        # Use passive counts as fallback when curriculum is empty
+        eval_count = len(at_level) if at_level else passive_count
+        total_evals = len(history) if history else passive_count
+
+        # Use passive_history if curriculum history is empty
+        final_history = history[-20:] if history else passive_history[-20:]
 
         response = {
             "id": skill_id,
@@ -185,9 +321,10 @@ def serve_skill_data(handler: "TavernHandler", skill_id: str):
                 "mastered_level": mastered,
                 "training_level": training,
                 "accuracy": round(recent_acc, 1),
-                "eval_count": len(at_level),
-                "total_evals": len(history),
-                "accuracy_history": history[-20:],
+                "eval_count": eval_count,
+                "total_evals": total_evals,
+                "passive_evals": passive_count,  # Include passive count separately
+                "accuracy_history": final_history,
             },
             "is_active": cm.state.get("active_skill") == skill_id,
         }

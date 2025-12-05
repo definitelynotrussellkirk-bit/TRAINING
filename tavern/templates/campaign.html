@@ -14,13 +14,18 @@
             grid-template-columns: 1fr 350px;
             gap: 1.5rem;
             padding: 1.5rem;
-            height: calc(100vh - 180px);
-            overflow: hidden;
+            height: calc(100vh - 120px);
         }
 
         .campaign-content {
             overflow-y: auto;
             padding-right: 0.5rem;
+            padding-bottom: 3rem;
+        }
+
+        .sidebar {
+            overflow-y: auto;
+            max-height: 100%;
         }
 
         /* Current Campaign Card */
@@ -180,6 +185,31 @@
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-bottom: 2rem;
+        }
+
+        .campaign-group {
+            margin-bottom: 1rem;
+        }
+
+        .campaign-group-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: var(--color-gold);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .campaign-group-count {
+            background: var(--bg-surface);
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
         }
 
         .campaign-item {
@@ -400,6 +430,32 @@
             gap: 0.75rem;
             margin-top: 1.5rem;
         }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--color-gold);
+            color: #000;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 9999;
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+            opacity: 1;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
     </style>
 </head>
 <body>
@@ -441,7 +497,7 @@
                     </div>
                 </div>
 
-                <div class="campaign-stats">
+                <div class="campaign-stats" style="grid-template-columns: repeat(5, 1fr);">
                     <div class="campaign-stat">
                         <div class="campaign-stat-value" id="statStep">-</div>
                         <div class="campaign-stat-label">Step</div>
@@ -449,6 +505,10 @@
                     <div class="campaign-stat">
                         <div class="campaign-stat-value" id="statDays">-</div>
                         <div class="campaign-stat-label">Days</div>
+                    </div>
+                    <div class="campaign-stat">
+                        <div class="campaign-stat-value" id="statEvals">-</div>
+                        <div class="campaign-stat-label">Evals</div>
                     </div>
                     <div class="campaign-stat">
                         <div class="campaign-stat-value" id="statCheckpoints">-</div>
@@ -499,7 +559,7 @@
 
             <!-- All Campaigns -->
             <div class="campaign-section">
-                <h3>All Campaigns</h3>
+                <h3>All Campaigns <span id="campaignCount" style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;"></span></h3>
                 <div class="campaign-list" id="campaignList">
                     <!-- Populated by JS -->
                 </div>
@@ -580,6 +640,15 @@
         }
         setInterval(updateTime, 1000);
         updateTime();
+
+        // Toast notification
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
 
         // Load data
         async function loadData() {
@@ -665,6 +734,17 @@
             // Checkpoints - would need API
             document.getElementById('statCheckpoints').textContent = '-';
 
+            // Fetch passive evals count from skills API
+            fetch('/api/skills')
+                .then(r => r.json())
+                .then(data => {
+                    const totalEvals = data.total_passive_evals || 0;
+                    document.getElementById('statEvals').textContent = totalEvals.toLocaleString();
+                })
+                .catch(() => {
+                    document.getElementById('statEvals').textContent = '-';
+                });
+
             // Skills
             const skills = activeCampaign.skills_focus || [];
             document.getElementById('campaignSkills').innerHTML = skills.map(s => `
@@ -684,35 +764,59 @@
 
         function renderCampaignList() {
             const list = document.getElementById('campaignList');
-            const allCampaigns = [];
+
+            // Count total campaigns
+            let totalCount = 0;
+            const heroGroups = {};
 
             for (const [heroId, heroCampaigns] of Object.entries(campaigns)) {
-                for (const c of heroCampaigns) {
-                    if (c.status !== 'archived') {
-                        allCampaigns.push({...c, hero_id: heroId});
-                    }
+                const active = heroCampaigns.filter(c => c.status !== 'archived');
+                if (active.length > 0) {
+                    heroGroups[heroId] = active;
+                    totalCount += active.length;
                 }
             }
 
-            if (allCampaigns.length === 0) {
+            if (totalCount === 0) {
                 list.innerHTML = '<div class="empty-state">No campaigns yet. Create one to start!</div>';
                 return;
             }
 
-            list.innerHTML = allCampaigns.map(c => {
-                const isActive = activeCampaign?.id === c.id && activeCampaign?.hero_id === c.hero_id;
-                return `
-                <div class="campaign-item ${isActive ? 'active' : 'clickable'}"
-                     data-hero="${c.hero_id}" data-id="${c.id}"
-                     ${isActive ? '' : `onclick="activateCampaign('${c.hero_id}', '${c.id}')"`}
-                     ${isActive ? '' : 'title="Click to switch to this campaign"'}>
-                    <div class="campaign-item-header">
-                        <span class="campaign-item-name">${c.name}</span>
-                        <span class="campaign-item-step">${isActive ? '★ Selected' : `Step ${(c.current_step || 0).toLocaleString()}`}</span>
-                    </div>
-                    <div class="campaign-item-date">${c.hero_id} - Created ${new Date(c.created_at).toLocaleDateString()}</div>
-                </div>
-            `}).join('');
+            // Render grouped by hero
+            let html = '';
+            for (const [heroId, heroCampaigns] of Object.entries(heroGroups)) {
+                const heroName = heroId.split('-')[0].toUpperCase();
+                html += `<div class="campaign-group">`;
+                html += `<div class="campaign-group-header">
+                    <span>${heroName}</span>
+                    <span class="campaign-group-count">${heroCampaigns.length}</span>
+                </div>`;
+
+                for (const c of heroCampaigns) {
+                    const isActive = activeCampaign?.id === c.id && activeCampaign?.hero_id === heroId;
+                    html += `
+                    <div class="campaign-item ${isActive ? 'active' : 'clickable'}"
+                         data-hero="${heroId}" data-id="${c.id}"
+                         ${isActive ? '' : `onclick="activateCampaign('${heroId}', '${c.id}')"`}
+                         ${isActive ? '' : 'title="Click to switch to this campaign"'}>
+                        <div class="campaign-item-header">
+                            <span class="campaign-item-name">${c.name}</span>
+                            <span class="campaign-item-step">${isActive ? '★ Active' : `Step ${(c.current_step || 0).toLocaleString()}`}</span>
+                        </div>
+                        <div class="campaign-item-date">${c.id} - Created ${new Date(c.created_at).toLocaleDateString()}</div>
+                    </div>`;
+                }
+                html += `</div>`;
+            }
+
+            list.innerHTML = html;
+
+            // Update count in header
+            const countEl = document.getElementById('campaignCount');
+            if (countEl) {
+                const heroCount = Object.keys(heroGroups).length;
+                countEl.textContent = `(${totalCount} across ${heroCount} heroes)`;
+            }
         }
 
         function renderArchiveList() {
@@ -775,8 +879,13 @@
                 });
 
                 if (resp.ok) {
+                    const result = await resp.json();
                     closeModal();
-                    loadData();
+                    await loadData();
+                    // Show success message
+                    showToast(`Campaign "${name}" created for ${heroId.split('-')[0].toUpperCase()}!`);
+                    // Scroll to campaigns list
+                    document.getElementById('campaignList').scrollIntoView({ behavior: 'smooth' });
                 } else {
                     const err = await resp.json();
                     alert('Error: ' + (err.error || 'Failed to create campaign'));

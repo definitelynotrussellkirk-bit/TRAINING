@@ -661,97 +661,154 @@ def cmd_status(args) -> int:
 
 
 # =============================================================================
-# RESET COMMAND - Clear stale state while preserving models
+# RESET COMMAND - Multi-level reset system
 # =============================================================================
 
 def cmd_reset(args) -> int:
     """
-    Reset training environment.
+    Multi-level reset system for the Realm of Training.
 
-    Clears runtime state that may be stale or corrupted:
-    - .pids/ (daemon PID files)
-    - control/state.json (training state)
-    - status/training_status.json (last training status)
-    - status/events.jsonl (event log)
-
-    Preserves:
-    - campaigns/ (all hero data and checkpoints)
-    - models/ (all model files)
-    - vault/jobs.db (unless --keep-jobs)
-    - config.json (root configuration)
+    Reset Levels:
+        CAMPAIGN - Reset ONE campaign (keep hero, delete checkpoints, reset curriculum)
+        HERO     - Reset a hero (all their campaigns)
+        FULL     - Reset everything (all campaigns, queue, state)
+        DEEP     - Nuclear option (also reset base evals, passives, DBs)
     """
-    from core.reset import reset_environment
+    from core.reset import ResetLevel, ResetManager
+    import json as json_mod
 
     base_dir = get_base_dir()
+    level = ResetLevel(getattr(args, 'level', 'full'))
+    target = getattr(args, 'target', None)
+    dry_run = getattr(args, 'dry_run', False)
+    confirm = getattr(args, 'confirm', False)
+    output_json = getattr(args, 'json', False)
+    yes = getattr(args, 'yes', False)
 
-    print("=" * 60)
-    print("REALM OF TRAINING - Environment Reset")
-    print("=" * 60)
-    print()
-    print("This will clear runtime state while preserving models and campaigns.")
-    print()
-    print("Will clear:")
-    print("  - .pids/ (daemon PID files)")
-    print("  - control/state.json (training state)")
-    print("  - status/training_status.json (last status)")
-    print("  - status/events.jsonl (event log)")
-    if not getattr(args, 'keep_jobs', False):
-        print("  - Pending/running jobs in vault/jobs.db")
-    print()
-    print("Will preserve:")
-    print("  - campaigns/ (all hero data and checkpoints)")
-    print("  - models/ (all model files)")
-    print("  - control/active_campaign.json (campaign selection)")
-    if getattr(args, 'keep_jobs', False):
-        print("  - vault/jobs.db (job database)")
-    print()
+    # Validate target requirements
+    if level in (ResetLevel.CAMPAIGN, ResetLevel.HERO) and not target:
+        print(f"Error: --target is required for {level.value} level")
+        print()
+        print("Examples:")
+        print("  python -m training reset --level campaign --target gou-qwen3-4b/campaign-001")
+        print("  python -m training reset --level hero --target gou-qwen3-4b")
+        return 1
 
-    # Confirm unless --yes
-    if not getattr(args, 'yes', False):
-        confirm = input("Proceed? [y/N] ").strip().lower()
-        if confirm != 'y':
-            print("Cancelled.")
-            return 0
+    # Safety warning for DEEP without confirm
+    if level == ResetLevel.DEEP and not confirm and not dry_run:
+        print("=" * 60)
+        print("WARNING: DEEP RESET")
+        print("=" * 60)
+        print()
+        print("DEEP reset will delete:")
+        print("  - All checkpoints for all campaigns")
+        print("  - All databases (job store, vault catalog, realm state)")
+        print("  - All status files")
+        print("  - All eval history and passives")
+        print()
+        print("This cannot be undone!")
+        print()
+        print("Use --dry-run to see what would be deleted.")
+        print("Use --confirm to proceed with the reset.")
+        return 1
 
-    # Do the actual reset work
-    result = reset_environment(
-        keep_jobs=getattr(args, 'keep_jobs', False),
-        base_dir=base_dir,
+    # Show what will happen (unless JSON output)
+    if not output_json and not dry_run:
+        print("=" * 60)
+        print(f"REALM OF TRAINING - {level.value.upper()} Reset")
+        print("=" * 60)
+        print()
+
+        if level == ResetLevel.CAMPAIGN:
+            print(f"Reset campaign: {target}")
+            print()
+            print("Will clear:")
+            print("  - All checkpoints in this campaign")
+            print("  - Curriculum state (reset to level 1)")
+            print("  - Eval history and ledger")
+            print("  - Training status")
+            print()
+            print("Will preserve:")
+            print("  - campaign.json and config.json")
+            print("  - Hero configuration")
+
+        elif level == ResetLevel.HERO:
+            print(f"Reset all campaigns for hero: {target}")
+            print()
+            print("Will clear:")
+            print("  - All checkpoints for all campaigns")
+            print("  - All curriculum states")
+            print("  - All eval histories")
+            print()
+            print("Will preserve:")
+            print("  - Hero config YAML")
+
+        elif level == ResetLevel.FULL:
+            print("Full reset of the Realm")
+            print()
+            print("Will clear:")
+            print("  - All daemons (stopped)")
+            print("  - All PID files")
+            print("  - All queue files")
+            print("  - All campaign checkpoints")
+            print("  - All curriculum states")
+            print("  - All status files")
+            print("  - All pending jobs")
+            print()
+            print("Will preserve:")
+            print("  - Hero config files")
+            print("  - Base models")
+            print("  - Campaign structure (campaign.json, config.json)")
+
+        elif level == ResetLevel.DEEP:
+            print("NUCLEAR reset - everything goes")
+            print()
+            print("Will clear:")
+            print("  - Everything in FULL reset, plus:")
+            print("  - Passives ledger")
+            print("  - Checkpoint ledger")
+            print("  - All SQLite databases")
+            print("  - All status/*.json files")
+            print()
+            print("Will preserve:")
+            print("  - Hero config files only")
+            print("  - Base models only")
+
+        print()
+
+        # Confirm unless --yes
+        if not yes:
+            confirm_input = input("Proceed? [y/N] ").strip().lower()
+            if confirm_input != 'y':
+                print("Cancelled.")
+                return 0
+
+    # Run the reset
+    manager = ResetManager(base_dir)
+    report = manager.reset(
+        level=level,
+        target=target,
+        dry_run=dry_run,
+        confirm_deep=confirm,
     )
 
-    # Summarize what happened
-    print("\n[1/4] Stopping daemons...")
-    for pid in result.daemons_stopped:
-        print(f"  Stopped PID {pid}")
-    print(f"  {len(result.daemons_stopped)} daemon(s) stopped")
-
-    print("\n[2/4] Clearing PID files...")
-    for pid_file in result.pids_cleared:
-        print(f"  Cleared {pid_file.name}")
-    print(f"  {len(result.pids_cleared)} PID file(s) cleared")
-
-    print("\n[3/4] Clearing state files...")
-    for state_file in result.state_files_cleared:
-        print(f"  Cleared {state_file.name}")
-    print(f"  {len(result.state_files_cleared)} state file(s) cleared")
-
-    # Jobs
-    if getattr(args, 'keep_jobs', False):
-        print("\n[4/4] Keeping jobs (--keep-jobs)")
+    # Output
+    if output_json:
+        print(json_mod.dumps(report.to_dict(), indent=2))
     else:
-        print("\n[4/4] Clearing pending jobs...")
-        print(f"  {result.jobs_cancelled} job(s) cancelled")
+        prefix = "[DRY RUN] " if dry_run else ""
+        print()
+        print(f"{prefix}Reset Report")
+        print("=" * 40)
+        print(report.summary())
 
-    print()
-    print("=" * 60)
-    print("Reset complete!")
-    print()
-    print("Next steps:")
-    print("  1. python -m training play    # Start fresh")
-    print("  2. python -m training status  # Verify clean state")
-    print("=" * 60)
+        if not dry_run and not report.errors:
+            print()
+            print("Next steps:")
+            print("  1. python -m training play    # Start fresh")
+            print("  2. python -m training status  # Verify clean state")
 
-    return 0
+    return 1 if report.errors else 0
 
 
 # =============================================================================

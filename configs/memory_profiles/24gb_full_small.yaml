@@ -1,0 +1,94 @@
+# =============================================================================
+# MEMORY PROFILE: 24GB Full Training (Small Models)
+# =============================================================================
+# Full parameter training for 0.6B-4B models on 24GB VRAM
+# No quantization, no adapters - train all weights directly.
+# =============================================================================
+
+id: 24gb_full_small
+name: "24GB Full Training (Small)"
+rpg_name: "The Purist's Path"
+icon: "⚔️"
+description: |
+  Full parameter training for small models (0.6B-4B).
+
+  Advantages over QLoRA:
+  - All parameters trained (no frozen weights)
+  - No quantization artifacts
+  - Better potential convergence
+
+  Trade-offs:
+  - Limited to smaller models
+  - Higher per-step VRAM usage
+
+target_vram_gb: 24
+
+# =============================================================================
+# PEFT CONFIGURATION
+# =============================================================================
+peft:
+  method: "none"  # Full training, no adapters
+
+# =============================================================================
+# QUANTIZATION
+# =============================================================================
+quantization:
+  load_in_4bit: false
+  load_in_8bit: false
+
+# =============================================================================
+# MEMORY-EFFICIENT IMPLEMENTATIONS
+# =============================================================================
+memory:
+  gradient_checkpointing: true
+  flash_attention: true
+  paged_optimizer: false  # Not needed for small models
+  cpu_offload: false
+
+# =============================================================================
+# OPTIMIZER CONFIGURATION
+# =============================================================================
+optimizer:
+  type: "adamw_torch_fused"  # Fast fused implementation
+
+  adamw:
+    lr: 1e-4                 # Higher LR for full training
+    betas: [0.9, 0.999]
+    eps: 1e-8
+    weight_decay: 0.01
+
+# =============================================================================
+# TRAINING CONSTRAINTS
+# =============================================================================
+constraints:
+  max_batch_size: 16         # Can use larger batches
+  recommended_grad_accum: 2
+  max_sequence_length: 2048
+  precision: "bf16"
+
+# =============================================================================
+# MODEL SIZE RECOMMENDATIONS
+# =============================================================================
+recommendations:
+  max_model_size_b: 4
+  optimal_model_sizes:
+    - "0.6B"
+    - "1B"
+    - "3B"
+    - "4B"
+  tested_models:
+    - "Qwen3-0.6B"
+    - "Qwen3-4B"
+    - "Phi-3.5-mini"
+  notes: |
+    Full training works well for models up to ~4B on 24GB.
+
+    Expected VRAM usage (4B model):
+    - Model weights (bf16): ~8GB
+    - Gradients: ~8GB
+    - Optimizer states: ~16GB (paged if needed)
+    - Activations: ~4GB (with checkpointing)
+
+    For 4B models, consider:
+    - batch_size=1-2 with gradient accumulation
+    - Shorter sequences (1024-2048)

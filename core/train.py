@@ -422,6 +422,26 @@ class UltimateTrainer:
         else:
             print("TrainerEngine not available, will use legacy path")
 
+        # Run ledger health check on startup
+        self._run_ledger_health_check()
+
+    def _run_ledger_health_check(self):
+        """Run checkpoint ledger health check on startup."""
+        try:
+            from core.checkpoint_ledger import get_ledger
+            ledger = get_ledger()
+            result = ledger.run_health_check(fix_issues=True)
+
+            if result["orphans_adopted"] > 0:
+                print(f"✓ Adopted {result['orphans_adopted']} orphan checkpoints")
+            if result["stale_removed"] > 0:
+                print(f"✓ Removed {result['stale_removed']} stale ledger entries")
+            if result["healthy"]:
+                if result["ledger_count"] > 0:
+                    print(f"✓ Ledger healthy ({result['ledger_count']} checkpoints)")
+        except Exception as e:
+            print(f"⚠️  Ledger health check failed: {e}")
+
     def _get_hyperparam(self, name: str, default=None):
         """Get hyperparam from config (preferred) or args (fallback)."""
         if self.config and hasattr(self.config, 'hyperparams'):

@@ -17,9 +17,12 @@ import time
 import signal
 import logging
 import requests
+import gc
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+
+import torch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -282,7 +285,9 @@ class HeroLoop:
         def signal_handler(signum, frame):
             self.logger.info("Shutdown signal received")
             self.running = False
-        
+            # Clean up GPU memory immediately on signal
+            self._cleanup_gpu()
+
         signal.signal(signal.SIGTERM, signal_handler)
         signal.signal(signal.SIGINT, signal_handler)
         
@@ -311,6 +316,9 @@ class HeroLoop:
                 self.logger.exception(f"Error in hero loop: {e}")
                 time.sleep(self.poll_interval)
         
+        # Final cleanup
+        self._cleanup_gpu()
+
         self.logger.info("")
         self.logger.info("=" * 60)
         self.logger.info("HERO LOOP STOPPED")
@@ -318,6 +326,32 @@ class HeroLoop:
         self.logger.info(f"  Total steps: {self.total_steps}")
         self.logger.info(f"  Data generations: {self.generations_triggered}")
         self.logger.info("=" * 60)
+
+    def _cleanup_gpu(self):
+        """Clean up GPU memory to prevent zombie processes holding VRAM."""
+        try:
+            # Clear trainer reference if exists
+            if hasattr(self, 'trainer') and self.trainer is not None:
+                if hasattr(self.trainer, 'model'):
+                    del self.trainer.model
+                if hasattr(self.trainer, 'engine') and self.trainer.engine is not None:
+                    if hasattr(self.trainer.engine, 'model'):
+                        del self.trainer.engine.model
+                    if hasattr(self.trainer.engine, 'tokenizer'):
+                        del self.trainer.engine.tokenizer
+                del self.trainer
+                self.trainer = None
+
+            # Force garbage collection
+            gc.collect()
+
+            # Clear CUDA cache
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                self.logger.info("GPU memory cleaned up")
+        except Exception as e:
+            self.logger.warning(f"GPU cleanup warning: {e}")
 
 
 def main():
@@ -333,11 +367,35 @@ def main():
     
     base_dir = get_base_dir()
     campaign_path = base_dir / "campaigns" / args.campaign
-    
+
     if not campaign_path.exists():
         print(f"ERROR: Campaign not found: {campaign_path}")
         sys.exit(1)
-    
+
+    # Validate against active_campaign.json to prevent mismatches
+    active_file = base_dir / "control" / "active_campaign.json"
+    if active_file.exists():
+        try:
+            active_data = json.load(open(active_file))
+            active_path = active_data.get("campaign_path", "")
+            if active_path and active_path != args.campaign:
+                print(f"")
+                print(f"╔══════════════════════════════════════════════════════════════════╗")
+                print(f"║  ⚠️  CAMPAIGN MISMATCH WARNING                                    ║")
+                print(f"╠══════════════════════════════════════════════════════════════════╣")
+                print(f"║  You are starting: {args.campaign:<43} ║")
+                print(f"║  Active campaign:  {active_path:<43} ║")
+                print(f"╠══════════════════════════════════════════════════════════════════╣")
+                print(f"║  This may cause confusion! Use one of:                           ║")
+                print(f"║    1. python3 scripts/start_hero_loop.py (uses active campaign)  ║")
+                print(f"║    2. Update active_campaign.json to match                       ║")
+                print(f"╚══════════════════════════════════════════════════════════════════╝")
+                print(f"")
+                print(f"Continuing in 5 seconds... Press Ctrl+C to abort.")
+                time.sleep(5)
+        except Exception:
+            pass  # Ignore errors reading active_campaign.json
+
     loop = HeroLoop(campaign_path, poll_interval=args.poll_interval)
     
     if args.once:

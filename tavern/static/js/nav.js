@@ -26,6 +26,8 @@ const NAV_ITEMS = [
       desc: 'Validation rituals - run health checks, verify training quality' },
     { href: '/garrison', icon: '🛡️', label: 'Garrison', id: 'garrison',
       desc: 'Fleet health - monitor all services, disk usage, connections' },
+    { href: '/analysis', icon: '🔬', label: 'Archaeology', id: 'analysis',
+      desc: 'Model archaeology - layer drift analysis, weight changes, learning patterns' },
     { href: '/settings', icon: '⚙️', label: 'Settings', id: 'settings',
       desc: 'Configuration - training params, VRAM calc, scheduler, mantra' },
 ];
@@ -371,6 +373,8 @@ function autoRenderNav() {
         activeId = 'temple';
     } else if (path.startsWith('/garrison')) {
         activeId = 'garrison';
+    } else if (path.startsWith('/analysis')) {
+        activeId = 'analysis';
     } else if (path.startsWith('/settings') || path.startsWith('/scheduler')) {
         activeId = 'settings';
     }

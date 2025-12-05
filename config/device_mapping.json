@@ -22,21 +22,27 @@
       "stronghold": "nas_archive",
       "zone": "warm",
       "is_primary": false,
-      "base_path": "/volume1/data/llm_training",
+      "base_path": "/mnt/synology/data/llm_training",
+      "mount_point": "/mnt/synology/data",
+      "remote_path": "/volume1/data",
       "description": "Synology NAS primary storage"
     },
     "synology_backup": {
       "stronghold": "nas_backup",
       "zone": "warm",
       "is_primary": false,
-      "base_path": "/volume1/backup/llm_training",
+      "base_path": "/mnt/synology/backup/llm_training",
+      "mount_point": "/mnt/synology/backup",
+      "remote_path": "/volume1/backup",
       "description": "Synology NAS backup storage"
     },
     "synology_archive": {
       "stronghold": "nas_cold",
       "zone": "cold",
       "is_primary": false,
-      "base_path": "/volume1/archive/llm_training",
+      "base_path": "/mnt/synology/archive/llm_training",
+      "mount_point": "/mnt/synology/archive",
+      "remote_path": "/volume1/archive",
       "description": "Synology NAS archive storage"
     }
   },

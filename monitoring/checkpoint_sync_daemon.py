@@ -2,6 +2,18 @@
 """
 Checkpoint Sync Daemon - Intelligently syncs checkpoints from 4090 to 3090
 
+DEPRECATED: This pull-based sync is superseded by DeploymentOrchestrator (push-based).
+
+The push-based approach in monitoring/deployment_orchestrator.py is preferred:
+- Runs on 4090 (trainer) and pushes to 3090 (inference)
+- Uses smart push logic (push on improvement or after N steps)
+- More reliable - doesn't depend on 3090 being up
+- Single source of truth for what gets synced
+
+This file is kept for backwards compatibility but should not be used.
+Use `python3 monitoring/deployment_orchestrator.py` instead.
+
+Original description:
 Runs on 3090 inference machine:
 - Discovers available checkpoints on 4090 training machine
 - Prioritizes recent checkpoints

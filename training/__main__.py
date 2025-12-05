@@ -76,20 +76,45 @@ def main():
         help="Show current status of all services"
     )
 
-    # reset command
+    # reset command - multi-level reset system
     p_reset = subparsers.add_parser(
         "reset",
-        help="Reset training environment (clear stale state, keep models)"
+        help="Reset training environment (multi-level: campaign, hero, full, deep)"
     )
     p_reset.add_argument(
-        "--yes",
+        "--level", "-l",
+        choices=["campaign", "hero", "full", "deep"],
+        default="full",
+        help="Reset level: campaign (one), hero (all for hero), full (everything), deep (nuclear)"
+    )
+    p_reset.add_argument(
+        "--target", "-t",
+        help="Target for campaign/hero reset (e.g., gou-qwen3-4b/campaign-001)"
+    )
+    p_reset.add_argument(
+        "--yes", "-y",
         action="store_true",
         help="Skip confirmation prompt"
     )
     p_reset.add_argument(
+        "--dry-run", "-n",
+        action="store_true",
+        help="Show what would be deleted without actually deleting"
+    )
+    p_reset.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Required confirmation for DEEP level reset"
+    )
+    p_reset.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON"
+    )
+    p_reset.add_argument(
         "--keep-jobs",
         action="store_true",
-        help="Keep job database (don't clear pending jobs)"
+        help="Keep job database (legacy, for full reset compatibility)"
     )
 
     # temple command - diagnostic rituals

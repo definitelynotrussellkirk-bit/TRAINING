@@ -159,9 +159,11 @@ class SnapshotService:
         Verify snapshot integrity.
 
         Checks:
-        - config.json exists and is valid JSON
-        - Model weights exist (safetensors or pytorch_model.bin)
-        - Model file is not empty
+        - config.json OR adapter_config.json exists and is valid JSON
+        - Model weights exist:
+          - Full model: model.safetensors or pytorch_model.bin
+          - PEFT adapter: adapter_model.safetensors (with adapter_config.json)
+        - Model/adapter file is not empty
 
         Args:
             snapshot_dir: Path to snapshot directory
@@ -170,25 +172,49 @@ class SnapshotService:
             True if snapshot is valid
         """
         try:
-            # Check for config file
+            # Check for config file (model config or adapter config)
             config_file = snapshot_dir / "config.json"
-            if not config_file.exists():
-                logger.debug(f"Missing config.json in {snapshot_dir}")
+            adapter_config_file = snapshot_dir / "adapter_config.json"
+
+            has_model_config = config_file.exists()
+            has_adapter_config = adapter_config_file.exists()
+
+            if not has_model_config and not has_adapter_config:
+                logger.debug(f"Missing config.json and adapter_config.json in {snapshot_dir}")
                 return False
 
-            # Check for model weights
-            model_file = snapshot_dir / "model.safetensors"
-            if not model_file.exists():
-                model_file = snapshot_dir / "pytorch_model.bin"
+            # Check for model weights - support both full models and PEFT adapters
+            model_file = None
+            is_peft = False
 
+            # First check for PEFT adapter (preferred for QLoRA checkpoints)
+            adapter_file = snapshot_dir / "adapter_model.safetensors"
+            if adapter_file.exists() and has_adapter_config:
+                model_file = adapter_file
+                is_peft = True
+
+            # Then check for full model weights
+            if model_file is None:
+                model_file = snapshot_dir / "model.safetensors"
+                if not model_file.exists():
+                    model_file = snapshot_dir / "pytorch_model.bin"
+
+            # If not found at root, check in checkpoint subdirectory
             if not model_file.exists():
-                # Check in checkpoint subdirectory
                 checkpoints = list(snapshot_dir.glob("checkpoint-*"))
                 if checkpoints:
                     ckpt = checkpoints[0]
-                    model_file = ckpt / "model.safetensors"
-                    if not model_file.exists():
-                        model_file = ckpt / "pytorch_model.bin"
+                    # Check for PEFT adapter first
+                    adapter_file = ckpt / "adapter_model.safetensors"
+                    ckpt_adapter_config = ckpt / "adapter_config.json"
+                    if adapter_file.exists() and ckpt_adapter_config.exists():
+                        model_file = adapter_file
+                        is_peft = True
+                    else:
+                        # Fall back to full model
+                        model_file = ckpt / "model.safetensors"
+                        if not model_file.exists():
+                            model_file = ckpt / "pytorch_model.bin"
 
             if not model_file.exists():
                 logger.debug(f"Missing model weights in {snapshot_dir}")
@@ -200,9 +226,12 @@ class SnapshotService:
                 return False
 
             # Verify config is valid JSON
-            with open(config_file) as f:
-                json.load(f)
+            config_to_check = adapter_config_file if is_peft and has_adapter_config else config_file
+            if config_to_check.exists():
+                with open(config_to_check) as f:
+                    json.load(f)
 
+            logger.debug(f"Snapshot verified: {snapshot_dir} (PEFT={is_peft})")
             return True
 
         except Exception as e:

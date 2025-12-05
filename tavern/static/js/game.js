@@ -26,7 +26,8 @@ const GameState = {
     totalLevel: 0,      // Sum of all MASTERED skill levels
     currentStep: 0,
     previousStep: 0,
-    totalEvals: 0,      // Real: total skill evaluations
+    totalEvals: 0,      // Real: total skill evaluations (curriculum + passive)
+    passiveEvals: 0,    // Passive evals from eval_runner
 
     // Current skill being trained
     currentSkill: 'BINARY',
@@ -256,7 +257,13 @@ function initRealmStateSync() {
         // Only update totals if we have actual skill data
         if (syData || binData) {
             GameState.totalLevel = GameState.sylloMastered + GameState.binaryMastered;
-            // Don't recompute totalEvals here - /api/game is authoritative for eval counts
+        }
+
+        // Get passive evals from API response
+        if (data.total_passive_evals !== undefined) {
+            GameState.passiveEvals = data.total_passive_evals;
+            // Include passive evals in total count
+            GameState.totalEvals = GameState.sylloEvals + GameState.binaryEvals + GameState.passiveEvals;
         }
 
         // Update UI
@@ -643,7 +650,7 @@ let skillsLoaded = false;
 
 async function fetchSkills() {
     try {
-        const response = await fetch(`/skills?_t=${Date.now()}`, {
+        const response = await fetch(`/api/skills?_t=${Date.now()}`, {
             cache: 'no-store'
         });
         if (!response.ok) return;
@@ -1169,8 +1176,8 @@ function processGameData(data) {
         // Total level = sum of all MASTERED skill levels
         GameState.totalLevel = GameState.sylloMastered + GameState.binaryMastered;
 
-        // Total evals = SYLLO + BINARY evaluations
-        GameState.totalEvals = GameState.sylloEvals + GameState.binaryEvals;
+        // Total evals = SYLLO + BINARY + passive evaluations
+        GameState.totalEvals = GameState.sylloEvals + GameState.binaryEvals + GameState.passiveEvals;
     }
 
     // Always update eval counts from /api/game (RealmState doesn't track these)
@@ -1180,7 +1187,8 @@ function processGameData(data) {
         const binData = skills.bin || skills.binary;
         if (syData) GameState.sylloEvals = syData.eval_count || 0;
         if (binData) GameState.binaryEvals = binData.eval_count || 0;
-        GameState.totalEvals = GameState.sylloEvals + GameState.binaryEvals;
+        // Include passive evals in total
+        GameState.totalEvals = GameState.sylloEvals + GameState.binaryEvals + GameState.passiveEvals;
     }
 
     // Determine current skill - always process skill_context from training (useful for both modes)

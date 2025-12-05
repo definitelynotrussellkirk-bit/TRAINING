@@ -88,22 +88,74 @@ python3 -m training stop-all
 | **DIO Training** | `./scripts/start_all.sh` | Full daemon system - Tavern, VaultKeeper, queue |
 | **4B Experiments** | `python3 scripts/train_4b_full.py` | Standalone script - no daemon needed |
 
-### Memory Optimization Options
+### Memory Optimization (THE KNOBS)
 
-For training 4B models on 24GB VRAM, configure in `config.json`:
+Memory optimization is configured through **Memory Profiles** in `configs/memory_profiles/`.
 
-| Option | GPU Memory | Config |
-|--------|------------|--------|
-| **DeepSpeed ZeRO-3** | ~8-12GB | `environment.deepspeed_config: "configs/ds_zero3_offload.json"` |
-| **DeepSpeed ZeRO-2** | ~17GB | `environment.deepspeed_config: "configs/ds_zero2_offload.json"` |
-| **GaLore 8-bit** | ~17GB | `optimizer.type: "galore_8bit"` |
-| **8-bit Adam** | ~22GB | `optimizer.type: "adamw_8bit"` |
-| **QLoRA** | ~6GB | `training_mode: "qlora"`, `load_in_4bit: true` |
-| **LoRA** | ~12GB | `training_mode: "lora"` |
+#### Available Profiles
 
-**Optimizer Types:** `adamw`, `adamw_8bit`, `galore`, `galore_8bit`, `muon`
+| Profile | VRAM | Model Size | Method | Optimizer |
+|---------|------|------------|--------|-----------|
+| `24gb_qlora` | ~8-12GB | 7B-8B | QLoRA (4-bit + LoRA) | `paged_adamw_32bit` |
+| `24gb_full_small` | ~16-20GB | 0.6B-4B | Full training | `adamw_torch_fused` |
+| `24gb_galore` | ~14-18GB | 7B-8B | GaLore (gradient projection) | `galore_adamw_8bit` |
 
-**Training Modes:** `full` (all params), `lora` (adapters), `qlora` (4-bit + adapters)
+#### Setting Memory Profile (Hero YAML)
+
+```yaml
+# configs/heroes/ojas-qwen3-8b.yaml
+memory_profile: "24gb_qlora"  # THE KNOB - preset profile
+
+training_defaults:
+  optimizer_type: "paged_adamw_32bit"  # THE KNOB - optimizer selection
+  batch_size: 1
+  gradient_accumulation: 8
+  max_length: 1024
+```
+
+#### Optimizer Types (THE KNOB)
+
+| Optimizer | Memory | Speed | Best For |
+|-----------|--------|-------|----------|
+| `adamw_torch_fused` | High | Fast | Small models (0.6B-4B) |
+| `adamw_8bit` | Medium | Fast | Medium models |
+| `paged_adamw_32bit` | Low | Medium | QLoRA (offloads to CPU) |
+| `paged_adamw_8bit` | Lowest | Slow | Maximum efficiency |
+| `galore_adamw_8bit` | Low | Medium | GaLore method |
+| `muon` | Medium | Medium | Geometry-aware training |
+
+#### PEFT Methods
+
+| Method | Description | Trainable Params | Use Case |
+|--------|-------------|------------------|----------|
+| **QLoRA** | 4-bit quantization + LoRA adapters | ~0.1% | 7B-8B on 24GB |
+| **LoRA** | Low-rank adapters (full precision base) | ~0.2% | When quantization hurts |
+| **GaLore** | Gradient low-rank projection | 100% | Full training with less memory |
+| **Full** | All parameters trained | 100% | Small models only |
+
+#### Memory-Efficient Implementations
+
+| Technique | Effect | Always On? |
+|-----------|--------|------------|
+| **Flash Attention 2** | O(N²) → O(N) attention memory | Yes |
+| **Gradient Checkpointing** | Recompute activations in backward | Yes |
+| **Paged Optimizer** | Offload optimizer states to CPU | QLoRA only |
+
+#### Quick Reference: 24GB VRAM
+
+```
+8B model → QLoRA + paged_adamw_32bit + batch_size=1 + max_length=1024
+4B model → Full + adamw_torch_fused + batch_size=2 + max_length=2048
+0.6B model → Full + adamw_torch_fused + batch_size=4 + max_length=4096
+```
+
+**Python API:**
+```python
+from trainer.config.memory_profiles import get_profile, suggest_profile
+
+profile = get_profile("24gb_qlora")
+profile = suggest_profile(model_size_b=8.0, vram_gb=24)
+```
 
 ---
 

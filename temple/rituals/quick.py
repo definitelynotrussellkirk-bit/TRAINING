@@ -29,6 +29,7 @@ def run() -> List[RitualCheckResult]:
     results.append(_check_vault_api())
     results.append(_check_queue_depth())
     results.append(_check_active_campaign())
+    results.append(_check_config_campaign_match())
     return results
 
 
@@ -248,6 +249,159 @@ def _check_active_campaign() -> RitualCheckResult:
             category="model",
             details={"error": str(e)},
             remediation="Check control/active_campaign.json format",
+            started_at=start,
+            finished_at=datetime.utcnow(),
+        )
+
+
+def _check_config_campaign_match() -> RitualCheckResult:
+    """Check that config.json matches the active campaign's hero."""
+    start = datetime.utcnow()
+    try:
+        from core.paths import get_base_dir
+        import yaml
+
+        base_dir = get_base_dir()
+
+        # Load config.json
+        config_path = base_dir / "config.json"
+        if not config_path.exists():
+            return RitualCheckResult(
+                id="config_campaign_match",
+                name="Config matches campaign",
+                description="Check that config.json base_model matches active campaign hero",
+                status="warn",
+                category="model",
+                details={"error": "No config.json found"},
+                remediation="Create config.json or run training doctor",
+                started_at=start,
+                finished_at=datetime.utcnow(),
+            )
+
+        with open(config_path) as f:
+            config = json.load(f)
+
+        config_base_model = config.get("base_model", "")
+        config_model_name = config.get("model_name", "")
+
+        # Load active campaign pointer
+        campaign_file = base_dir / "control" / "active_campaign.json"
+        if not campaign_file.exists():
+            # No active campaign - just check config.json is valid
+            return RitualCheckResult(
+                id="config_campaign_match",
+                name="Config matches campaign",
+                description="Check that config.json base_model matches active campaign hero",
+                status="ok",
+                category="model",
+                details={
+                    "note": "No active campaign - using config.json as-is",
+                    "config_base_model": config_base_model,
+                    "config_model_name": config_model_name,
+                },
+                started_at=start,
+                finished_at=datetime.utcnow(),
+            )
+
+        with open(campaign_file) as f:
+            campaign_ptr = json.load(f)
+
+        hero_id = campaign_ptr.get("hero_id")
+        if not hero_id:
+            return RitualCheckResult(
+                id="config_campaign_match",
+                name="Config matches campaign",
+                description="Check that config.json base_model matches active campaign hero",
+                status="warn",
+                category="model",
+                details={"error": "Active campaign has no hero_id"},
+                remediation="Fix control/active_campaign.json",
+                started_at=start,
+                finished_at=datetime.utcnow(),
+            )
+
+        # Load hero config YAML
+        hero_config_path = base_dir / "configs" / "heroes" / f"{hero_id}.yaml"
+        if not hero_config_path.exists():
+            return RitualCheckResult(
+                id="config_campaign_match",
+                name="Config matches campaign",
+                description="Check that config.json base_model matches active campaign hero",
+                status="warn",
+                category="model",
+                details={
+                    "hero_id": hero_id,
+                    "error": f"Hero config not found: {hero_config_path.name}",
+                },
+                remediation=f"Create configs/heroes/{hero_id}.yaml",
+                started_at=start,
+                finished_at=datetime.utcnow(),
+            )
+
+        with open(hero_config_path) as f:
+            hero_config = yaml.safe_load(f)
+
+        hero_model_path = hero_config.get("model", {}).get("hf_name", "")
+
+        # Normalize paths for comparison (strip models/ prefix if present)
+        def normalize_model_path(p):
+            p = str(p)
+            if p.startswith("models/"):
+                return p[7:]  # Remove "models/" prefix
+            return p
+
+        config_normalized = normalize_model_path(config_base_model)
+        hero_normalized = normalize_model_path(hero_model_path)
+
+        # Check if they match
+        if config_normalized == hero_normalized:
+            return RitualCheckResult(
+                id="config_campaign_match",
+                name="Config matches campaign",
+                description="Check that config.json base_model matches active campaign hero",
+                status="ok",
+                category="model",
+                details={
+                    "hero_id": hero_id,
+                    "config_base_model": config_base_model,
+                    "hero_model_path": hero_model_path,
+                    "match": True,
+                },
+                started_at=start,
+                finished_at=datetime.utcnow(),
+            )
+        else:
+            return RitualCheckResult(
+                id="config_campaign_match",
+                name="Config matches campaign",
+                description="Check that config.json base_model matches active campaign hero",
+                status="fail",
+                category="model",
+                details={
+                    "hero_id": hero_id,
+                    "config_base_model": config_base_model,
+                    "hero_model_path": hero_model_path,
+                    "match": False,
+                    "error": "MISMATCH: config.json is training a different model than the active campaign!",
+                },
+                remediation=(
+                    f"Update config.json base_model to '{hero_model_path}' "
+                    f"to match the active campaign ({hero_id}), "
+                    "or switch to the correct campaign."
+                ),
+                started_at=start,
+                finished_at=datetime.utcnow(),
+            )
+
+    except Exception as e:
+        return RitualCheckResult(
+            id="config_campaign_match",
+            name="Config matches campaign",
+            description="Check that config.json base_model matches active campaign hero",
+            status="fail",
+            category="model",
+            details={"error": str(e)},
+            remediation="Check config.json and hero YAML files",
             started_at=start,
             finished_at=datetime.utcnow(),
         )

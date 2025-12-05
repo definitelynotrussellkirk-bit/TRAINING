@@ -12,6 +12,7 @@ The Groundskeeper handles ALL cleanup tasks in one place:
 - SQLite VACUUM (monthly to reclaim space)
 - Worker cleanup (remove long-offline workers)
 - Job events cleanup (remove old job_events records)
+- Checkpoint maintenance (ledger health, vault sync, retention)
 
 Usage:
     # Single cleanup run
@@ -31,6 +32,7 @@ Usage:
     python3 core/groundskeeper.py --task logs
     python3 core/groundskeeper.py --task pids
     python3 core/groundskeeper.py --task vacuum
+    python3 core/groundskeeper.py --task checkpoints
 
 Integration with Weaver:
     The Weaver can call Groundskeeper.sweep() periodically.
@@ -345,74 +347,42 @@ class Groundskeeper:
 
         When checkpoints are deleted, their queued evaluations become stale.
         This removes queue entries for checkpoints that no longer exist.
+
+        Also cleans up stale entries from the checkpoint ledger (the root cause
+        of stale queue entries).
         """
         result = CleanupResult(task="eval_queues", dry_run=dry_run)
 
-        # Find existing checkpoint steps
-        checkpoint_dir = self.base_dir / "models" / "current_model"
-        existing_steps = set()
-
-        if checkpoint_dir.exists():
-            for ckpt in checkpoint_dir.glob("checkpoint-*"):
-                try:
-                    step = int(ckpt.name.split("-")[1])
-                    existing_steps.add(step)
-                except (ValueError, IndexError):
-                    pass
-
-        if not existing_steps:
-            logger.debug("No checkpoints found, skipping eval queue cleanup")
+        if dry_run:
+            # For dry run, just report what would be cleaned
+            logger.info("Dry run: would clean eval queues and ledger")
             return result
 
-        # Clean passive queue
-        passive_queue_file = self.base_dir / "status" / "passive_queue.json"
-        if passive_queue_file.exists():
-            try:
-                with open(passive_queue_file) as f:
-                    data = json.load(f)
+        try:
+            # Use the comprehensive prune function from eval_runner
+            from core.eval_runner import prune_stale_queues
 
-                original_count = len(data.get("queue", []))
-                data["queue"] = [
-                    e for e in data.get("queue", [])
-                    if e.get("checkpoint_step") in existing_steps
-                ]
-                removed = original_count - len(data["queue"])
+            pruned = prune_stale_queues(self.base_dir, also_clean_ledger=True)
 
-                if removed > 0:
-                    if not dry_run:
-                        with open(passive_queue_file, "w") as f:
-                            json.dump(data, f, indent=2)
-                    result.items_cleaned += removed
-                    logger.info(f"Cleaned {removed} stale passive queue entries")
+            # Aggregate results
+            result.items_cleaned = (
+                pruned.get("skill_evals", 0) +
+                pruned.get("passives", 0) +
+                pruned.get("ledger_paths", 0) +
+                pruned.get("ledger_entries", 0)
+            )
 
-            except Exception as e:
-                result.errors.append(f"Failed to clean passive queue: {e}")
-                logger.error(f"Error cleaning passive queue: {e}")
+            if result.items_cleaned > 0:
+                logger.info(
+                    f"Eval queue cleanup: {pruned.get('skill_evals', 0)} skill evals, "
+                    f"{pruned.get('passives', 0)} passives, "
+                    f"{pruned.get('ledger_paths', 0)} ledger paths, "
+                    f"{pruned.get('ledger_entries', 0)} ledger entries"
+                )
 
-        # Clean eval queue
-        eval_queue_file = self.base_dir / "status" / "eval_queue.json"
-        if eval_queue_file.exists():
-            try:
-                with open(eval_queue_file) as f:
-                    data = json.load(f)
-
-                original_count = len(data.get("queue", []))
-                data["queue"] = [
-                    e for e in data.get("queue", [])
-                    if e.get("checkpoint_step") in existing_steps
-                ]
-                removed = original_count - len(data["queue"])
-
-                if removed > 0:
-                    if not dry_run:
-                        with open(eval_queue_file, "w") as f:
-                            json.dump(data, f, indent=2)
-                    result.items_cleaned += removed
-                    logger.info(f"Cleaned {removed} stale eval queue entries")
-
-            except Exception as e:
-                result.errors.append(f"Failed to clean eval queue: {e}")
-                logger.error(f"Error cleaning eval queue: {e}")
+        except Exception as e:
+            result.errors.append(f"Failed to clean eval queues: {e}")
+            logger.error(f"Error cleaning eval queues: {e}")
 
         return result
 
@@ -771,6 +741,60 @@ class Groundskeeper:
 
         return result
 
+    def cleanup_checkpoints(self, dry_run: bool = False) -> CleanupResult:
+        """
+        Run checkpoint maintenance:
+        1. Ledger health check (adopt orphans, remove stale entries)
+        2. VaultKeeper catalog cleanup (remove entries not in ledger)
+        3. Apply retention policy (delete old checkpoints beyond limit)
+        """
+        result = CleanupResult(task="checkpoints", dry_run=dry_run)
+
+        try:
+            # Step 1: Ledger health check
+            from core.checkpoint_ledger import get_ledger
+            ledger = get_ledger()
+            health = ledger.run_health_check(fix_issues=not dry_run)
+
+            if health.get("orphans_adopted", 0) > 0:
+                result.items_cleaned += health["orphans_adopted"]
+                logger.info(f"{'Would adopt' if dry_run else 'Adopted'} {health['orphans_adopted']} orphan checkpoints")
+
+            if health.get("stale_removed", 0) > 0:
+                result.items_cleaned += health["stale_removed"]
+                logger.info(f"{'Would remove' if dry_run else 'Removed'} {health['stale_removed']} stale ledger entries")
+
+            # Step 2: VaultKeeper cleanup
+            try:
+                from vault.keeper import get_vault_keeper
+                keeper = get_vault_keeper()
+                vault_result = keeper.cleanup_stale_checkpoints(dry_run=dry_run)
+
+                if vault_result.get("stale_found", 0) > 0:
+                    deleted = vault_result.get("deleted", 0) if not dry_run else vault_result["stale_found"]
+                    logger.info(f"{'Would clean' if dry_run else 'Cleaned'} {deleted} stale VaultKeeper entries")
+
+            except Exception as e:
+                logger.warning(f"VaultKeeper cleanup skipped: {e}")
+
+            # Step 3: Retention policy enforcement
+            # This is more complex - for now just report status
+            summary = ledger.get_summary()
+            if summary.get("count", 0) > 0:
+                total_gb = summary.get("total_size_gb", 0)
+                logger.info(f"Checkpoint inventory: {summary['count']} checkpoints, {total_gb:.1f}GB")
+
+                # If over limit, would need to delete oldest (not implemented yet)
+                limit_gb = 150.0
+                if total_gb > limit_gb:
+                    logger.warning(f"Checkpoints exceed {limit_gb}GB limit - manual cleanup needed")
+
+        except Exception as e:
+            result.errors.append(str(e))
+            logger.error(f"Checkpoint cleanup error: {e}")
+
+        return result
+
     # ========== Main Sweep ==========
 
     def sweep(self, dry_run: bool = False, tasks: Optional[List[str]] = None) -> Dict[str, CleanupResult]:
@@ -797,6 +821,7 @@ class Groundskeeper:
             "workers": self.cleanup_workers,
             "job_events": self.cleanup_job_events,
             "stale_jobs": self.cleanup_stale_checkpoint_jobs,
+            "checkpoints": self.cleanup_checkpoints,
         }
 
         tasks_to_run = tasks if tasks else list(task_map.keys())

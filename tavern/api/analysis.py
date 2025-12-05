@@ -271,3 +271,303 @@ def serve_top_movers(handler: "TavernHandler", campaign_id: str, query: dict):
     except Exception as e:
         logger.error(f"Top movers error: {e}")
         handler._send_json({"error": str(e)}, 500)
+
+
+def trigger_layer_stats(handler: "TavernHandler", query: dict, body: dict):
+    """
+    POST /api/analysis/trigger
+
+    Trigger layer stats analysis for a checkpoint.
+
+    Body params:
+    - checkpoint_step: Step number (will find path from ledger)
+    - checkpoint_path: Full path (optional, overrides step)
+    - campaign_id: Campaign ID
+    - hero_id: Hero ID
+    - reference_step: Optional reference checkpoint step for drift
+    - compute_activations: Whether to compute activation stats (default true)
+    """
+    import requests
+    from core.checkpoint_ledger import get_ledger
+    from core.hosts import get_service_url
+
+    campaign_id = body.get("campaign_id")
+    hero_id = body.get("hero_id")
+    checkpoint_step = body.get("checkpoint_step")
+    checkpoint_path = body.get("checkpoint_path")
+    reference_step = body.get("reference_step")
+    compute_activations = body.get("compute_activations", True)
+
+    if not campaign_id or not hero_id:
+        handler._send_json({"error": "campaign_id and hero_id required"}, 400)
+        return
+
+    # Resolve checkpoint path from ledger if only step provided
+    if not checkpoint_path and checkpoint_step:
+        ledger = get_ledger()
+        record = ledger.get(checkpoint_step)
+        if record and record.get("path"):
+            checkpoint_path = record["path"]
+        else:
+            handler._send_json({"error": f"Checkpoint {checkpoint_step} not found in ledger"}, 404)
+            return
+
+    if not checkpoint_path:
+        handler._send_json({"error": "checkpoint_step or checkpoint_path required"}, 400)
+        return
+
+    # Resolve reference path if provided
+    reference_path = None
+    if reference_step:
+        ledger = get_ledger()
+        ref_record = ledger.get(reference_step)
+        if ref_record and ref_record.get("path"):
+            reference_path = ref_record["path"]
+
+    # Build job payload
+    job_payload = {
+        "job_type": "layer_stats",
+        "payload": {
+            "campaign_id": campaign_id,
+            "hero_id": hero_id,
+            "checkpoint_path": checkpoint_path,
+            "compute_activations": compute_activations,
+        },
+        "priority": "normal",
+    }
+
+    if reference_path:
+        job_payload["payload"]["reference_checkpoint_path"] = reference_path
+
+    # Submit to job queue
+    try:
+        vault_url = get_service_url("vault", fallback="http://localhost:8767")
+        resp = requests.post(
+            f"{vault_url}/api/jobs",
+            json=job_payload,
+            timeout=10,
+        )
+
+        result = resp.json()
+
+        if result.get("accepted"):
+            handler._send_json({
+                "success": True,
+                "job_id": result.get("job_id"),
+                "queue_position": result.get("queue_position"),
+                "message": f"Layer stats job submitted for step {checkpoint_step or 'custom'}",
+            })
+        else:
+            handler._send_json({
+                "success": False,
+                "error": result.get("message", "Job submission failed"),
+            }, 400)
+
+    except requests.RequestException as e:
+        logger.error(f"Failed to submit layer_stats job: {e}")
+        handler._send_json({
+            "success": False,
+            "error": f"Failed to connect to job server: {e}",
+        }, 503)
+
+
+def get_available_checkpoints(handler: "TavernHandler", query: dict):
+    """
+    GET /api/analysis/checkpoints
+
+    Get list of checkpoints available for analysis.
+    Returns checkpoints from ledger with analysis status.
+    """
+    from core.checkpoint_ledger import get_ledger
+
+    hero_id = query.get("hero_id", [_get_active_hero_id()])[0]
+    campaign_id = query.get("campaign_id", [None])[0]
+    limit = int(query.get("limit", [20])[0])
+
+    ledger = get_ledger()
+
+    # Get recent checkpoints from ledger
+    all_records = ledger.list_all()
+    records = sorted(all_records, key=lambda x: x.get("step", 0), reverse=True)[:limit]
+
+    # Check which have analysis
+    analysis_dir = None
+    if hero_id and campaign_id:
+        analysis_dir = _get_analysis_dir(campaign_id, hero_id) / "layer_stats"
+
+    checkpoints = []
+    for rec in records:
+        step = rec.get("step", 0)
+        has_analysis = False
+
+        if analysis_dir and analysis_dir.exists():
+            analysis_file = analysis_dir / f"ckpt-{step:06d}.layer_stats.json"
+            has_analysis = analysis_file.exists()
+
+        checkpoints.append({
+            "step": step,
+            "path": rec.get("path"),
+            "train_loss": rec.get("train_loss"),
+            "created_at": rec.get("created_at"),
+            "has_analysis": has_analysis,
+        })
+
+    handler._send_json({
+        "checkpoints": checkpoints,
+        "total": len(all_records),
+    })
+
+
+# =============================================================================
+# PRIMITIVE ANALYTICS ENDPOINTS
+# =============================================================================
+
+def serve_primitive_weakness_report(handler: "TavernHandler", query: dict):
+    """
+    GET /api/analysis/primitives/weakness
+
+    Get weakness report showing which cognitive primitives are struggling.
+
+    Query params:
+    - campaign_id: Filter to specific campaign
+    - hero_id: Filter to specific hero
+    - threshold: Accuracy below this is weak (default 0.7)
+    """
+    try:
+        from guild.primitives import get_weakness_report
+
+        campaign_id = query.get("campaign_id", [None])[0]
+        hero_id = query.get("hero_id", [None])[0]
+        threshold = float(query.get("threshold", [0.7])[0])
+
+        report = get_weakness_report(
+            campaign_id=campaign_id,
+            hero_id=hero_id,
+        )
+
+        handler._send_json(report.to_dict())
+
+    except Exception as e:
+        logger.error(f"Primitive weakness report error: {e}")
+        handler._send_json({"error": str(e)}, 500)
+
+
+def serve_primitive_profile(handler: "TavernHandler", query: dict):
+    """
+    GET /api/analysis/primitives/profile
+
+    Get complete primitive profile showing stats for all known primitives.
+
+    Query params:
+    - campaign_id: Filter to specific campaign
+    - hero_id: Filter to specific hero
+    """
+    try:
+        from guild.primitives import get_primitive_profile, PRIMITIVE_CATEGORIES
+
+        campaign_id = query.get("campaign_id", [None])[0]
+        hero_id = query.get("hero_id", [None])[0]
+
+        profile = get_primitive_profile(
+            campaign_id=campaign_id,
+            hero_id=hero_id,
+        )
+
+        # Convert to serializable format grouped by category
+        by_category = {}
+        for prim_id, stats in profile.items():
+            cat = stats.category
+            if cat not in by_category:
+                by_category[cat] = {
+                    "name": PRIMITIVE_CATEGORIES.get(cat, cat),
+                    "primitives": [],
+                }
+            by_category[cat]["primitives"].append({
+                "id": prim_id,
+                "accuracy": stats.accuracy,
+                "samples": stats.total_samples,
+                "skills": stats.skills_exercised,
+                "is_weak": stats.is_weak,
+            })
+
+        handler._send_json({
+            "profile": by_category,
+            "total_primitives": len(profile),
+            "campaign_id": campaign_id,
+            "hero_id": hero_id,
+        })
+
+    except Exception as e:
+        logger.error(f"Primitive profile error: {e}")
+        handler._send_json({"error": str(e)}, 500)
+
+
+def serve_primitive_suggestions(handler: "TavernHandler", query: dict):
+    """
+    GET /api/analysis/primitives/suggestions
+
+    Get training suggestions to strengthen weak primitives.
+
+    Query params:
+    - campaign_id: Filter to specific campaign
+    - threshold: Accuracy below this is weak (default 0.7)
+    """
+    try:
+        from guild.primitives import suggest_training_for_weak
+
+        campaign_id = query.get("campaign_id", [None])[0]
+        threshold = float(query.get("threshold", [0.7])[0])
+
+        suggestions = suggest_training_for_weak(
+            campaign_id=campaign_id,
+            threshold=threshold,
+        )
+
+        handler._send_json({
+            "suggestions": [
+                {
+                    "primitive": s.primitive_id,
+                    "current_accuracy": s.current_accuracy,
+                    "suggested_skills": s.suggested_skills,
+                    "suggested_levels": s.suggested_levels,
+                    "rationale": s.rationale,
+                }
+                for s in suggestions
+            ],
+            "count": len(suggestions),
+            "campaign_id": campaign_id,
+        })
+
+    except Exception as e:
+        logger.error(f"Primitive suggestions error: {e}")
+        handler._send_json({"error": str(e)}, 500)
+
+
+def serve_eval_campaign_summary(handler: "TavernHandler", query: dict):
+    """
+    GET /api/analysis/eval-summary
+
+    Get comprehensive eval summary for a campaign (uses new campaign_id filtering).
+
+    Query params:
+    - campaign_id: Campaign to summarize (required)
+    - hero_id: Filter to specific hero
+    """
+    try:
+        from core.evaluation_ledger import get_eval_ledger
+
+        campaign_id = query.get("campaign_id", [None])[0]
+        hero_id = query.get("hero_id", [None])[0]
+
+        if not campaign_id:
+            handler._send_json({"error": "campaign_id required"}, 400)
+            return
+
+        ledger = get_eval_ledger()
+        summary = ledger.get_campaign_summary(campaign_id, hero_id)
+
+        handler._send_json(summary)
+
+    except Exception as e:
+        logger.error(f"Eval campaign summary error: {e}")
+        handler._send_json({"error": str(e)}, 500)

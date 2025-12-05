@@ -234,6 +234,13 @@ class EnvironmentConfig:
     # DeepSpeed - CPU offloading for large models
     deepspeed_config: Optional[str] = None  # Path to DeepSpeed JSON config (e.g., "configs/ds_zero2_offload.json")
 
+    # Optimizer selection (THE KNOB for memory efficiency)
+    # Options: adamw_torch_fused, adamw_8bit, paged_adamw_32bit, paged_adamw_8bit
+    # For QLoRA on 24GB: use paged_adamw_32bit (offloads memory spikes to CPU)
+    # For small models: use adamw_torch_fused (fastest)
+    # See configs/memory_profiles/ for full profiles
+    optimizer_type: str = "paged_adamw_32bit"
+
     # Logging
     report_to: List[str] = field(default_factory=lambda: ["none"])
     logging_steps: int = 10

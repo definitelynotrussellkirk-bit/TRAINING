@@ -736,6 +736,9 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Analysis - Model Archaeology (uses analysis_api module)
         elif path == "/analysis" or path == "/analysis.html":
             self._serve_template("analysis.html")
+        elif path == "/api/analysis/checkpoints":
+            # GET /api/analysis/checkpoints - list checkpoints available for analysis
+            analysis_api.get_available_checkpoints(self, query)
         elif path.startswith("/api/analysis/") and "/layer_stats/" in path:
             # /api/analysis/{campaign_id}/layer_stats/{checkpoint}
             parts = path.replace("/api/analysis/", "").split("/layer_stats/")
@@ -831,6 +834,12 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._handle_arcana_repl()
         elif path == "/api/arcana/propose":
             self._handle_arcana_propose()
+        # Analysis - Trigger layer stats analysis
+        elif path == "/api/analysis/trigger":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body_raw = self.rfile.read(content_length)
+            body = json.loads(body_raw) if body_raw else {}
+            analysis_api.trigger_layer_stats(self, {}, body)
         # Generate API - Generate training data from UI
         elif path == "/api/generate":
             generate_api.serve_generate_post(self)
@@ -1897,6 +1906,73 @@ class TavernHandler(SimpleHTTPRequestHandler):
                     "step": record.checkpoint_step,
                 })
             response["history"] = history
+
+            # Fallback to passives_ledger if no evaluation ledger results
+            if response["latest"] is None and not history:
+                try:
+                    from core.passives import get_passives_ledger
+
+                    # Map skill IDs to passive names
+                    passive_name_map = {
+                        "bin": ["binary_arithmetic", "arithmetic", "bin"],
+                        "sy": ["syllacrostic", "syllo", "sy", "word_puzzles"],
+                    }
+
+                    passives_ledger = get_passives_ledger(BASE_DIR)
+                    passive_names = passive_name_map.get(skill_name, [skill_name])
+
+                    # Find passives matching this skill
+                    all_passives = []
+                    for passive_name in passive_names:
+                        passives = passives_ledger.get_by_passive(passive_name)
+                        all_passives.extend(passives)
+
+                    if all_passives:
+                        # Sort by timestamp descending (most recent first)
+                        all_passives.sort(key=lambda p: p.timestamp, reverse=True)
+
+                        # Get the latest passive result
+                        latest_passive = all_passives[0]
+                        results = []
+                        for prob in latest_passive.problems:
+                            results.append({
+                                "problem_id": f"passive-{prob.get('problem_idx', 0)}",
+                                "correct": prob.get("correct", False),
+                                "partial_score": 0.0,
+                                "expected": prob.get("expected", ""),
+                                "model_answer": prob.get("got", ""),
+                                "prompt": prob.get("prompt", ""),
+                            })
+
+                        response["latest"] = {
+                            "level": 1,  # Passives don't have levels
+                            "level_name": f"Passive ({latest_passive.passive_id})",
+                            "accuracy": latest_passive.accuracy,
+                            "correct": latest_passive.correct,
+                            "total": latest_passive.total,
+                            "timestamp": latest_passive.timestamp,
+                            "step": latest_passive.checkpoint_step,
+                            "results": results,
+                            "source": "passives",  # Mark source
+                        }
+
+                        # Build history from passives
+                        passive_history = []
+                        for p in all_passives[:10]:
+                            passive_history.append({
+                                "level": 1,
+                                "accuracy": p.accuracy,
+                                "correct": p.correct,
+                                "total": p.total,
+                                "timestamp": p.timestamp,
+                                "step": p.checkpoint_step,
+                                "source": "passives",
+                            })
+                        response["history"] = passive_history
+                        response["from_passives"] = True
+
+                except Exception as passive_err:
+                    logger.debug(f"Passive fallback error: {passive_err}")
 
             self._send_json(response)
 

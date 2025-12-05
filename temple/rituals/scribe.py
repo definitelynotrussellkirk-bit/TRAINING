@@ -29,6 +29,7 @@ def run() -> List[RitualCheckResult]:
     results.append(_check_remote_checkpoint_dir())
     results.append(_check_eval_queue())
     results.append(_check_eval_ledger())
+    results.append(_check_eval_data_flow())
     return results
 
 
@@ -405,6 +406,142 @@ def _check_eval_ledger() -> RitualCheckResult:
             category="eval",
             details={"error": str(e)},
             remediation="Check evaluation_ledger.py and status/eval_ledger.json",
+            started_at=start,
+            finished_at=datetime.utcnow(),
+        )
+
+
+def _check_eval_data_flow() -> RitualCheckResult:
+    """
+    Check end-to-end evaluation data flow.
+
+    Validates that:
+    1. Passive evals in ledger are visible in Tavern API
+    2. Skill pages show eval counts when passives exist
+    3. accuracy_history is populated when eval data exists
+
+    This diagnostic would have caught the "0 evals" bug where passives_ledger.json
+    had 2600+ results but the UI showed 0 evals.
+    """
+    start = datetime.utcnow()
+    base_dir = _get_base_dir()
+    details = {}
+    issues = []
+
+    try:
+        # Step 1: Read passives_ledger.json directly
+        passives_file = base_dir / "status" / "passives_ledger.json"
+        ledger_count = 0
+        if passives_file.exists():
+            with open(passives_file) as f:
+                ledger = json.load(f)
+                ledger_count = ledger.get("count", len(ledger.get("results", [])))
+        details["passives_ledger_count"] = ledger_count
+
+        # Step 2: Check curriculum_state.json
+        curriculum_file = base_dir / "data_manager" / "curriculum_state.json"
+        curriculum_evals = 0
+        if curriculum_file.exists():
+            with open(curriculum_file) as f:
+                curriculum = json.load(f)
+                # Count total evals across all skills
+                for skill_id, skill_data in curriculum.items():
+                    if isinstance(skill_data, dict):
+                        evals = skill_data.get("total_evaluations", 0)
+                        curriculum_evals += evals
+        details["curriculum_state_evals"] = curriculum_evals
+
+        # Step 3: Check Tavern API response (if running)
+        api_total = 0
+        api_passives = 0
+        try:
+            import urllib.request
+            import urllib.error
+
+            req = urllib.request.Request(
+                "http://localhost:8888/api/skills",
+                headers={"Accept": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                api_data = json.loads(resp.read().decode())
+                api_total = api_data.get("total_passive_evals", 0)
+                api_passives = api_data.get("passive_count", 0)
+                details["api_total_passive_evals"] = api_total
+                details["api_passive_count"] = api_passives
+
+                # Check individual skills
+                skill_issues = []
+                for skill in api_data.get("skills", []):
+                    skill_id = skill.get("id", "unknown")
+                    eval_count = skill.get("eval_count", 0)
+                    from_passives = skill.get("from_passives", False)
+
+                    # If skill has no evals but passives exist, flag it
+                    if eval_count == 0 and ledger_count > 0:
+                        skill_issues.append(f"{skill_id}: 0 evals but passives exist")
+
+                    details[f"skill_{skill_id}_evals"] = eval_count
+                    details[f"skill_{skill_id}_from_passives"] = from_passives
+
+                if skill_issues:
+                    issues.extend(skill_issues)
+
+        except urllib.error.URLError:
+            details["api_status"] = "tavern_not_running"
+        except Exception as e:
+            details["api_error"] = str(e)
+
+        # Step 4: Check for data flow issues
+
+        # Issue: Passives exist in ledger but API returns 0
+        if ledger_count > 0 and api_total == 0 and "api_status" not in details:
+            issues.append(f"DATA_FLOW_BROKEN: {ledger_count} passives in ledger but API returns 0")
+
+        # Issue: curriculum_state is empty but passives exist
+        if curriculum_evals == 0 and ledger_count > 0:
+            # This is OK now since we fallback to passives, but note it
+            details["fallback_to_passives"] = True
+
+        # Issue: API running but returning much less than ledger
+        if api_total > 0 and ledger_count > 0:
+            ratio = api_total / ledger_count
+            if ratio < 0.5:  # Less than 50% surfacing
+                issues.append(f"DATA_LOSS: Only {ratio:.0%} of ledger passives in API ({api_total}/{ledger_count})")
+
+        # Determine status
+        if issues:
+            status = "fail"
+            remediation = "Eval data not flowing to UI. Check:\n" + "\n".join([f"  - {i}" for i in issues])
+        elif ledger_count == 0:
+            status = "warn"
+            remediation = "No passive evaluations recorded yet. Run some evals."
+        else:
+            status = "ok"
+            remediation = None
+
+        details["issues"] = issues if issues else []
+
+        return RitualCheckResult(
+            id="eval_data_flow",
+            name="Evaluation Data Flow",
+            description="Check end-to-end flow from ledger to UI",
+            status=status,
+            category="eval",
+            details=details,
+            remediation=remediation,
+            started_at=start,
+            finished_at=datetime.utcnow(),
+        )
+
+    except Exception as e:
+        return RitualCheckResult(
+            id="eval_data_flow",
+            name="Evaluation Data Flow",
+            description="Check end-to-end flow from ledger to UI",
+            status="fail",
+            category="eval",
+            details={"error": str(e)},
+            remediation="Check passives_ledger.json and tavern/api/skills.py",
             started_at=start,
             finished_at=datetime.utcnow(),
         )

@@ -26,30 +26,40 @@ model:
   rope_scaling: "dynamic"
 
 # =============================================================================
+# MEMORY PROFILE (THE KNOB)
+# =============================================================================
+# Reference a preset profile from configs/memory_profiles/
+# Available: 24gb_qlora, 24gb_full_small, 24gb_galore
+memory_profile: "24gb_qlora"
+
+# =============================================================================
 # DEFAULT TRAINING SETTINGS
 # =============================================================================
 # Requires memory optimization for 24GB VRAM
 training_defaults:
   precision: "bf16"
-  load_in_4bit: false
-  batch_size: 1
-  gradient_accumulation: 8
+  load_in_4bit: true  # Required for QLoRA
+  batch_size: 1  # Conservative for 24GB VRAM
+  gradient_accumulation: 8  # Compensate for small batch
   learning_rate: 0.00005
   warmup_steps: 200
-  max_length: 1024  # Reduced for memory
+  max_length: 1024  # Conservative for 24GB VRAM
   gradient_checkpointing: true
   save_steps: 1000
   save_total_limit: 15
+  # Optimizer (THE KNOB for memory vs speed)
+  # Options: adamw_torch_fused, adamw_8bit, paged_adamw_32bit, paged_adamw_8bit
+  optimizer_type: "paged_adamw_32bit"  # Paged optimizer offloads to CPU
 
 # =============================================================================
 # QLORA CONFIGURATION
 # =============================================================================
 # Consider enabling for 24GB training
 qlora:
-  enabled: false
+  enabled: true  # QLoRA for 24GB VRAM training
   r: 64
-  alpha: 16
-  dropout: 0.05
+  alpha: 128
+  dropout: 0.02
   target_modules:
     - q_proj
     - k_proj
@@ -102,7 +112,7 @@ idle_behavior:
     sy: 0.5
   generation:
     batch_size: 1000
-    levels: [1, 2, 3, 4, 5]
+    levels: [8, 9, 10]
     min_queue_depth: 1
 
 # =============================================================================

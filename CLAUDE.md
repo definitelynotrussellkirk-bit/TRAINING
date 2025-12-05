@@ -61,6 +61,8 @@ DROP QUEST → DIO BATTLES → GAIN XP → LEVEL UP → UNLOCK SKILLS → REPEAT
 | **Vault** | http://localhost:8888/vault | Browse checkpoints, zones, assets |
 | **Settings** | http://localhost:8888/settings | Config, VRAM calc, scheduler |
 | **Guild Hall** | http://localhost:8888/guild | Skill progression dashboard |
+| **Trophies** | http://localhost:8888/achievements | Achievement showcase and progress |
+| **Primitives** | http://localhost:8888/primitives | Cognitive profile radar chart |
 | VaultKeeper API | http://localhost:8767/api/stats | Asset & Ledger API |
 | RealmState API | http://localhost:8866/api/realm | Real-time game state (SSE) |
 
@@ -901,7 +903,15 @@ Designs documented below but code not yet written.
 
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
-Latest (2025-12-05) - **EVAL SYSTEM FIX & THROTTLING**:
+Latest (2025-12-05) - **UI ENHANCEMENTS & TODO FIXES**:
+- **Achievement Showcase** - New `/achievements` page with 18 unlockable badges and progress tracking
+- **Primitive Radar** - New `/primitives` page with SVG radar chart for cognitive profile visualization
+- **MUD-Style Graphics** - Added ASCII frame, block progress bars, training glow effects to game UI
+- **Scheduler Fix** - `recent_accuracy` now loads from eval ledger (was hardcoded 0.0)
+- **Level Names** - Skill level names now fetched from YAML config in eval results
+- **Primitives API** - `hero_level` computed from step count, mastery proxy from skill levels
+
+Previous (2025-12-05) - **EVAL SYSTEM FIX & THROTTLING**:
 - **Skill Evals Now Working** - Fixed broken symlink `status/curriculum_state.json` that prevented skill evals from queuing for ~50 sessions
 - **Eval Throttling** - Added 100-step minimum gap between eval queues to prevent queue buildup
 - **Skills-Only Mode** - Added `--skills-only` flag to eval_runner to skip passive evals

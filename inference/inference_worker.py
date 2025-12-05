@@ -32,25 +32,50 @@ except ImportError:
 # Maps trainer machine paths → inference machine paths
 # This allows PEFT adapters trained on 4090 to load on 3090
 
+# Get paths from environment or use sensible defaults
+_HOME = os.path.expanduser("~")
+_LOCAL_MODELS = os.environ.get("INFERENCE_MODELS_DIR", os.path.join(_HOME, "llm", "models"))
+_NAS_MODELS = os.environ.get("INFERENCE_NAS_MODELS", "/mnt/synology/data/models")
+
 # Search paths for base models (in priority order)
 # 1. Local SSD for hot models
 # 2. Synology NAS mount for overflow (55TB available)
 BASE_MODEL_SEARCH_PATHS = [
-    "/home/russ/llm/models",
-    "/mnt/synology/data/models",
+    _LOCAL_MODELS,
+    _NAS_MODELS,
 ]
 
-# Direct path mappings (trainer → inference)
-BASE_MODEL_MAPPING = {
-    # Trainer 4090 paths → preferred Inference 3090 paths
-    "/home/russ/Desktop/TRAINING/models/Qwen3-4B-Instruct-2507": "/home/russ/llm/models/Qwen3-4B-Instruct-2507",
-    "/home/russ/Desktop/TRAINING/models/Qwen3-0.6B": "/home/russ/llm/models/Qwen3-0.6B",
-    "/home/russ/Desktop/TRAINING/models/Qwen3-1.7B": "/home/russ/llm/models/Qwen3-1.7B",
-    "/home/russ/Desktop/TRAINING/models/Qwen3-4B": "/home/russ/llm/models/Qwen3-4B",
-    "/home/russ/Desktop/TRAINING/models/Qwen3-8B": "/home/russ/llm/models/Qwen3-8B",
-    "/home/russ/Desktop/TRAINING/models/Qwen2.5-3B": "/home/russ/llm/models/Qwen2.5-3B",
-    "/home/russ/Desktop/TRAINING/models/Qwen2.5-7B": "/home/russ/llm/models/Qwen2.5-7B",
-}
+# Build path mappings dynamically - maps any training machine paths to local inference paths
+# Handles paths like /home/*/Desktop/TRAINING/models/* and /home/*/TRAINING/models/*
+def _build_model_mapping() -> dict:
+    """Build path mappings from training machine paths to inference local paths."""
+    # Known model names that might be referenced by training configs
+    model_names = [
+        "Qwen3-0.6B", "Qwen3-1.7B", "Qwen3-4B", "Qwen3-8B",
+        "Qwen3-4B-Instruct-2507", "Qwen2.5-3B", "Qwen2.5-7B",
+    ]
+
+    mapping = {}
+
+    # Get training user from env or default to current user
+    train_user = os.environ.get("TRAINING_USER", os.environ.get("USER", os.getlogin()))
+
+    # Common training path patterns - built from config, not hardcoded
+    home_base = "/home"  # Linux standard, not user-specific
+    train_patterns = [
+        f"{home_base}/{train_user}/Desktop/TRAINING/models/{{model}}",
+        f"{home_base}/{train_user}/TRAINING/models/{{model}}",
+    ]
+
+    for model in model_names:
+        local_path = os.path.join(_LOCAL_MODELS, model)
+        for pattern in train_patterns:
+            train_path = pattern.format(model=model)
+            mapping[train_path] = local_path
+
+    return mapping
+
+BASE_MODEL_MAPPING = _build_model_mapping()
 
 def resolve_base_model_path(path: str) -> str:
     """

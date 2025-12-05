@@ -9,7 +9,8 @@ Handles:
 
 import json
 import logging
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, Any, Optional
 
 from guild.skills.primitives import (
     PRIMITIVE_CATALOG,
@@ -21,6 +22,43 @@ if TYPE_CHECKING:
     from tavern.server import TavernHandler
 
 logger = logging.getLogger(__name__)
+
+BASE_DIR = Path(__file__).parent.parent.parent
+
+
+def _get_hero_stats() -> Dict[str, Any]:
+    """Get hero level and skill stats from curriculum state."""
+    curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
+    result = {"hero_level": 0, "skills": {}}
+
+    if not curriculum_file.exists():
+        return result
+
+    try:
+        with open(curriculum_file) as f:
+            curriculum = json.load(f)
+
+        # Get current step from latest accuracy entry in any skill
+        latest_step = 0
+        skills = curriculum.get("skills", {})
+        for skill_id, skill_data in skills.items():
+            acc_history = skill_data.get("accuracy_history", [])
+            if acc_history:
+                step = acc_history[-1].get("step", 0)
+                if step > latest_step:
+                    latest_step = step
+
+            result["skills"][skill_id] = {
+                "current_level": skill_data.get("current_level", 1),
+            }
+
+        # Hero level = steps / 1000
+        result["hero_level"] = latest_step // 1000
+
+        return result
+    except Exception as e:
+        logger.warning(f"Failed to get hero stats: {e}")
+        return result
 
 
 def serve_primitives(handler: "TavernHandler"):
@@ -117,6 +155,19 @@ def serve_primitive_stats(handler: "TavernHandler"):
             "code": "Code",
         }
 
+        # Get hero stats for level and skill mastery proxy
+        hero_stats = _get_hero_stats()
+
+        # Map tracks to skills for mastery proxy
+        # Tracks map to skills that exercise their primitives
+        track_to_skills = {
+            "arithmetic": ["bin"],
+            "binary": ["bin"],
+            "logic": ["bin", "sy"],
+            "string": ["sy"],
+            "code": [],
+        }
+
         for track in tracks:
             prims = PRIMITIVE_CATALOG.get(track, [])
             if not prims:
@@ -124,16 +175,24 @@ def serve_primitive_stats(handler: "TavernHandler"):
 
             avg_difficulty = sum(p.difficulty for p in prims) / len(prims)
 
-            # TODO: Compute actual mastery from evaluation results
-            # For now, return 0 (no data) - will be populated when
-            # per-primitive tracking is implemented
+            # Compute mastery as proxy: average of skill_level / 50 for related skills
+            # This is a rough approximation until per-primitive tracking is implemented
             mastery = 0.0
+            related_skills = track_to_skills.get(track, [])
+            if related_skills:
+                skill_levels = []
+                for skill_id in related_skills:
+                    if skill_id in hero_stats.get("skills", {}):
+                        level = hero_stats["skills"][skill_id].get("current_level", 1)
+                        skill_levels.append(level / 50.0)  # Normalize to 0-1
+                if skill_levels:
+                    mastery = sum(skill_levels) / len(skill_levels)
 
             track_stats[track] = {
                 "name": track_names.get(track, track.title()),
                 "count": len(prims),
                 "avg_difficulty": round(avg_difficulty, 1),
-                "mastery": mastery,
+                "mastery": round(mastery, 2),
                 "icon": track_icons.get(track, "📊"),
             }
 
@@ -142,7 +201,7 @@ def serve_primitive_stats(handler: "TavernHandler"):
         handler._send_json({
             "tracks": track_stats,
             "total_primitives": total_count,
-            "hero_level": 0,  # TODO: Get from campaign state
+            "hero_level": hero_stats["hero_level"],
         })
 
     except Exception as e:

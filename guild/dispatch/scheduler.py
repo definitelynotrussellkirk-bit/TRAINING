@@ -62,6 +62,38 @@ class CurriculumScheduler:
 
         self.config = self._load_config()
         self.state = self._load_state()
+        self._eval_ledger = None  # Lazy load
+
+    def _get_eval_ledger(self):
+        """Get evaluation ledger (lazy loaded)."""
+        if self._eval_ledger is None:
+            try:
+                from core.evaluation_ledger import get_eval_ledger
+                self._eval_ledger = get_eval_ledger()
+            except Exception as e:
+                logger.warning(f"Failed to load eval ledger: {e}")
+        return self._eval_ledger
+
+    def _get_recent_accuracy(self, skill_id: str, level: int, n_evals: int = 3) -> float:
+        """Get average accuracy from last N evals for skill at current level."""
+        ledger = self._get_eval_ledger()
+        if not ledger:
+            return 0.0
+
+        try:
+            evals = ledger.get_by_skill(skill_id, level=level)
+            if not evals:
+                return 0.0
+
+            # Take last N evals
+            recent = evals[-n_evals:]
+            if not recent:
+                return 0.0
+
+            return sum(e.accuracy for e in recent) / len(recent)
+        except Exception as e:
+            logger.warning(f"Failed to get accuracy for {skill_id} L{level}: {e}")
+            return 0.0
 
     def _load_config(self) -> dict:
         """Load schedule configuration."""
@@ -117,14 +149,15 @@ class CurriculumScheduler:
                 # Root-level 'levels' is the authoritative max level
                 max_level = skill_data.get("levels", max_level)
 
+            current_level = curriculum_levels.get(skill_id, 1)
             states.append(SkillState(
                 skill_id=skill_id,
-                current_level=curriculum_levels.get(skill_id, 1),
+                current_level=current_level,
                 max_level=max_level,
                 enabled=config.get("enabled", True),
                 priority=config.get("priority", 99),
                 weight=config.get("weight", 1.0),
-                recent_accuracy=0.0,  # TODO: load from eval history
+                recent_accuracy=self._get_recent_accuracy(skill_id, current_level),
                 examples_generated=self.state.get("skill_counts", {}).get(skill_id, 0),
                 last_trained=None,
             ))

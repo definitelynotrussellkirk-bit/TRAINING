@@ -41,6 +41,7 @@ from typing import Optional
 from urllib.parse import urlparse, parse_qs
 import urllib.request
 import urllib.error
+import yaml
 
 # Add parent to path for imports
 TAVERN_DIR = Path(__file__).parent
@@ -106,6 +107,43 @@ def get_active_hero_id() -> str:
     return None
 
 
+# Cached skill level names
+_skill_level_names: dict = {}
+
+
+def get_level_name(skill_id: str, level: int) -> Optional[str]:
+    """Get the name for a skill level from its config."""
+    global _skill_level_names
+
+    # Normalize skill ID
+    id_mapping = {"binary": "bin", "syllo": "sy"}
+    skill_id = id_mapping.get(skill_id, skill_id)
+
+    # Check cache
+    cache_key = f"{skill_id}:{level}"
+    if cache_key in _skill_level_names:
+        return _skill_level_names[cache_key]
+
+    # Load from skill YAML
+    skill_yaml = BASE_DIR / "configs" / "skills" / f"{skill_id}.yaml"
+    if not skill_yaml.exists():
+        return None
+
+    try:
+        with open(skill_yaml) as f:
+            skill_data = yaml.safe_load(f)
+
+        level_prog = skill_data.get("level_progression", {})
+        level_info = level_prog.get(level, {})
+        level_name = level_info.get("name") if isinstance(level_info, dict) else None
+
+        # Cache result
+        _skill_level_names[cache_key] = level_name
+        return level_name
+    except Exception:
+        return None
+
+
 # Skill loader - uses SkillEngine
 def get_skills_data():
     """Load skill data from SkillEngine (single source of truth)."""
@@ -169,9 +207,20 @@ def get_skills_data():
         # Sort by name
         skills.sort(key=lambda s: s["name"])
 
+        # Get active skill from curriculum state
+        active_skill = ""
+        try:
+            curriculum_file = BASE_DIR / "data_manager" / "curriculum_state.json"
+            if curriculum_file.exists():
+                with open(curriculum_file) as f:
+                    curriculum = json.load(f)
+                active_skill = curriculum.get("active_skill", "")
+        except Exception:
+            pass
+
         return {
             "skills": skills,
-            "active_skill": "",  # TODO: Get from training status
+            "active_skill": active_skill,
             "total_mastered": sum(s["mastered_level"] for s in skills),
         }
 
@@ -1903,7 +1952,7 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
                     response["latest"] = {
                         "level": latest_record.level,
-                        "level_name": None,  # TODO: Fetch from skill config if needed
+                        "level_name": get_level_name(skill_name, latest_record.level),
                         "accuracy": latest_record.accuracy,
                         "correct": latest_record.correct,
                         "total": latest_record.total,

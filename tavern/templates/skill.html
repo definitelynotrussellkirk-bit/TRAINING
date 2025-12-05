@@ -7,6 +7,8 @@
     <!-- Shared theme -->
     <link rel="stylesheet" href="/static/css/theme.css?v=1">
     <link rel="stylesheet" href="/static/css/game.css?v=3">
+    <!-- RealmState for SSE updates -->
+    <script src="/static/js/realm-state.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         /* Skill page specific styles */
@@ -1445,8 +1447,27 @@
             }
         }
 
+        // Subscribe to RealmState SSE for instant skill updates
+        function initSSE() {
+            if (window.RealmState && typeof window.RealmState.subscribe === 'function') {
+                // Connect to SSE
+                RealmState.connectSSE();
+
+                // Subscribe to skills updates - refreshes when eval completes
+                RealmState.subscribe('skills', (skillsData) => {
+                    console.log('[Skill] SSE update received, refreshing...');
+                    loadSkillData();
+                });
+                console.log('[Skill] SSE subscription active');
+            } else {
+                // Retry after a short delay
+                setTimeout(initSSE, 500);
+            }
+        }
+
         // Load on page load
         loadSkillData();
+        initSSE();
     </script>
 </body>
 </html>

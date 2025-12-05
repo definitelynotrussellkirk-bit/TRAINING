@@ -2677,18 +2677,21 @@ function init() {
 
     // Set up polling for secondary data
     pollers.add('hints', fetchHintData, 10000, { immediate: false });
-    pollers.add('skills', fetchSkills, 30000, { immediate: false });
+    pollers.add('skills', fetchSkills, 120000, { immediate: false }); // Reduced: SSE provides instant updates
     pollers.add('time', updateTime, 1000, { immediate: false });
     pollers.add('momentum', fetchMomentum, 15000, { immediate: false });
     pollers.add('vault', fetchVaultData, 60000, { immediate: true }); // Vault data from ledger (accurate)
-    pollers.add('efficiency', updateEfficiency, 30000, { immediate: true }); // Efficiency dashboard
-    pollers.add('transitions', updateTransitions, 60000, { immediate: true }); // Level transitions log
+    pollers.add('efficiency', updateEfficiency, 120000, { immediate: true }); // Reduced: SSE provides instant updates
+    pollers.add('transitions', updateTransitions, 120000, { immediate: true }); // Reduced: SSE provides instant updates
 
     // Start all pollers
     pollers.startAll();
 
     // Register for real-time SSE training updates (in addition to RealmState)
     registerTrainingEventHandlers();
+
+    // Register RealmState subscriptions for instant SSE updates
+    registerRealmStateHandlers();
 
     console.log('[Game] Pollers initialized:', Object.keys(pollers.getAllStats()));
 }
@@ -2807,6 +2810,36 @@ function registerTrainingEventHandlers() {
             console.log('[Game] Registered SSE training event handlers');
         }
     }, 100);
+}
+
+/**
+ * Register RealmState SSE subscriptions for instant updates
+ * Supplements polling with real-time push notifications
+ */
+function registerRealmStateHandlers() {
+    // Wait for RealmState to be initialized
+    const waitForRealmState = setInterval(() => {
+        if (window.RealmState && typeof window.RealmState.subscribe === 'function') {
+            clearInterval(waitForRealmState);
+
+            // Subscribe to skills updates - triggers on eval completion
+            window.RealmState.subscribe('skills', (skillsData) => {
+                console.log('[Game] SSE skills update received');
+                // Immediately fetch full skill data (rich format with level_accuracy, strain zones)
+                fetchSkills();
+                // Also refresh efficiency and transitions (they depend on skill data)
+                updateEfficiency();
+                updateTransitions();
+            });
+
+            console.log('[Game] Registered RealmState subscriptions');
+        }
+    }, 100);
+
+    // Timeout after 10 seconds
+    setTimeout(() => {
+        clearInterval(waitForRealmState);
+    }, 10000);
 }
 
 // ============================================

@@ -987,15 +987,33 @@
             }
         }
 
+        // Subscribe to RealmState SSE for instant skill updates
+        function initSSE() {
+            if (window.RealmState && typeof window.RealmState.subscribe === 'function') {
+                RealmState.connectSSE();
+
+                // Subscribe to skills updates - refreshes when eval completes
+                RealmState.subscribe('skills', (skillsData) => {
+                    console.log('[Guild] SSE skills update, refreshing...');
+                    loadGuildData();
+                    loadCampaignPeaks();
+                });
+                console.log('[Guild] SSE subscription active');
+            } else {
+                setTimeout(initSSE, 500);
+            }
+        }
+
         // Load on page load
         loadGuildData();
         loadTaskMaster();
         loadCampaignPeaks();
+        initSSE();
 
-        // Refresh every 30 seconds
-        setInterval(loadGuildData, 30000);
-        setInterval(loadTaskMaster, 30000);
-        setInterval(loadCampaignPeaks, 30000);
+        // Reduced polling (SSE provides instant updates)
+        setInterval(loadGuildData, 120000);  // 2 min fallback
+        setInterval(loadTaskMaster, 60000);   // 1 min (doesn't use SSE)
+        setInterval(loadCampaignPeaks, 120000); // 2 min fallback
     </script>
 </body>
 </html>

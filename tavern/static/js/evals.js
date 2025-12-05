@@ -266,9 +266,12 @@ async function deleteEval(checkpoint, skill, level) {
     }
 
     try {
-        // Call VaultKeeper DELETE endpoint via fetch
-        const url = `http://localhost:8767/api/evals/checkpoint/${checkpoint}?skill=${skill}&level=${level}`;
+        // Call VaultKeeper DELETE endpoint via Tavern proxy
+        const url = `${VAULT_API}/checkpoint/${checkpoint}?skill=${skill}&level=${level}`;
         const res = await fetch(url, { method: 'DELETE' });
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
         const data = await res.json();
 
         if (data.ok) {
@@ -294,8 +297,11 @@ async function deleteAllEvalsForCheckpoint(checkpoint) {
     }
 
     try {
-        const url = `http://localhost:8767/api/evals/checkpoint/${checkpoint}`;
+        const url = `${VAULT_API}/checkpoint/${checkpoint}`;
         const res = await fetch(url, { method: 'DELETE' });
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
         const data = await res.json();
 
         if (data.ok) {

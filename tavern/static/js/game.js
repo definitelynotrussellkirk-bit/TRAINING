@@ -2618,8 +2618,8 @@ function updateMomentumUI(m) {
                 btn.textContent = 'Open Analysis';
                 btn.onclick = () => (window.location.href = '/analysis');
             } else {
-                btn.textContent = 'Show Details';
-                btn.onclick = () => console.log('Blocker context:', pb.context);
+                // Unknown action type - hide button
+                btn.style.display = 'none';
             }
         } else {
             blockerDiv.style.display = 'none';

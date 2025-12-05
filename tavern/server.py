@@ -2712,24 +2712,24 @@ class TavernHandler(SimpleHTTPRequestHandler):
             control_dir.mkdir(exist_ok=True)
 
             if action == "start":
-                # Start daemon in background
-                daemon_script = BASE_DIR / "core" / "training_daemon.py"
-                log_file = BASE_DIR / "logs" / "training_daemon.log"
+                # Start hero_loop via launcher script (reads active campaign)
+                launcher_script = BASE_DIR / "scripts" / "start_hero_loop.py"
+                log_file = BASE_DIR / "logs" / "hero_loop.log"
                 log_file.parent.mkdir(parents=True, exist_ok=True)
 
-                # Set PYTHONPATH so daemon can import trainer, guild, etc.
+                # Set PYTHONPATH so hero_loop can import trainer, guild, etc.
                 env = os.environ.copy()
                 env["PYTHONPATH"] = str(BASE_DIR)
 
                 subprocess.Popen(
-                    ["nohup", "python3", str(daemon_script)],
+                    ["nohup", "python3", str(launcher_script)],
                     stdout=open(log_file, "a"),
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
                     cwd=str(BASE_DIR),
                     env=env
                 )
-                self._send_json({"success": True, "action": "start", "message": "Daemon starting..."})
+                self._send_json({"success": True, "action": "start", "message": "Hero loop starting..."})
 
             elif action == "stop":
                 # Create stop signal

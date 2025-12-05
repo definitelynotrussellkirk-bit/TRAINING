@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from arena.types import BattleState, BattleStatus
+from arena.arena_types import BattleState, BattleStatus
 
 
 class BattleLog:

@@ -292,17 +292,17 @@ def serve_quick_start(handler: "TavernHandler"):
 
                 daemon = get_daemon_status()
                 if not daemon["running"]:
-                    # Start the daemon
-                    daemon_script = base_dir / "core" / "training_daemon.py"
-                    log_file = base_dir / "logs" / "training_daemon.log"
+                    # Start the hero_loop via launcher script
+                    launcher_script = base_dir / "scripts" / "start_hero_loop.py"
+                    log_file = base_dir / "logs" / "hero_loop.log"
                     log_file.parent.mkdir(parents=True, exist_ok=True)
 
-                    # Set PYTHONPATH so daemon can import trainer, guild, etc.
+                    # Set PYTHONPATH so hero_loop can import trainer, guild, etc.
                     env = os.environ.copy()
                     env["PYTHONPATH"] = str(base_dir)
 
                     subprocess.Popen(
-                        ["nohup", "python3", str(daemon_script)],
+                        ["nohup", "python3", str(launcher_script)],
                         stdout=open(log_file, "a"),
                         stderr=subprocess.STDOUT,
                         start_new_session=True,
@@ -310,7 +310,7 @@ def serve_quick_start(handler: "TavernHandler"):
                         env=env
                     )
                     daemon_started = True
-                    logger.info("[Quick Start] Started training daemon")
+                    logger.info("[Quick Start] Started hero loop")
                 else:
                     logger.info("[Quick Start] Daemon already running")
             except Exception as e:

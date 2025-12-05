@@ -204,9 +204,9 @@ class StateTracker:
                 timeout=5
             )
             
-            # Look for training_daemon.py process
+            # Look for hero_loop process
             for line in result.stdout.split('\n'):
-                if 'training_daemon.py' in line and 'grep' not in line:
+                if 'hero_loop' in line and 'grep' not in line:
                     return True
             
             return False

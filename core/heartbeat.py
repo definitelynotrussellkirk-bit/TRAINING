@@ -10,7 +10,7 @@ Usage:
     from core.heartbeat import HeartbeatWriter
 
     hb = HeartbeatWriter(
-        worker_id="training_daemon",
+        worker_id="hero_loop",
         role="training",
         device="GPU0",
     )
@@ -108,7 +108,7 @@ class HeartbeatWriter:
     Writes heartbeat files for a worker process.
 
     Usage:
-        hb = HeartbeatWriter("training_daemon", "training", "GPU0")
+        hb = HeartbeatWriter("hero_loop", "training", "GPU0")
         hb.beat(status="running", current_job_id="job123")
     """
 

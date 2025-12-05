@@ -118,7 +118,7 @@ class CheckpointRecord:
     skill_effort_at_save: Dict[str, float] = field(default_factory=dict)
 
     # Metadata
-    created_by: str = "training_daemon"
+    created_by: str = "hero_loop"
     ledger_version: str = "1.2.0"  # Added hero_id, campaign_id
 
     def to_dict(self) -> Dict[str, Any]:

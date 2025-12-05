@@ -3,7 +3,7 @@ Ritual of the Weaver - Daemon and process health diagnostics.
 
 This ritual checks the health of background processes:
 - Weaver orchestrator status
-- Training daemon status
+- Hero loop status
 - PID file validity
 - Process health via PID files
 """
@@ -24,7 +24,7 @@ def run() -> List[RitualCheckResult]:
     results = []
     results.append(_check_weaver_status())
     results.append(_check_pid_files())
-    results.append(_check_training_daemon())
+    results.append(_check_hero_loop())
     results.append(_check_eval_runner())
     return results
 
@@ -168,22 +168,22 @@ def _check_pid_files() -> RitualCheckResult:
         )
 
 
-def _check_training_daemon() -> RitualCheckResult:
-    """Check training daemon status."""
+def _check_hero_loop() -> RitualCheckResult:
+    """Check hero loop status."""
     start = datetime.utcnow()
     try:
         from core.paths import get_base_dir
-        pid_file = get_base_dir() / ".pids" / "training_daemon.pid"
+        pid_file = get_base_dir() / ".pids" / "hero_loop.pid"
 
         if not pid_file.exists():
             return RitualCheckResult(
-                id="training_daemon",
-                name="Training Daemon",
-                description="Check if training daemon is running",
+                id="hero_loop",
+                name="Hero Loop",
+                description="Check if hero loop is running",
                 status="warn",
                 category="daemon",
-                details={"error": "No training_daemon.pid file"},
-                remediation="Training daemon starts automatically with Weaver",
+                details={"error": "No hero_loop.pid file"},
+                remediation="Hero loop starts automatically with Weaver",
                 started_at=start,
                 finished_at=datetime.utcnow(),
             )
@@ -204,9 +204,9 @@ def _check_training_daemon() -> RitualCheckResult:
                 pass
 
         return RitualCheckResult(
-            id="training_daemon",
-            name="Training Daemon",
-            description="Check if training daemon is running",
+            id="hero_loop",
+            name="Hero Loop",
+            description="Check if hero loop is running",
             status="ok" if running else "fail",
             category="daemon",
             details={
@@ -220,9 +220,9 @@ def _check_training_daemon() -> RitualCheckResult:
         )
     except Exception as e:
         return RitualCheckResult(
-            id="training_daemon",
-            name="Training Daemon",
-            description="Check if training daemon is running",
+            id="hero_loop",
+            name="Hero Loop",
+            description="Check if hero loop is running",
             status="fail",
             category="daemon",
             details={"error": str(e)},

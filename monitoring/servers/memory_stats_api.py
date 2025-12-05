@@ -29,8 +29,8 @@ class MemoryStatsHandler(BaseHTTPRequestHandler):
                         cmdline = proc.cmdline()
                         cmdline_str = ' '.join(cmdline).lower()
 
-                        # Look for training_daemon.py or train.py
-                        if 'python' in proc.info['name'].lower() and ('training_daemon' in cmdline_str or 'train.py' in cmdline_str):
+                        # Look for hero_loop or train.py
+                        if 'python' in proc.info['name'].lower() and ('hero_loop' in cmdline_str or 'train.py' in cmdline_str):
                             training_mem_mb = proc.info['memory_info'].rss / (1024 * 1024)
                             training_pid = proc.info['pid']
                             break

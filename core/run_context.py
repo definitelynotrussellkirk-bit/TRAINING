@@ -172,7 +172,7 @@ def _get_daemon_status(base_dir: Path) -> DaemonStatus:
     """Check if training daemon is running."""
     import os
 
-    pid_file = base_dir / ".pids" / "training_daemon.pid"
+    pid_file = base_dir / ".pids" / "hero_loop.pid"
     status = DaemonStatus()
 
     if not pid_file.exists():

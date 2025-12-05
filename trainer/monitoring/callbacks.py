@@ -235,7 +235,7 @@ class LiveMonitorCallback(TrainerCallback):
                 if torch.cuda.is_available():
                     device_name = f"GPU{torch.cuda.current_device()}"
                 self.heartbeat_writer = HeartbeatWriter(
-                    worker_id="training_daemon",
+                    worker_id="hero_loop",
                     role="training",
                     device=device_name,
                 )
@@ -471,7 +471,7 @@ class LiveMonitorCallback(TrainerCallback):
 
                 # Also update worker state
                 realm_update_worker(
-                    worker_id="training_daemon",
+                    worker_id="hero_loop",
                     role="training",
                     status="running",
                     current_job=self.current_file,

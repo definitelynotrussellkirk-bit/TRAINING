@@ -628,7 +628,7 @@ class Garrison:
 
         # Check daemons
         daemon_checks = [
-            ("training_daemon", "training_daemon"),
+            ("hero_loop", "hero_loop"),
             ("eval_runner", "eval_runner"),
             ("garrison", "garrison"),
         ]

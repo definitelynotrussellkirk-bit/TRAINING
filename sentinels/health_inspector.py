@@ -108,7 +108,7 @@ class HealthInspector:
 
     def inspect_daemon(self) -> HealthReport:
         """Inspect training daemon health."""
-        pid_file = self.base_dir / ".pids" / "training_daemon.pid"
+        pid_file = self.base_dir / ".pids" / "hero_loop.pid"
         checks_passed = 0
         checks_failed = 0
         details = {}

@@ -88,7 +88,7 @@ class SystemHealth:
 # Expected processes by machine
 EXPECTED_PROCESSES = {
     "4090": [
-        {"name": "training_daemon", "pattern": "training_daemon.py", "critical": True},
+        {"name": "hero_loop", "pattern": "hero_loop", "critical": True},
         {"name": "deployment_orchestrator", "pattern": "deployment_orchestrator.py", "critical": False},
     ],
     "3090": [

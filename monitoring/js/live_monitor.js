@@ -461,8 +461,34 @@ class LiveMonitor {
     }
 
     showExampleDetail(step) {
-        // TODO: Implement detailed view modal
-        console.log('Show detail for step:', step);
+        // Find the example in recent_examples
+        const examples = this.currentData?.recent_examples || [];
+        const example = examples.find(ex => ex.step === step);
+
+        if (!example) {
+            alert(`No data found for step ${step}`);
+            return;
+        }
+
+        // Show available data (full prompt/answer not stored in recent_examples)
+        const modal = document.getElementById('expandModal');
+        const content = document.getElementById('expandedContent');
+
+        content.innerHTML = `
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: var(--accent-blue); margin-bottom: 10px;">Step ${step} Summary</h3>
+                <div class="content-box">
+                    <p><strong>Result:</strong> ${example.matches ? '✅ Correct' : '❌ Incorrect'}</p>
+                    <p><strong>Loss:</strong> ${example.loss?.toFixed(4) || 'N/A'}</p>
+                </div>
+            </div>
+            <div style="color: var(--text-secondary); font-style: italic;">
+                Note: Full prompt/answer data is only available for the current step.
+            </div>
+        `;
+
+        document.getElementById('modalStep').textContent = step;
+        modal.classList.add('active');
     }
 }
 

@@ -368,8 +368,8 @@ HTML_TEMPLATE = """
                 return;
             }
 
-            const step = data.step || 0;
-            const totalSteps = 12488; // TODO: get from config
+            const step = data.step || data.current_step || 0;
+            const totalSteps = data.total_steps || data.batch_total_steps || step || 1;
             const progress = (step / totalSteps * 100).toFixed(2);
             const loss = data.train_loss?.toFixed(4) || 'N/A';
             const lr = data.learning_rate?.toExponential(2) || 'N/A';

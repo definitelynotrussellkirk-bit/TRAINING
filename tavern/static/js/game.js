@@ -324,6 +324,7 @@ const GameState = {
 
     // Training
     isTraining: false,
+    isPaused: false,
     currentQuest: null,
     questProgress: 0,
     totalSteps: 0,
@@ -486,6 +487,7 @@ function initRealmStateSync() {
         // Use nullish coalescing (??) to preserve existing values when data is null/undefined
         // This prevents flickering when different data sources have different update frequencies
         GameState.isTraining = training.status === 'training';
+        GameState.isPaused = training.status === 'paused';
         GameState.currentStep = training.step ?? GameState.currentStep ?? 0;
         GameState.totalSteps = training.totalSteps ?? GameState.totalSteps ?? 0;
         GameState.loss = training.loss ?? GameState.loss ?? 0;
@@ -1647,6 +1649,7 @@ function processGameData(data) {
     if (training && !GameState.realmSyncActive) {
         // Only process training data from /api/game when RealmState is NOT active
         GameState.isTraining = training.status === 'training';
+        GameState.isPaused = training.status === 'paused';
         GameState.currentStep = training.step ?? training.current_step ?? GameState.currentStep ?? 0;
         GameState.totalSteps = training.total_steps ?? GameState.totalSteps ?? 0;
         GameState.loss = training.loss ?? GameState.loss ?? 0;
@@ -2859,12 +2862,28 @@ function updateControlButtons() {
     const btnResume = document.getElementById('btnResume');
     const controls = document.getElementById('trainingControls');
 
-    // Show controls only when training
+    // Show controls when training or paused (not when idle/completed)
+    const showControls = GameState.isTraining || GameState.isPaused;
     if (controls) {
-        controls.style.display = GameState.isTraining ? 'flex' : 'none';
+        controls.style.display = showControls ? 'flex' : 'none';
     }
 
-    // TODO: Check actual pause state from API and show correct button
+    // Show correct button based on pause state
+    if (btnPause && btnResume) {
+        if (GameState.isPaused) {
+            // Training is paused - show Resume, hide Pause
+            btnPause.style.display = 'none';
+            btnResume.style.display = 'inline-flex';
+        } else if (GameState.isTraining) {
+            // Training is active - show Pause, hide Resume
+            btnPause.style.display = 'inline-flex';
+            btnResume.style.display = 'none';
+        } else {
+            // Idle - hide both
+            btnPause.style.display = 'none';
+            btnResume.style.display = 'none';
+        }
+    }
 }
 
 // ============================================

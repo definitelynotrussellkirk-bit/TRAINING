@@ -743,6 +743,20 @@
                     </div>
                 </div>
 
+                <!-- Level Accuracy Breakdown -->
+                <div class="skill-card">
+                    <h3>📊 Level Accuracy</h3>
+                    <div id="levelAccuracyBreakdown" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 10px;">
+                        <p style="color: #666; width: 100%; text-align: center;">Loading level data...</p>
+                    </div>
+                    <div id="levelAccuracyLegend" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.75em; color: #888;">
+                        <span style="color: #22c55e;">■ >= 80%</span>
+                        <span style="margin-left: 10px; color: #f59e0b;">■ 50-79%</span>
+                        <span style="margin-left: 10px; color: #ef4444;">■ < 50%</span>
+                        <span style="margin-left: 10px; color: #444;">■ Not tested</span>
+                    </div>
+                </div>
+
                 <!-- Accuracy Thresholds -->
                 <div class="skill-card">
                     <h3>🏆 Accuracy Thresholds</h3>
@@ -1060,6 +1074,58 @@
                 `;
                 thresholdEl.appendChild(item);
             });
+
+            // Level Accuracy Breakdown - using level_accuracy from API
+            const levelAccuracy = state.level_accuracy || {};
+            const levelAccuracyEl = document.getElementById('levelAccuracyBreakdown');
+            const levelAccuracyLegend = document.getElementById('levelAccuracyLegend');
+
+            if (Object.keys(levelAccuracy).length > 0) {
+                levelAccuracyEl.innerHTML = '';
+                // Show first 20 levels or max_level, whichever is smaller
+                const showLevels = Math.min(maxLevel, 20);
+
+                for (let lvl = 1; lvl <= showLevels; lvl++) {
+                    const acc = levelAccuracy[lvl];
+                    const block = document.createElement('div');
+                    block.style.cssText = 'width: 36px; height: 36px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7em; font-weight: bold; cursor: pointer; transition: transform 0.1s;';
+
+                    let bgColor, textColor, tooltip;
+                    if (acc !== undefined) {
+                        const accPct = acc * 100;
+                        if (accPct >= 80) {
+                            bgColor = '#22c55e';  // Green
+                            textColor = '#000';
+                            tooltip = `L${lvl}: ${accPct.toFixed(0)}% (mastered)`;
+                        } else if (accPct >= 50) {
+                            bgColor = '#f59e0b';  // Amber
+                            textColor = '#000';
+                            tooltip = `L${lvl}: ${accPct.toFixed(0)}% (training)`;
+                        } else {
+                            bgColor = '#ef4444';  // Red
+                            textColor = '#fff';
+                            tooltip = `L${lvl}: ${accPct.toFixed(0)}% (struggling)`;
+                        }
+                    } else {
+                        bgColor = '#333';  // Dark gray
+                        textColor = '#666';
+                        tooltip = `L${lvl}: Not evaluated`;
+                    }
+
+                    block.style.backgroundColor = bgColor;
+                    block.style.color = textColor;
+                    block.textContent = lvl;
+                    block.title = tooltip;
+                    block.onclick = () => selectLevelForEvals(lvl);
+                    block.onmouseenter = () => block.style.transform = 'scale(1.15)';
+                    block.onmouseleave = () => block.style.transform = 'scale(1)';
+                    levelAccuracyEl.appendChild(block);
+                }
+                levelAccuracyLegend.style.display = 'block';
+            } else {
+                levelAccuracyEl.innerHTML = '<p style="color: #666; width: 100%; text-align: center;">No per-level accuracy data yet</p>';
+                levelAccuracyLegend.style.display = 'none';
+            }
 
             // Level tiers
             const levelProg = config.level_progression || {};

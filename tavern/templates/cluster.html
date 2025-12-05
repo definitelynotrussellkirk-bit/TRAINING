@@ -556,11 +556,11 @@
             icon.classList.add('refreshing');
 
             try {
-                // Fetch from VaultKeeper API
-                const clusterRes = await fetch('http://localhost:8767/api/jobs/cluster');
+                // Fetch from Tavern API (proxies to VaultKeeper)
+                const clusterRes = await fetch('/api/jobs/cluster');
                 const clusterData = await clusterRes.json();
 
-                const workersRes = await fetch('http://localhost:8767/api/jobs/workers');
+                const workersRes = await fetch('/api/jobs/workers');
                 const workersData = await workersRes.json();
 
                 // Update UI

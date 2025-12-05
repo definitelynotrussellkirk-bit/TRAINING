@@ -139,3 +139,42 @@ def serve_jobs_warnings(handler: "TavernHandler", query: dict):
     except Exception as e:
         logger.error(f"Jobs warnings error: {e}")
         handler._send_json({"error": str(e)}, 500)
+
+
+def _proxy_vault(handler: "TavernHandler", endpoint: str):
+    """Proxy request to VaultKeeper API."""
+    import urllib.request
+    import urllib.error
+
+    try:
+        from core.hosts import get_service_url
+        vault_url = get_service_url("vault", fallback="http://localhost:8767")
+    except Exception:
+        vault_url = "http://localhost:8767"
+
+    url = f"{vault_url}{endpoint}"
+
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            data = json.loads(response.read().decode("utf-8"))
+            handler._send_json(data)
+    except urllib.error.URLError as e:
+        logger.error(f"VaultKeeper proxy error: {e}")
+        handler._send_json({"error": str(e)}, 502)
+    except Exception as e:
+        logger.error(f"VaultKeeper proxy error: {e}")
+        handler._send_json({"error": str(e)}, 500)
+
+
+def serve_jobs_cluster(handler: "TavernHandler"):
+    """
+    GET /api/jobs/cluster - Proxy to VaultKeeper cluster status.
+    """
+    _proxy_vault(handler, "/api/jobs/cluster")
+
+
+def serve_jobs_workers(handler: "TavernHandler"):
+    """
+    GET /api/jobs/workers - Proxy to VaultKeeper workers list.
+    """
+    _proxy_vault(handler, "/api/jobs/workers")

@@ -675,6 +675,10 @@ class TavernHandler(SimpleHTTPRequestHandler):
             jobs_api.serve_jobs_stats(self)
         elif path == "/api/jobs/warnings":
             jobs_api.serve_jobs_warnings(self, query)
+        elif path == "/api/jobs/cluster":
+            jobs_api.serve_jobs_cluster(self)
+        elif path == "/api/jobs/workers":
+            jobs_api.serve_jobs_workers(self)
         elif path.startswith("/api/jobs/"):
             job_id = path.replace("/api/jobs/", "")
             jobs_api.serve_job(self, job_id)

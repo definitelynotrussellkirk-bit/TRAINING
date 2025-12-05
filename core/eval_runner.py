@@ -312,7 +312,7 @@ class EvalRunner:
                 "correct": is_correct,
                 "prompt": prompt,
                 "expected": expected,
-                "got": response,
+                "got": strip_thinking_tags(response),  # Store without <think> tags
             })
 
         accuracy = correct / total if total > 0 else 0
@@ -541,7 +541,7 @@ class EvalRunner:
                 "correct": is_correct,
                 "prompt": prompt,
                 "expected": expected,
-                "got": response,
+                "got": strip_thinking_tags(response),  # Store without <think> tags
             })
 
         accuracy = correct / total if total > 0 else 0
@@ -626,7 +626,7 @@ class EvalRunner:
             is_correct = self._check_passive_answer(passive_id, expected, response)
             if is_correct:
                 correct += 1
-            results.append({"problem_idx": i, "correct": is_correct, "prompt": prompt, "expected": expected, "got": response})
+            results.append({"problem_idx": i, "correct": is_correct, "prompt": prompt, "expected": expected, "got": strip_thinking_tags(response)})
 
         accuracy = correct / len(problems) if problems else 0
 

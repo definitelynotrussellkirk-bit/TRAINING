@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-12-05 (Eval throttling fix, CLAUDE.md audit)
+**Last Updated:** 2025-12-05 (Hero loop migration, training_daemon removal)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 **Philosophy:** This repo is the method, not the results (see META section)
 
@@ -903,7 +903,15 @@ Designs documented below but code not yet written.
 
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
-Latest (2025-12-05) - **UI ENHANCEMENTS & TODO FIXES**:
+Latest (2025-12-05) - **HERO LOOP MIGRATION**:
+- **training_daemon.py Removed** - Deleted 2220-line monolithic daemon
+- **Hero Loop Architecture** - New campaign-based training via `arena/hero_loop.py`
+- **Launcher Script** - `scripts/start_hero_loop.py` reads active campaign from `control/active_campaign.json`
+- **Codebase Cleanup** - Updated 15+ files with hero_loop references (process detection, worker IDs, PIDs)
+- **Temple Ritual** - `_check_hero_loop()` replaces `_check_training_daemon()` in weaver.py
+- **New Campaigns Added** - GOU-4B and OJAS-8B campaign configs tracked in git
+
+Previous (2025-12-05) - **UI ENHANCEMENTS & TODO FIXES**:
 - **Achievement Showcase** - New `/achievements` page with 18 unlockable badges and progress tracking
 - **Primitive Radar** - New `/primitives` page with SVG radar chart for cognitive profile visualization
 - **MUD-Style Graphics** - Added ASCII frame, block progress bars, training glow effects to game UI

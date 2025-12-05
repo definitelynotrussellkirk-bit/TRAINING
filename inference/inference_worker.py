@@ -261,10 +261,13 @@ class ModelPool:
                 trust_remote_code=True
             )
 
+            # IMPORTANT: Use device_map="cuda:0" instead of "auto" to prevent split-device issues.
+            # device_map="auto" can place embedding layers on CPU while other layers on CUDA,
+            # causing "Expected all tensors to be on the same device" errors during index_select.
             load_kwargs = {
                 "trust_remote_code": True,
                 "torch_dtype": torch.bfloat16,
-                "device_map": "auto"
+                "device_map": "cuda:0"  # Force all on CUDA to avoid device mismatch
             }
 
             if load_in_4bit:
@@ -275,7 +278,16 @@ class ModelPool:
                     bnb_4bit_quant_type="nf4"
                 )
 
-            model = AutoModelForCausalLM.from_pretrained(model_path, **load_kwargs)
+            try:
+                model = AutoModelForCausalLM.from_pretrained(model_path, **load_kwargs)
+            except (RuntimeError, torch.cuda.OutOfMemoryError) as e:
+                # Fall back to device_map="auto" if CUDA OOM
+                if "out of memory" in str(e).lower() or "CUDA" in str(e):
+                    print(f"   ⚠️ CUDA OOM with device_map='cuda:0', falling back to 'auto'")
+                    load_kwargs["device_map"] = "auto"
+                    model = AutoModelForCausalLM.from_pretrained(model_path, **load_kwargs)
+                else:
+                    raise
 
             entry = ModelEntry(model_id, model, tokenizer, str(model_path),
                              is_peft=False, base_model_path=None)
@@ -342,11 +354,29 @@ class ModelPool:
                     use_4bit = True
                     print(f"   Detected QLoRA adapter, loading base model in 4-bit")
 
+            # AUTO-QUANTIZE: For 7B+ models on 24GB VRAM, auto-enable 4-bit to prevent
+            # device mismatch errors from memory pressure causing CPU offloading
+            if not use_4bit:
+                base_model_name = Path(resolved_base_path).name.lower()
+                # Detect model size from name - look for patterns like "8b", "7b", "13b"
+                # Must handle names like "qwen3-8b" where we want 8, not 3
+                import re
+                # Find all numbers followed by 'b' and take the largest (model size)
+                size_matches = re.findall(r'(\d+)b', base_model_name)
+                if size_matches:
+                    model_size_b = max(int(s) for s in size_matches)
+                    if model_size_b >= 7:
+                        use_4bit = True
+                        print(f"   🔧 Auto-enabling 4-bit quantization for {model_size_b}B model (prevents OOM/device mismatch)")
+
             # Load base model
+            # IMPORTANT: Use device_map="cuda:0" instead of "auto" to prevent split-device issues.
+            # device_map="auto" can place embedding layers on CPU while other layers on CUDA,
+            # causing "Expected all tensors to be on the same device" errors during index_select.
             load_kwargs = {
                 "trust_remote_code": True,
                 "torch_dtype": torch.bfloat16,
-                "device_map": "auto"
+                "device_map": "cuda:0"  # Force all on CUDA to avoid device mismatch
             }
 
             if use_4bit:
@@ -357,7 +387,16 @@ class ModelPool:
                     bnb_4bit_quant_type="nf4"
                 )
 
-            base_model = AutoModelForCausalLM.from_pretrained(resolved_base_path, **load_kwargs)
+            try:
+                base_model = AutoModelForCausalLM.from_pretrained(resolved_base_path, **load_kwargs)
+            except (RuntimeError, torch.cuda.OutOfMemoryError) as e:
+                # Fall back to device_map="auto" if CUDA OOM
+                if "out of memory" in str(e).lower() or "CUDA" in str(e):
+                    print(f"   ⚠️ CUDA OOM with device_map='cuda:0', falling back to 'auto'")
+                    load_kwargs["device_map"] = "auto"
+                    base_model = AutoModelForCausalLM.from_pretrained(resolved_base_path, **load_kwargs)
+                else:
+                    raise
 
             # Load PEFT adapter on top of base model
             model = PeftModel.from_pretrained(base_model, adapter_path)

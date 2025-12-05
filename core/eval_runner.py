@@ -56,6 +56,23 @@ from core.passives import (
     PassiveMode,
 )
 from core.battle_log import log_eval, format_eval_result
+import re
+
+
+def strip_thinking_tags(text: str) -> str:
+    """Strip Qwen3 <think>...</think> tags from model output.
+
+    Qwen3 models use thinking mode which wraps reasoning in <think></think> tags.
+    We need to strip these for answer comparison while preserving the actual answer.
+    """
+    if not text:
+        return text
+
+    # Remove <think>...</think> blocks (including multiline)
+    stripped = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+
+    # Clean up any leading/trailing whitespace from removal
+    return stripped.strip()
 
 
 def to_chat_problem(prompt: str, expected: str, metadata: dict = None) -> dict:
@@ -766,6 +783,7 @@ class EvalRunner:
     def _get_model_response(self, prompt: str) -> Optional[str]:
         """Get response from inference server."""
         import requests
+        from core.output_validator import validate_model_output, classify_error, get_error_guidance
 
         if not self._current_model_id:
             logger.error("No model loaded")
@@ -790,7 +808,19 @@ class EvalRunner:
 
             if response.status_code == 200:
                 data = response.json()
-                return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+                # Check if response is actually an error message masquerading as output
+                validated = validate_model_output(content, log_error=True)
+                if validated is None:
+                    # It was an error - provide debugging guidance
+                    error_type = classify_error(content)
+                    if error_type:
+                        guidance = get_error_guidance(error_type)
+                        logger.error(f"Error type: {error_type}. {guidance}")
+                    return None
+
+                return content
             else:
                 logger.warning(f"Inference error: {response.status_code}")
                 return None
@@ -804,6 +834,9 @@ class EvalRunner:
         if not expected or not expected.strip():
             logger.warning(f"Empty expected answer for {skill} - marking as incorrect")
             return False
+
+        # Strip Qwen3 thinking tags from model output before comparison
+        got = strip_thinking_tags(got)
 
         # Normalize
         expected_norm = expected.strip().lower()
@@ -871,6 +904,9 @@ class EvalRunner:
 
     def _check_passive_answer(self, passive_id: str, expected: str, got: str) -> bool:
         """Check answer for passive evaluation."""
+        # Strip Qwen3 thinking tags from model output before comparison
+        got = strip_thinking_tags(got)
+
         expected_norm = expected.strip().lower()
         got_norm = got.strip().lower()
 

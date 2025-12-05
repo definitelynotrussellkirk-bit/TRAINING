@@ -827,25 +827,18 @@ async def chat_completions(req: ChatCompletionRequest):
     except HTTPException:
         raise
     except Exception as e:
-        return {
-            "id": job_id,
-            "object": "chat.completion",
-            "created": int(datetime.now().timestamp()),
-            "model": req.model,
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": f"Error: {str(e)}"
-                },
-                "finish_reason": "error"
-            }],
-            "usage": {
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "total_tokens": 0
-            }
-        }
+        # IMPORTANT: Raise proper HTTP exception instead of returning error as content.
+        # Returning errors as valid 200 responses causes downstream eval code to treat
+        # error messages as model output, leading to confusing 0% accuracy results.
+        import traceback
+        error_detail = str(e)
+        # Include traceback for debugging CUDA/device errors
+        if "cuda" in error_detail.lower() or "device" in error_detail.lower():
+            error_detail = f"{error_detail}\n\nTraceback:\n{traceback.format_exc()}"
+        raise HTTPException(
+            status_code=500,
+            detail=f"Generation failed: {error_detail}"
+        )
 
 # ===== Ops & Maintenance =====
 @app.get("/logs/{component}", dependencies=[Depends(require_admin)])

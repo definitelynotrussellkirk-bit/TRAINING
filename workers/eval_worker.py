@@ -365,6 +365,8 @@ class EvalWorker(BaseWorker):
 
     def _generate(self, prompt: str, max_tokens: int = 100) -> str:
         """Generate text from inference server."""
+        from core.output_validator import validate_model_output, classify_error, get_error_guidance
+
         response = requests.post(
             f"{self.inference_url}/generate",
             json={
@@ -380,7 +382,18 @@ class EvalWorker(BaseWorker):
             raise RuntimeError(f"Inference failed: {response.status_code}")
 
         data = response.json()
-        return data.get("text", data.get("response", ""))
+        content = data.get("text", data.get("response", ""))
+
+        # Validate that we got real output, not an error message
+        validated = validate_model_output(content, log_error=True)
+        if validated is None:
+            error_type = classify_error(content)
+            if error_type:
+                guidance = get_error_guidance(error_type)
+                logger.error(f"Error type: {error_type}. {guidance}")
+            raise RuntimeError(f"Inference returned error instead of output: {content[:200]}")
+
+        return content
 
 
 # =============================================================================

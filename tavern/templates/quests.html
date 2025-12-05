@@ -935,6 +935,87 @@
         .quest-name.clickable:hover {
             color: var(--color-gold);
         }
+
+        /* Drop Zone Styles */
+        .drop-zone-card h3 {
+            color: var(--color-gold);
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg-dark);
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .drop-zone.drag-over {
+            transform: scale(1.02);
+        }
+
+        .drop-zone-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .drop-zone-text {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .drop-zone-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .file-input-label {
+            color: var(--color-gold);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .drop-zone-priority {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.85rem;
+        }
+
+        .drop-zone-priority select {
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+        }
+
+        .drop-zone.uploading {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        .drop-zone.success {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .drop-zone.error {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -1087,6 +1168,24 @@
 
         <!-- RIGHT: History & Forge -->
         <aside class="right-panel">
+            <!-- Upload Drop Zone -->
+            <div class="summary-card drop-zone-card" id="dropZone">
+                <h3>📥 Start Quest</h3>
+                <div class="drop-zone" id="dropArea">
+                    <div class="drop-zone-icon">📁</div>
+                    <div class="drop-zone-text">Drop .jsonl files here</div>
+                    <div class="drop-zone-hint">or <label class="file-input-label">click to browse<input type="file" id="fileInput" accept=".jsonl" multiple hidden></label></div>
+                </div>
+                <div class="drop-zone-priority">
+                    <label>Priority:</label>
+                    <select id="uploadPriority">
+                        <option value="normal" selected>Normal</option>
+                        <option value="high">High</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- History -->
             <div class="summary-card">
                 <h3>📖 History</h3>
@@ -1746,6 +1845,124 @@
                 closePreview();
             }
         });
+
+        // =============================================
+        // FILE UPLOAD / DROP ZONE
+        // =============================================
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadPriority = document.getElementById('uploadPriority');
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop area when dragging over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('drag-over'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('drag-over'), false);
+        });
+
+        // Handle dropped files
+        dropArea.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        // Handle file input change
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        // Click on drop area opens file dialog
+        dropArea.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'INPUT') {
+                fileInput.click();
+            }
+        });
+
+        async function handleFiles(files) {
+            for (const file of files) {
+                await uploadFile(file);
+            }
+        }
+
+        async function uploadFile(file) {
+            // Validate file type
+            if (!file.name.endsWith('.jsonl')) {
+                showUploadStatus('error', `${file.name}: Only .jsonl files allowed`);
+                return;
+            }
+
+            dropArea.classList.add('uploading');
+
+            try {
+                // Read file as text
+                const content = await readFileAsText(file);
+
+                // Encode as base64
+                const base64Content = btoa(unescape(encodeURIComponent(content)));
+
+                const priority = uploadPriority.value;
+
+                const response = await fetch('/api/quests/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: file.name,
+                        content: base64Content,
+                        priority: priority
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showUploadStatus('success', `${file.name}: Queued (${result.examples} examples)`);
+                    // Refresh the quest list
+                    setTimeout(() => loadQuests(), 500);
+                } else {
+                    showUploadStatus('error', `${file.name}: ${result.error}`);
+                }
+            } catch (error) {
+                showUploadStatus('error', `${file.name}: Upload failed - ${error.message}`);
+            } finally {
+                dropArea.classList.remove('uploading');
+            }
+        }
+
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsText(file);
+            });
+        }
+
+        function showUploadStatus(status, message) {
+            dropArea.classList.remove('success', 'error');
+            dropArea.classList.add(status);
+
+            const textEl = dropArea.querySelector('.drop-zone-text');
+            const originalText = textEl.textContent;
+            textEl.textContent = message;
+
+            setTimeout(() => {
+                dropArea.classList.remove(status);
+                textEl.textContent = 'Drop .jsonl files here';
+            }, 3000);
+        }
     </script>
 
     <!-- File Preview Modal -->

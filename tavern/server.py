@@ -63,6 +63,7 @@ from tavern.api import run_context as run_context_api
 from tavern.api import temple as temple_api
 from tavern.api import fleet as fleet_api
 from tavern.api import arcana as arcana_api
+from tavern.api import strain as strain_api
 
 # Import events system
 try:
@@ -687,6 +688,16 @@ class TavernHandler(SimpleHTTPRequestHandler):
         elif path == "/api/momentum":
             momentum_api.serve_momentum(self)
 
+        # Strain Metrics - Training intensity visualization
+        elif path == "/api/strain":
+            strain_api.serve_strain(self)
+        elif path == "/api/strain/zones":
+            strain_api.serve_strain_zones(self)
+        elif path == "/api/strain/efficiency":
+            strain_api.serve_efficiency(self)
+        elif path == "/api/strain/transitions":
+            strain_api.serve_level_transitions(self)
+
         # Training API - Start training from UI
         elif path == "/api/train":
             if self.command == "POST":
@@ -805,6 +816,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
             self._delete_quest()
         elif path == "/api/quests/retry":
             self._retry_quest()
+        elif path == "/api/quests/upload":
+            self._upload_quest()
         # Generators - Toggle on/off
         elif path == "/api/generators/toggle":
             self._toggle_generator()
@@ -818,6 +831,8 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Vault - Delete checkpoints
         elif path == "/api/vault/delete":
             self._delete_checkpoints()
+        elif path == "/api/vault/promote":
+            self._promote_checkpoint()
         # Jobs - Submit jobs
         elif path == "/api/jobs":
             self._submit_job()
@@ -2937,6 +2952,84 @@ class TavernHandler(SimpleHTTPRequestHandler):
             logger.error(f"Retry quest error: {e}")
             self._send_json({"success": False, "error": str(e)}, 500)
 
+    def _upload_quest(self):
+        """Upload a new quest file to the queue."""
+        import base64
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length).decode())
+
+            filename = body.get("filename")
+            content = body.get("content")  # Base64 encoded
+            priority = body.get("priority", "normal")
+
+            if not filename:
+                self._send_json({"success": False, "error": "Missing filename"}, 400)
+                return
+
+            if not content:
+                self._send_json({"success": False, "error": "Missing file content"}, 400)
+                return
+
+            # Validate filename (must be .jsonl)
+            if not filename.endswith(".jsonl"):
+                self._send_json({"success": False, "error": "Only .jsonl files allowed"}, 400)
+                return
+
+            # Sanitize filename (prevent path traversal)
+            import re
+            safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
+
+            # Validate priority
+            if priority not in ["high", "normal", "low"]:
+                priority = "normal"
+
+            # Decode content
+            try:
+                file_content = base64.b64decode(content).decode('utf-8')
+            except Exception:
+                self._send_json({"success": False, "error": "Invalid base64 content"}, 400)
+                return
+
+            # Validate JSONL format (check first few lines)
+            lines = file_content.strip().split('\n')
+            if not lines:
+                self._send_json({"success": False, "error": "Empty file"}, 400)
+                return
+
+            for i, line in enumerate(lines[:5]):  # Check first 5 lines
+                try:
+                    json.loads(line)
+                except json.JSONDecodeError as e:
+                    self._send_json({"success": False, "error": f"Invalid JSON on line {i+1}: {e}"}, 400)
+                    return
+
+            # Write to queue directory
+            target_dir = BASE_DIR / "queue" / priority
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target_path = target_dir / safe_filename
+
+            # Check if file already exists
+            if target_path.exists():
+                self._send_json({"success": False, "error": f"File already exists in {priority} queue"}, 409)
+                return
+
+            with open(target_path, 'w') as f:
+                f.write(file_content)
+
+            logger.info(f"Uploaded quest: {safe_filename} -> {priority} ({len(lines)} examples)")
+
+            self._send_json({
+                "success": True,
+                "filename": safe_filename,
+                "priority": priority,
+                "examples": len(lines)
+            })
+
+        except Exception as e:
+            logger.error(f"Upload quest error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
     # ==========================================
     # GENERATORS (Data Forge) Handlers
     # ==========================================
@@ -3832,6 +3925,105 @@ class TavernHandler(SimpleHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Delete checkpoints error: {e}")
+            self._send_json({"success": False, "error": str(e)}, 500)
+
+    def _promote_checkpoint(self):
+        """Promote a checkpoint to be the active/champion model."""
+        import shutil
+        import os
+
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(content_length)) if content_length else {}
+
+            step = body.get("step")
+            path = body.get("path")
+
+            if not step and not path:
+                self._send_json({"success": False, "error": "Provide step or path"}, 400)
+                return
+
+            # Find checkpoint path if only step provided
+            checkpoint_path = None
+            if path:
+                checkpoint_path = Path(path)
+            elif step:
+                # Search for checkpoint with this step
+                search_dirs = [BASE_DIR / "current_model"]
+
+                # Also search campaign checkpoints
+                campaigns_dir = BASE_DIR / "campaigns"
+                if campaigns_dir.exists():
+                    for hero_dir in campaigns_dir.iterdir():
+                        if hero_dir.is_dir() and hero_dir.name not in ('active', 'archived'):
+                            for campaign_dir in hero_dir.iterdir():
+                                if campaign_dir.is_dir():
+                                    cp_dir = campaign_dir / "checkpoints"
+                                    if cp_dir.exists():
+                                        search_dirs.append(cp_dir)
+
+                for search_dir in search_dirs:
+                    if not search_dir.exists():
+                        continue
+                    for item in search_dir.iterdir():
+                        if item.is_dir() and item.name.startswith(f"checkpoint-{step}"):
+                            checkpoint_path = item
+                            break
+                    if checkpoint_path:
+                        break
+
+            if not checkpoint_path or not checkpoint_path.exists():
+                self._send_json({"success": False, "error": f"Checkpoint not found: {step or path}"}, 404)
+                return
+
+            # Validate it's a checkpoint
+            if not checkpoint_path.name.startswith("checkpoint-"):
+                self._send_json({"success": False, "error": "Invalid checkpoint path"}, 400)
+                return
+
+            # Target: models/current_model (symlink or copy)
+            target_dir = BASE_DIR / "models" / "current_model"
+
+            # Remove existing target if it exists
+            if target_dir.exists() or target_dir.is_symlink():
+                if target_dir.is_symlink():
+                    target_dir.unlink()
+                else:
+                    # It's a real directory - back it up first
+                    backup_name = f"current_model_backup_{int(time.time())}"
+                    backup_dir = BASE_DIR / "models" / backup_name
+                    shutil.move(str(target_dir), str(backup_dir))
+                    logger.info(f"Backed up existing current_model to {backup_name}")
+
+            # Create symlink to the checkpoint
+            target_dir.symlink_to(checkpoint_path)
+            logger.info(f"Promoted checkpoint: {checkpoint_path.name} -> models/current_model")
+
+            # Update config.json to record the promoted checkpoint
+            config_path = BASE_DIR / "config.json"
+            if config_path.exists():
+                try:
+                    with open(config_path) as f:
+                        config = json.load(f)
+                    config["promoted_checkpoint"] = {
+                        "step": step or int(checkpoint_path.name.split("-")[1].split("_")[0]),
+                        "path": str(checkpoint_path),
+                        "promoted_at": datetime.datetime.now().isoformat()
+                    }
+                    with open(config_path, 'w') as f:
+                        json.dump(config, f, indent=2)
+                except Exception as e:
+                    logger.warning(f"Could not update config.json: {e}")
+
+            self._send_json({
+                "success": True,
+                "checkpoint": checkpoint_path.name,
+                "path": str(checkpoint_path),
+                "target": str(target_dir),
+            })
+
+        except Exception as e:
+            logger.error(f"Promote checkpoint error: {e}")
             self._send_json({"success": False, "error": str(e)}, 500)
 
     # =========================================================================

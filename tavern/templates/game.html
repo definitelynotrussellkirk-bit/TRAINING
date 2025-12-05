@@ -7,7 +7,7 @@
     <!-- Shared theme (design tokens, badges, components) -->
     <link rel="stylesheet" href="/static/css/theme.css?v=1">
     <!-- Main game styles -->
-    <link rel="stylesheet" href="/static/css/game.css?v=8">
+    <link rel="stylesheet" href="/static/css/game.css?v=15">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -57,6 +57,10 @@
             <div class="health-indicator" id="healthIndicator" title="Realm health">
                 <span class="health-icon" id="healthIcon">⚪</span>
             </div>
+            <!-- SOUND TOGGLE -->
+            <button class="sound-toggle" id="soundToggle" onclick="toggleSound()" title="Toggle sound effects">
+                <span id="soundIcon">🔊</span>
+            </button>
             <!-- IDLE INDICATOR (now shows actual realm mode) -->
             <div class="idle-indicator" id="idleIndicator">
                 <span class="idle-icon" id="modeIcon">💤</span>
@@ -88,9 +92,17 @@
         <section class="hero-panel">
             <div class="hero-frame">
                 <div class="hero-portrait" id="heroPortrait">
-                    <!-- Hero with idle animation -->
-                    <div class="hero-ascii">
-                        <div class="dio-icon" id="heroSprite">🧔🏽</div>
+                    <!-- MUD-style ASCII frame -->
+                    <div class="mud-frame">
+                        <div class="mud-frame-row">╔══════════════╗</div>
+                        <div class="mud-frame-row mud-frame-middle">
+                            <span class="mud-frame-side">║</span>
+                            <div class="hero-ascii">
+                                <div class="dio-icon" id="heroSprite">🧔🏽</div>
+                            </div>
+                            <span class="mud-frame-side">║</span>
+                        </div>
+                        <div class="mud-frame-row">╚══════════════╝</div>
                     </div>
                     <!-- ✨ Sparkle overlay -->
                     <span class="hero-sparkle">✨</span>
@@ -103,23 +115,26 @@
                 </div>
             </div>
 
-            <!-- 💚💙💛 HP/MP/Stamina Resource Bars (WoW Style) -->
+            <!-- 💚💙💛 HP/MP/Stamina Resource Bars (WoW Style + MUD Text) -->
             <div class="hero-resources">
                 <div class="resource-bar-wow hp" title="VRAM - Hero's health">
                     <span class="bar-label">VRAM</span>
                     <div class="bar-fill" id="hpBarFill" style="width: 50%"></div>
                     <span class="bar-text" id="hpBarText">12 / 24 GB</span>
                 </div>
+                <div class="mud-bar hp" id="mudBarHp">[<span class="mud-bar-fill">████████</span><span class="mud-bar-empty">░░░░</span>]</div>
                 <div class="resource-bar-wow mp" title="RAM - Hero's mana">
                     <span class="bar-label">RAM</span>
                     <div class="bar-fill" id="mpBarFill" style="width: 50%"></div>
                     <span class="bar-text" id="mpBarText">32 / 64 GB</span>
                 </div>
+                <div class="mud-bar mp" id="mudBarMp">[<span class="mud-bar-fill">████████</span><span class="mud-bar-empty">░░░░</span>]</div>
                 <div class="resource-bar-wow stamina" title="GPU Utilization - Hero's stamina">
                     <span class="bar-label">STAM</span>
                     <div class="bar-fill" id="staminaBarFill" style="width: 0%"></div>
                     <span class="bar-text" id="staminaBarText">0%</span>
                 </div>
+                <div class="mud-bar stamina" id="mudBarStamina">[<span class="mud-bar-fill"></span><span class="mud-bar-empty">░░░░░░░░░░░░</span>]</div>
             </div>
 
             <div class="hero-info">
@@ -157,6 +172,7 @@
                         <span class="stat-icon">💪</span>
                         <span class="stat-label">STRAIN</span>
                         <span class="stat-value" id="statStrain">--</span>
+                        <span class="strain-zone" id="strainZone" title="Training Zone"></span>
                     </div>
                 </div>
             </div>
@@ -293,6 +309,28 @@
                 </div>
             </div>
 
+            <!-- EFFICIENCY DASHBOARD -->
+            <div class="efficiency-card" id="efficiencyCard">
+                <div class="panel-header">
+                    <h3>📊 Learning Efficiency</h3>
+                </div>
+                <div class="efficiency-bars" id="efficiencyBars">
+                    <!-- Filled by JavaScript -->
+                    <div class="efficiency-loading">Calculating...</div>
+                </div>
+            </div>
+
+            <!-- LEVEL TRANSITIONS (MILESTONES) -->
+            <div class="transitions-card" id="transitionsCard">
+                <div class="panel-header">
+                    <h3>🏆 Recent Milestones</h3>
+                </div>
+                <div class="transitions-list" id="transitionsList">
+                    <!-- Filled by JavaScript -->
+                    <div class="transitions-loading">Loading...</div>
+                </div>
+            </div>
+
             <!-- VAULT SUMMARY -->
             <div class="vault-card">
                 <div class="panel-header">
@@ -359,6 +397,6 @@
     <!-- Unified Realm State (single source of truth) -->
     <script src="/static/js/realm-state.js?v=1"></script>
     <!-- Main game logic -->
-    <script src="/static/js/game.js?v=32"></script>
+    <script src="/static/js/game.js?v=42"></script>
 </body>
 </html>

@@ -18,6 +18,293 @@ const CONFIG = {
 };
 
 // ============================================
+// SOUND MANAGER (Web Audio API)
+// ============================================
+
+const SoundManager = {
+    ctx: null,
+    muted: false,
+    volume: 0.3,
+
+    init() {
+        // Load mute preference
+        this.muted = localStorage.getItem('realm_sound_muted') === 'true';
+        // AudioContext created on first user interaction (browser requirement)
+    },
+
+    _ensureContext() {
+        if (!this.ctx) {
+            try {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.warn('[Sound] Web Audio API not supported');
+                return false;
+            }
+        }
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+        return true;
+    },
+
+    toggle() {
+        this.muted = !this.muted;
+        localStorage.setItem('realm_sound_muted', this.muted);
+        return this.muted;
+    },
+
+    // Play a tone with given frequency and duration
+    _playTone(freq, duration = 0.15, type = 'sine', volume = this.volume) {
+        if (this.muted || !this._ensureContext()) return;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+        gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+
+    // Play a sequence of tones (for melodies)
+    _playSequence(notes, baseVolume = this.volume) {
+        if (this.muted || !this._ensureContext()) return;
+
+        let time = this.ctx.currentTime;
+        notes.forEach(([freq, duration, type = 'sine']) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, time);
+
+            gain.gain.setValueAtTime(baseVolume, time);
+            gain.gain.exponentialRampToValueAtTime(0.001, time + duration * 0.9);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(time);
+            osc.stop(time + duration);
+            time += duration;
+        });
+    },
+
+    // === SOUND EFFECTS ===
+
+    // Level up - rising triumphant melody
+    levelUp() {
+        this._playSequence([
+            [523, 0.1],   // C5
+            [659, 0.1],   // E5
+            [784, 0.1],   // G5
+            [1047, 0.25], // C6 (hold)
+        ], this.volume * 0.8);
+    },
+
+    // Achievement unlocked - fanfare
+    achievement() {
+        this._playSequence([
+            [784, 0.08],  // G5
+            [880, 0.08],  // A5
+            [988, 0.08],  // B5
+            [1047, 0.15], // C6
+            [1175, 0.2],  // D6
+        ], this.volume * 0.7);
+    },
+
+    // Quest complete - satisfying ding
+    questComplete() {
+        this._playSequence([
+            [880, 0.1],   // A5
+            [1109, 0.2],  // C#6
+        ], this.volume * 0.6);
+    },
+
+    // Checkpoint saved - soft confirmation
+    checkpoint() {
+        this._playTone(659, 0.1, 'sine', this.volume * 0.4);  // E5
+        setTimeout(() => this._playTone(784, 0.15, 'sine', this.volume * 0.3), 100);  // G5
+    },
+
+    // Training step - subtle tick (very quiet, for ambient feel)
+    step() {
+        this._playTone(440 + Math.random() * 100, 0.03, 'sine', this.volume * 0.05);
+    },
+
+    // Error/warning - dissonant
+    error() {
+        this._playTone(220, 0.15, 'sawtooth', this.volume * 0.3);
+        setTimeout(() => this._playTone(185, 0.2, 'sawtooth', this.volume * 0.25), 100);
+    },
+
+    // Button click - subtle UI feedback
+    click() {
+        this._playTone(600, 0.05, 'sine', this.volume * 0.15);
+    },
+
+    // Zone discovery - mystical
+    zoneDiscovery() {
+        this._playSequence([
+            [392, 0.15, 'triangle'],  // G4
+            [494, 0.15, 'triangle'],  // B4
+            [587, 0.15, 'triangle'],  // D5
+            [784, 0.3, 'triangle'],   // G5
+        ], this.volume * 0.5);
+    },
+
+    // Critical hit - impact
+    critical() {
+        this._playTone(150, 0.1, 'square', this.volume * 0.4);
+        setTimeout(() => this._playTone(200, 0.15, 'square', this.volume * 0.3), 50);
+    },
+};
+
+// Initialize sound manager
+SoundManager.init();
+
+// ============================================
+// MUD-STYLE TEXT UTILITIES
+// ============================================
+
+const MudStyle = {
+    /**
+     * Generate a text-based progress bar using Unicode blocks
+     * @param {number} percent - Value from 0-100
+     * @param {number} width - Number of characters for the bar
+     * @returns {object} - {filled: "████", empty: "░░░░", text: "[████░░░░]"}
+     */
+    progressBar(percent, width = 10) {
+        const pct = Math.max(0, Math.min(100, percent));
+        const filled = Math.round((pct / 100) * width);
+        const empty = width - filled;
+
+        const filledStr = '█'.repeat(filled);
+        const emptyStr = '░'.repeat(empty);
+
+        return {
+            filled: filledStr,
+            empty: emptyStr,
+            text: `[${filledStr}${emptyStr}]`,
+            html: `<span class="mud-bar-fill">${filledStr}</span><span class="mud-bar-empty">${emptyStr}</span>`
+        };
+    },
+
+    /**
+     * Format a number with color class based on type
+     */
+    colorValue(value, type) {
+        const classes = {
+            damage: 'val-damage',
+            crit: 'val-crit',
+            heal: 'val-heal',
+            xp: 'val-xp',
+            gold: 'val-gold',
+            level: 'val-level',
+            step: 'val-step',
+            loss: 'val-loss',
+            acc: 'val-acc'
+        };
+        return `<span class="${classes[type] || ''}">${value}</span>`;
+    },
+
+    /**
+     * Format combat message with colored values
+     */
+    formatCombat(message) {
+        // Replace common patterns with colored versions
+        return message
+            // Loss values
+            .replace(/loss[:\s]+(\d+\.?\d*)/gi, (m, v) => `loss: ${this.colorValue(v, 'loss')}`)
+            // Accuracy
+            .replace(/(\d+\.?\d*%)\s*(accuracy|acc)/gi, (m, v) => `${this.colorValue(v, 'acc')} accuracy`)
+            // XP/Steps
+            .replace(/\+?(\d+)\s*(xp|experience|steps?)/gi, (m, v, t) => `+${this.colorValue(v, 'xp')} ${t}`)
+            // Gold
+            .replace(/\+?(\d+)\s*gold/gi, (m, v) => `+${this.colorValue(v, 'gold')} gold`)
+            // Level references
+            .replace(/level\s*(\d+)/gi, (m, v) => `Level ${this.colorValue(v, 'level')}`)
+            // Checkpoint steps
+            .replace(/step\s*(\d+)/gi, (m, v) => `step ${this.colorValue(v, 'step')}`);
+    },
+
+    /**
+     * Add decorative separator
+     */
+    separator(type = 'single') {
+        const chars = {
+            single: '────────────────────────',
+            double: '════════════════════════',
+            ornate: '╔═══╦═══╦═══╦═══╗'
+        };
+        return chars[type] || chars.single;
+    },
+
+    /**
+     * Apply training glow to hero frame
+     */
+    setHeroTraining(isTraining) {
+        const portrait = document.getElementById('heroPortrait');
+        if (portrait) {
+            portrait.classList.toggle('training', isTraining);
+        }
+    },
+
+    /**
+     * Add text animation class temporarily
+     */
+    animateText(element, animation = 'text-glow', duration = 2000) {
+        if (!element) return;
+        element.classList.add(animation);
+        setTimeout(() => element.classList.remove(animation), duration);
+    }
+};
+
+// Export for global use
+window.MudStyle = MudStyle;
+
+// Global toggle function for HTML onclick
+function toggleSound() {
+    const muted = SoundManager.toggle();
+    const btn = document.getElementById('soundToggle');
+    const icon = document.getElementById('soundIcon');
+
+    if (btn) {
+        btn.classList.toggle('muted', muted);
+    }
+    if (icon) {
+        icon.textContent = muted ? '🔇' : '🔊';
+    }
+
+    // Play a click sound to confirm (if not muted)
+    if (!muted) {
+        SoundManager.click();
+    }
+
+    console.log(`[Sound] ${muted ? 'Muted' : 'Unmuted'}`);
+}
+
+// Initialize sound toggle button state on load
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('soundToggle');
+    const icon = document.getElementById('soundIcon');
+
+    if (btn && SoundManager.muted) {
+        btn.classList.add('muted');
+    }
+    if (icon && SoundManager.muted) {
+        icon.textContent = '🔇';
+    }
+});
+
+// ============================================
 // GAME STATE
 // ============================================
 
@@ -53,10 +340,12 @@ const GameState = {
     sylloTraining: 1,
     sylloAcc: 0,
     sylloEvals: 0,
+    sylloEffort: 0,       // Cumulative effort for SY skill
     binaryMastered: 0,
     binaryTraining: 1,
     binaryAcc: 0,
     binaryEvals: 0,
+    binaryEffort: 0,      // Cumulative effort for BIN skill
 
     // GPU (real hardware stats)
     vramUsed: 0,
@@ -358,7 +647,21 @@ function computeActionHint() {
             hints.push({ priority: 10, text: '⚠️ High val-train gap. Consider more diverse data.' });
         }
 
-        // High loss warning
+        // Strain zone hints (curriculum guidance)
+        const floor = 0.02;
+        const strain = Math.max(0, GameState.loss - floor);
+        if (strain >= 0.5) {
+            // Overload zone
+            hints.push({ priority: 9, text: '⚠️ Overload zone - material too hard. Consider easier curriculum.' });
+        } else if (strain < 0.1 && GameState.loss > 0) {
+            // Recovery zone
+            hints.push({ priority: 5, text: '↓ Recovery zone - hero is coasting. Consider leveling up.' });
+        } else if (strain >= 0.1 && strain < 0.3) {
+            // Productive zone - optional positive feedback
+            hints.push({ priority: 2, text: '✓ Productive zone - optimal learning pace.' });
+        }
+
+        // High loss warning (legacy - keep for backwards compatibility)
         if (GameState.loss > 2.0) {
             hints.push({ priority: 8, text: `💪 Strain is high. ${GameState.heroName || 'Hero'} is struggling with this material.` });
         }
@@ -565,6 +868,7 @@ function updateHeroStats() {
 
     setText('#statClarity', formatClarity(GameState.perplexity));
     setText('#statStrain', formatStrain(GameState.loss));
+    updateStrainZone();
 }
 
 function updateBattleStatus() {
@@ -716,6 +1020,21 @@ function renderSkills() {
             ? `${skill.last_accuracy.toFixed(0)}%${timeAgo ? ` <span class="eval-time">(${timeAgo})</span>` : ''}`
             : '--';
 
+        // Get effort for this skill
+        let skillEffort = 0;
+        if (skill.id === 'sy' || skill.id === 'syllo') {
+            skillEffort = GameState.sylloEffort || 0;
+        } else if (skill.id === 'bin' || skill.id === 'binary') {
+            skillEffort = GameState.binaryEffort || 0;
+        }
+
+        // Effort bar - scaled to a reasonable max (100 = full bar)
+        const effortPct = Math.min(100, (skillEffort / 100) * 100);
+        const effortDisplay = skillEffort > 0 ? skillEffort.toFixed(1) : '0';
+
+        // Generate MUD-style text bar for progress
+        const mudProgress = MudStyle.progressBar(progressPct, 12);
+
         return `
             <div class="skill-card clickable ${isActive ? 'active' : ''}" data-skill="${skill.id}" style="--skill-color: ${skill.color}">
                 <div class="skill-header">
@@ -725,6 +1044,14 @@ function renderSkills() {
                 </div>
                 <div class="skill-bar-container">
                     <div class="skill-bar" style="width: ${progressPct}%; background: ${skill.color}"></div>
+                </div>
+                <div class="mud-bar ${skill.id}" title="Progress: ${progressPct.toFixed(0)}%">[${mudProgress.html}]</div>
+                <div class="skill-effort" title="Cumulative effort invested in this skill">
+                    <span class="effort-label">Effort</span>
+                    <div class="effort-bar-container">
+                        <div class="effort-bar" style="width: ${effortPct}%"></div>
+                    </div>
+                    <span class="effort-value">${effortDisplay}</span>
                 </div>
                 <div class="skill-meta">
                     <span class="skill-acc">${lastAccDisplay}</span>
@@ -771,6 +1098,144 @@ function updateVault() {
     setText('#vaultCheckpoints', GameState.checkpointCount || '--');
     setText('#vaultSize', GameState.totalSize ? `${GameState.totalSize.toFixed(1)} GB` : '-- GB');
     setText('#vaultBest', GameState.bestCheckpoint || '--');
+}
+
+// ============================================
+// EFFICIENCY DASHBOARD
+// ============================================
+
+async function updateEfficiency() {
+    const container = document.getElementById('efficiencyBars');
+    if (!container) return;
+
+    try {
+        const response = await fetch(`/api/strain/efficiency?_t=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('Failed to fetch efficiency');
+
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+
+        const skills = data.skills || {};
+        const ranking = data.ranking || [];
+
+        // Find max efficiency for scaling bars
+        let maxEfficiency = 0;
+        for (const skill of Object.values(skills)) {
+            if (skill.efficiency > maxEfficiency) maxEfficiency = skill.efficiency;
+        }
+        // Use level as fallback if no efficiency data yet
+        if (maxEfficiency === 0) {
+            for (const skill of Object.values(skills)) {
+                if (skill.current_level > maxEfficiency) maxEfficiency = skill.current_level;
+            }
+        }
+        maxEfficiency = maxEfficiency || 1;  // Avoid division by zero
+
+        // Build HTML for each skill
+        let html = '';
+        ranking.forEach((skillId, index) => {
+            const skill = skills[skillId];
+            if (!skill) return;
+
+            // Use effort from frontend if backend has none
+            const frontendEffort = skillId === 'sy' ? GameState.sylloEffort : GameState.binaryEffort;
+            const effort = skill.effort > 0 ? skill.effort : (frontendEffort || 0);
+
+            // Calculate efficiency using frontend effort
+            const efficiency = effort > 0 ? (skill.plastic_gain / effort) : 0;
+            const displayValue = effort > 0 ? efficiency.toFixed(3) : skill.current_level;
+
+            // Scale bar to max
+            const barWidth = maxEfficiency > 0 ? (displayValue / maxEfficiency * 100) : 0;
+
+            const rankClass = index === 0 ? 'first' : 'second';
+            const rankIcon = index === 0 ? '1st' : '2nd';
+
+            html += `
+                <div class="efficiency-row">
+                    <span class="efficiency-rank ${rankClass}">${rankIcon}</span>
+                    <span class="efficiency-label">${skill.skill_name}</span>
+                    <div class="efficiency-bar-container">
+                        <div class="efficiency-bar ${skillId}" style="width: ${Math.min(100, barWidth)}%">
+                            ${barWidth > 20 ? `<span class="efficiency-value">${displayValue}</span>` : ''}
+                        </div>
+                        ${barWidth <= 20 ? `<span class="efficiency-value">${displayValue}</span>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html || '<div class="efficiency-loading">No efficiency data</div>';
+    } catch (error) {
+        console.error('[Efficiency] Update failed:', error);
+        container.innerHTML = '<div class="efficiency-loading">--</div>';
+    }
+}
+
+// ============================================
+// LEVEL TRANSITIONS LOG
+// ============================================
+
+async function updateTransitions() {
+    const container = document.getElementById('transitionsList');
+    if (!container) return;
+
+    try {
+        const response = await fetch(`/api/strain/transitions?_t=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('Failed to fetch transitions');
+
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+
+        const transitions = data.transitions || [];
+
+        if (transitions.length === 0) {
+            container.innerHTML = '<div class="transitions-loading">No level-ups yet</div>';
+            return;
+        }
+
+        // Build HTML for each transition (most recent first, limited to 5)
+        let html = '';
+        transitions.slice(0, 5).forEach((t) => {
+            const skillIcon = t.skill_id === 'sy' ? '🧩' : '🔢';
+            const timeAgo = formatTimeAgo(t.timestamp);
+
+            html += `
+                <div class="transition-item">
+                    <span class="transition-icon">${skillIcon}</span>
+                    <span class="transition-skill ${t.skill_id}">${t.skill_name}</span>
+                    <span class="transition-level">
+                        L${t.from_level}<span class="arrow">→</span>L${t.to_level}
+                    </span>
+                    <span class="transition-step">Step ${t.step}</span>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('[Transitions] Update failed:', error);
+        container.innerHTML = '<div class="transitions-loading">--</div>';
+    }
+}
+
+function formatTimeAgo(timestamp) {
+    if (!timestamp) return '';
+    try {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffDays > 0) return `${diffDays}d ago`;
+        if (diffHours > 0) return `${diffHours}h ago`;
+        if (diffMins > 0) return `${diffMins}m ago`;
+        return 'just now';
+    } catch {
+        return '';
+    }
 }
 
 // Fetch vault data directly (more reliable than unified API)
@@ -872,12 +1337,32 @@ function renderBattleLog(events) {
     // Add new events at the top (reverse to maintain order)
     for (const event of newEvents.reverse()) {
         const entry = document.createElement('div');
-        entry.className = `log-entry ${getSeverityClass(event.severity)}`;
+
+        // Determine log entry class based on channel/content
+        let entryClass = getSeverityClass(event.severity);
+        const channel = (event.channel || '').toLowerCase();
+        const msg = (event.message || '').toLowerCase();
+
+        // Add channel-specific classes for MUD-style coloring
+        if (channel.includes('checkpoint') || msg.includes('checkpoint')) {
+            entryClass += ' checkpoint';
+        } else if (channel.includes('level') || msg.includes('level up')) {
+            entryClass += ' levelup';
+        } else if (channel.includes('quest') || msg.includes('quest complete')) {
+            entryClass += ' quest-complete';
+        } else if (msg.includes('loss') || msg.includes('strain')) {
+            entryClass += ' combat-damage';
+        }
+
+        entry.className = `log-entry ${entryClass}`;
 
         // Format timestamp to just time
         const time = event.timestamp ? new Date(event.timestamp).toLocaleTimeString('en-US', { hour12: false }) : '--:--:--';
 
-        entry.innerHTML = `${event.icon || '📢'} <span class="log-time">[${time}]</span> <span class="log-channel">${event.channel}</span> ${escapeHtml(event.message)}`;
+        // Apply MUD-style color formatting to message
+        const formattedMsg = MudStyle.formatCombat(escapeHtml(event.message));
+
+        entry.innerHTML = `${event.icon || '📢'} <span class="log-time">[${time}]</span> <span class="log-channel">${event.channel}</span> ${formattedMsg}`;
         container.insertBefore(entry, container.firstChild);
     }
 
@@ -1086,6 +1571,51 @@ async function fetchEffortHistory() {
     }
 }
 
+/**
+ * Update strain zone indicator based on current loss.
+ * Strain = loss - floor (floor ~0.01-0.02 for most skills)
+ * Zones: recovery (<0.1), productive (0.1-0.3), stretch (0.3-0.5), overload (>0.5)
+ */
+function updateStrainZone() {
+    const el = document.getElementById('strainZone');
+    if (!el) return;
+
+    const loss = GameState.loss;
+    if (!loss || !GameState.isTraining) {
+        el.textContent = '';
+        el.className = 'strain-zone';
+        el.title = 'Training Zone';
+        return;
+    }
+
+    // Approximate floor for current skill (default 0.02)
+    const floor = 0.02;
+    const strain = Math.max(0, loss - floor);
+
+    let zone, icon, hint;
+    if (strain < 0.1) {
+        zone = 'recovery';
+        icon = '\u2193';  // ↓
+        hint = 'Under-challenged - consider leveling up';
+    } else if (strain < 0.3) {
+        zone = 'productive';
+        icon = '\u2713';  // ✓
+        hint = 'Optimal learning zone';
+    } else if (strain < 0.5) {
+        zone = 'stretch';
+        icon = '\u2191';  // ↑
+        hint = 'Challenging but sustainable';
+    } else {
+        zone = 'overload';
+        icon = '\u26A0';  // ⚠
+        hint = 'Too hard - consider reducing difficulty';
+    }
+
+    el.textContent = `${icon} ${zone.toUpperCase()}`;
+    el.className = `strain-zone ${zone}`;
+    el.title = hint;
+}
+
 function processGameData(data) {
     /**
      * Process fresh game data from /api/game endpoint.
@@ -1268,6 +1798,7 @@ function processGameData(data) {
     // Skill level up detection
     if (GameState.totalLevel > prevTotalLevel && prevTotalLevel > 0) {
         showNotification('Skill Level Up!', `Total level is now ${GameState.totalLevel}!`, 'success');
+        SoundManager.levelUp();
     }
 
     // Update all UI
@@ -1283,6 +1814,12 @@ function updateAll() {
     updateVault();
     updateForge();
     updateTime();
+
+    // MUD-style hero training glow
+    MudStyle.setHeroTraining(GameState.isTraining);
+
+    // Check for new achievements
+    Achievements.checkAll();
 }
 
 // ============================================
@@ -2093,6 +2630,9 @@ function updateMomentumUI(m) {
 function init() {
     console.log('Realm of Training initializing...');
 
+    // Initialize achievement system
+    Achievements.init();
+
     // Load active campaign/hero first
     fetchCampaignData();
 
@@ -2138,6 +2678,8 @@ function init() {
     pollers.add('time', updateTime, 1000, { immediate: false });
     pollers.add('momentum', fetchMomentum, 15000, { immediate: false });
     pollers.add('vault', fetchVaultData, 60000, { immediate: true }); // Vault data from ledger (accurate)
+    pollers.add('efficiency', updateEfficiency, 30000, { immediate: true }); // Efficiency dashboard
+    pollers.add('transitions', updateTransitions, 60000, { immediate: true }); // Level transitions log
 
     // Start all pollers
     pollers.startAll();
@@ -2180,7 +2722,7 @@ function registerTrainingEventHandlers() {
                 // Add to effort history for graph
                 // Effort = cumulative strain (sum of (loss - floor) over time)
                 if (data.loss && data.step) {
-                    const floor = 0.5;  // Comfort zone loss (could come from config)
+                    const floor = 0.02;  // Target floor loss (sy=0.01, bin=0.02)
                     const strain = Math.max(0, data.loss - floor);  // Strain = loss - floor, min 0
 
                     // Calculate cumulative effort
@@ -2188,6 +2730,14 @@ function registerTrainingEventHandlers() {
                     if (GameState.lossHistory.length > 0) {
                         const lastEntry = GameState.lossHistory[GameState.lossHistory.length - 1];
                         effort = (lastEntry.effort || lastEntry.loss) + strain;  // Cumulative
+                    }
+
+                    // Track per-skill effort
+                    const activeSkill = (GameState.currentSkill || '').toLowerCase();
+                    if (activeSkill.includes('sy') || activeSkill.includes('syllo')) {
+                        GameState.sylloEffort += strain;
+                    } else if (activeSkill.includes('bin') || activeSkill.includes('binary')) {
+                        GameState.binaryEffort += strain;
                     }
 
                     GameState.lossHistory.push({
@@ -2225,6 +2775,30 @@ function registerTrainingEventHandlers() {
                 GameState.isTraining = false;
                 updateBattleStatus();
                 console.log('[Game] Training completed:', data.steps, 'steps');
+
+                // Show floating XP number for quest completion
+                const steps = data.steps || 0;
+                if (steps > 0) {
+                    RPGFlair.showFloatingNumber(`+${steps} XP`, 'xp');
+                    showNotification('Quest Complete!', `Earned ${steps} experience points`, 'success');
+                    SoundManager.questComplete();
+                }
+            });
+
+            // Handle training.checkpoint events (new champion/save)
+            window.eventStream.on('training.checkpoint', (event) => {
+                const data = event.data || {};
+                const step = data.step || '?';
+                console.log('[Game] Checkpoint saved:', step);
+
+                // Show gold floating number (saving = treasure)
+                RPGFlair.showFloatingNumber('+100 Gold', 'gold');
+                showNotification('Checkpoint Saved!', `Progress secured at step ${step}`, 'success');
+                SoundManager.checkpoint();
+
+                // Increment checkpoint count
+                GameState.checkpointCount = (GameState.checkpointCount || 0) + 1;
+                updateVault();
             });
 
             console.log('[Game] Registered SSE training event handlers');
@@ -2722,6 +3296,129 @@ const RealmConsole = {
 };
 
 // ============================================
+// 🏆 ACHIEVEMENT SYSTEM
+// ============================================
+
+/**
+ * Achievement definitions and tracking
+ */
+const Achievements = {
+    // Achievement definitions
+    definitions: {
+        // Training milestones
+        'first_steps': { name: 'First Steps', icon: '👣', desc: 'Complete your first training step', check: () => GameState.currentStep >= 1 },
+        'century': { name: 'Century', icon: '💯', desc: 'Reach 100 training steps', check: () => GameState.currentStep >= 100 },
+        'thousand': { name: 'Thousand Steps', icon: '🚶', desc: 'Reach 1,000 training steps', check: () => GameState.currentStep >= 1000 },
+        'ten_thousand': { name: 'Marathon', icon: '🏃', desc: 'Reach 10,000 training steps', check: () => GameState.currentStep >= 10000 },
+        'hundred_thousand': { name: 'Ultramarathon', icon: '🏅', desc: 'Reach 100,000 training steps', check: () => GameState.currentStep >= 100000 },
+
+        // Level milestones
+        'level_1': { name: 'Awakening', icon: '✨', desc: 'Reach total level 1', check: () => GameState.totalLevel >= 1 },
+        'level_5': { name: 'Apprentice', icon: '📚', desc: 'Reach total level 5', check: () => GameState.totalLevel >= 5 },
+        'level_10': { name: 'Journeyman', icon: '🎓', desc: 'Reach total level 10', check: () => GameState.totalLevel >= 10 },
+        'level_20': { name: 'Expert', icon: '🏆', desc: 'Reach total level 20', check: () => GameState.totalLevel >= 20 },
+        'level_50': { name: 'Master', icon: '👑', desc: 'Reach total level 50', check: () => GameState.totalLevel >= 50 },
+
+        // Accuracy achievements
+        'sharp_eye': { name: 'Sharp Eye', icon: '🎯', desc: 'Achieve 80% accuracy on any skill', check: () => GameState.currentSkillAcc >= 80 },
+        'precision': { name: 'Precision', icon: '💎', desc: 'Achieve 90% accuracy on any skill', check: () => GameState.currentSkillAcc >= 90 },
+        'perfectionist': { name: 'Perfectionist', icon: '🌟', desc: 'Achieve 100% accuracy on any skill', check: () => GameState.currentSkillAcc >= 100 },
+
+        // Checkpoint achievements
+        'first_save': { name: 'First Save', icon: '💾', desc: 'Save your first checkpoint', check: () => GameState.checkpointCount >= 1 },
+        'hoarder': { name: 'Hoarder', icon: '📦', desc: 'Accumulate 10 checkpoints', check: () => GameState.checkpointCount >= 10 },
+        'archivist': { name: 'Archivist', icon: '🏛️', desc: 'Accumulate 50 checkpoints', check: () => GameState.checkpointCount >= 50 },
+
+        // Skill achievements
+        'dual_wielder': { name: 'Dual Wielder', icon: '⚔️', desc: 'Train in 2 different skills', check: () => (GameState.sylloMastered > 0 ? 1 : 0) + (GameState.binaryMastered > 0 ? 1 : 0) >= 2 },
+
+        // Strain zone achievements
+        'in_the_zone': { name: 'In The Zone', icon: '🟢', desc: 'Train in the productive zone', check: () => {
+            const strain = Math.max(0, GameState.loss - 0.02);
+            return strain >= 0.1 && strain < 0.3 && GameState.isTraining;
+        }},
+        'pushing_limits': { name: 'Pushing Limits', icon: '🟠', desc: 'Train in the stretch zone', check: () => {
+            const strain = Math.max(0, GameState.loss - 0.02);
+            return strain >= 0.3 && strain < 0.5 && GameState.isTraining;
+        }},
+    },
+
+    // Unlocked achievements (loaded from localStorage)
+    unlocked: {},
+
+    // Initialize from localStorage
+    init() {
+        try {
+            const saved = localStorage.getItem('realm_achievements');
+            if (saved) {
+                this.unlocked = JSON.parse(saved);
+                console.log(`[Achievements] Loaded ${Object.keys(this.unlocked).length} achievements`);
+            }
+        } catch (e) {
+            console.error('[Achievements] Failed to load:', e);
+            this.unlocked = {};
+        }
+    },
+
+    // Save to localStorage
+    save() {
+        try {
+            localStorage.setItem('realm_achievements', JSON.stringify(this.unlocked));
+        } catch (e) {
+            console.error('[Achievements] Failed to save:', e);
+        }
+    },
+
+    // Check for new achievements
+    checkAll() {
+        for (const [id, def] of Object.entries(this.definitions)) {
+            if (!this.unlocked[id] && def.check()) {
+                this.unlock(id);
+            }
+        }
+    },
+
+    // Unlock an achievement
+    unlock(id) {
+        if (this.unlocked[id]) return; // Already unlocked
+
+        const def = this.definitions[id];
+        if (!def) return;
+
+        this.unlocked[id] = {
+            unlockedAt: new Date().toISOString(),
+            name: def.name
+        };
+        this.save();
+
+        console.log(`[Achievements] Unlocked: ${def.name}`);
+
+        // Show achievement toast via RPGFlair
+        if (typeof RPGFlair !== 'undefined' && RPGFlair.showAchievement) {
+            RPGFlair.showAchievement(def.name, def.icon);
+        }
+
+        // Also show notification
+        if (typeof showNotification === 'function') {
+            showNotification('Achievement Unlocked!', `${def.icon} ${def.name} - ${def.desc}`, 'success');
+        }
+
+        // Play achievement sound
+        SoundManager.achievement();
+    },
+
+    // Get count of unlocked achievements
+    getCount() {
+        return Object.keys(this.unlocked).length;
+    },
+
+    // Get total achievements
+    getTotal() {
+        return Object.keys(this.definitions).length;
+    }
+};
+
+// ============================================
 // 🔥 RPG FLAIR - THE TAVERN IS ALIVE
 // ============================================
 
@@ -3072,7 +3769,7 @@ const RPGFlair = {
     },
 
     /**
-     * Update HP/MP/Stamina resource bars
+     * Update HP/MP/Stamina resource bars (WoW + MUD style)
      */
     updateResourceBars() {
         const hpFill = document.getElementById('hpBarFill');
@@ -3082,21 +3779,33 @@ const RPGFlair = {
         const staminaFill = document.getElementById('staminaBarFill');
         const staminaText = document.getElementById('staminaBarText');
 
+        // MUD bar elements
+        const mudHp = document.getElementById('mudBarHp');
+        const mudMp = document.getElementById('mudBarMp');
+        const mudStamina = document.getElementById('mudBarStamina');
+
         // VRAM as HP (round total to nearest integer for cleaner display)
         const vramTotalRounded = Math.round(GameState.vramTotal || 24);
+        let hpPct = 0;
         if (hpFill && GameState.vramTotal > 0) {
-            const pct = (GameState.vramUsed / GameState.vramTotal) * 100;
-            hpFill.style.width = `${pct}%`;
+            hpPct = (GameState.vramUsed / GameState.vramTotal) * 100;
+            hpFill.style.width = `${hpPct}%`;
         }
         if (hpText) {
             hpText.textContent = `${GameState.vramUsed?.toFixed(1) || '--'} / ${vramTotalRounded} GB`;
         }
+        // Update MUD HP bar
+        if (mudHp) {
+            const bar = MudStyle.progressBar(hpPct, 12);
+            mudHp.innerHTML = `[${bar.html}]`;
+        }
 
         // RAM as MP
         const ramTotalRounded = Math.round(GameState.ramTotal || 0);
+        let mpPct = 0;
         if (mpFill && GameState.ramTotal > 0) {
-            const pct = (GameState.ramUsed / GameState.ramTotal) * 100;
-            mpFill.style.width = `${pct}%`;
+            mpPct = (GameState.ramUsed / GameState.ramTotal) * 100;
+            mpFill.style.width = `${mpPct}%`;
         }
         if (mpText) {
             if (GameState.ramTotal > 0) {
@@ -3105,6 +3814,11 @@ const RPGFlair = {
                 mpText.textContent = '-- / -- GB';
             }
         }
+        // Update MUD MP bar
+        if (mudMp) {
+            const bar = MudStyle.progressBar(mpPct, 12);
+            mudMp.innerHTML = `[${bar.html}]`;
+        }
 
         // GPU Utilization as Stamina
         if (staminaFill) {
@@ -3112,6 +3826,11 @@ const RPGFlair = {
         }
         if (staminaText) {
             staminaText.textContent = `${Math.round(GameState.gpuUtil)}%`;
+        }
+        // Update MUD Stamina bar
+        if (mudStamina) {
+            const bar = MudStyle.progressBar(GameState.gpuUtil || 0, 12);
+            mudStamina.innerHTML = `[${bar.html}]`;
         }
     },
 
@@ -3140,11 +3859,13 @@ const RPGFlair = {
         if (GameState.totalLevel > this.prevLevel && this.prevLevel > 0) {
             this.showAchievement(`Level ${GameState.totalLevel}!`, '⬆️');
             this.showZoneDiscovery(`Level ${GameState.totalLevel}`, 'Level Up!');
+            SoundManager.zoneDiscovery();
         }
 
         // High accuracy = critical hit
         if (GameState.currentSkillAcc > 90 && this.prevAccuracy <= 90 && this.prevAccuracy > 0) {
             this.showCriticalHit('90%+ ACCURACY!');
+            SoundManager.critical();
         }
 
         // High strain = storm weather

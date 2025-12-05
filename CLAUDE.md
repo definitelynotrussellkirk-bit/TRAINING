@@ -1,6 +1,6 @@
 # REALM OF TRAINING - Game Design Document
 
-**Last Updated:** 2025-12-03 (Training Modes: DeepSpeed, GaLore, LoRA/QLoRA)
+**Last Updated:** 2025-12-05 (Eval throttling fix, CLAUDE.md audit)
 **Update Frequency:** Every ~50k tokens or when significant changes occur
 **Philosophy:** This repo is the method, not the results (see META section)
 
@@ -16,7 +16,7 @@ A **Campaign** is a hero's journey to maximum potential - one attempt to push a 
 
 | RPG Concept | Training Reality |
 |-------------|------------------|
-| **Hero** | A model (DIO=Qwen3-0.6B, FLO=Qwen3-4B) |
+| **Hero** | A model (DIO=0.6B, GOU=4B, OJAS=8B, etc.) |
 | **Campaign** | One playthrough/attempt to reach max potential |
 | **Continue** | Keep training, keep learning, push further |
 | **Level Cap** | The theoretical limit of what this model can learn |
@@ -851,37 +851,42 @@ Drills are short, focused exercises that target a single primitive. They're used
 
 ## 🎯 GAME ROADMAP (What's Missing)
 
-### Phase 1: Actions from the Game
-- [ ] **Start Quest** - Drop files in inbox from the UI
-- [ ] **Pause/Resume Battle** - Control training from Tavern
-- [ ] **Promote Champion** - Deploy best checkpoint from UI
+### Phase 1: Actions from the Game (100%) ✅
+- [x] **Start Quest** - Drop files in inbox from the UI ✅ (drag & drop + file picker on `/quests`)
+- [x] **Pause/Resume Battle** - Control training from Tavern ✅ (buttons + API)
+- [x] **Promote Champion** - Deploy best checkpoint from UI ✅ (👑 button on `/vault`, symlinks to `models/current_model`)
 - [x] **View Quest Board** - See pending quests, priorities ✅ `/quests`
 
-### Phase 2: More Game Feel
-- [ ] **Notifications** - "Quest complete!", "Level up!", "New champion!"
-- [ ] **Sound Effects** - Battle sounds, level up chimes (optional)
-- [ ] **Animations** - Damage numbers, XP floating up
-- [ ] **Achievement System** - Milestones tracked
+### Phase 2: More Game Feel (100%) ✅
+- [x] **Notifications** - "Quest complete!", "Level up!", "New champion!" ✅ (SSE + toasts)
+- [x] **Sound Effects** - Level up chimes, checkpoint dings, achievement fanfares ✅ (Web Audio API)
+- [x] **Animations** - Damage numbers, XP floating up ✅ (RPGFlair system)
+- [x] **Achievement System** - Milestones tracked ✅ (18 achievements, localStorage persistence)
 
-### Phase 3: Graphics
-- [ ] **Hero Portrait** - Replace ASCII with actual image
-- [ ] **Skill Icons** - Visual icons for SY, BIN
-- [ ] **Battle Animations** - Visual feedback during training
+### Phase 3: MUD-Style Text Graphics (100%) ✅
+- [x] **ASCII Hero Frame** - Unicode box-drawing border around hero portrait ✅
+- [x] **MUD Progress Bars** - Text-based `[████░░░░]` bars for HP/MP/Stamina/Skills ✅
+- [x] **Enhanced Battle Log** - Combat log with MudStyle.formatCombat() color formatting ✅
+- [x] **Training Glow** - Hero portrait glows during active training ✅
+- [x] **Text Animations** - CSS animations for glow, shimmer, shake effects ✅
 
-### Phase 4: Full Control
+### Phase 4: Full Control (100%) ✅
 - [x] **Armory Screen** - Edit config.json from UI ✅ `/settings` + VRAM calc
-- [ ] **Vault Browser** - Browse/delete/export checkpoints
+- [x] **Vault Browser** - Browse/delete/export checkpoints ✅ `/vault`
 - [x] **Guild Management** - Adjust curriculum, skill priorities ✅ `/settings` scheduler
 
-### Phase 5: Strain/Effort Visualization
-- [ ] **Strain Graph** - Show `loss - floor` instead of raw loss (normalized view)
-- [ ] **Zone Indicator** - Color-coded badge: Recovery/Productive/Stretch/Overload
-- [ ] **Effort Meter** - Cumulative effort per skill (like XP bar)
-- [ ] **Curriculum Hint** - Show suggested action based on strain analysis
-- [ ] **Efficiency Dashboard** - Compare skills by plastic_gain / effort
-- [ ] **Level Transition Log** - Effort spent per level-up
+### Phase 5: Strain/Effort Visualization (100%) ✅
+Backend: `guild/metrics/strain.py` ✅ + `tavern/api/strain.py` ✅
+- [x] **Strain API** - `/api/strain` endpoint with zone/hint data ✅
+- [x] **Zone Indicator** - Color-coded badge: Recovery/Productive/Stretch/Overload ✅
+- [x] **Curriculum Hint** - Show suggested action based on strain analysis ✅
+- [x] **Strain Graph** - Effort history chart (cumulative strain) ✅ (already implemented)
+- [x] **Effort Meter** - Cumulative effort per skill in skill cards ✅
+- [x] **Efficiency Dashboard** - Compare skills by plastic_gain / effort ✅ (`/api/strain/efficiency`)
+- [x] **Level Transition Log** - Recent milestones with skill level-ups ✅ (`/api/strain/transitions`)
 
-### Phase 6: Quest Modules & Primitives
+### Phase 6: Quest Modules & Primitives (PLANNED - Not Implemented)
+Designs documented below but code not yet written.
 - [ ] **Module Loader** - Install/validate quest modules from zip/URL
 - [ ] **Module Browser** - Browse available modules in Tavern
 - [ ] **Primitive Tracker** - Track per-primitive accuracy across skills
@@ -896,7 +901,13 @@ Drills are short, focused exercises that target a single primitive. They're used
 
 **See [CHANGELOG.md](CHANGELOG.md) for full history.**
 
-Latest (2025-12-02) - **REALMSTATE SSE & LEDGER CLEANUP**:
+Latest (2025-12-05) - **EVAL SYSTEM FIX & THROTTLING**:
+- **Skill Evals Now Working** - Fixed broken symlink `status/curriculum_state.json` that prevented skill evals from queuing for ~50 sessions
+- **Eval Throttling** - Added 100-step minimum gap between eval queues to prevent queue buildup
+- **Skills-Only Mode** - Added `--skills-only` flag to eval_runner to skip passive evals
+- **CLAUDE.md Audit** - Updated heroes table, marked Phase 6 as PLANNED, fixed roadmap status
+
+Previous (2025-12-02) - **REALMSTATE SSE & LEDGER CLEANUP**:
 - **RealmState SSE** - Server-Sent Events for real-time UI updates (`realm/server.py`)
 - **Atomic Worker Updates** - New `/api/worker/{id}` endpoint for worker state
 - **Staleness Detection** - Warns when data sources go stale

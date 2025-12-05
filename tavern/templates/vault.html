@@ -415,8 +415,8 @@
             margin-bottom: 0.75rem;
         }
 
-        /* Delete button */
-        .delete-btn {
+        /* Action buttons (Promote, Delete) */
+        .promote-btn, .delete-btn {
             background: transparent;
             border: 1px solid transparent;
             border-radius: 6px;
@@ -427,8 +427,15 @@
             font-size: 1rem;
         }
 
+        .asset-card:hover .promote-btn,
         .asset-card:hover .delete-btn {
             opacity: 0.7;
+        }
+
+        .promote-btn:hover {
+            opacity: 1 !important;
+            background: rgba(245, 158, 11, 0.2);
+            border-color: rgba(245, 158, 11, 0.5);
         }
 
         .delete-btn:hover {
@@ -1009,6 +1016,7 @@
                                 <div class="metric-value">${cp.size_gb || '?'}</div>
                                 <div class="metric-label">GB</div>
                             </div>
+                            ${cp.is_local && cp.path ? `<button class="promote-btn" onclick="event.stopPropagation(); promoteCheckpoint(${cp.step}, '${cp.path}')" title="Promote to Champion">👑</button>` : ''}
                             ${cp.is_local && cp.path ? `<button class="delete-btn" onclick="event.stopPropagation(); deleteCheckpoint(${cp.step}, '${cp.path}')" title="Delete checkpoint">🗑️</button>` : ''}
                         </div>
                     </div>
@@ -1045,6 +1053,29 @@
                 }
             } catch (err) {
                 alert('Error deleting checkpoint: ' + err.message);
+            }
+        }
+
+        async function promoteCheckpoint(step, path) {
+            const confirmed = confirm(`Promote checkpoint-${step} to Champion?\n\nThis will set this checkpoint as the active model.\nPath: ${path}`);
+            if (!confirmed) return;
+
+            try {
+                const resp = await fetch('/api/vault/promote', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ step: step, path: path })
+                });
+
+                const result = await resp.json();
+                if (result.success) {
+                    alert(`Champion promoted!\n\n${result.checkpoint} is now the active model.\n\nTarget: models/current_model`);
+                    fetchVaultAssets(); // Refresh
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Error promoting checkpoint: ' + err.message);
             }
         }
 

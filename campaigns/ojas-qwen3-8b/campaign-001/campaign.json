@@ -1,0 +1,27 @@
+{
+  "id": "campaign-001",
+  "hero_id": "ojas-qwen3-8b",
+  "name": "OJAS r64 balanced",
+  "description": "QLoRA r=64/alpha=128 for 8B on 24GB - balanced capacity",
+  "created_at": "2025-12-04T08:10:00.000000",
+  "status": "active",
+  "starting_checkpoint": null,
+  "starting_step": 0,
+  "current_step": 0,
+  "total_examples": 0,
+  "skills_focus": [
+    "bin",
+    "sy"
+  ],
+  "config_overrides": {},
+  "milestones": [],
+  "peak_skill_levels": {},
+  "peak_metrics": {
+    "lowest_loss": 0.0151,
+    "lowest_val_loss": 0.01279713585972786,
+    "highest_accuracy": 1.0
+  },
+  "skill_effort": {},
+  "level_transitions": [],
+  "archived_at": null
+}

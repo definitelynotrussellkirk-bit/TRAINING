@@ -1,8 +1,8 @@
 """
-Guardian - The watchdog sentinel protecting the training daemon.
+Guardian - The watchdog sentinel protecting the hero loop.
 
-The Guardian watches over the training daemon, ensuring it stays alive
-and responsive. If the daemon falls, the Guardian raises it again.
+The Guardian watches over the hero loop, ensuring it stays alive
+and responsive. If the hero falls, the Guardian raises it again.
 
 RPG Flavor:
     The Guardian is an eternal watcher at the Arena gates. When the
@@ -54,7 +54,7 @@ class Guardian:
     def __init__(
         self,
         base_dir: str | Path = None,
-        daemon_script: str = "core/training_daemon.py",
+        daemon_script: str = "scripts/start_hero_loop.py",
     ):
         """
         Initialize the Guardian.
@@ -72,8 +72,8 @@ class Guardian:
         else:
             self.base_dir = Path(base_dir)
         self.daemon_script = daemon_script
-        self.pid_file = self.base_dir / ".pids" / "training_daemon.pid"
-        self.log_file = self.base_dir / "logs" / "training_output.log"
+        self.pid_file = self.base_dir / ".pids" / "hero_loop.pid"
+        self.log_file = self.base_dir / "logs" / "hero_loop.log"
 
         self.state = SentinelState.DORMANT
         self._incidents: list[AlertRecord] = []

@@ -44,7 +44,7 @@ MIN_DISK_SPACE_GB = 50
 MIN_MEMORY_GB = 4
 MAX_CHECKPOINT_AGE_HOURS = 24
 REQUIRED_DIRS = ["inbox", "logs", "status", "queue", "current_model"]
-REQUIRED_FILES = ["config.json", "train.py", "training_daemon.py"]
+REQUIRED_FILES = ["config.json", "train.py", "scripts/start_hero_loop.py"]
 
 
 class HealthCheck:
@@ -189,7 +189,7 @@ class HealthCheck:
         if pid and psutil.pid_exists(pid):
             try:
                 proc = psutil.Process(pid)
-                if 'training_daemon' in ' '.join(proc.cmdline()):
+                if 'hero_loop' in ' '.join(proc.cmdline()):
                     self.log_pass("Daemon process", f"Running (PID {pid})")
                 else:
                     self.log_issue(
@@ -203,7 +203,7 @@ class HealthCheck:
             self.log_issue(
                 "Daemon process",
                 "Not running",
-                f"python3 training_daemon.py --base-dir {BASE_DIR} &"
+                f"python3 scripts/start_hero_loop.py"
             )
 
     def check_training_progress(self):

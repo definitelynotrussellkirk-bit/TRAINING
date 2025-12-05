@@ -148,10 +148,9 @@ def start_daemon():
     kill_orphaned_processes()
     time.sleep(2)
 
-    # Start daemon
+    # Start hero loop
     cmd = [
-        'nohup', 'python3', 'training_daemon.py',
-        '--base-dir', str(BASE_DIR)
+        'nohup', 'python3', 'scripts/start_hero_loop.py'
     ]
 
     with open(TRAINING_OUTPUT_LOG, 'a') as f:

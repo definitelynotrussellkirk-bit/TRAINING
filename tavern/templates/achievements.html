@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Achievements - Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-body), system-ui, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-card) 100%);
+            border-bottom: 1px solid var(--border-gold);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-gold);
+            font-family: var(--font-title), serif;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-md);
+            transition: all 0.2s;
+        }
+
+        .nav-links a:hover {
+            background: var(--bg-highlight);
+            color: var(--text-primary);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--text-gold);
+            font-family: var(--font-title);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .progress-bar-container {
+            width: 200px;
+            height: 8px;
+            background: var(--bg-dark);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-gold), #fbbf24);
+            transition: width 0.3s ease;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .achievements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .achievement-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+            display: flex;
+            gap: 1rem;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .achievement-card.locked {
+            opacity: 0.5;
+            filter: grayscale(0.8);
+        }
+
+        .achievement-card.unlocked {
+            border-color: var(--color-gold);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.1);
+        }
+
+        .achievement-card.unlocked::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+        }
+
+        .achievement-icon {
+            font-size: 2.5rem;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-dark);
+            border-radius: var(--radius-md);
+            flex-shrink: 0;
+        }
+
+        .achievement-card.unlocked .achievement-icon {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.05));
+        }
+
+        .achievement-info {
+            flex: 1;
+        }
+
+        .achievement-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .achievement-card.unlocked .achievement-name {
+            color: var(--text-gold);
+        }
+
+        .achievement-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .achievement-date {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        .category-label {
+            display: inline-block;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            background: var(--bg-highlight);
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* MUD-style decorative elements */
+        .mud-divider {
+            text-align: center;
+            color: var(--text-muted);
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            margin: 2rem 0;
+            opacity: 0.5;
+        }
+
+        .celebration {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .celebration-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>
+            <span>🏆</span>
+            <span>Hall of Achievements</span>
+        </h1>
+        <nav class="nav-links">
+            <a href="/">Tavern</a>
+            <a href="/guild">Guild</a>
+            <a href="/vault">Vault</a>
+            <a href="/quests">Quests</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <!-- Stats Summary -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-value" id="unlockedCount">0</div>
+                <div class="stat-label">Unlocked</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="totalCount">18</div>
+                <div class="stat-label">Total</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="progressPct">0%</div>
+                <div class="stat-label">Complete</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unlocked Achievements -->
+        <h2 class="section-title">
+            <span>🌟</span>
+            <span>Unlocked Achievements</span>
+        </h2>
+        <div class="achievements-grid" id="unlockedGrid">
+            <!-- Populated by JS -->
+        </div>
+
+        <div class="mud-divider">═══════════════════════════════════════════════════</div>
+
+        <!-- Locked Achievements -->
+        <h2 class="section-title">
+            <span>🔒</span>
+            <span>Locked Achievements</span>
+        </h2>
+        <div class="achievements-grid" id="lockedGrid">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <script>
+        // Achievement definitions (mirror from game.js)
+        const ACHIEVEMENTS = {
+            // Training milestones
+            'first_steps': { name: 'First Steps', icon: '👣', desc: 'Complete your first training step', category: 'Training' },
+            'century': { name: 'Century', icon: '💯', desc: 'Reach 100 training steps', category: 'Training' },
+            'thousand': { name: 'Thousand Steps', icon: '🚶', desc: 'Reach 1,000 training steps', category: 'Training' },
+            'ten_thousand': { name: 'Marathon', icon: '🏃', desc: 'Reach 10,000 training steps', category: 'Training' },
+            'hundred_thousand': { name: 'Ultramarathon', icon: '🏅', desc: 'Reach 100,000 training steps', category: 'Training' },
+
+            // Level milestones
+            'level_1': { name: 'Awakening', icon: '✨', desc: 'Reach total level 1', category: 'Levels' },
+            'level_5': { name: 'Apprentice', icon: '📚', desc: 'Reach total level 5', category: 'Levels' },
+            'level_10': { name: 'Journeyman', icon: '🎓', desc: 'Reach total level 10', category: 'Levels' },
+            'level_20': { name: 'Expert', icon: '🏆', desc: 'Reach total level 20', category: 'Levels' },
+            'level_50': { name: 'Master', icon: '👑', desc: 'Reach total level 50', category: 'Levels' },
+
+            // Accuracy achievements
+            'sharp_eye': { name: 'Sharp Eye', icon: '🎯', desc: 'Achieve 80% accuracy on any skill', category: 'Accuracy' },
+            'precision': { name: 'Precision', icon: '💎', desc: 'Achieve 90% accuracy on any skill', category: 'Accuracy' },
+            'perfectionist': { name: 'Perfectionist', icon: '🌟', desc: 'Achieve 100% accuracy on any skill', category: 'Accuracy' },
+
+            // Checkpoint achievements
+            'first_save': { name: 'First Save', icon: '💾', desc: 'Save your first checkpoint', category: 'Vault' },
+            'hoarder': { name: 'Hoarder', icon: '📦', desc: 'Accumulate 10 checkpoints', category: 'Vault' },
+            'archivist': { name: 'Archivist', icon: '🏛️', desc: 'Accumulate 50 checkpoints', category: 'Vault' },
+
+            // Skill achievements
+            'dual_wielder': { name: 'Dual Wielder', icon: '⚔️', desc: 'Train in 2 different skills', category: 'Skills' },
+
+            // Strain zone achievements
+            'in_the_zone': { name: 'In The Zone', icon: '🟢', desc: 'Train in the productive zone', category: 'Strain' },
+            'pushing_limits': { name: 'Pushing Limits', icon: '🟠', desc: 'Train in the stretch zone', category: 'Strain' },
+        };
+
+        function loadAchievements() {
+            // Load unlocked achievements from localStorage
+            let unlocked = {};
+            try {
+                const saved = localStorage.getItem('realm_achievements');
+                if (saved) {
+                    unlocked = JSON.parse(saved);
+                }
+            } catch (e) {
+                console.error('Failed to load achievements:', e);
+            }
+
+            const unlockedGrid = document.getElementById('unlockedGrid');
+            const lockedGrid = document.getElementById('lockedGrid');
+            const total = Object.keys(ACHIEVEMENTS).length;
+            const unlockedCount = Object.keys(unlocked).length;
+
+            // Update stats
+            document.getElementById('unlockedCount').textContent = unlockedCount;
+            document.getElementById('totalCount').textContent = total;
+            const pct = Math.round((unlockedCount / total) * 100);
+            document.getElementById('progressPct').textContent = `${pct}%`;
+            document.getElementById('progressBar').style.width = `${pct}%`;
+
+            // Clear grids
+            unlockedGrid.innerHTML = '';
+            lockedGrid.innerHTML = '';
+
+            // Render achievements
+            for (const [id, def] of Object.entries(ACHIEVEMENTS)) {
+                const isUnlocked = !!unlocked[id];
+                const card = createAchievementCard(id, def, isUnlocked, unlocked[id]);
+
+                if (isUnlocked) {
+                    unlockedGrid.appendChild(card);
+                } else {
+                    lockedGrid.appendChild(card);
+                }
+            }
+
+            // Show celebration if all unlocked
+            if (unlockedCount === total) {
+                lockedGrid.innerHTML = `
+                    <div class="celebration" style="grid-column: 1 / -1;">
+                        <div class="celebration-icon">🎉</div>
+                        <div>All achievements unlocked! You are a true master!</div>
+                    </div>
+                `;
+            }
+
+            // Show message if none unlocked
+            if (unlockedCount === 0) {
+                unlockedGrid.innerHTML = `
+                    <div class="celebration" style="grid-column: 1 / -1;">
+                        <div class="celebration-icon">🌱</div>
+                        <div>Your journey begins... Start training to unlock achievements!</div>
+                    </div>
+                `;
+            }
+        }
+
+        function createAchievementCard(id, def, isUnlocked, unlockData) {
+            const card = document.createElement('div');
+            card.className = `achievement-card ${isUnlocked ? 'unlocked' : 'locked'}`;
+
+            let dateHtml = '';
+            if (isUnlocked && unlockData?.unlockedAt) {
+                const date = new Date(unlockData.unlockedAt);
+                dateHtml = `<div class="achievement-date">Unlocked ${date.toLocaleDateString()}</div>`;
+            }
+
+            card.innerHTML = `
+                <div class="achievement-icon">${def.icon}</div>
+                <div class="achievement-info">
+                    <div class="category-label">${def.category}</div>
+                    <div class="achievement-name">${def.name}</div>
+                    <div class="achievement-desc">${def.desc}</div>
+                    ${dateHtml}
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Load on page load
+        document.addEventListener('DOMContentLoaded', loadAchievements);
+
+        // Refresh periodically (in case achievements unlock in another tab)
+        setInterval(loadAchievements, 30000);
+    </script>
+</body>
+</html>

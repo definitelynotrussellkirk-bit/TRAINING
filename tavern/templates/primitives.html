@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Primitives - Realm of Training</title>
+    <link rel="stylesheet" href="/static/css/theme.css?v=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-body), system-ui, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-card) 100%);
+            border-bottom: 1px solid var(--border-gold);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-gold);
+            font-family: var(--font-title), serif;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-md);
+            transition: all 0.2s;
+        }
+
+        .nav-links a:hover {
+            background: var(--bg-highlight);
+            color: var(--text-primary);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .radar-section {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .radar-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Radar Chart Container */
+        .radar-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .radar-title {
+            font-size: 1.1rem;
+            color: var(--text-gold);
+            margin-bottom: 1rem;
+            font-family: var(--font-title);
+        }
+
+        .radar-chart {
+            position: relative;
+            width: 300px;
+            height: 300px;
+        }
+
+        .radar-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .radar-polygon {
+            fill: rgba(255, 215, 0, 0.2);
+            stroke: var(--color-gold);
+            stroke-width: 2;
+        }
+
+        .radar-grid {
+            fill: none;
+            stroke: var(--border-color);
+            stroke-width: 1;
+        }
+
+        .radar-axis {
+            stroke: var(--border-color);
+            stroke-width: 1;
+        }
+
+        .radar-label {
+            fill: var(--text-secondary);
+            font-size: 12px;
+            text-anchor: middle;
+        }
+
+        .radar-value {
+            fill: var(--text-gold);
+            font-size: 10px;
+            text-anchor: middle;
+        }
+
+        /* Track Stats Grid */
+        .tracks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .track-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .track-card:hover {
+            border-color: var(--color-gold);
+            transform: translateY(-2px);
+        }
+
+        .track-card.active {
+            border-color: var(--color-gold);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+        }
+
+        .track-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .track-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-dark);
+            border-radius: var(--radius-md);
+        }
+
+        .track-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .track-count {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .track-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .track-difficulty {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .difficulty-bar {
+            display: flex;
+            gap: 2px;
+        }
+
+        .difficulty-pip {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            background: var(--border-color);
+        }
+
+        .difficulty-pip.filled {
+            background: var(--color-gold);
+        }
+
+        /* Primitives List */
+        .section-title {
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .primitives-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .primitive-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+        }
+
+        .primitive-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .primitive-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .primitive-difficulty {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            background: var(--bg-dark);
+            border-radius: 4px;
+            color: var(--text-secondary);
+        }
+
+        .primitive-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-bottom: 0.5rem;
+        }
+
+        .primitive-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+
+        .primitive-tag {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.4rem;
+            background: var(--bg-highlight);
+            border-radius: 3px;
+            color: var(--text-muted);
+        }
+
+        /* MUD decorations */
+        .mud-divider {
+            text-align: center;
+            color: var(--text-muted);
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            margin: 2rem 0;
+            opacity: 0.5;
+        }
+
+        .total-count {
+            text-align: center;
+            padding: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .total-count strong {
+            color: var(--text-gold);
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>
+            <span>🧬</span>
+            <span>Primitive Stats</span>
+        </h1>
+        <nav class="nav-links">
+            <a href="/">Tavern</a>
+            <a href="/achievements">Achievements</a>
+            <a href="/guild">Guild</a>
+            <a href="/vault">Vault</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <!-- Radar + Tracks Overview -->
+        <div class="radar-section">
+            <!-- Radar Chart -->
+            <div class="radar-container">
+                <div class="radar-title">Cognitive Profile</div>
+                <div class="radar-chart">
+                    <svg class="radar-svg" viewBox="-150 -150 300 300" id="radarChart">
+                        <!-- Grid circles -->
+                        <circle class="radar-grid" cx="0" cy="0" r="120" />
+                        <circle class="radar-grid" cx="0" cy="0" r="90" />
+                        <circle class="radar-grid" cx="0" cy="0" r="60" />
+                        <circle class="radar-grid" cx="0" cy="0" r="30" />
+                        <!-- Axes and labels will be added by JS -->
+                        <polygon class="radar-polygon" id="radarPolygon" points="" />
+                    </svg>
+                </div>
+                <div class="total-count">
+                    <strong id="totalPrimitives">0</strong> primitives across <strong id="totalTracks">0</strong> tracks
+                </div>
+            </div>
+
+            <!-- Track Cards -->
+            <div class="tracks-grid" id="tracksGrid">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <div class="mud-divider">═══════════════════════════════════════════════════</div>
+
+        <!-- Primitives List -->
+        <h2 class="section-title" id="primitivesTitle">
+            <span>📋</span>
+            <span>All Primitives</span>
+        </h2>
+        <div class="primitives-grid" id="primitivesGrid">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <script>
+        let allPrimitives = {};
+        let trackStats = {};
+        let selectedTrack = null;
+
+        async function loadData() {
+            try {
+                // Fetch primitives and stats in parallel
+                const [primResp, statsResp] = await Promise.all([
+                    fetch('/api/primitives'),
+                    fetch('/api/primitives/stats')
+                ]);
+
+                const primData = await primResp.json();
+                const statsData = await statsResp.json();
+
+                allPrimitives = primData.primitives || {};
+                trackStats = statsData.tracks || {};
+
+                document.getElementById('totalPrimitives').textContent = primData.total_count || 0;
+                document.getElementById('totalTracks').textContent = primData.tracks?.length || 0;
+
+                renderTracks();
+                renderRadar();
+                renderPrimitives(null); // Show all initially
+            } catch (e) {
+                console.error('Failed to load primitives:', e);
+            }
+        }
+
+        function renderTracks() {
+            const grid = document.getElementById('tracksGrid');
+            grid.innerHTML = '';
+
+            for (const [trackId, stats] of Object.entries(trackStats)) {
+                const card = document.createElement('div');
+                card.className = 'track-card';
+                card.dataset.track = trackId;
+
+                // Difficulty pips (1-5 scale, avg rounded)
+                const avgDiff = Math.round(stats.avg_difficulty);
+                const pips = Array(5).fill(0).map((_, i) =>
+                    `<div class="difficulty-pip ${i < avgDiff ? 'filled' : ''}"></div>`
+                ).join('');
+
+                card.innerHTML = `
+                    <div class="track-header">
+                        <div class="track-icon">${stats.icon}</div>
+                        <div>
+                            <div class="track-name">${stats.name}</div>
+                            <div class="track-count">${stats.count} primitives</div>
+                        </div>
+                    </div>
+                    <div class="track-stats">
+                        <div class="track-difficulty">
+                            Difficulty: <div class="difficulty-bar">${pips}</div>
+                        </div>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => selectTrack(trackId));
+                grid.appendChild(card);
+            }
+        }
+
+        function selectTrack(trackId) {
+            // Toggle selection
+            if (selectedTrack === trackId) {
+                selectedTrack = null;
+            } else {
+                selectedTrack = trackId;
+            }
+
+            // Update card styling
+            document.querySelectorAll('.track-card').forEach(card => {
+                card.classList.toggle('active', card.dataset.track === selectedTrack);
+            });
+
+            // Update title
+            const title = document.getElementById('primitivesTitle');
+            if (selectedTrack) {
+                const stats = trackStats[selectedTrack];
+                title.innerHTML = `<span>${stats.icon}</span><span>${stats.name} Primitives</span>`;
+            } else {
+                title.innerHTML = `<span>📋</span><span>All Primitives</span>`;
+            }
+
+            renderPrimitives(selectedTrack);
+        }
+
+        function renderRadar() {
+            const svg = document.getElementById('radarChart');
+            const polygon = document.getElementById('radarPolygon');
+
+            const tracks = Object.keys(trackStats);
+            const n = tracks.length;
+            if (n === 0) return;
+
+            const angleStep = (2 * Math.PI) / n;
+            const maxRadius = 120;
+
+            // Clear existing axes/labels
+            svg.querySelectorAll('.radar-axis, .radar-label').forEach(el => el.remove());
+
+            // Draw axes and labels
+            const points = [];
+            tracks.forEach((track, i) => {
+                const angle = -Math.PI/2 + i * angleStep;
+                const stats = trackStats[track];
+
+                // Axis line
+                const x2 = Math.cos(angle) * maxRadius;
+                const y2 = Math.sin(angle) * maxRadius;
+                const axis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                axis.setAttribute('class', 'radar-axis');
+                axis.setAttribute('x1', '0');
+                axis.setAttribute('y1', '0');
+                axis.setAttribute('x2', x2);
+                axis.setAttribute('y2', y2);
+                svg.insertBefore(axis, polygon);
+
+                // Label
+                const labelRadius = maxRadius + 25;
+                const lx = Math.cos(angle) * labelRadius;
+                const ly = Math.sin(angle) * labelRadius;
+                const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                label.setAttribute('class', 'radar-label');
+                label.setAttribute('x', lx);
+                label.setAttribute('y', ly + 4);
+                label.textContent = `${stats.icon} ${stats.name}`;
+                svg.appendChild(label);
+
+                // Calculate point based on primitive count (normalized)
+                // Use count as a proxy for "coverage" since mastery isn't tracked yet
+                const maxCount = Math.max(...Object.values(trackStats).map(s => s.count));
+                const value = stats.count / maxCount;
+                const px = Math.cos(angle) * (value * maxRadius);
+                const py = Math.sin(angle) * (value * maxRadius);
+                points.push(`${px},${py}`);
+            });
+
+            polygon.setAttribute('points', points.join(' '));
+        }
+
+        function renderPrimitives(trackFilter) {
+            const grid = document.getElementById('primitivesGrid');
+            grid.innerHTML = '';
+
+            const tracks = trackFilter ? [trackFilter] : Object.keys(allPrimitives);
+
+            for (const track of tracks) {
+                const prims = allPrimitives[track] || [];
+                for (const prim of prims) {
+                    const card = document.createElement('div');
+                    card.className = 'primitive-card';
+
+                    const tags = (prim.tags || []).map(t =>
+                        `<span class="primitive-tag">${t}</span>`
+                    ).join('');
+
+                    card.innerHTML = `
+                        <div class="primitive-header">
+                            <div class="primitive-name">${prim.display_name}</div>
+                            <div class="primitive-difficulty">Lvl ${prim.difficulty}</div>
+                        </div>
+                        <div class="primitive-desc">${prim.description}</div>
+                        <div class="primitive-tags">${tags}</div>
+                    `;
+
+                    grid.appendChild(card);
+                }
+            }
+        }
+
+        // Load on page load
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>

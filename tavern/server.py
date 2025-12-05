@@ -64,6 +64,7 @@ from tavern.api import temple as temple_api
 from tavern.api import fleet as fleet_api
 from tavern.api import arcana as arcana_api
 from tavern.api import strain as strain_api
+from tavern.api import primitives as primitives_api
 
 # Import events system
 try:
@@ -477,6 +478,18 @@ class TavernHandler(SimpleHTTPRequestHandler):
         # Guild - Skills and Passives
         elif path == "/guild" or path == "/guild.html" or path == "/guildhall.html":
             self._serve_template("guild.html")
+
+        # Achievements - Hall of Achievements
+        elif path == "/achievements" or path == "/achievements.html":
+            self._serve_template("achievements.html")
+
+        # Primitives - Cognitive Profile
+        elif path == "/primitives" or path == "/primitives.html" or path == "/stats":
+            self._serve_template("primitives.html")
+        elif path == "/api/primitives":
+            primitives_api.serve_primitives(self)
+        elif path == "/api/primitives/stats":
+            primitives_api.serve_primitive_stats(self)
         elif path == "/api/hero":
             heroes_api.serve_hero_info(self)
         elif path.startswith("/api/hero-config/"):

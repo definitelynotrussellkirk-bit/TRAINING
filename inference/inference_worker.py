@@ -8,6 +8,7 @@ Supports:
 - PEFT/LoRA adapters (adapter_model.safetensors)
 """
 
+import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from pathlib import Path

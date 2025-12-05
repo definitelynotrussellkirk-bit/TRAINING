@@ -328,6 +328,21 @@ class ThroughputSample:
 
 # Utility functions for view model creation
 
+def _get_gpu_3090_stats(status_dict: Dict) -> Dict:
+    """Extract GPU 3090 stats from status_dict or return defaults."""
+    gpu_3090 = status_dict.get("gpu_3090", {})
+    return {
+        "online": gpu_3090.get("online", False),
+        "temp_c": gpu_3090.get("temp_c", 0),
+        "util_pct": gpu_3090.get("util_pct", 0),
+        "vram_used_gb": gpu_3090.get("vram_used_gb", 0.0),
+        "vram_total_gb": gpu_3090.get("vram_total_gb", 24.0),
+        "vram_pct": gpu_3090.get("vram_pct", 0),
+        "power_w": gpu_3090.get("power_w", 0),
+        "power_profile": gpu_3090.get("power_profile", "unknown"),
+    }
+
+
 def create_live_status_from_training_status(status_dict: Dict) -> LiveStatusView:
     """Convert old training_status.json format to LiveStatusView"""
 
@@ -423,15 +438,7 @@ def create_live_status_from_training_status(status_dict: Dict) -> LiveStatusView
             "fan_pct": gpu_stats.get("fan_speed", 0),
         },
 
-        gpu_3090={
-            "online": False,  # TODO: check 3090 status
-            "temp_c": 0,
-            "util_pct": 0,
-            "vram_used_gb": 0.0,
-            "vram_total_gb": 24.0,
-            "power_w": 0,
-            "power_profile": "unknown",
-        },
+        gpu_3090=_get_gpu_3090_stats(status_dict),
 
         ram={
             "used_gb": status_dict.get("ram_used_gb", 0.0),

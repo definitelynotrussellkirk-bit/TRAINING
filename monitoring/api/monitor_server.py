@@ -212,7 +212,7 @@ def api_status_system():
         },
         system_3090={
             "online": status.get("remote_3090_online", False),
-            "cpu_pct": 0,  # TODO: fetch from 3090
+            "cpu_pct": 0,  # Requires /system/stats endpoint on inference server
             "ram_gb": 0.0,
             "ram_total_gb": 0.0,
             "disk_used_gb": 0.0,

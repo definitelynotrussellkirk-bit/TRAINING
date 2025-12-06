@@ -1,0 +1,125 @@
+# =============================================================================
+# MEMORY PROFILE: 24GB LoRA with 8-bit Quantized Base
+# =============================================================================
+# Middle ground: 8-bit base (not 4-bit) + LoRA adapters
+# Better quality than QLoRA (4-bit), more efficient than full-precision LoRA
+# Best for: 7B models where 4-bit quantization degrades quality too much
+# =============================================================================
+
+id: 24gb_lora_8bit_base
+name: "24GB LoRA 8-bit Base"
+rpg_name: "The Balanced Path"
+icon: "⚖️"
+description: |
+  LoRA adapters on 8-bit quantized base model.
+
+  Trade-offs:
+  vs QLoRA (4-bit): Better quality, higher VRAM
+  vs LoRA (full): Lower VRAM, slightly lower quality
+
+  The middle ground when:
+  - 4-bit hurts quality too much
+  - Full precision doesn't fit
+
+target_vram_gb: 24
+
+# =============================================================================
+# PEFT CONFIGURATION
+# =============================================================================
+peft:
+  method: "lora"  # LoRA (quantization handled separately)
+
+  lora:
+    r: 64
+    alpha: 128
+    dropout: 0.05
+    target_modules:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+      - gate_proj
+      - up_proj
+      - down_proj
+    bias: "none"
+    task_type: "CAUSAL_LM"
+
+  galore:
+    rank: 1024
+    update_proj_gap: 200
+    scale: 0.25
+    proj_type: "std"
+
+# =============================================================================
+# QUANTIZATION - 8-BIT
+# Better quality than 4-bit, less memory than full precision
+# =============================================================================
+quantization:
+  load_in_4bit: false
+  load_in_8bit: true         # KEY: 8-bit quantization
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: false
+
+# =============================================================================
+# MEMORY-EFFICIENT IMPLEMENTATIONS
+# =============================================================================
+memory:
+  gradient_checkpointing: true
+  flash_attention: true
+  paged_optimizer: false
+  cpu_offload: false
+
+# =============================================================================
+# OPTIMIZER CONFIGURATION
+# =============================================================================
+optimizer:
+  type: "adamw_8bit"
+
+  adamw:
+    lr: 2e-4
+    betas: [0.9, 0.999]
+    eps: 1e-8
+    weight_decay: 0.01
+
+  muon:
+    hidden_lr: 0.02
+    aux_lr: 3e-4
+    momentum: 0.95
+    weight_decay: 0
+
+# =============================================================================
+# TRAINING CONSTRAINTS
+# =============================================================================
+constraints:
+  max_batch_size: 1
+  recommended_grad_accum: 8
+  max_sequence_length: 2048
+  precision: "bf16"
+
+# =============================================================================
+# MODEL SIZE RECOMMENDATIONS
+# =============================================================================
+recommendations:
+  max_model_size_b: 8
+  optimal_model_sizes:
+    - "7B"
+    - "8B"
+  tested_models:
+    - "Qwen3-8B"
+    - "Mistral-7B"
+    - "Llama-3-8B"
+  notes: |
+    8-bit LoRA for 7B-8B models - quality-focused alternative to QLoRA.
+
+    Expected VRAM usage (8B model):
+    - Model (8-bit): ~8GB (vs ~5GB 4-bit, ~16GB bf16)
+    - LoRA adapters: ~0.5GB
+    - Activations: ~8GB (with checkpointing)
+    - Optimizer (8-bit): ~2GB
+    - Total: ~18-20GB peak
+
+    Quality ranking: Full > 8-bit > 4-bit (QLoRA)
+    Memory ranking: 4-bit < 8-bit < Full
+
+    Use when: QLoRA quality is unacceptable but full precision doesn't fit.

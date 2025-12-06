@@ -3,236 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Model Archaeology - Analysis</title>
+    <title>Model Archaeology - Realm of Training</title>
     <!-- Shared theme -->
     <link rel="stylesheet" href="/static/css/theme.css?v=1">
     <link rel="stylesheet" href="/static/css/game.css?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        /* ═══════════════════════════════════════════════════════════
+           MODEL ARCHAEOLOGY - Layer Drift Analysis
+           ═══════════════════════════════════════════════════════════ */
+
+        /* ─────────────────────────────────────────────────────────────
+           ARCHAEOLOGY BANNER
+           ───────────────────────────────────────────────────────────── */
+        .archaeology-banner {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border: 1px solid var(--border-color);
+            border-bottom: 3px solid #8b5cf6;
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .archaeology-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at 20% 50%, rgba(139, 92, 246, 0.2) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .banner-icon-frame {
+            position: relative;
+            width: 70px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .banner-icon-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 3px solid #8b5cf6;
+            border-radius: 50%;
+            animation: archGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes archGlow {
+            0%, 100% { box-shadow: 0 0 10px rgba(139, 92, 246, 0.3); }
+            50% { box-shadow: 0 0 25px rgba(139, 92, 246, 0.6); }
+        }
+
+        .banner-icon {
+            font-size: 2.5rem;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+
+        .banner-info {
+            flex: 1;
+            z-index: 1;
+            min-width: 0;
+        }
+
+        .banner-title {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            color: var(--color-gold);
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .banner-subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+
+        .banner-controls {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .control-select {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            min-width: 140px;
+        }
+
+        .control-select:focus {
+            outline: none;
+            border-color: #8b5cf6;
+        }
+
+        .banner-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .banner-btn:hover {
+            background: rgba(139, 92, 246, 0.1);
+            border-color: #8b5cf6;
+            color: #a78bfa;
+        }
+
+        .banner-btn.primary {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            border-color: #8b5cf6;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .banner-btn.primary:hover {
+            filter: brightness(1.1);
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           MAIN LAYOUT
+           ───────────────────────────────────────────────────────────── */
         .analysis-main {
             padding: 1.5rem;
             max-width: 1600px;
             margin: 0 auto;
         }
 
-        .analysis-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .analysis-title {
-            font-family: var(--font-display);
-            font-size: 1.75rem;
-            color: var(--color-gold);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .analysis-subtitle {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-left: 2.5rem;
-        }
-
-        /* Controls */
-        .controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .control-select {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.5rem 1rem;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            cursor: pointer;
-        }
-
-        .control-select:focus {
-            outline: none;
-            border-color: var(--color-gold);
-        }
-
-        .refresh-btn {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.5rem 1rem;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .refresh-btn:hover {
-            border-color: var(--color-gold);
-            color: var(--color-gold);
-        }
-
-        .run-analysis-btn {
-            background: linear-gradient(135deg, var(--color-gold), #b8860b);
-            color: var(--bg-dark);
-            font-weight: 600;
-        }
-
-        .run-analysis-btn:hover {
-            opacity: 0.9;
-            color: var(--bg-dark);
-        }
-
-        /* Modal styles */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: var(--bg-card);
-            border: 1px solid var(--border-gold);
-            border-radius: 12px;
-            padding: 1.5rem;
-            width: 90%;
-            max-width: 500px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .modal-title {
-            font-family: var(--font-display);
-            color: var(--color-gold);
-            font-size: 1.25rem;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            font-size: 1.5rem;
-            cursor: pointer;
-        }
-
-        .modal-close:hover {
-            color: var(--text-primary);
-        }
-
-        .modal-body {
-            margin-bottom: 1rem;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .form-group select, .form-group input {
-            width: 100%;
-            padding: 0.5rem;
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-        }
-
-        .form-group select:focus, .form-group input:focus {
-            outline: none;
-            border-color: var(--color-gold);
-        }
-
-        .checkpoint-option {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.25rem 0;
-        }
-
-        .checkpoint-option .step {
-            font-weight: 600;
-            color: var(--color-gold);
-        }
-
-        .checkpoint-option .loss {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-        }
-
-        .checkpoint-option .analyzed {
-            color: var(--color-success);
-            font-size: 0.75rem;
-        }
-
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.75rem;
-        }
-
-        .modal-btn {
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-        }
-
-        .modal-btn-cancel {
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-        }
-
-        .modal-btn-cancel:hover {
-            border-color: var(--text-muted);
-        }
-
-        .modal-btn-submit {
-            background: linear-gradient(135deg, var(--color-gold), #b8860b);
-            border: none;
-            color: var(--bg-dark);
-            font-weight: 600;
-        }
-
-        .modal-btn-submit:hover {
-            opacity: 0.9;
-        }
-
-        .modal-btn-submit:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* Summary Cards */
+        /* ─────────────────────────────────────────────────────────────
+           SUMMARY CARDS
+           ───────────────────────────────────────────────────────────── */
         .summary-row {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -246,226 +167,125 @@
             border-radius: 12px;
             padding: 1.25rem;
             text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #8b5cf6, #a78bfa);
         }
 
         .summary-value {
-            font-size: 2rem;
+            font-size: 1.75rem;
             font-weight: 700;
             color: var(--color-gold);
             font-family: 'Courier New', monospace;
         }
 
         .summary-label {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-muted);
             text-transform: uppercase;
             margin-top: 0.25rem;
+            letter-spacing: 0.5px;
         }
 
-        /* Main Grid */
+        /* ─────────────────────────────────────────────────────────────
+           MAIN GRID
+           ───────────────────────────────────────────────────────────── */
         .analysis-grid {
             display: grid;
-            grid-template-columns: 1fr 350px;
+            grid-template-columns: 1fr 320px;
             gap: 1.5rem;
         }
 
-        /* Heatmap Section */
-        .heatmap-section {
+        /* ─────────────────────────────────────────────────────────────
+           SECTION CARDS
+           ───────────────────────────────────────────────────────────── */
+        .section-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 1.5rem;
+            overflow: hidden;
         }
 
         .section-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
+            padding: 1rem 1.25rem;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, transparent 100%);
             border-bottom: 1px solid var(--border-color);
         }
 
         .section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
             font-family: var(--font-display);
             font-size: 1.1rem;
-            color: var(--text-primary);
+            color: var(--color-gold);
+            margin: 0;
         }
 
+        .section-icon {
+            font-size: 1.2rem;
+        }
+
+        .section-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .section-body {
+            padding: 1.25rem;
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           HEATMAP
+           ───────────────────────────────────────────────────────────── */
         .heatmap-container {
             position: relative;
             overflow-x: auto;
-            margin-top: 1rem;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            padding: 0.5rem;
         }
 
         #driftHeatmap {
             min-height: 400px;
-            background: var(--bg-dark);
-            border-radius: 8px;
         }
 
         .heatmap-legend {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            justify-content: center;
+            gap: 0.75rem;
             margin-top: 1rem;
             font-size: 0.8rem;
             color: var(--text-muted);
         }
 
         .legend-gradient {
-            width: 120px;
+            width: 150px;
             height: 12px;
             background: linear-gradient(90deg, #1e3a5f, #3b82f6, #22c55e, #f59e0b, #ef4444);
-            border-radius: 4px;
-        }
-
-        /* Top Movers Section */
-        .movers-section {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .movers-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.25rem;
-        }
-
-        .mover-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            margin-top: 0.75rem;
-        }
-
-        .mover-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.5rem;
-            background: var(--bg-dark);
             border-radius: 6px;
         }
 
-        .mover-rank {
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-highlight);
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-
-        .mover-rank.top { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .mover-rank.stable { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
-
-        .mover-name {
-            flex: 1;
-            font-size: 0.85rem;
-            font-family: monospace;
-            color: var(--text-secondary);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .mover-bar-container {
-            width: 80px;
-            height: 8px;
-            background: var(--bg-card);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .mover-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #f59e0b, #ef4444);
-            border-radius: 4px;
-        }
-
-        .mover-bar.stable {
-            background: linear-gradient(90deg, #22c55e, #3b82f6);
-        }
-
-        .mover-value {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            width: 50px;
-            text-align: right;
-        }
-
-        /* Checkpoints Section */
-        .checkpoints-section {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.25rem;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .checkpoint-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .checkpoint-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem;
-            background: var(--bg-dark);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .checkpoint-item:hover {
-            background: var(--bg-highlight);
-            border-color: var(--border-gold);
-        }
-
-        .checkpoint-item.selected {
-            border: 1px solid var(--color-gold);
-            background: rgba(251, 191, 36, 0.1);
-        }
-
-        .checkpoint-step {
-            font-weight: 600;
-            color: var(--color-gold);
-            min-width: 70px;
-        }
-
-        .checkpoint-meta {
-            flex: 1;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
-        .checkpoint-badge {
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 600;
-        }
-
-        .checkpoint-badge.drift { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .checkpoint-badge.clean { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
-
         /* Layer Detail Panel */
         .layer-detail {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.25rem;
+            margin-top: 1.25rem;
+            padding: 1rem;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 8px;
             display: none;
         }
 
@@ -476,15 +296,15 @@
         .layer-detail-header {
             font-family: monospace;
             font-size: 0.9rem;
-            color: var(--text-primary);
+            color: #a78bfa;
             margin-bottom: 1rem;
             padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.3);
         }
 
         .layer-stats-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(4, 1fr);
             gap: 0.75rem;
         }
 
@@ -492,20 +312,192 @@
             padding: 0.5rem;
             background: var(--bg-dark);
             border-radius: 6px;
+            text-align: center;
         }
 
         .layer-stat-value {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 600;
             color: var(--text-primary);
         }
 
         .layer-stat-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           SIDEBAR - MOVERS & CHECKPOINTS
+           ───────────────────────────────────────────────────────────── */
+        .sidebar-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .movers-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .mover-list {
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .mover-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: var(--bg-surface);
+            border-radius: 6px;
+            border-left: 3px solid transparent;
+        }
+
+        .mover-item.hot {
+            border-left-color: #ef4444;
+        }
+
+        .mover-item.cold {
+            border-left-color: #22c55e;
+        }
+
+        .mover-rank {
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-dark);
+            border-radius: 4px;
             font-size: 0.7rem;
+            font-weight: 600;
             color: var(--text-muted);
         }
 
-        /* Empty State */
+        .mover-item.hot .mover-rank {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .mover-item.cold .mover-rank {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .mover-name {
+            flex: 1;
+            font-size: 0.8rem;
+            font-family: monospace;
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mover-bar-container {
+            width: 60px;
+            height: 6px;
+            background: var(--bg-dark);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .mover-bar {
+            height: 100%;
+            border-radius: 3px;
+        }
+
+        .mover-bar.hot {
+            background: linear-gradient(90deg, #f59e0b, #ef4444);
+        }
+
+        .mover-bar.cold {
+            background: linear-gradient(90deg, #22c55e, #3b82f6);
+        }
+
+        .mover-value {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            width: 45px;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        /* Checkpoints Section */
+        .checkpoint-list {
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .checkpoint-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--bg-surface);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .checkpoint-item:hover {
+            border-left-color: #8b5cf6;
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .checkpoint-item.selected {
+            border-left-color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .checkpoint-step {
+            font-weight: 600;
+            color: var(--color-gold);
+            font-size: 0.9rem;
+            min-width: 60px;
+        }
+
+        .checkpoint-meta {
+            flex: 1;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .checkpoint-badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .checkpoint-badge.drift {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .checkpoint-badge.clean {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           EMPTY STATE
+           ───────────────────────────────────────────────────────────── */
         .empty-state {
             text-align: center;
             padding: 3rem;
@@ -523,10 +515,6 @@
             margin-bottom: 0.5rem;
         }
 
-        .empty-state p {
-            font-size: 0.9rem;
-        }
-
         .empty-state code {
             display: block;
             margin-top: 1rem;
@@ -537,37 +525,193 @@
             font-size: 0.85rem;
         }
 
-        /* Loading */
+        /* ─────────────────────────────────────────────────────────────
+           LOADING
+           ───────────────────────────────────────────────────────────── */
         .loading-spinner {
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 2rem;
             color: var(--text-muted);
+            gap: 0.75rem;
         }
 
         .spinner {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             border: 2px solid var(--border-color);
-            border-top-color: var(--color-gold);
+            border-top-color: #8b5cf6;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-right: 0.75rem;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
 
-        /* Responsive */
+        /* ─────────────────────────────────────────────────────────────
+           MODAL
+           ───────────────────────────────────────────────────────────── */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem;
+            background: rgba(139, 92, 246, 0.1);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            font-size: 1.2rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            max-height: 50vh;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+        }
+
+        .form-hint {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 6px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            background: rgba(0,0,0,0.2);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .modal-btn {
+            padding: 0.6rem 1.25rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .modal-btn-cancel {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .modal-btn-cancel:hover {
+            border-color: var(--text-muted);
+        }
+
+        .modal-btn-submit {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .modal-btn-submit:hover {
+            filter: brightness(1.1);
+        }
+
+        .modal-btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           RESPONSIVE
+           ───────────────────────────────────────────────────────────── */
         @media (max-width: 1200px) {
             .analysis-grid {
                 grid-template-columns: 1fr;
             }
-            .movers-section {
+            .sidebar-stack {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
+            }
+            .layer-stats-grid {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
@@ -575,8 +719,11 @@
             .summary-row {
                 grid-template-columns: 1fr 1fr;
             }
-            .movers-section {
+            .sidebar-stack {
                 grid-template-columns: 1fr;
+            }
+            .banner-controls {
+                flex-wrap: wrap;
             }
         }
     </style>
@@ -585,43 +732,53 @@
     <!-- TITLE BAR -->
     <header class="game-header">
         <div class="header-left">
-            <a href="/" class="game-title">Realm of Training</a>
+            <h1 class="game-title">Archaeology</h1>
         </div>
-        <nav class="header-nav">
-            <a href="/">Tavern</a>
-            <a href="/quests">Quests</a>
-            <a href="/guild">Guild</a>
-            <a href="/oracle">Oracle</a>
-            <a href="/campaign">Campaign</a>
-            <a href="/analysis" class="active">Analysis</a>
-            <a href="/settings">Settings</a>
-        </nav>
+        <div class="header-center">
+            <div class="resource-bar">
+                <div class="resource">
+                    <span class="resource-icon">🔬</span>
+                    <span class="resource-label">SCHOOL</span>
+                    <span class="resource-value">Archaeology</span>
+                </div>
+                <div class="resource">
+                    <span class="resource-icon">📊</span>
+                    <span class="resource-label">ANALYZED</span>
+                    <span class="resource-value" id="headerAnalyzed">0</span>
+                </div>
+            </div>
+        </div>
         <div class="header-right">
             <div class="time-display" id="timeDisplay">--:--:--</div>
         </div>
     </header>
 
+    <!-- ARCHAEOLOGY BANNER -->
+    <div class="archaeology-banner">
+        <div class="banner-icon-frame">
+            <div class="banner-icon-ring"></div>
+            <span class="banner-icon">🔬</span>
+        </div>
+        <div class="banner-info">
+            <h2 class="banner-title">Model Archaeology</h2>
+            <p class="banner-subtitle">Layer drift analysis and weight evolution tracking</p>
+        </div>
+        <div class="banner-controls">
+            <select class="control-select" id="heroSelect">
+                <option value="">Loading heroes...</option>
+            </select>
+            <select class="control-select" id="campaignSelect">
+                <option value="">Loading campaigns...</option>
+            </select>
+            <button class="banner-btn" onclick="loadData()">Refresh</button>
+            <button class="banner-btn primary" onclick="showRunAnalysisModal()">
+                + Run Analysis
+            </button>
+        </div>
+    </div>
+
     <!-- MAIN -->
     <main class="analysis-main">
-        <div class="analysis-header">
-            <div>
-                <h1 class="analysis-title">Model Archaeology</h1>
-                <p class="analysis-subtitle">Layer drift analysis and weight evolution tracking</p>
-            </div>
-            <div class="controls">
-                <select class="control-select" id="campaignSelect">
-                    <option value="">Loading campaigns...</option>
-                </select>
-                <select class="control-select" id="heroSelect">
-                    <option value="">Loading heroes...</option>
-                </select>
-                <button class="refresh-btn" onclick="loadData()">Refresh</button>
-                <button class="refresh-btn run-analysis-btn" onclick="showRunAnalysisModal()" title="Run layer analysis on a checkpoint">
-                    Run Analysis
-                </button>
-            </div>
-        </div>
-
         <!-- Summary Cards -->
         <div class="summary-row">
             <div class="summary-card">
@@ -645,52 +802,58 @@
         <!-- Main Grid -->
         <div class="analysis-grid">
             <!-- Heatmap -->
-            <div class="heatmap-section">
+            <div class="section-card">
                 <div class="section-header">
-                    <h3 class="section-title">Layer Drift Heatmap</h3>
-                    <span style="font-size: 0.8rem; color: var(--text-muted);">
-                        Hover for details &bull; Click to select layer
-                    </span>
+                    <h3 class="section-title">
+                        <span class="section-icon">🗺️</span>
+                        Layer Drift Heatmap
+                    </h3>
+                    <span class="section-hint">Hover for details | Click to select layer</span>
                 </div>
-                <div class="heatmap-container">
-                    <canvas id="driftHeatmap"></canvas>
-                </div>
-                <div class="heatmap-legend">
-                    <span>Low drift</span>
-                    <div class="legend-gradient"></div>
-                    <span>High drift</span>
-                </div>
+                <div class="section-body">
+                    <div class="heatmap-container">
+                        <canvas id="driftHeatmap"></canvas>
+                    </div>
+                    <div class="heatmap-legend">
+                        <span>Low drift</span>
+                        <div class="legend-gradient"></div>
+                        <span>High drift</span>
+                    </div>
 
-                <!-- Layer Detail Panel -->
-                <div class="layer-detail" id="layerDetail">
-                    <div class="layer-detail-header" id="layerDetailName">--</div>
-                    <div class="layer-stats-grid">
-                        <div class="layer-stat">
-                            <div class="layer-stat-value" id="layerTotalDrift">--</div>
-                            <div class="layer-stat-label">Total Drift (L2)</div>
-                        </div>
-                        <div class="layer-stat">
-                            <div class="layer-stat-value" id="layerAvgCosine">--</div>
-                            <div class="layer-stat-label">Avg Cosine Similarity</div>
-                        </div>
-                        <div class="layer-stat">
-                            <div class="layer-stat-value" id="layerMaxDrift">--</div>
-                            <div class="layer-stat-label">Max Single-Step Drift</div>
-                        </div>
-                        <div class="layer-stat">
-                            <div class="layer-stat-value" id="layerCheckpoints">--</div>
-                            <div class="layer-stat-label">Checkpoints</div>
+                    <!-- Layer Detail Panel -->
+                    <div class="layer-detail" id="layerDetail">
+                        <div class="layer-detail-header" id="layerDetailName">--</div>
+                        <div class="layer-stats-grid">
+                            <div class="layer-stat">
+                                <div class="layer-stat-value" id="layerTotalDrift">--</div>
+                                <div class="layer-stat-label">Total Drift (L2)</div>
+                            </div>
+                            <div class="layer-stat">
+                                <div class="layer-stat-value" id="layerAvgCosine">--</div>
+                                <div class="layer-stat-label">Avg Cosine Sim</div>
+                            </div>
+                            <div class="layer-stat">
+                                <div class="layer-stat-value" id="layerMaxDrift">--</div>
+                                <div class="layer-stat-label">Max Step Drift</div>
+                            </div>
+                            <div class="layer-stat">
+                                <div class="layer-stat-value" id="layerCheckpoints">--</div>
+                                <div class="layer-stat-label">Checkpoints</div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Sidebar -->
-            <div class="movers-section">
+            <div class="sidebar-stack">
                 <!-- Top Movers -->
                 <div class="movers-card">
                     <div class="section-header">
-                        <h3 class="section-title">Most Changed Layers</h3>
+                        <h3 class="section-title">
+                            <span class="section-icon">🔥</span>
+                            Most Changed
+                        </h3>
                     </div>
                     <div class="mover-list" id="topMoversList">
                         <div class="loading-spinner">
@@ -703,7 +866,10 @@
                 <!-- Most Stable -->
                 <div class="movers-card">
                     <div class="section-header">
-                        <h3 class="section-title">Most Stable Layers</h3>
+                        <h3 class="section-title">
+                            <span class="section-icon">🧊</span>
+                            Most Stable
+                        </h3>
                     </div>
                     <div class="mover-list" id="stableMoversList">
                         <div class="loading-spinner">
@@ -714,9 +880,12 @@
                 </div>
 
                 <!-- Analyzed Checkpoints -->
-                <div class="checkpoints-section">
+                <div class="movers-card">
                     <div class="section-header">
-                        <h3 class="section-title">Analyzed Checkpoints</h3>
+                        <h3 class="section-title">
+                            <span class="section-icon">📦</span>
+                            Analyzed Checkpoints
+                        </h3>
                     </div>
                     <div class="checkpoint-list" id="checkpointList">
                         <div class="loading-spinner">
@@ -737,7 +906,10 @@
     <div class="modal-overlay" id="analysisModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title">Run Layer Analysis</h3>
+                <h3 class="modal-title">
+                    <span>🔬</span>
+                    Run Layer Analysis
+                </h3>
                 <button class="modal-close" onclick="hideRunAnalysisModal()">&times;</button>
             </div>
             <div class="modal-body">
@@ -754,15 +926,15 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="analysisActivations" checked>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="analysisActivations" checked style="width: auto;">
                         Compute activation statistics (slower but more detailed)
                     </label>
                 </div>
-                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 1rem;">
+                <div class="form-hint">
                     Analysis will be queued as a job. GPU required for activation stats.
                     Results will appear when the job completes.
-                </p>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="modal-btn modal-btn-cancel" onclick="hideRunAnalysisModal()">Cancel</button>
@@ -774,7 +946,7 @@
     </div>
 
     <script>
-        // State - initialized from active campaign, not hardcoded
+        // State
         let campaignId = null;
         let heroId = null;
         let timelineData = null;
@@ -800,7 +972,7 @@
                 // Set from active campaign
                 if (data.active) {
                     campaignId = data.active.id;
-                    heroId = data.active.hero_id;  // Use active hero, not hardcoded
+                    heroId = data.active.hero_id;
                 }
 
                 // Build hero list from campaign data
@@ -1010,13 +1182,12 @@
         }
 
         function getHeatmapColor(value) {
-            // Blue -> Cyan -> Green -> Yellow -> Red
             const colors = [
-                [30, 58, 95],    // Dark blue
-                [59, 130, 246],  // Blue
-                [34, 197, 94],   // Green
-                [245, 158, 11],  // Yellow
-                [239, 68, 68]    // Red
+                [30, 58, 95],
+                [59, 130, 246],
+                [34, 197, 94],
+                [245, 158, 11],
+                [239, 68, 68]
             ];
 
             const idx = Math.min(Math.floor(value * (colors.length - 1)), colors.length - 2);
@@ -1035,7 +1206,6 @@
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
-            // Calculate cell
             const labelWidth = 180;
             const topMargin = 60;
             const cellWidth = 40;
@@ -1059,10 +1229,8 @@
         function handleHeatmapClick(e, checkpoints, layers) {
             const canvas = e.target;
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
-            const labelWidth = 180;
             const topMargin = 60;
             const cellHeight = 16;
 
@@ -1101,34 +1269,32 @@
             const maxDrift = moversData.top_movers[0]?.total_drift || 1;
 
             topList.innerHTML = moversData.top_movers.map((m, i) => `
-                <div class="mover-item">
-                    <div class="mover-rank top">${i + 1}</div>
+                <div class="mover-item hot">
+                    <div class="mover-rank">${i + 1}</div>
                     <div class="mover-name" title="${m.layer}">${formatLayerName(m.layer)}</div>
                     <div class="mover-bar-container">
-                        <div class="mover-bar" style="width: ${(m.total_drift / maxDrift * 100)}%"></div>
+                        <div class="mover-bar hot" style="width: ${(m.total_drift / maxDrift * 100)}%"></div>
                     </div>
                     <div class="mover-value">${m.total_drift.toFixed(2)}</div>
                 </div>
-            `).join('') || '<div style="color: var(--text-muted);">No data</div>';
+            `).join('') || '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No data</div>';
 
             // Stable layers
             const stableList = document.getElementById('stableMoversList');
-            const minDrift = moversData.most_stable[0]?.total_drift || 0.01;
 
             stableList.innerHTML = moversData.most_stable.map((m, i) => `
-                <div class="mover-item">
-                    <div class="mover-rank stable">${i + 1}</div>
+                <div class="mover-item cold">
+                    <div class="mover-rank">${i + 1}</div>
                     <div class="mover-name" title="${m.layer}">${formatLayerName(m.layer)}</div>
                     <div class="mover-bar-container">
-                        <div class="mover-bar stable" style="width: ${Math.min(m.total_drift / (maxDrift * 0.1) * 100, 100)}%"></div>
+                        <div class="mover-bar cold" style="width: ${Math.min(m.total_drift / (maxDrift * 0.1) * 100, 100)}%"></div>
                     </div>
                     <div class="mover-value">${m.total_drift.toFixed(4)}</div>
                 </div>
-            `).join('') || '<div style="color: var(--text-muted);">No data</div>';
+            `).join('') || '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No data</div>';
         }
 
         function formatLayerName(name) {
-            // Shorten layer names for display
             return name
                 .replace('model.layers.', 'L')
                 .replace('.self_attn.', '.attn.')
@@ -1147,12 +1313,15 @@
             // Sort by step descending
             const sorted = [...checkpointData.stats].sort((a, b) => b.checkpoint_step - a.checkpoint_step);
 
+            // Update header count
+            document.getElementById('headerAnalyzed').textContent = sorted.length;
+
             list.innerHTML = sorted.map(c => `
                 <div class="checkpoint-item" onclick="loadCheckpointDetail(${c.checkpoint_step})">
                     <div class="checkpoint-step">${c.checkpoint_step.toLocaleString()}</div>
                     <div class="checkpoint-meta">
                         ${c.num_layers} layers
-                        ${c.compute_duration_sec ? `&bull; ${c.compute_duration_sec.toFixed(1)}s` : ''}
+                        ${c.compute_duration_sec ? ` | ${c.compute_duration_sec.toFixed(1)}s` : ''}
                     </div>
                     <div class="checkpoint-badge ${c.has_drift ? 'drift' : 'clean'}">
                         ${c.has_drift ? 'DRIFT' : 'CLEAN'}
@@ -1172,7 +1341,6 @@
                 const data = await resp.json();
                 console.log('Checkpoint detail:', data);
 
-                // Could show in a modal or panel
                 alert(`Checkpoint ${step}\n\n` +
                     `Layers: ${Object.keys(data.weight_stats || {}).length}\n` +
                     `Has drift: ${!!data.drift_stats}\n` +
@@ -1225,7 +1393,7 @@
                 <div class="empty-state">
                     <div class="empty-state-icon">🔬</div>
                     <h3>No Analysis Data Yet</h3>
-                    <p>Click "Run Analysis" to analyze a checkpoint, or run manually:</p>
+                    <p>Click "+ Run Analysis" to analyze a checkpoint, or run manually:</p>
                     <code>python3 scripts/run_layer_stats.py local --checkpoint checkpoint-183000</code>
                 </div>
             `;
@@ -1238,10 +1406,7 @@
         let availableCheckpoints = [];
 
         async function showRunAnalysisModal() {
-            // Show modal
             document.getElementById('analysisModal').classList.add('active');
-
-            // Load available checkpoints
             await loadAvailableCheckpoints();
         }
 
@@ -1265,7 +1430,6 @@
                 const data = await resp.json();
                 availableCheckpoints = data.checkpoints || [];
 
-                // Populate checkpoint select
                 checkpointSelect.innerHTML = availableCheckpoints.map(c => {
                     const lossStr = c.train_loss ? ` (loss: ${c.train_loss.toFixed(4)})` : '';
                     const analyzedStr = c.has_analysis ? ' ✓' : '';
@@ -1276,7 +1440,6 @@
                     checkpointSelect.innerHTML = '<option value="">No checkpoints available</option>';
                 }
 
-                // Populate reference select (same options plus "None")
                 referenceSelect.innerHTML = '<option value="">None - Weight stats only</option>' +
                     availableCheckpoints.map(c => {
                         const lossStr = c.train_loss ? ` (loss: ${c.train_loss.toFixed(4)})` : '';
@@ -1358,7 +1521,7 @@
             }
         });
 
-        // Campaign select change handler
+        // Campaign/hero select change handlers
         document.getElementById('campaignSelect').addEventListener('change', loadData);
         document.getElementById('heroSelect').addEventListener('change', loadData);
 

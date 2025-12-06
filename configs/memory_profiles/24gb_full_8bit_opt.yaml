@@ -1,0 +1,121 @@
+# =============================================================================
+# MEMORY PROFILE: 24GB Full Training with 8-bit Optimizer
+# =============================================================================
+# Full parameter training with 8-bit optimizer to extend model size range
+# Best for: 2B-4B models where standard full training is tight on memory
+# =============================================================================
+
+id: 24gb_full_8bit_opt
+name: "24GB Full Training 8-bit Optimizer"
+rpg_name: "The Efficient Scholar"
+icon: "📚"
+description: |
+  Full parameter training with 8-bit optimizer.
+
+  Trade-offs vs standard full training:
+  + ~30% less VRAM for optimizer states
+  + Can fit slightly larger models
+  - Minor training stability concerns (rare)
+
+  Use when: Full training is preferred but memory is tight.
+
+target_vram_gb: 24
+
+# =============================================================================
+# PEFT CONFIGURATION - DISABLED
+# =============================================================================
+peft:
+  method: "none"  # Full training - all parameters
+
+  lora:
+    r: 64
+    alpha: 128
+    dropout: 0.05
+    target_modules:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+      - gate_proj
+      - up_proj
+      - down_proj
+    bias: "none"
+    task_type: "CAUSAL_LM"
+
+  galore:
+    rank: 1024
+    update_proj_gap: 200
+    scale: 0.25
+    proj_type: "std"
+
+# =============================================================================
+# QUANTIZATION - DISABLED
+# =============================================================================
+quantization:
+  load_in_4bit: false
+  load_in_8bit: false
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: false
+
+# =============================================================================
+# MEMORY-EFFICIENT IMPLEMENTATIONS
+# =============================================================================
+memory:
+  gradient_checkpointing: true
+  flash_attention: true
+  paged_optimizer: false     # Not needed at this scale
+  cpu_offload: false
+
+# =============================================================================
+# OPTIMIZER CONFIGURATION
+# 8-bit optimizer for memory savings
+# =============================================================================
+optimizer:
+  type: "adamw_8bit"  # 50% less optimizer memory
+
+  adamw:
+    lr: 1e-4                 # Standard full training LR
+    betas: [0.9, 0.999]
+    eps: 1e-8
+    weight_decay: 0.01
+
+  muon:
+    hidden_lr: 0.02
+    aux_lr: 3e-4
+    momentum: 0.95
+    weight_decay: 0
+
+# =============================================================================
+# TRAINING CONSTRAINTS
+# =============================================================================
+constraints:
+  max_batch_size: 2
+  recommended_grad_accum: 4
+  max_sequence_length: 2048
+  precision: "bf16"
+
+# =============================================================================
+# MODEL SIZE RECOMMENDATIONS
+# =============================================================================
+recommendations:
+  max_model_size_b: 4
+  optimal_model_sizes:
+    - "2B"
+    - "3B"
+    - "4B"
+  tested_models:
+    - "Qwen3-4B"
+    - "Phi-2"
+    - "Gemma-2B"
+  notes: |
+    Full training with 8-bit optimizer for 2B-4B models.
+
+    Expected VRAM usage (4B model):
+    - Model (bf16): ~8GB
+    - Gradients: ~8GB
+    - Activations: ~4GB (with checkpointing)
+    - Optimizer (8-bit): ~4GB (vs ~8GB for 32-bit)
+    - Total: ~20-22GB peak
+
+    Better accuracy than LoRA/QLoRA for small models.

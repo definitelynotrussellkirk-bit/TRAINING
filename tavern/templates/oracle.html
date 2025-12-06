@@ -4,11 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Oracle - Realm of Training</title>
-    <!-- Shared theme -->
     <link rel="stylesheet" href="/static/css/theme.css?v=1">
     <link rel="stylesheet" href="/static/css/game.css?v=4">
     <style>
-        /* Oracle-specific styles - uses theme.css variables */
+        /* Oracle Enhanced Styles */
         body {
             background: var(--bg-dark);
             color: var(--text-primary);
@@ -16,214 +15,449 @@
         }
 
         .oracle-container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
 
-        .oracle-subtitle {
-            text-align: center;
+        /* Hero Banner */
+        .hero-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
             margin-bottom: 20px;
-            color: var(--text-muted);
-            font-size: 1rem;
+            background: linear-gradient(135deg, rgba(30, 30, 50, 0.95) 0%, rgba(40, 35, 60, 0.95) 100%);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
-        .oracle-layout {
-            display: grid;
-            grid-template-columns: 300px 1fr;
+        .hero-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .hero-icon-large {
+            font-size: 3rem;
+            filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
+        }
+
+        .hero-details h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            color: #ffd700;
+            margin: 0;
+        }
+
+        .hero-details .subtitle {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+
+        .server-status {
+            display: flex;
+            align-items: center;
             gap: 20px;
         }
 
-        /* Sidebar - Checkpoint Selection */
-        .checkpoint-panel {
+        .status-item {
+            text-align: center;
+        }
+
+        .status-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .status-value.online { color: var(--color-success); }
+        .status-value.offline { color: var(--color-danger); }
+
+        .status-label {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Main Layout */
+        .oracle-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .panel {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: 20px;
+            border-radius: 12px;
+            overflow: hidden;
         }
 
-        .checkpoint-panel h2 {
-            color: var(--text-gold);
-            margin-bottom: 15px;
-            font-size: 1.2rem;
-        }
-
-        .host-selector {
-            margin-bottom: 20px;
-        }
-
-        .host-selector label {
-            display: block;
-            color: var(--text-muted);
-            margin-bottom: 5px;
-            font-size: 0.9rem;
-        }
-
-        .host-selector select {
-            width: 100%;
-            padding: 10px;
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
             background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
-            font-family: inherit;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .host-status {
+        .panel-header h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-gold);
+            margin: 0;
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-top: 8px;
+        }
+
+        .panel-content {
+            padding: 12px;
+        }
+
+        /* Loaded Models Panel */
+        .loaded-models-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .loaded-model-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .loaded-model-item:hover {
+            border-color: var(--border-gold);
+            background: rgba(251, 191, 36, 0.1);
+        }
+
+        .loaded-model-item.active {
+            border-color: var(--color-success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .loaded-model-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .loaded-model-info .step {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .loaded-model-info .loss {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .use-btn {
+            padding: 4px 12px;
+            background: var(--border-gold);
+            border: none;
+            border-radius: 4px;
+            color: var(--bg-dark);
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .no-models {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .quick-btn {
+            padding: 10px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
             font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
         }
 
-        .host-status .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--color-danger);
+        .quick-btn:hover {
+            border-color: var(--border-gold);
+            background: rgba(251, 191, 36, 0.1);
         }
 
-        .host-status .status-dot.online {
-            background: var(--color-success);
+        .quick-btn .icon {
+            font-size: 1.2rem;
         }
 
+        .quick-btn .label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        /* Generation Settings */
+        .settings-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .setting-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .setting-row label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .setting-row input[type="range"] {
+            width: 100%;
+            accent-color: var(--border-gold);
+        }
+
+        .setting-row input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+        }
+
+        .setting-row textarea {
+            width: 100%;
+            padding: 8px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        /* Checkpoint List */
         .checkpoint-list {
-            max-height: 400px;
+            max-height: 300px;
             overflow-y: auto;
         }
 
         .checkpoint-item {
-            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            margin-bottom: 8px;
+            border-radius: 8px;
+            margin-bottom: 6px;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .checkpoint-item:hover {
             border-color: var(--border-gold);
-            background: rgba(251, 191, 36, 0.1);
+            background: rgba(251, 191, 36, 0.05);
         }
 
         .checkpoint-item.selected {
             border-color: var(--border-gold);
-            background: rgba(251, 191, 36, 0.15);
+            background: rgba(251, 191, 36, 0.1);
         }
 
         .checkpoint-item.loaded {
-            border-color: var(--color-success);
+            border-left: 3px solid var(--color-success);
         }
 
-        .checkpoint-item .step {
-            font-weight: bold;
+        .checkpoint-item .hero-icon {
+            font-size: 1.2rem;
+        }
+
+        .checkpoint-item .info {
+            flex: 1;
+        }
+
+        .checkpoint-item .step-label {
+            font-weight: 600;
             color: var(--text-primary);
         }
 
-        .checkpoint-item .stats {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .checkpoint-item .skill-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            background: var(--border-gold);
-            border-radius: 10px;
-            font-size: 0.75rem;
-            color: var(--bg-dark);
-            margin-top: 4px;
-        }
-
-        .section-label {
+        .checkpoint-item .meta {
             font-size: 0.75rem;
             color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin: 10px 0 8px 0;
-            padding-bottom: 4px;
-            border-bottom: 1px solid var(--border-color);
         }
 
-        .checkpoint-item.inactive {
-            opacity: 0.5;
+        .checkpoint-item .badges {
+            display: flex;
+            gap: 4px;
         }
 
-        .load-btn {
-            width: 100%;
-            padding: 12px;
-            background: var(--border-gold);
-            border: none;
-            border-radius: var(--radius-md);
+        .mini-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 600;
+        }
+
+        .mini-badge.best {
+            background: linear-gradient(135deg, var(--color-gold), #b8860b);
             color: var(--bg-dark);
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 15px;
-            transition: opacity 0.2s;
         }
 
-        .load-btn:hover {
-            opacity: 0.9;
-        }
-
-        .load-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .mini-badge.latest {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
         }
 
         /* Chat Panel */
         .chat-panel {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
+            border-radius: 12px;
             display: flex;
             flex-direction: column;
-            height: 70vh;
+            height: calc(100vh - 220px);
+            min-height: 500px;
         }
 
         .chat-header {
-            padding: 15px 20px;
-            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-dark);
         }
 
-        .chat-header .model-info {
-            font-size: 0.9rem;
+        .chat-header h2 {
+            font-size: 1.1rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chat-header .model-badge {
+            padding: 4px 10px;
+            background: rgba(16, 185, 129, 0.2);
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: var(--color-success);
+            font-weight: 600;
+        }
+
+        .chat-header .model-badge.none {
+            background: rgba(107, 114, 128, 0.2);
             color: var(--text-muted);
         }
 
-        .chat-header .model-info .loaded-model {
-            color: var(--color-success);
-            font-weight: bold;
+        .chat-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-action-btn {
+            padding: 6px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chat-action-btn:hover {
+            border-color: var(--border-gold);
+            color: var(--text-primary);
         }
 
         .chat-messages {
             flex: 1;
             overflow-y: auto;
             padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
         .message {
-            margin-bottom: 20px;
-            max-width: 80%;
+            max-width: 85%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .message.user {
-            margin-left: auto;
+            align-self: flex-end;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+        }
+
+        .message .sender {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .message.user .sender {
+            justify-content: flex-end;
         }
 
         .message .bubble {
             padding: 12px 16px;
-            border-radius: 12px;
-            line-height: 1.5;
+            border-radius: 16px;
+            line-height: 1.6;
+            word-wrap: break-word;
         }
 
         .message.user .bubble {
-            background: var(--border-gold);
+            background: linear-gradient(135deg, var(--border-gold), #d4a017);
             color: var(--bg-dark);
             border-bottom-right-radius: 4px;
         }
@@ -234,614 +468,790 @@
             border-bottom-left-radius: 4px;
         }
 
-        .message .sender {
-            font-size: 0.8rem;
+        /* Code blocks in messages */
+        .message .bubble pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 8px 0;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        .message .bubble code {
+            font-family: var(--font-mono);
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        .message .bubble pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .message .response-meta {
+            font-size: 0.7rem;
             color: var(--text-muted);
-            margin-bottom: 4px;
+            margin-top: 6px;
+            opacity: 0.7;
         }
 
-        .message.user .sender {
-            text-align: right;
-        }
-
-        .chat-input {
-            padding: 15px 20px;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            gap: 10px;
-        }
-
-        .chat-input textarea {
-            flex: 1;
-            padding: 12px;
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
-            font-family: inherit;
-            resize: none;
-            min-height: 50px;
-        }
-
-        .chat-input button {
-            padding: 12px 24px;
-            background: var(--border-gold);
-            border: none;
-            border-radius: var(--radius-md);
-            color: var(--bg-dark);
-            font-weight: bold;
-            cursor: pointer;
-            align-self: flex-end;
-        }
-
-        .chat-input button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* Loading States */
-        .loading {
+        /* Typing Indicator */
+        .typing-indicator {
             display: flex;
             align-items: center;
-            gap: 10px;
-            color: var(--text-muted);
+            gap: 4px;
+            padding: 12px 16px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+            width: fit-content;
         }
 
-        .loading .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--border-color);
-            border-top-color: var(--border-gold);
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--text-muted);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            animation: typingBounce 1.4s infinite ease-in-out;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typingBounce {
+            0%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-6px); }
+        }
+
+        /* System Message */
+        .system-message {
+            text-align: center;
+            padding: 8px 16px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            background: rgba(107, 114, 128, 0.1);
+            border-radius: 8px;
+            align-self: center;
+        }
+
+        .system-message.success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--color-success);
+        }
+
+        .system-message.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--color-danger);
         }
 
         /* Empty State */
         .empty-state {
             text-align: center;
-            padding: 40px;
+            padding: 60px 40px;
             color: var(--text-muted);
         }
 
         .empty-state .icon {
-            font-size: 3rem;
-            margin-bottom: 15px;
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        /* Chat Input */
+        .chat-input-container {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-dark);
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .chat-input-wrapper textarea {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.95rem;
+            resize: none;
+            min-height: 48px;
+            max-height: 120px;
+            line-height: 1.5;
+        }
+
+        .chat-input-wrapper textarea:focus {
+            outline: none;
+            border-color: var(--border-gold);
+        }
+
+        .chat-input-wrapper textarea:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .send-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--border-gold), #d4a017);
+            border: none;
+            border-radius: 12px;
+            color: var(--bg-dark);
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .token-counter {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            text-align: right;
         }
 
         /* Responsive */
-        @media (max-width: 900px) {
+        @media (max-width: 1000px) {
             .oracle-layout {
                 grid-template-columns: 1fr;
             }
 
-            .checkpoint-panel {
+            .sidebar {
                 order: 2;
             }
 
             .chat-panel {
-                height: 50vh;
+                height: 60vh;
+                min-height: 400px;
             }
+        }
+
+        /* Collapsible panel */
+        .panel.collapsed .panel-content {
+            display: none;
+        }
+
+        .panel-toggle {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: transform 0.2s;
+        }
+
+        .panel.collapsed .panel-toggle {
+            transform: rotate(-90deg);
         }
     </style>
 </head>
 <body>
-    <!-- Shared game header -->
+    <!-- Header -->
     <header class="game-header">
         <div class="header-left">
-            <h1 class="game-title">🔮 Oracle</h1>
+            <h1 class="game-title">Realm of Training</h1>
         </div>
         <div class="header-center">
-            <div class="resource-bar">
-                <div class="resource steps">
-                    <span class="resource-icon">⚡</span>
-                    <span class="resource-label">STEPS</span>
-                    <span class="resource-value" id="totalSteps">0</span>
-                </div>
-                <div class="resource evals">
-                    <span class="resource-icon">🎯</span>
-                    <span class="resource-label">EVALS</span>
-                    <span class="resource-value" id="totalEvals">0</span>
-                </div>
-            </div>
+            <span class="realm-subtitle">The Oracle</span>
         </div>
         <div class="header-right">
-            <div class="realm-mode-toggle" id="realmModeToggle">
-                <button class="mode-btn mode-training" id="btnTraining" title="Enable auto-training">TRAIN</button>
-                <button class="mode-btn mode-idle" id="btnIdle" title="Pause auto-training">IDLE</button>
-            </div>
-            <div class="health-indicator" id="healthIndicator" title="Realm health">
-                <span class="health-icon" id="healthIcon">⚪</span>
-            </div>
-            <div class="idle-indicator" id="idleIndicator">
-                <span class="idle-icon" id="modeIcon">💤</span>
-                <span class="idle-text" id="modeText">IDLE</span>
-            </div>
-            <div class="time-display" id="timeDisplay">--:--:--</div>
+            <span id="timeDisplay" class="time-display"></span>
         </div>
     </header>
 
     <main class="oracle-container">
-        <div class="oracle-subtitle">
-            <p id="oracleSubtitle">Talk to any checkpoint of your hero</p>
+        <!-- Hero Banner -->
+        <div class="hero-banner">
+            <div class="hero-info">
+                <span class="hero-icon-large" id="heroIconLarge">⚡</span>
+                <div class="hero-details">
+                    <h2 id="heroName">OJAS</h2>
+                    <div class="subtitle" id="heroSubtitle">Consult with your AI Champion</div>
+                </div>
+            </div>
+            <div class="server-status">
+                <div class="status-item">
+                    <div class="status-value" id="serverStatus">--</div>
+                    <div class="status-label">Server</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-value" id="loadedCount">0</div>
+                    <div class="status-label">Loaded</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-value" id="latestStep">--</div>
+                    <div class="status-label">Latest</div>
+                </div>
+            </div>
         </div>
 
         <div class="oracle-layout">
-            <!-- Checkpoint Selection Panel -->
-            <div class="checkpoint-panel">
-                <h2>Select Version</h2>
-
-                <div class="host-selector">
-                    <label>Inference Host</label>
-                    <select id="hostSelect">
-                        <option value="">Loading...</option>
-                    </select>
-                    <div class="host-status">
-                        <span class="status-dot" id="hostDot"></span>
-                        <span id="hostStatusText">Checking...</span>
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Currently Loaded Models -->
+                <div class="panel" id="loadedPanel">
+                    <div class="panel-header">
+                        <h3>🔮 Ready to Chat</h3>
+                        <button class="panel-toggle" onclick="togglePanel('loadedPanel')">▼</button>
+                    </div>
+                    <div class="panel-content">
+                        <div class="loaded-models-grid" id="loadedModelsGrid">
+                            <div class="no-models">Loading...</div>
+                        </div>
                     </div>
                 </div>
 
-                <h2>Checkpoints</h2>
-                <div class="checkpoint-list" id="checkpointList">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        <span>Loading checkpoints...</span>
+                <!-- Quick Actions -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>⚡ Quick Load</h3>
+                    </div>
+                    <div class="panel-content">
+                        <div class="quick-actions">
+                            <button class="quick-btn" onclick="loadLatest()">
+                                <span class="icon">🆕</span>
+                                <span class="label">Latest</span>
+                            </button>
+                            <button class="quick-btn" onclick="loadBest()">
+                                <span class="icon">👑</span>
+                                <span class="label">Best Loss</span>
+                            </button>
+                            <button class="quick-btn" onclick="loadBase()">
+                                <span class="icon">🏛️</span>
+                                <span class="label">Base Model</span>
+                            </button>
+                            <button class="quick-btn" onclick="refreshModels()">
+                                <span class="icon">🔄</span>
+                                <span class="label">Refresh</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <button class="load-btn" id="loadBtn" disabled>Load Selected Checkpoint</button>
+                <!-- Generation Settings -->
+                <div class="panel collapsed" id="settingsPanel">
+                    <div class="panel-header">
+                        <h3>⚙️ Generation</h3>
+                        <button class="panel-toggle" onclick="togglePanel('settingsPanel')">▼</button>
+                    </div>
+                    <div class="panel-content">
+                        <div class="settings-grid">
+                            <div class="setting-row">
+                                <label>
+                                    Temperature
+                                    <span id="tempValue">0.7</span>
+                                </label>
+                                <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7"
+                                       oninput="document.getElementById('tempValue').textContent = this.value">
+                            </div>
+                            <div class="setting-row">
+                                <label>Max Tokens</label>
+                                <input type="number" id="maxTokens" value="512" min="64" max="2048" step="64">
+                            </div>
+                            <div class="setting-row">
+                                <label>System Prompt</label>
+                                <textarea id="systemPrompt" placeholder="Optional system prompt..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- All Checkpoints -->
+                <div class="panel" id="checkpointsPanel">
+                    <div class="panel-header">
+                        <h3>📦 All Checkpoints</h3>
+                        <button class="panel-toggle" onclick="togglePanel('checkpointsPanel')">▼</button>
+                    </div>
+                    <div class="panel-content">
+                        <div class="checkpoint-list" id="checkpointList">
+                            <div class="no-models">Loading...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Chat Panel -->
             <div class="chat-panel">
                 <div class="chat-header">
-                    <h2 id="chatTitle">Chat</h2>
-                    <div class="model-info">
-                        Loaded: <span class="loaded-model" id="loadedModel">None</span>
+                    <h2>
+                        <span id="chatHeroIcon">🔮</span>
+                        <span id="chatTitle">Oracle Chat</span>
+                        <span class="model-badge none" id="modelBadge">No model selected</span>
+                    </h2>
+                    <div class="chat-actions">
+                        <button class="chat-action-btn" onclick="clearChat()" title="Clear conversation">🗑️ Clear</button>
+                        <button class="chat-action-btn" onclick="exportChat()" title="Export conversation">📋 Export</button>
                     </div>
                 </div>
 
                 <div class="chat-messages" id="chatMessages">
                     <div class="empty-state">
                         <div class="icon">🔮</div>
-                        <p>Select and load a checkpoint to begin</p>
+                        <h3>The Oracle Awaits</h3>
+                        <p>Select a model from the left panel to begin your consultation</p>
                     </div>
                 </div>
 
-                <div class="chat-input">
-                    <textarea id="messageInput" placeholder="Ask your hero anything..." disabled></textarea>
-                    <button id="sendBtn" disabled>Send</button>
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea id="messageInput" placeholder="Ask your champion anything..." disabled
+                                  onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+                            <span>Send</span>
+                            <span>→</span>
+                        </button>
+                    </div>
+                    <div class="token-counter" id="tokenCounter"></div>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- NAVIGATION (dynamic) -->
+    <!-- Navigation -->
     <nav class="game-nav" id="bottomNav"></nav>
     <script src="/static/js/nav.js"></script>
-    <script src="/static/js/events.js"></script>
-    <script src="/static/js/realm-state.js?v=1"></script>
-    <!-- Shared modules -->
-    <script src="/static/js/formatters.js?v=1"></script>
 
     <script>
-        const $ = (sel) => document.querySelector(sel);
-        const $$ = (sel) => document.querySelectorAll(sel);
-
         // State
-        let selectedCheckpoint = null;
-        let loadedCheckpoint = null;
-        let currentHost = '3090';
+        let activeModel = null;
+        let loadedModels = [];
         let conversationHistory = [];
-        let activeHero = null;
-        let activeCampaign = null;
-        let heroName = 'Hero';  // Default fallback
+        let latestStep = null;
+        let bestStep = null;
+        let isGenerating = false;
+
+        // Hero icon mapping
+        const HERO_ICONS = {
+            'DIO': '🧔🏽', 'FLO': '👩', 'ZENO': '♾️', 'VERO': '✅', 'NERO': '🌑',
+            'ORO': '🪙', 'LOBO': '🐺', 'TORO': '🐂', 'MONO': '🐒', 'OJO': '👁',
+            'GOU': '🐕', 'TAO': '☯️', 'MO': '✒️', 'SHOU': '🛡', 'NEKO': '🐈',
+            'KUMO': '🕸', 'TOMO': '🤝', 'AO': '🌊', 'MOMO': '🍑', 'MOYO': '❤️',
+            'MOTO': '🔥', 'OMO': '🧒', 'MIRO': '🕊', 'LUMO': '💡', 'OM': '🕉️',
+            'OJAS': '⚡', 'BODHI': '🧘', 'DAYA': '🙏', 'AGNI': '🔥', 'KAVI': '✍️',
+        };
+
+        function getHeroIcon(heroId) {
+            if (!heroId) return '🔮';
+            const name = heroId.split('-')[0].toUpperCase();
+            return HERO_ICONS[name] || '🔮';
+        }
+
+        function getHeroName(heroId) {
+            if (!heroId) return 'Oracle';
+            return heroId.split('-')[0].toUpperCase();
+        }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
-            await loadAvailableHosts();
-            await loadCampaignInfo();
-            loadCheckpoints();
-            checkHostStatus();
+            await Promise.all([
+                loadHeroInfo(),
+                loadOracleStatus(),
+                loadCheckpoints()
+            ]);
 
-            // Event listeners
-            $('#hostSelect').addEventListener('change', (e) => {
-                currentHost = e.target.value;
-                checkHostStatus();
-            });
+            // Update time
+            setInterval(updateTime, 1000);
+            updateTime();
 
-            $('#loadBtn').addEventListener('click', loadSelectedCheckpoint);
-            $('#sendBtn').addEventListener('click', sendMessage);
-            $('#messageInput').addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
+            // Refresh status periodically
+            setInterval(loadOracleStatus, 15000);
         });
 
-        async function loadAvailableHosts() {
+        async function loadHeroInfo() {
             try {
-                const response = await fetch('/oracle/hosts');
-                const data = await response.json();
-                const select = $('#hostSelect');
+                const resp = await fetch('/api/campaigns/active');
+                if (resp.ok) {
+                    const campaign = await resp.json();
+                    const heroId = campaign.hero_id;
+                    const heroIcon = getHeroIcon(heroId);
+                    const heroName = getHeroName(heroId);
 
-                if (data.hosts && data.hosts.length > 0) {
-                    select.innerHTML = data.hosts.map(host =>
-                        `<option value="${host.id}">${host.name} (${host.host})</option>`
-                    ).join('');
-                    currentHost = data.hosts[0].id;
-                } else {
-                    select.innerHTML = '<option value="">No hosts available</option>';
+                    document.getElementById('heroIconLarge').textContent = heroIcon;
+                    document.getElementById('heroName').textContent = heroName;
+                    document.getElementById('heroSubtitle').textContent = `${campaign.id} - Consult with your AI Champion`;
+                    document.getElementById('chatHeroIcon').textContent = heroIcon;
                 }
-            } catch (error) {
-                console.error('Failed to load hosts:', error);
-                $('#hostSelect').innerHTML = '<option value="">Error loading hosts</option>';
+            } catch (err) {
+                console.error('Failed to load hero info:', err);
             }
         }
 
-        async function loadCampaignInfo() {
+        async function loadOracleStatus() {
             try {
-                // Get active campaign
-                const campResp = await fetch('/api/campaigns/active');
-                if (campResp.ok) {
-                    activeCampaign = await campResp.json();
+                const resp = await fetch('/oracle/status');
+                const data = await resp.json();
+
+                // Update latest/best
+                if (data.latest_checkpoint) {
+                    latestStep = data.latest_checkpoint.step;
+                    document.getElementById('latestStep').textContent = latestStep.toLocaleString();
+                }
+                if (data.best_checkpoint) {
+                    bestStep = data.best_checkpoint.step;
                 }
 
-                // Get hero details
-                const heroesResp = await fetch('/api/heroes');
-                if (heroesResp.ok) {
-                    const heroes = await heroesResp.json();
-                    if (activeCampaign?.hero_id) {
-                        activeHero = heroes.find(h => h.id === activeCampaign.hero_id);
-                    }
+                // Update server status and loaded models
+                const hostData = data.hosts?.['3090'];
+                if (hostData) {
+                    const isOnline = hostData.status === 'online';
+                    const statusEl = document.getElementById('serverStatus');
+                    statusEl.textContent = isOnline ? '● ON' : '○ OFF';
+                    statusEl.className = 'status-value ' + (isOnline ? 'online' : 'offline');
+
+                    loadedModels = hostData.loaded_models || [];
+                    document.getElementById('loadedCount').textContent = loadedModels.length;
+
+                    renderLoadedModels();
                 }
-
-                // Update UI
-                heroName = activeHero?.name || 'Your Hero';
-                $('#oracleSubtitle').textContent = `Consult with ${heroName} - Your AI Champion`;
-                $('#chatTitle').textContent = `Chat with ${heroName}`;
-
-                // Update placeholder text
-                $('#messageInput').placeholder = `Ask ${heroName} anything...`;
             } catch (err) {
-                console.error('Error loading campaign info:', err);
-                $('#oracleSubtitle').textContent = 'Consult with Your AI Champion';
+                console.error('Failed to load oracle status:', err);
+                document.getElementById('serverStatus').textContent = '⚠️';
             }
+        }
+
+        function renderLoadedModels() {
+            const grid = document.getElementById('loadedModelsGrid');
+
+            if (loadedModels.length === 0) {
+                grid.innerHTML = '<div class="no-models">No models loaded. Use Quick Load to get started.</div>';
+                return;
+            }
+
+            grid.innerHTML = loadedModels.map(model => {
+                const isActive = activeModel?.step === model.step;
+                const stepLabel = model.step === 0 ? 'Base Model' : `Step ${model.step.toLocaleString()}`;
+                const lossStr = model.ledger_info?.train_loss?.toFixed(4) || '';
+
+                return `
+                    <div class="loaded-model-item ${isActive ? 'active' : ''}" onclick="selectModel(${model.step})">
+                        <div class="loaded-model-info">
+                            <span class="step">${stepLabel}</span>
+                            ${lossStr ? `<span class="loss">loss: ${lossStr}</span>` : ''}
+                        </div>
+                        <button class="use-btn">${isActive ? '✓ Active' : 'Use'}</button>
+                    </div>
+                `;
+            }).join('');
         }
 
         async function loadCheckpoints() {
             try {
-                // Use vault/assets for campaign-aware checkpoint list
-                const response = await fetch('/vault/assets');
-                const data = await response.json();
-
-                const list = $('#checkpointList');
-                const checkpoints = data.checkpoints || [];
-
-                // Filter to active campaign checkpoints
-                const activeCheckpoints = checkpoints.filter(cp => cp.is_active_campaign);
-                const otherCheckpoints = checkpoints.filter(cp => !cp.is_active_campaign);
-
-                if (checkpoints.length === 0) {
-                    list.innerHTML = `
-                        <div class="empty-state">
-                            <p>No checkpoints found</p>
-                            <p style="font-size: 0.85rem; margin-top: 10px;">
-                                Train your hero to create checkpoints
-                            </p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                let html = '';
-
-                // Add base model option
-                if (activeHero) {
-                    html += `
-                        <div class="checkpoint-item base-model" data-step="0" data-hero="${activeCampaign?.hero_id || ''}">
-                            <div class="step">🏛️ ${activeHero.name}'s Base (${activeHero.model?.size_b || '?'}B)</div>
-                            <div class="stats">${activeHero.model?.hf_name || 'Base Model'}</div>
-                        </div>
-                    `;
-                }
-
-                // Active campaign checkpoints
-                if (activeCheckpoints.length > 0) {
-                    html += `<div class="section-label">Active Campaign (${activeCheckpoints.length})</div>`;
-                    for (const cp of activeCheckpoints.slice(0, 15)) {
-                        html += renderCheckpointItem(cp, false);
-                    }
-                }
-
-                // Other campaign checkpoints (faded)
-                if (otherCheckpoints.length > 0) {
-                    html += `<div class="section-label" style="opacity: 0.5; margin-top: 15px;">Other Campaigns (${otherCheckpoints.length})</div>`;
-                    for (const cp of otherCheckpoints.slice(0, 10)) {
-                        html += renderCheckpointItem(cp, true);
-                    }
-                }
-
-                list.innerHTML = html;
-
-                // Add click handlers
-                $$('.checkpoint-item').forEach(item => {
-                    item.addEventListener('click', () => selectCheckpoint(item));
-                });
-            } catch (err) {
-                console.error('Error loading checkpoints:', err);
-            }
-        }
-
-        function renderCheckpointItem(cp, isInactive) {
-            const heroLabel = cp.hero_id ? cp.hero_id.split('-')[0].toUpperCase() : '';
-            const sizeStr = cp.size_gb ? cp.size_gb.toFixed(1) + ' GB' : '';
-            const ageStr = cp.age_hours != null
-                ? (cp.age_hours < 1 ? 'Just now' : cp.age_hours.toFixed(1) + 'h ago')
-                : '';
-            const statsStr = [heroLabel, sizeStr, ageStr].filter(Boolean).join(' · ');
-            return `
-                <div class="checkpoint-item ${isInactive ? 'inactive' : ''}"
-                     data-step="${cp.step}"
-                     data-path="${cp.path}"
-                     data-hero="${cp.hero_id || ''}"
-                     style="${isInactive ? 'opacity: 0.5;' : ''}">
-                    <div class="step">${cp.is_champion ? '👑' : '💾'} Step ${cp.step.toLocaleString()}</div>
-                    <div class="stats">${statsStr || 'Checkpoint'}</div>
-                </div>
-            `;
-        }
-
-        function selectCheckpoint(item) {
-            $$('.checkpoint-item').forEach(i => i.classList.remove('selected'));
-            item.classList.add('selected');
-            selectedCheckpoint = {
-                step: parseInt(item.dataset.step),
-                path: item.dataset.path,
-                hero_id: item.dataset.hero || activeCampaign?.hero_id
-            };
-            $('#loadBtn').disabled = false;
-        }
-
-        // Legacy support - also try ledger if vault doesn't have data
-        async function loadCheckpointsFromLedger() {
-            try {
-                const response = await fetch('/ledger?limit=20');
-                const data = await response.json();
-
-                const list = $('#checkpointList');
+                const resp = await fetch('/ledger?limit=30&include_base=false');
+                const data = await resp.json();
+                const list = document.getElementById('checkpointList');
 
                 if (!data.checkpoints || data.checkpoints.length === 0) {
-                    list.innerHTML = `
-                        <div class="empty-state">
-                            <p>No checkpoints in ledger yet</p>
-                            <p style="font-size: 0.85rem; margin-top: 10px;">
-                                Checkpoints will appear here after training saves them
-                            </p>
-                        </div>
-                    `;
+                    list.innerHTML = '<div class="no-models">No checkpoints yet</div>';
                     return;
                 }
 
-                list.innerHTML = data.checkpoints.map(cp => {
-                    if (cp.is_base) {
-                        return `
-                            <div class="checkpoint-item base-model" data-step="0" data-name="${cp.canonical_name}" data-path="${cp.path}">
-                                <div class="step">🏛️ ${cp.display_name || 'Base Model'}</div>
-                                <div class="stats">
-                                    ${cp.size_gb ? cp.size_gb + ' GB' : ''}
-                                    ${cp.hidden_size ? `| ${cp.hidden_size}d` : ''}
-                                    ${cp.num_layers ? `| ${cp.num_layers}L` : ''}
-                                </div>
-                                <span class="skill-badge" style="background: var(--text-muted);">Untrained</span>
-                            </div>
-                        `;
-                    }
+                list.innerHTML = data.checkpoints.filter(cp => !cp.is_base).map(cp => {
+                    const heroIcon = getHeroIcon(cp.hero_id);
+                    const isLoaded = loadedModels.some(m => m.step === cp.step);
+                    const isBest = cp.step === bestStep;
+                    const isLatest = cp.step === latestStep;
+                    const lossStr = cp.train_loss?.toFixed(4) || '';
+                    const ageStr = cp.age_hours != null
+                        ? (cp.age_hours < 1 ? 'now' : cp.age_hours < 24 ? `${Math.round(cp.age_hours)}h` : `${Math.round(cp.age_hours/24)}d`)
+                        : '';
+
                     return `
-                        <div class="checkpoint-item" data-step="${cp.step}" data-name="${cp.canonical_name}">
-                            <div class="step">Step ${cp.step.toLocaleString()}</div>
-                            <div class="stats">
-                                Loss: ${cp.train_loss ? cp.train_loss.toFixed(4) : '?'}
-                                ${cp.age_hours ? `| ${cp.age_hours}h ago` : ''}
+                        <div class="checkpoint-item ${isLoaded ? 'loaded' : ''}"
+                             onclick="loadCheckpoint(${cp.step})" data-step="${cp.step}">
+                            <span class="hero-icon">${heroIcon}</span>
+                            <div class="info">
+                                <div class="step-label">Step ${cp.step.toLocaleString()}</div>
+                                <div class="meta">${lossStr ? `loss: ${lossStr}` : ''} ${ageStr ? `• ${ageStr}` : ''}</div>
                             </div>
-                            ${cp.skill_name ? `<span class="skill-badge">${cp.skill_name} L${cp.skill_level || '?'}</span>` : ''}
+                            <div class="badges">
+                                ${isBest ? '<span class="mini-badge best">BEST</span>' : ''}
+                                ${isLatest ? '<span class="mini-badge latest">NEW</span>' : ''}
+                            </div>
                         </div>
                     `;
                 }).join('');
-
-                // Click handlers
-                $$('.checkpoint-item').forEach(item => {
-                    item.addEventListener('click', () => {
-                        $$('.checkpoint-item').forEach(i => i.classList.remove('selected'));
-                        item.classList.add('selected');
-                        selectedCheckpoint = {
-                            step: parseInt(item.dataset.step),
-                            name: item.dataset.name
-                        };
-                        $('#loadBtn').disabled = false;
-                    });
-                });
-
-            } catch (error) {
-                console.error('Failed to load checkpoints:', error);
-                $('#checkpointList').innerHTML = `
-                    <div class="empty-state">
-                        <p>Failed to load checkpoints</p>
-                        <p style="font-size: 0.85rem;">${error.message}</p>
-                    </div>
-                `;
+            } catch (err) {
+                console.error('Failed to load checkpoints:', err);
             }
         }
 
-        async function checkHostStatus() {
-            const dot = $('#hostDot');
-            const text = $('#hostStatusText');
+        function selectModel(step) {
+            const model = loadedModels.find(m => m.step === step);
+            if (!model) return;
 
-            dot.classList.remove('online');
-            text.textContent = 'Checking...';
+            activeModel = model;
+            renderLoadedModels();
+            enableChat();
 
-            try {
-                const response = await fetch('/oracle/status');
-                const data = await response.json();
+            const stepLabel = step === 0 ? 'Base Model' : `Step ${step.toLocaleString()}`;
+            document.getElementById('modelBadge').textContent = stepLabel;
+            document.getElementById('modelBadge').className = 'model-badge';
+            document.getElementById('chatTitle').textContent = `Chat with ${getHeroName(null)}`;
 
-                const hostInfo = data.hosts[currentHost];
-
-                if (hostInfo && hostInfo.status === 'online') {
-                    dot.classList.add('online');
-                    const models = hostInfo.loaded_models || [];
-                    if (models.length > 0) {
-                        // Show all loaded models
-                        const modelLabels = models.map(m =>
-                            m.step === 0 ? 'Base' : `${m.step.toLocaleString()}`
-                        ).join(', ');
-                        text.textContent = `Online - ${models.length} models: ${modelLabels}`;
-
-                        // Mark loaded checkpoints in list
-                        const loadedSteps = new Set(models.map(m => m.step));
-                        $$('.checkpoint-item').forEach(item => {
-                            item.classList.remove('loaded');
-                            if (loadedSteps.has(parseInt(item.dataset.step))) {
-                                item.classList.add('loaded');
-                            }
-                        });
-
-                        // Don't auto-select - user must explicitly choose
-                        $('#loadedModel').textContent = 'Select a checkpoint';
-                    } else {
-                        text.textContent = 'Online - No model loaded';
-                    }
-                } else {
-                    text.textContent = hostInfo?.error || 'Offline';
-                }
-            } catch (error) {
-                text.textContent = 'Error checking status';
-            }
+            addSystemMessage(`Selected: ${stepLabel}`, 'success');
         }
 
-        async function loadSelectedCheckpoint() {
-            if (!selectedCheckpoint) return;
+        async function loadCheckpoint(step) {
+            // Check if already loaded
+            if (loadedModels.some(m => m.step === step)) {
+                selectModel(step);
+                return;
+            }
 
-            const btn = $('#loadBtn');
-            btn.disabled = true;
-            btn.textContent = 'Loading...';
+            addSystemMessage(`Loading step ${step.toLocaleString()}...`);
 
             try {
-                const response = await fetch('/oracle/load', {
+                const resp = await fetch('/oracle/load', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        step: selectedCheckpoint.step,
-                        host: currentHost,
-                        hero_id: selectedCheckpoint.hero_id || activeCampaign?.hero_id
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ step, host: '3090' })
                 });
 
-                const data = await response.json();
+                const data = await resp.json();
 
                 if (data.success) {
-                    loadedCheckpoint = selectedCheckpoint.step;
-                    const stepLabel = selectedCheckpoint.step === 0
-                        ? (data.checkpoint_name || 'Base Model')
-                        : `Step ${selectedCheckpoint.step.toLocaleString()}`;
-                    $('#loadedModel').textContent = stepLabel;
-                    enableChat();
-                    addSystemMessage(`Loaded checkpoint: Step ${selectedCheckpoint.step.toLocaleString()}`);
-
-                    // Update UI
-                    $$('.checkpoint-item').forEach(item => {
-                        item.classList.remove('loaded');
-                        if (parseInt(item.dataset.step) === selectedCheckpoint.step) {
-                            item.classList.add('loaded');
-                        }
-                    });
-
-                    checkHostStatus();
+                    await loadOracleStatus();
+                    selectModel(step);
+                    addSystemMessage(`Loaded step ${step.toLocaleString()}`, 'success');
                 } else {
-                    alert(`Failed to load: ${data.error}`);
+                    addSystemMessage(`Failed: ${data.error}`, 'error');
                 }
-            } catch (error) {
-                alert(`Error: ${error.message}`);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Load Selected Checkpoint';
+            } catch (err) {
+                addSystemMessage(`Error: ${err.message}`, 'error');
             }
+        }
+
+        async function loadLatest() {
+            if (latestStep) await loadCheckpoint(latestStep);
+        }
+
+        async function loadBest() {
+            if (bestStep) await loadCheckpoint(bestStep);
+        }
+
+        async function loadBase() {
+            await loadCheckpoint(0);
+        }
+
+        async function refreshModels() {
+            document.getElementById('loadedModelsGrid').innerHTML = '<div class="no-models">Refreshing...</div>';
+            await loadOracleStatus();
+            await loadCheckpoints();
         }
 
         function enableChat() {
-            $('#messageInput').disabled = false;
-            $('#sendBtn').disabled = false;
+            document.getElementById('messageInput').disabled = false;
+            document.getElementById('sendBtn').disabled = false;
 
-            if ($('#chatMessages .empty-state')) {
-                $('#chatMessages').innerHTML = '';
+            const messages = document.getElementById('chatMessages');
+            if (messages.querySelector('.empty-state')) {
+                messages.innerHTML = '';
             }
         }
 
-        function addSystemMessage(text) {
-            const messages = $('#chatMessages');
-            messages.innerHTML += `
-                <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin: 15px 0;">
-                    ${text}
-                </div>
-            `;
+        function addSystemMessage(text, type = '') {
+            const messages = document.getElementById('chatMessages');
+            if (messages.querySelector('.empty-state')) {
+                messages.innerHTML = '';
+            }
+
+            const div = document.createElement('div');
+            div.className = `system-message ${type}`;
+            div.textContent = text;
+            messages.appendChild(div);
             messages.scrollTop = messages.scrollHeight;
         }
 
-        function addMessage(role, content) {
-            const messages = $('#chatMessages');
-            const sender = role === 'user' ? 'You' : heroName;
+        function addMessage(role, content, meta = null) {
+            const messages = document.getElementById('chatMessages');
+            const heroIcon = getHeroIcon(null);
+            const sender = role === 'user' ? 'You' : getHeroName(null);
+            const senderIcon = role === 'user' ? '👤' : heroIcon;
 
-            messages.innerHTML += `
-                <div class="message ${role}">
-                    <div class="sender">${sender}</div>
-                    <div class="bubble">${escapeHtml(content)}</div>
+            // Simple markdown-ish rendering
+            let rendered = escapeHtml(content);
+            // Code blocks
+            rendered = rendered.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+            // Inline code
+            rendered = rendered.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Bold
+            rendered = rendered.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            // Line breaks
+            rendered = rendered.replace(/\n/g, '<br>');
+
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.innerHTML = `
+                <div class="sender">${senderIcon} ${sender}</div>
+                <div class="bubble">${rendered}</div>
+                ${meta ? `<div class="response-meta">${meta}</div>` : ''}
+            `;
+
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const messages = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'message assistant';
+            div.id = 'typingIndicator';
+            div.innerHTML = `
+                <div class="sender">${getHeroIcon(null)} ${getHeroName(null)}</div>
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
                 </div>
             `;
+            messages.appendChild(div);
             messages.scrollTop = messages.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
         }
 
         async function sendMessage() {
-            const input = $('#messageInput');
-            const message = input.value.trim();
+            if (!activeModel || isGenerating) return;
 
-            if (!message || loadedCheckpoint === null || loadedCheckpoint === undefined) return;
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message) return;
 
             input.value = '';
+            autoResize(input);
             addMessage('user', message);
 
-            const sendBtn = $('#sendBtn');
-            sendBtn.disabled = true;
-            sendBtn.textContent = '...';
+            isGenerating = true;
+            document.getElementById('sendBtn').disabled = true;
+            showTypingIndicator();
+
+            const startTime = Date.now();
 
             try {
-                const response = await fetch('/oracle/chat', {
+                const settings = {
+                    message,
+                    host: '3090',
+                    step: activeModel.step,
+                    max_tokens: parseInt(document.getElementById('maxTokens').value) || 512,
+                    temperature: parseFloat(document.getElementById('temperature').value) || 0.7,
+                };
+
+                const systemPrompt = document.getElementById('systemPrompt').value.trim();
+                if (systemPrompt) {
+                    settings.system_prompt = systemPrompt;
+                }
+
+                const resp = await fetch('/oracle/chat', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        message: message,
-                        host: currentHost,
-                        step: loadedCheckpoint,
-                        max_tokens: 512
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
                 });
 
-                const data = await response.json();
+                hideTypingIndicator();
+                const data = await resp.json();
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
                 if (data.success) {
-                    addMessage('assistant', data.response);
+                    const tokens = data.tokens_generated || '?';
+                    addMessage('assistant', data.response, `${tokens} tokens • ${elapsed}s`);
                 } else {
                     addMessage('assistant', `Error: ${data.error}`);
                 }
-            } catch (error) {
-                addMessage('assistant', `Error: ${error.message}`);
+            } catch (err) {
+                hideTypingIndicator();
+                addMessage('assistant', `Error: ${err.message}`);
             } finally {
-                sendBtn.disabled = false;
-                sendBtn.textContent = 'Send';
+                isGenerating = false;
+                document.getElementById('sendBtn').disabled = false;
             }
+        }
+
+        function clearChat() {
+            const messages = document.getElementById('chatMessages');
+            messages.innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">🔮</div>
+                    <h3>The Oracle Awaits</h3>
+                    <p>Your conversation has been cleared</p>
+                </div>
+            `;
+            conversationHistory = [];
+        }
+
+        function exportChat() {
+            const messages = document.querySelectorAll('#chatMessages .message');
+            let text = `Oracle Chat Export - ${new Date().toLocaleString()}\n`;
+            text += `Model: ${activeModel ? `Step ${activeModel.step}` : 'None'}\n`;
+            text += '─'.repeat(50) + '\n\n';
+
+            messages.forEach(msg => {
+                const sender = msg.querySelector('.sender')?.textContent || '';
+                const bubble = msg.querySelector('.bubble')?.textContent || '';
+                text += `${sender}:\n${bubble}\n\n`;
+            });
+
+            navigator.clipboard.writeText(text).then(() => {
+                addSystemMessage('Chat copied to clipboard', 'success');
+            });
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+
+            // Update token estimate
+            const text = textarea.value;
+            const tokens = Math.ceil(text.length / 4);
+            document.getElementById('tokenCounter').textContent = tokens > 0 ? `~${tokens} tokens` : '';
+        }
+
+        function togglePanel(id) {
+            document.getElementById(id).classList.toggle('collapsed');
         }
 
         function escapeHtml(text) {
@@ -850,8 +1260,9 @@
             return div.innerHTML;
         }
 
-        // Refresh host status periodically
-        setInterval(checkHostStatus, 30000);
+        function updateTime() {
+            document.getElementById('timeDisplay').textContent = new Date().toLocaleTimeString();
+        }
     </script>
 </body>
 </html>

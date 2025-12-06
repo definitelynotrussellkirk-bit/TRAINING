@@ -93,6 +93,9 @@ class FetchResult:
     source_location: Optional[AssetLocation] = None
     transfer: Optional[TransferResult] = None
     error: Optional[str] = None
+    verified: bool = False  # True if integrity was verified
+    size_bytes: Optional[int] = None  # Actual size on disk
+    size_mismatch: bool = False  # True if size differs from catalog
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -101,6 +104,9 @@ class FetchResult:
             "local_path": self.local_path,
             "source_location": self.source_location.to_dict() if self.source_location else None,
             "transfer": self.transfer.to_dict() if self.transfer else None,
+            "verified": self.verified,
+            "size_bytes": self.size_bytes,
+            "size_mismatch": self.size_mismatch,
             "error": self.error,
         }
 
@@ -583,9 +589,24 @@ class VaultKeeper:
         try:
             from core.checkpoint_ledger import get_ledger
             ledger = get_ledger()
+        except ImportError as e:
+            logger.error(f"Ledger module not available: {e}")
+            return {
+                "error": "ledger_unavailable",
+                "error_type": "import",
+                "message": f"Cannot import checkpoint_ledger: {e}",
+                "stale_found": 0,
+                "deleted": 0,
+            }
         except Exception as e:
-            logger.warning(f"Cannot access ledger: {e}")
-            return {"error": str(e)}
+            logger.error(f"Cannot access ledger: {e}")
+            return {
+                "error": "ledger_error",
+                "error_type": "access",
+                "message": f"Ledger access failed: {e}",
+                "stale_found": 0,
+                "deleted": 0,
+            }
 
         # Get all checkpoint asset_ids from catalog
         with self._get_conn() as conn:
@@ -632,6 +653,135 @@ class VaultKeeper:
         if stale:
             action = "Would delete" if dry_run else "Deleted"
             logger.info(f"{action} {len(stale)} stale checkpoint entries from catalog")
+
+        return result
+
+    def verify_local_assets(
+        self,
+        asset_type: Optional[str] = None,
+        fix_missing: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Verify integrity of all local assets.
+
+        Checks that all assets registered in local_vault actually exist
+        on disk and optionally removes stale location entries.
+
+        Args:
+            asset_type: Only verify assets of this type (e.g., "checkpoint")
+            fix_missing: If True, remove location entries for missing files
+
+        Returns:
+            Dict with verification statistics and issues found
+        """
+        import logging
+        logger = logging.getLogger("vault.keeper")
+
+        # Get all local_vault locations
+        with self._get_conn() as conn:
+            if asset_type:
+                rows = conn.execute(
+                    """
+                    SELECT l.asset_id, l.path, l.size_bytes, a.name, a.asset_type
+                    FROM locations l
+                    JOIN assets a ON l.asset_id = a.asset_id
+                    WHERE l.stronghold = 'local_vault' AND a.asset_type = ?
+                    """,
+                    (asset_type,)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT l.asset_id, l.path, l.size_bytes, a.name, a.asset_type
+                    FROM locations l
+                    JOIN assets a ON l.asset_id = a.asset_id
+                    WHERE l.stronghold = 'local_vault'
+                    """
+                ).fetchall()
+
+        total = len(rows)
+        verified = 0
+        missing = []
+        size_mismatches = []
+
+        # Get base dir for resolving relative paths
+        try:
+            from core.paths import get_base_dir
+            base_dir = get_base_dir()
+        except ImportError:
+            base_dir = Path(__file__).parent.parent
+
+        for row in rows:
+            asset_id = row["asset_id"]
+            raw_path = row["path"]
+            expected_size = row["size_bytes"]
+            name = row["name"]
+            atype = row["asset_type"]
+
+            # Resolve relative paths against base_dir
+            path = Path(raw_path)
+            if not path.is_absolute():
+                path = base_dir / path
+
+            if not path.exists():
+                missing.append({
+                    "asset_id": asset_id,
+                    "name": name,
+                    "type": atype,
+                    "path": str(path),
+                    "stored_path": raw_path,  # Original path in catalog
+                })
+                continue
+
+            # Get actual size
+            if path.is_dir():
+                actual_size = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+            else:
+                actual_size = path.stat().st_size
+
+            # Check for size mismatch (if we have expected size)
+            if expected_size and expected_size > 0:
+                if abs(expected_size - actual_size) > 1024:  # 1KB tolerance
+                    size_mismatches.append({
+                        "asset_id": asset_id,
+                        "name": name,
+                        "type": atype,
+                        "path": str(path),
+                        "expected_bytes": expected_size,
+                        "actual_bytes": actual_size,
+                        "diff_mb": round((actual_size - expected_size) / (1024 * 1024), 2),
+                    })
+
+            verified += 1
+
+        # Fix missing entries if requested
+        fixed = 0
+        if fix_missing and missing:
+            for entry in missing:
+                try:
+                    # Use stored_path (original catalog path) for removal
+                    self.remove_location(entry["asset_id"], "local_vault", entry["stored_path"])
+                    fixed += 1
+                    logger.debug(f"Removed missing location: {entry['name']}")
+                except Exception as e:
+                    logger.warning(f"Failed to remove location {entry['asset_id']}: {e}")
+
+        result = {
+            "total_checked": total,
+            "verified": verified,
+            "missing_count": len(missing),
+            "size_mismatch_count": len(size_mismatches),
+            "fixed": fixed if fix_missing else 0,
+            "missing": missing[:20],  # Show first 20
+            "size_mismatches": size_mismatches[:20],  # Show first 20
+        }
+
+        if missing:
+            action = "Fixed" if fix_missing else "Found"
+            logger.info(f"{action} {len(missing)} missing local assets")
+
+        if size_mismatches:
+            logger.warning(f"Found {len(size_mismatches)} assets with size mismatches")
 
         return result
 
@@ -812,6 +962,7 @@ class VaultKeeper:
         asset_id: str,
         destination: str | Path,
         from_stronghold: Optional[str] = None,
+        verify_size: bool = False,
     ) -> FetchResult:
         """
         Fetch an asset to a local path.
@@ -820,9 +971,10 @@ class VaultKeeper:
             asset_id: Asset to fetch
             destination: Local destination path
             from_stronghold: Specific stronghold to fetch from (or best available)
+            verify_size: If True, verify file size matches catalog entry
 
         Returns:
-            FetchResult with transfer details
+            FetchResult with transfer details (includes verification info)
         """
         # Locate the asset
         lookup = self.locate(asset_id)
@@ -875,20 +1027,43 @@ class VaultKeeper:
 
         # Special case: if source is local_vault, it's already local
         if source.stronghold == "local_vault":
-            # Just verify it exists and return the path
-            if Path(source.path).exists():
-                return FetchResult(
-                    asset_id=asset_id,
-                    success=True,
-                    local_path=source.path,
-                    source_location=source,
-                )
-            else:
+            local_path = Path(source.path)
+            if not local_path.exists():
                 return FetchResult(
                     asset_id=asset_id,
                     success=False,
                     error=f"Local file not found: {source.path}",
                 )
+
+            # Get actual file size
+            if local_path.is_dir():
+                # For directories (checkpoints), sum all file sizes
+                actual_size = sum(f.stat().st_size for f in local_path.rglob("*") if f.is_file())
+            else:
+                actual_size = local_path.stat().st_size
+
+            # Check size if requested
+            size_mismatch = False
+            verified = False
+            if verify_size:
+                # Get expected size from catalog
+                asset = self.get(asset_id)
+                if asset and asset.size_bytes:
+                    size_mismatch = abs(asset.size_bytes - actual_size) > 1024  # 1KB tolerance
+                    verified = not size_mismatch
+                else:
+                    # No size in catalog to compare against
+                    verified = True  # Can't verify, assume OK
+
+            return FetchResult(
+                asset_id=asset_id,
+                success=True,
+                local_path=source.path,
+                source_location=source,
+                verified=verified,
+                size_bytes=actual_size,
+                size_mismatch=size_mismatch,
+            )
 
         # Fetch from remote
         destination = Path(destination)

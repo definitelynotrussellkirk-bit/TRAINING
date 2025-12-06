@@ -18,230 +18,557 @@
             padding-bottom: 80px;
         }
 
-        .host-count {
-            font-size: 0.8em;
+        /* ═══════════════════════════════════════════════════════════
+           HERO BANNER - Fleet Commander
+           ═══════════════════════════════════════════════════════════ */
+        .fleet-banner {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border: 2px solid #333;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 24px;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .fleet-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at 30% 50%, rgba(255, 215, 0, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .fleet-icon-container {
+            position: relative;
+        }
+
+        .fleet-icon {
+            font-size: 4rem;
+            filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.3));
+        }
+
+        .fleet-status-ring {
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            width: calc(100% + 16px);
+            height: calc(100% + 16px);
+            border-radius: 50%;
+            border: 3px solid transparent;
+            animation: pulse-ring 2s ease-in-out infinite;
+        }
+
+        .fleet-status-ring.healthy {
+            border-color: #4CAF50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .fleet-status-ring.warning {
+            border-color: #ffa726;
+            box-shadow: 0 0 15px rgba(255, 167, 38, 0.4);
+            animation: pulse-ring-warning 1.5s ease-in-out infinite;
+        }
+
+        .fleet-status-ring.critical {
+            border-color: #f44336;
+            box-shadow: 0 0 15px rgba(244, 67, 54, 0.4);
+            animation: pulse-ring-critical 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-ring {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.02); }
+        }
+
+        @keyframes pulse-ring-warning {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes pulse-ring-critical {
+            0%, 100% { opacity: 1; box-shadow: 0 0 15px rgba(244, 67, 54, 0.4); }
+            50% { opacity: 0.8; box-shadow: 0 0 25px rgba(244, 67, 54, 0.6); }
+        }
+
+        .fleet-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .fleet-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #ffd700;
+            margin: 0;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+
+        .fleet-subtitle {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .fleet-stats {
+            display: flex;
+            gap: 24px;
+            margin-top: 8px;
+        }
+
+        .fleet-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fleet-stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .fleet-stat-value.healthy { color: #4CAF50; }
+        .fleet-stat-value.warning { color: #ffa726; }
+        .fleet-stat-value.critical { color: #f44336; }
+
+        .fleet-stat-label {
+            font-size: 0.75rem;
             color: #666;
+            text-transform: uppercase;
+        }
+
+        .fleet-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .fleet-action {
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .fleet-action:hover {
+            background: rgba(255, 215, 0, 0.15);
+            border-color: rgba(255, 215, 0, 0.4);
+            transform: translateX(4px);
+        }
+
+        .fleet-action.scanning {
+            animation: scanning 1s ease-in-out infinite;
+        }
+
+        @keyframes scanning {
+            0%, 100% { background: rgba(33, 150, 243, 0.2); }
+            50% { background: rgba(33, 150, 243, 0.4); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           STRATEGIC OVERVIEW - Locations Grid
+           ═══════════════════════════════════════════════════════════ */
+        .strategic-overview {
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.1rem;
+            color: #ffd700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-badge {
+            background: rgba(255, 215, 0, 0.2);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            color: #ffd700;
             font-family: 'Inter', sans-serif;
         }
 
-        .btn-sm {
-            padding: 6px 10px;
-            font-size: 1rem;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-sm:hover {
-            background: rgba(255, 215, 0, 0.2);
-            border-color: rgba(255, 215, 0, 0.4);
-        }
-
-        .header-right {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        /* Locations Summary */
-        .locations-summary {
-            margin-bottom: 20px;
-        }
-
         .locations-grid {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 12px;
         }
 
         .location-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
             gap: 12px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
-            padding: 12px 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            min-width: 200px;
-            transition: all 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .location-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            transition: all 0.3s;
         }
 
         .location-card:hover {
-            border-color: rgba(255, 215, 0, 0.3);
-            transform: translateY(-2px);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
         }
 
         .location-card.online {
-            border-color: rgba(34, 197, 94, 0.4);
-            background: rgba(34, 197, 94, 0.1);
+            border-color: rgba(76, 175, 80, 0.4);
         }
 
-        .location-card.offline {
-            border-color: rgba(100, 100, 100, 0.3);
-            opacity: 0.6;
+        .location-card.online::before {
+            background: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
         }
 
         .location-card.warning {
             border-color: rgba(255, 167, 38, 0.4);
-            background: rgba(255, 167, 38, 0.1);
+        }
+
+        .location-card.warning::before {
+            background: #ffa726;
+            box-shadow: 0 0 10px rgba(255, 167, 38, 0.5);
+        }
+
+        .location-card.offline {
+            opacity: 0.6;
+        }
+
+        .location-card.offline::before {
+            background: #666;
         }
 
         .location-icon {
             font-size: 2rem;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
         }
 
         .location-info {
-            display: flex;
-            flex-direction: column;
+            flex: 1;
+            min-width: 0;
         }
 
         .location-name {
             font-weight: 600;
             color: #fff;
-            font-size: 1rem;
+            font-size: 0.95rem;
+            margin-bottom: 2px;
         }
 
         .location-status {
             font-size: 0.8rem;
-            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        .location-status.online {
-            color: #4CAF50;
+        .location-status.online { color: #4CAF50; }
+        .location-status.warning { color: #ffa726; }
+        .location-status.offline { color: #666; }
+        .location-status.healthy { color: #4CAF50; }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: blink 2s ease-in-out infinite;
         }
 
-        .location-status.offline {
-            color: #666;
+        .location-card.warning .status-dot {
+            animation: blink-fast 1s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes blink-fast {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
         }
 
         .location-stats {
             font-size: 0.75rem;
-            color: #666;
-            margin-top: 2px;
-        }
-
-        /* Status banner */
-        .status-banner {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 16px;
-            padding: 16px 24px;
-            border-radius: 12px;
-            margin-bottom: 24px;
-            font-size: 1.1rem;
-        }
-
-        .status-healthy {
-            background: linear-gradient(135deg, #1a3a1a 0%, #0d2a0d 100%);
-            border: 2px solid #4CAF50;
-        }
-        .status-warning {
-            background: linear-gradient(135deg, #3a3a1a 0%, #2a2a0d 100%);
-            border: 2px solid #ffa726;
-        }
-        .status-critical {
-            background: linear-gradient(135deg, #3a1a1a 0%, #2a0d0d 100%);
-            border: 2px solid #f44336;
-        }
-        .status-unknown, .status-offline {
-            background: #252538;
-            border: 2px solid #666;
-        }
-
-        .status-icon {
-            font-size: 2rem;
-        }
-
-        /* Zones summary */
-        .zones-summary {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .zone-card {
-            background: #252538;
-            border-radius: 8px;
-            padding: 16px;
-            border-left: 4px solid;
-        }
-
-        .zone-card.hot { border-left-color: #f44336; }
-        .zone-card.warm { border-left-color: #ffa726; }
-        .zone-card.cold { border-left-color: #2196F3; }
-
-        .zone-name {
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.85rem;
             color: #888;
-            margin-bottom: 8px;
-        }
-
-        .zone-percent {
-            font-size: 1.8rem;
-            font-weight: 600;
-        }
-
-        .zone-detail {
-            font-size: 0.85rem;
-            color: #666;
             margin-top: 4px;
         }
 
-        /* Host grid */
-        .hosts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
+        /* ═══════════════════════════════════════════════════════════
+           ALERTS SECTION
+           ═══════════════════════════════════════════════════════════ */
+        .alerts-section {
+            background: linear-gradient(135deg, #2a1a1a 0%, #1a0d0d 100%);
+            border: 1px solid #5a2a2a;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            animation: alert-pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes alert-pulse {
+            0%, 100% { border-color: #5a2a2a; }
+            50% { border-color: #8a3a3a; }
+        }
+
+        .alerts-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .alerts-title {
+            color: #f44336;
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .alert-count {
+            background: #f44336;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+        }
+
+        .alert-item {
+            padding: 10px 14px;
+            background: rgba(244, 67, 54, 0.1);
+            border-left: 3px solid #f44336;
+            border-radius: 0 6px 6px 0;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: #ffcdd2;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .alert-icon {
+            font-size: 1.1rem;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           ZONES DISPLAY - Thermometer Style
+           ═══════════════════════════════════════════════════════════ */
+        .zones-section {
             margin-bottom: 24px;
         }
 
-        .host-card {
-            background: #252538;
+        .zones-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .zone-card {
+            background: #1a1a2e;
             border-radius: 12px;
             padding: 20px;
             border: 1px solid #333;
             position: relative;
+            overflow: hidden;
         }
 
-        /* Role-based styling */
+        .zone-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+        }
+
+        .zone-card.hot::before { background: linear-gradient(90deg, #f44336, #ff7043); }
+        .zone-card.warm::before { background: linear-gradient(90deg, #ffa726, #ffcc02); }
+        .zone-card.cold::before { background: linear-gradient(90deg, #2196F3, #00bcd4); }
+
+        .zone-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .zone-icon {
+            font-size: 1.5rem;
+        }
+
+        .zone-name {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            color: #888;
+            letter-spacing: 0.5px;
+        }
+
+        .zone-percent {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .zone-card.hot .zone-percent { color: #ff7043; }
+        .zone-card.warm .zone-percent { color: #ffcc02; }
+        .zone-card.cold .zone-percent { color: #4fc3f7; }
+
+        .zone-detail {
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .zone-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            margin-top: 12px;
+            overflow: hidden;
+        }
+
+        .zone-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .zone-card.hot .zone-bar-fill { background: linear-gradient(90deg, #f44336, #ff7043); }
+        .zone-card.warm .zone-bar-fill { background: linear-gradient(90deg, #ffa726, #ffcc02); }
+        .zone-card.cold .zone-bar-fill { background: linear-gradient(90deg, #2196F3, #00bcd4); }
+
+        .zone-devices {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           HOST CARDS - Enhanced
+           ═══════════════════════════════════════════════════════════ */
+        .hosts-section {
+            margin-bottom: 24px;
+        }
+
+        .hosts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 20px;
+        }
+
+        .host-card {
+            background: linear-gradient(180deg, #252538 0%, #1a1a2e 100%);
+            border-radius: 16px;
+            border: 1px solid #333;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .host-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+            border-color: #444;
+        }
+
+        /* Role-based top accent */
         .host-card.role-trainer {
-            border-top: 3px solid #ffd700;
+            border-top: 4px solid #ffd700;
         }
         .host-card.role-inference {
-            border-top: 3px solid #9c27b0;
+            border-top: 4px solid #9c27b0;
         }
         .host-card.role-storage {
-            border-top: 3px solid #2196F3;
+            border-top: 4px solid #2196F3;
         }
         .host-card.role-worker {
-            border-top: 3px solid #4CAF50;
+            border-top: 4px solid #4CAF50;
         }
 
         .host-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #333;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .host-identity {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .host-icon {
+            font-size: 2rem;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
         }
 
         .host-name {
             font-size: 1.2rem;
             font-weight: 600;
             color: #fff;
+            margin-bottom: 2px;
         }
 
         .host-ip {
-            color: #888;
+            color: #666;
             font-size: 0.85rem;
-            margin-top: 4px;
+            font-family: monospace;
         }
 
         .host-roles {
@@ -253,34 +580,63 @@
 
         .role-badge {
             font-size: 0.7rem;
-            padding: 2px 6px;
-            border-radius: 3px;
+            padding: 3px 8px;
+            border-radius: 4px;
             background: #333;
             color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .role-badge.trainer { background: #3d3d00; color: #ffd700; }
-        .role-badge.inference { background: #2d1a3d; color: #ce93d8; }
-        .role-badge.eval_worker { background: #1a3d1a; color: #a5d6a7; }
-        .role-badge.data_forge { background: #3d2a1a; color: #ffcc80; }
-        .role-badge.storage_warm { background: #1a2a3d; color: #90caf9; }
-        .role-badge.storage_cold { background: #1a1a3d; color: #9fa8da; }
+        .role-badge.trainer { background: rgba(255, 215, 0, 0.2); color: #ffd700; }
+        .role-badge.inference { background: rgba(156, 39, 176, 0.2); color: #ce93d8; }
+        .role-badge.eval_worker { background: rgba(76, 175, 80, 0.2); color: #a5d6a7; }
+        .role-badge.data_forge { background: rgba(255, 152, 0, 0.2); color: #ffcc80; }
+        .role-badge.storage_warm { background: rgba(255, 167, 38, 0.2); color: #ffcc80; }
+        .role-badge.storage_cold { background: rgba(33, 150, 243, 0.2); color: #90caf9; }
+        .role-badge.control_plane { background: rgba(255, 215, 0, 0.2); color: #ffd700; }
 
-        .host-status {
-            padding: 4px 12px;
+        .host-status-badge {
+            padding: 6px 14px;
             border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            white-space: nowrap;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .host-status.healthy { background: #1b5e20; color: #a5d6a7; }
-        .host-status.warning { background: #e65100; color: #ffcc80; }
-        .host-status.critical { background: #b71c1c; color: #ef9a9a; }
-        .host-status.unknown { background: #424242; color: #bdbdbd; }
-        .host-status.offline { background: #37474f; color: #90a4ae; }
+        .host-status-badge.healthy {
+            background: linear-gradient(135deg, #1b5e20, #2e7d32);
+            color: #a5d6a7;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+        }
+        .host-status-badge.warning {
+            background: linear-gradient(135deg, #e65100, #f57c00);
+            color: #ffcc80;
+            box-shadow: 0 0 10px rgba(255, 152, 0, 0.3);
+            animation: pulse-badge 2s ease-in-out infinite;
+        }
+        .host-status-badge.critical {
+            background: linear-gradient(135deg, #b71c1c, #c62828);
+            color: #ef9a9a;
+            box-shadow: 0 0 10px rgba(244, 67, 54, 0.3);
+            animation: pulse-badge 1s ease-in-out infinite;
+        }
+        .host-status-badge.unknown, .host-status-badge.offline {
+            background: #37474f;
+            color: #90a4ae;
+        }
 
-        /* Metrics grid */
+        @keyframes pulse-badge {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .host-body {
+            padding: 20px;
+        }
+
+        /* Metrics Grid */
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -288,98 +644,83 @@
             margin-bottom: 16px;
         }
 
-        .metric-box {
-            background: #1a1a2e;
-            border-radius: 8px;
-            padding: 12px;
+        .metric-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        .metric-box.wide {
+        .metric-card.wide {
             grid-column: span 2;
         }
 
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
         .metric-label {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: #888;
             text-transform: uppercase;
-            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-icon {
+            font-size: 1rem;
+            opacity: 0.6;
         }
 
         .metric-value {
-            font-size: 1.4rem;
-            font-weight: 600;
+            font-size: 1.5rem;
+            font-weight: 700;
             color: #fff;
         }
 
+        .metric-value.good { color: #4CAF50; }
         .metric-value.warning { color: #ffa726; }
         .metric-value.critical { color: #f44336; }
-        .metric-value.good { color: #4CAF50; }
 
         .metric-detail {
             font-size: 0.8rem;
             color: #666;
-            margin-top: 2px;
+            margin-top: 4px;
         }
 
-        /* Progress bars */
-        .progress-bar {
+        .metric-bar {
             height: 6px;
-            background: #333;
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 3px;
-            margin-top: 8px;
+            margin-top: 10px;
             overflow: hidden;
         }
 
-        .progress-fill {
+        .metric-bar-fill {
             height: 100%;
             border-radius: 3px;
-            transition: width 0.3s ease;
+            transition: width 0.5s ease;
         }
 
-        .progress-fill.good { background: #4CAF50; }
-        .progress-fill.warning { background: #ffa726; }
-        .progress-fill.critical { background: #f44336; }
+        .metric-bar-fill.good { background: linear-gradient(90deg, #4CAF50, #66BB6A); }
+        .metric-bar-fill.warning { background: linear-gradient(90deg, #ffa726, #ffcc02); }
+        .metric-bar-fill.critical { background: linear-gradient(90deg, #f44336, #ff7043); }
 
-        /* Volumes section (for NAS) */
-        .volumes-section {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #333;
-        }
-
-        .volumes-title {
-            font-size: 0.85rem;
-            color: #888;
-            margin-bottom: 8px;
-        }
-
-        .volume-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 0;
-            font-size: 0.85rem;
-        }
-
-        .volume-path {
-            color: #aaa;
-        }
-
-        .volume-stats {
-            color: #666;
-        }
-
-        /* Services list */
+        /* Services Section */
         .services-section {
             margin-top: 16px;
-            padding-top: 12px;
-            border-top: 1px solid #333;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .services-title {
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: #888;
-            margin-bottom: 8px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
         }
 
         .services-list {
@@ -389,16 +730,78 @@
         }
 
         .service-badge {
-            padding: 4px 10px;
-            border-radius: 4px;
+            padding: 5px 12px;
+            border-radius: 6px;
             font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        .service-badge.up { background: #1b5e20; color: #a5d6a7; }
-        .service-badge.down { background: #b71c1c; color: #ef9a9a; }
-        .service-badge.error { background: #e65100; color: #ffcc80; }
+        .service-badge.up {
+            background: rgba(76, 175, 80, 0.15);
+            color: #a5d6a7;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        .service-badge.down {
+            background: rgba(244, 67, 54, 0.15);
+            color: #ef9a9a;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+        .service-badge.error {
+            background: rgba(255, 152, 0, 0.15);
+            color: #ffcc80;
+            border: 1px solid rgba(255, 152, 0, 0.3);
+        }
 
-        /* Issues list */
+        .service-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .service-badge.up .service-dot { background: #4CAF50; }
+        .service-badge.down .service-dot { background: #f44336; }
+        .service-badge.error .service-dot { background: #ffa726; }
+
+        /* Volumes Section */
+        .volumes-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .volumes-title {
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .volume-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .volume-path {
+            color: #aaa;
+            font-size: 0.85rem;
+            font-family: monospace;
+        }
+
+        .volume-stats {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .volume-stats.good { color: #4CAF50; }
+        .volume-stats.warning { color: #ffa726; }
+        .volume-stats.critical { color: #f44336; }
+
+        /* Issues Section */
         .issues-section {
             margin-top: 12px;
         }
@@ -406,133 +809,157 @@
         .issue-item {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 6px 10px;
-            background: #3a2a1a;
-            border-radius: 4px;
+            gap: 10px;
+            padding: 10px 14px;
+            background: rgba(255, 152, 0, 0.1);
+            border-left: 3px solid #ffa726;
+            border-radius: 0 8px 8px 0;
             font-size: 0.85rem;
             color: #ffcc80;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
 
-        /* RAID status */
-        .raid-status {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
+        .issue-item:last-child {
+            margin-bottom: 0;
+        }
+
+        /* RAID Status */
+        .raid-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 6px;
             font-size: 0.8rem;
             font-weight: 500;
+            margin-top: 12px;
         }
 
-        .raid-status.healthy { background: #1b5e20; color: #a5d6a7; }
-        .raid-status.degraded { background: #b71c1c; color: #ef9a9a; }
+        .raid-badge.healthy {
+            background: rgba(76, 175, 80, 0.15);
+            color: #a5d6a7;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        .raid-badge.degraded {
+            background: rgba(244, 67, 54, 0.15);
+            color: #ef9a9a;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
 
         /* Uptime */
         .uptime {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: #666;
-            margin-top: 8px;
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        /* Last updated */
+        /* ═══════════════════════════════════════════════════════════
+           FOOTER & UTILITIES
+           ═══════════════════════════════════════════════════════════ */
         .last-updated {
             text-align: center;
             color: #666;
             font-size: 0.85rem;
-            margin-top: 20px;
+            margin-top: 24px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
         }
 
-        /* Action buttons */
-        .actions {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
+        .cache-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 8px;
         }
 
-        .btn {
-            padding: 8px 16px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
+        .cache-badge.live {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
         }
 
-        .btn-primary {
-            background: #2196F3;
-            color: white;
+        .cache-badge.cached {
+            background: rgba(255, 167, 38, 0.2);
+            color: #ffa726;
         }
 
-        .btn-primary:hover {
-            background: #1976D2;
-        }
-
-        .btn-secondary {
-            background: #424242;
-            color: #e0e0e0;
-        }
-
-        .btn-secondary:hover {
-            background: #616161;
-        }
-
-        /* Loading state */
+        /* Loading State */
         .loading {
             text-align: center;
-            padding: 40px;
+            padding: 60px 40px;
             color: #888;
         }
 
         .spinner {
             display: inline-block;
-            width: 30px;
-            height: 30px;
-            border: 3px solid #333;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #333;
             border-top-color: #ffd700;
             border-radius: 50%;
             animation: spin 1s linear infinite;
+            margin-bottom: 16px;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
 
-        /* Alerts section */
-        .alerts-section {
-            background: #2a1a1a;
-            border: 1px solid #5a2a2a;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 24px;
-        }
-
-        .alerts-title {
-            color: #f44336;
-            font-weight: 600;
-            margin-bottom: 12px;
-        }
-
-        .alert-item {
-            padding: 8px 12px;
-            background: #3a1a1a;
-            border-radius: 4px;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-            color: #ffcdd2;
-        }
-
-        .alert-item:last-child {
-            margin-bottom: 0;
-        }
-
-        /* Host count badges */
-        .host-count {
-            background: #333;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.8rem;
+        .loading-text {
+            font-size: 1rem;
             color: #888;
-            margin-left: 8px;
+        }
+
+        /* Header Overrides */
+        .header-right {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-sm {
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #fff;
+        }
+
+        .btn-sm:hover {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: rgba(255, 215, 0, 0.4);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .fleet-banner {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .fleet-stats {
+                justify-content: center;
+            }
+
+            .fleet-actions {
+                flex-direction: row;
+                justify-content: center;
+            }
+
+            .hosts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .zones-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -557,33 +984,85 @@
             </div>
         </div>
         <div class="header-right">
-            <button class="btn btn-sm" onclick="refreshStatus()" title="Load cached status (fast, updates every few minutes)">🔄</button>
-            <button class="btn btn-sm" onclick="refreshStatus(true)" title="Scan all hosts now (slower, but always current)">📡</button>
-            <button class="btn btn-sm" onclick="runMaintenance()" title="Run cleanup tasks on all hosts">🔧</button>
+            <button class="btn btn-sm" onclick="refreshStatus()" title="Quick refresh (cached)">🔄</button>
+            <button class="btn btn-sm" id="scanBtn" onclick="refreshStatus(true)" title="Full fleet scan">📡 Scan</button>
         </div>
     </header>
 
     <div class="garrison-page">
-        <div id="status-banner" class="status-banner status-unknown">
-            <span class="status-icon">?</span>
-            <span>Loading fleet status...</span>
+        <!-- Fleet Commander Banner -->
+        <div class="fleet-banner" id="fleetBanner">
+            <div class="fleet-icon-container">
+                <div class="fleet-status-ring" id="statusRing"></div>
+                <div class="fleet-icon">🏰</div>
+            </div>
+            <div class="fleet-info">
+                <h2 class="fleet-title">Fleet Command</h2>
+                <div class="fleet-subtitle" id="fleetSubtitle">Monitoring distributed training infrastructure</div>
+                <div class="fleet-stats" id="fleetStats">
+                    <div class="fleet-stat">
+                        <span class="fleet-stat-value" id="onlineCount">-</span>
+                        <span class="fleet-stat-label">Online</span>
+                    </div>
+                    <div class="fleet-stat">
+                        <span class="fleet-stat-value" id="alertCount">-</span>
+                        <span class="fleet-stat-label">Alerts</span>
+                    </div>
+                    <div class="fleet-stat">
+                        <span class="fleet-stat-value" id="serviceCount">-</span>
+                        <span class="fleet-stat-label">Services</span>
+                    </div>
+                </div>
+            </div>
+            <div class="fleet-actions">
+                <button class="fleet-action" onclick="refreshStatus(true)" id="scanAction">
+                    <span>📡</span> Scan Fleet
+                </button>
+                <button class="fleet-action" onclick="runMaintenance()">
+                    <span>🔧</span> Maintenance
+                </button>
+            </div>
         </div>
 
-        <!-- Locations Summary -->
-        <div class="locations-summary" id="locationsSummary">
+        <!-- Strategic Overview (Locations) -->
+        <div class="strategic-overview">
+            <div class="section-header">
+                <div class="section-title">
+                    <span>📍</span> Strategic Overview
+                    <span class="section-badge" id="locationsBadge">0 locations</span>
+                </div>
+            </div>
             <div class="locations-grid" id="locationsGrid">
                 <!-- Populated by JS -->
             </div>
         </div>
 
+        <!-- Alerts Section -->
         <div id="alerts-container"></div>
 
-        <div id="zones-container" class="zones-summary" style="display: none;"></div>
+        <!-- Zones Section -->
+        <div class="zones-section" id="zones-section" style="display: none;">
+            <div class="section-header">
+                <div class="section-title">
+                    <span>🌡️</span> Storage Zones
+                </div>
+            </div>
+            <div class="zones-grid" id="zones-grid"></div>
+        </div>
 
-        <div id="hosts-container" class="hosts-grid">
-            <div class="loading">
-                <div class="spinner"></div>
-                <p>Loading fleet health...</p>
+        <!-- Hosts Section -->
+        <div class="hosts-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <span>🖥️</span> Host Status
+                    <span class="section-badge" id="hostsBadge">0 hosts</span>
+                </div>
+            </div>
+            <div class="hosts-grid" id="hosts-container">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p class="loading-text">Connecting to fleet...</p>
+                </div>
             </div>
         </div>
 
@@ -597,10 +1076,7 @@
     <script>
         let statusData = null;
 
-        function getStatusClass(status) {
-            return status || 'unknown';
-        }
-
+        // Helper functions
         function getProgressClass(percent) {
             if (percent >= 90) return 'critical';
             if (percent >= 80) return 'warning';
@@ -621,26 +1097,59 @@
             return '';
         }
 
-        // Location definitions with icons
-        const LOCATIONS = {
-            'trainer': { icon: '💻', name: 'Trainer', desc: 'RTX 4090 Training Server' },
-            'inference': { icon: '🔮', name: 'Inference', desc: 'RTX 3090 Inference Server' },
-            'synology': { icon: '📦', name: 'Synology NAS', desc: 'Network Storage (Warm)' },
-            'cold_storage': { icon: '🧊', name: 'Cold Storage', desc: 'Archive Storage' },
-            'vault': { icon: '🗝️', name: 'Vault', desc: 'Asset Registry' },
-            'oracle': { icon: '🔮', name: 'Oracle', desc: 'Inference Endpoint' },
-            'forge': { icon: '🔥', name: 'Forge', desc: 'Data Generation' },
-            'guild': { icon: '🏰', name: 'Guild', desc: 'Skill Management' },
-        };
+        function getHostIcon(host) {
+            const roles = host.roles || [];
+            if (roles.includes('trainer') || roles.includes('control_plane')) return '💻';
+            if (roles.includes('inference')) return '🔮';
+            if (roles.includes('storage_warm') || roles.includes('storage_cold')) return '📦';
+            return '🖥️';
+        }
 
+        // Render fleet banner
+        function renderFleetBanner(data) {
+            const status = data.overall_status || 'unknown';
+            const hosts = Object.values(data.hosts || {});
+            const onlineCount = hosts.filter(h => h.status === 'healthy' || h.status === 'online').length;
+            const alertCount = (data.alerts || []).length;
+
+            // Count services
+            let serviceCount = 0;
+            hosts.forEach(h => {
+                const services = Object.keys(h.services || {}).filter(k => k !== 'name' && k !== 'checkpoints');
+                serviceCount += services.filter(s => h.services[s] === 'up').length;
+            });
+
+            // Update stats
+            document.getElementById('onlineCount').textContent = onlineCount;
+            document.getElementById('onlineCount').className = 'fleet-stat-value ' + (onlineCount > 0 ? 'healthy' : 'critical');
+
+            document.getElementById('alertCount').textContent = alertCount;
+            document.getElementById('alertCount').className = 'fleet-stat-value ' + (alertCount === 0 ? 'healthy' : alertCount <= 2 ? 'warning' : 'critical');
+
+            document.getElementById('serviceCount').textContent = serviceCount;
+            document.getElementById('serviceCount').className = 'fleet-stat-value healthy';
+
+            // Update status ring
+            const ring = document.getElementById('statusRing');
+            ring.className = 'fleet-status-ring ' + status;
+
+            // Update subtitle
+            const subtitle = document.getElementById('fleetSubtitle');
+            const statusText = {
+                'healthy': 'All systems operational',
+                'warning': 'Some systems require attention',
+                'critical': 'Critical issues detected',
+                'unknown': 'Fleet status unknown',
+                'offline': 'Fleet offline'
+            };
+            subtitle.textContent = statusText[status] || 'Monitoring distributed infrastructure';
+        }
+
+        // Render locations
         function renderLocations(hosts) {
             const container = document.getElementById('locationsGrid');
             if (!container) return;
 
-            // Build location cards from hosts data
-            let html = '';
-
-            // Define all locations we want to show
             const locationDefs = [
                 { id: 'trainer4090', icon: '💻', name: 'Trainer (4090)', hostKey: 'trainer4090' },
                 { id: 'inference3090', icon: '🔮', name: 'Inference (3090)', hostKey: 'inference3090' },
@@ -650,26 +1159,27 @@
                 { id: 'tavern', icon: '🏰', name: 'Tavern', service: true, port: 8888 },
             ];
 
+            let onlineCount = 0;
+            let html = '';
+
             for (const loc of locationDefs) {
                 let status = 'offline';
                 let statusText = 'Offline';
                 let statsText = '';
 
-                // Check if this is a host-based location
                 if (loc.hostKey && hosts) {
-                    // Direct match by hostKey
                     const host = hosts[loc.hostKey];
                     if (host) {
-                        status = host.status || 'unknown';
+                        status = host.status === 'healthy' ? 'online' : host.status || 'unknown';
+                        if (status === 'online' || status === 'healthy') onlineCount++;
                         statusText = status.charAt(0).toUpperCase() + status.slice(1);
 
-                        // Build stats
                         const stats = [];
                         if (host.disk_percent != null) {
-                            stats.push(`Disk: ${host.disk_percent.toFixed(0)}%`);
+                            stats.push(`Disk ${host.disk_percent.toFixed(0)}%`);
                         }
                         if (host.gpu_memory_percent != null) {
-                            stats.push(`GPU: ${host.gpu_memory_percent.toFixed(0)}%`);
+                            stats.push(`GPU ${host.gpu_memory_percent.toFixed(0)}%`);
                         }
                         if (host.services?.checkpoints != null) {
                             stats.push(`${host.services.checkpoints} ckpts`);
@@ -678,63 +1188,34 @@
                     }
                 }
 
-                // Service-based locations - assume online for now
                 if (loc.service) {
                     status = 'online';
                     statusText = `Port ${loc.port}`;
+                    onlineCount++;
                 }
 
+                const statusClass = status === 'healthy' ? 'online' : status;
+
                 html += `
-                    <div class="location-card ${status}">
+                    <div class="location-card ${statusClass}">
                         <span class="location-icon">${loc.icon}</span>
                         <div class="location-info">
-                            <span class="location-name">${loc.name}</span>
-                            <span class="location-status ${status}">${statusText}</span>
-                            ${statsText ? `<span class="location-stats">${statsText}</span>` : ''}
+                            <div class="location-name">${loc.name}</div>
+                            <div class="location-status ${statusClass}">
+                                <span class="status-dot"></span>
+                                ${statusText}
+                            </div>
+                            ${statsText ? `<div class="location-stats">${statsText}</div>` : ''}
                         </div>
                     </div>
                 `;
             }
 
             container.innerHTML = html;
+            document.getElementById('locationsBadge').textContent = `${onlineCount} online`;
         }
 
-        function renderZones(zones) {
-            const container = document.getElementById('zones-container');
-            if (!zones || Object.keys(zones).length === 0) {
-                container.style.display = 'none';
-                return;
-            }
-
-            let hasData = false;
-            let html = '';
-
-            for (const [zoneName, stats] of Object.entries(zones)) {
-                if (stats.total_gb > 0) {
-                    hasData = true;
-                    const percentClass = getProgressClass(stats.percent);
-                    html += `
-                        <div class="zone-card ${zoneName}">
-                            <div class="zone-name">${zoneName} Zone</div>
-                            <div class="zone-percent ${percentClass}">${stats.percent.toFixed(1)}%</div>
-                            <div class="zone-detail">${stats.used_gb.toFixed(0)} GB / ${stats.total_gb.toFixed(0)} GB</div>
-                            <div class="zone-detail">${stats.devices.length} device(s)</div>
-                            <div class="progress-bar">
-                                <div class="progress-fill ${percentClass}" style="width: ${stats.percent}%"></div>
-                            </div>
-                        </div>
-                    `;
-                }
-            }
-
-            if (hasData) {
-                container.innerHTML = html;
-                container.style.display = 'grid';
-            } else {
-                container.style.display = 'none';
-            }
-        }
-
+        // Render alerts
         function renderAlerts(alerts) {
             const container = document.getElementById('alerts-container');
             if (!alerts || alerts.length === 0) {
@@ -744,28 +1225,87 @@
 
             let html = `
                 <div class="alerts-section">
-                    <div class="alerts-title">Alerts (${alerts.length})</div>
+                    <div class="alerts-header">
+                        <div class="alerts-title">
+                            <span>⚠️</span> Active Alerts
+                            <span class="alert-count">${alerts.length}</span>
+                        </div>
+                    </div>
             `;
 
             for (const alert of alerts) {
-                html += `<div class="alert-item">${alert}</div>`;
+                html += `
+                    <div class="alert-item">
+                        <span class="alert-icon">⚠️</span>
+                        ${alert}
+                    </div>
+                `;
             }
 
             html += '</div>';
             container.innerHTML = html;
         }
 
+        // Render zones
+        function renderZones(zones) {
+            const section = document.getElementById('zones-section');
+            const container = document.getElementById('zones-grid');
+
+            if (!zones || Object.keys(zones).length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            let hasData = false;
+            let html = '';
+
+            const zoneIcons = { hot: '🔥', warm: '🌡️', cold: '🧊' };
+
+            for (const [zoneName, stats] of Object.entries(zones)) {
+                if (stats.total_gb > 0) {
+                    hasData = true;
+                    html += `
+                        <div class="zone-card ${zoneName}">
+                            <div class="zone-header">
+                                <div>
+                                    <div class="zone-name">${zoneName} Zone</div>
+                                </div>
+                                <span class="zone-icon">${zoneIcons[zoneName] || '📦'}</span>
+                            </div>
+                            <div class="zone-percent">${stats.percent.toFixed(1)}%</div>
+                            <div class="zone-detail">${stats.used_gb.toFixed(0)} GB / ${stats.total_gb.toFixed(0)} GB</div>
+                            <div class="zone-bar">
+                                <div class="zone-bar-fill" style="width: ${stats.percent}%"></div>
+                            </div>
+                            <div class="zone-devices">${stats.devices.length} device(s)</div>
+                        </div>
+                    `;
+                }
+            }
+
+            if (hasData) {
+                container.innerHTML = html;
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
+        // Render host card
         function renderHost(hostId, host) {
             const status = host.status || 'unknown';
             const name = host.name || hostId;
             const roleClass = getRoleClass(host);
+            const hostIcon = getHostIcon(host);
 
             let html = `
                 <div class="host-card ${roleClass}">
                     <div class="host-header">
-                        <div>
-                            <div class="host-name">${name}</div>
-                            <div class="host-ip">${host.host}</div>
+                        <div class="host-identity">
+                            <div class="host-icon">${hostIcon}</div>
+                            <div>
+                                <div class="host-name">${name}</div>
+                                <div class="host-ip">${host.host}</div>
             `;
 
             // Role badges
@@ -781,55 +1321,65 @@
             }
 
             html += `
+                            </div>
                         </div>
-                        <span class="host-status ${status}">${status.toUpperCase()}</span>
+                        <span class="host-status-badge ${status}">${status.toUpperCase()}</span>
                     </div>
-
-                    <div class="metrics-grid">
+                    <div class="host-body">
+                        <div class="metrics-grid">
             `;
 
-            // Disk
+            // Disk metric
             if (host.disk_percent !== null && host.disk_percent !== undefined) {
                 const diskClass = getProgressClass(host.disk_percent);
                 html += `
-                    <div class="metric-box">
-                        <div class="metric-label">Disk</div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-label">Disk Usage</span>
+                            <span class="metric-icon">💾</span>
+                        </div>
                         <div class="metric-value ${diskClass}">${host.disk_percent.toFixed(0)}%</div>
-                        <div class="metric-detail">${host.disk_free_gb?.toFixed(0) || '?'}GB free / ${host.disk_total_gb?.toFixed(0) || '?'}GB</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill ${diskClass}" style="width: ${host.disk_percent}%"></div>
+                        <div class="metric-detail">${host.disk_free_gb?.toFixed(0) || '?'}GB free of ${host.disk_total_gb?.toFixed(0) || '?'}GB</div>
+                        <div class="metric-bar">
+                            <div class="metric-bar-fill ${diskClass}" style="width: ${host.disk_percent}%"></div>
                         </div>
                     </div>
                 `;
             }
 
-            // RAM
+            // RAM metric
             if (host.ram_percent !== null && host.ram_percent !== undefined) {
                 const ramClass = getProgressClass(host.ram_percent);
                 html += `
-                    <div class="metric-box">
-                        <div class="metric-label">RAM</div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-label">Memory</span>
+                            <span class="metric-icon">🧠</span>
+                        </div>
                         <div class="metric-value ${ramClass}">${host.ram_percent.toFixed(0)}%</div>
                         <div class="metric-detail">${host.ram_used_gb?.toFixed(0) || '?'}GB / ${host.ram_total_gb?.toFixed(0) || '?'}GB</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill ${ramClass}" style="width: ${host.ram_percent}%"></div>
+                        <div class="metric-bar">
+                            <div class="metric-bar-fill ${ramClass}" style="width: ${host.ram_percent}%"></div>
                         </div>
                     </div>
                 `;
             }
 
-            // Load Average (for CPU workers)
+            // Load Average
             if (host.load_avg_1m !== null && host.load_avg_1m !== undefined) {
                 const cores = host.cpu_cores || 1;
-                const loadPercent = (host.load_avg_1m / cores) * 100;
+                const loadPercent = Math.min((host.load_avg_1m / cores) * 100, 100);
                 const loadClass = loadPercent >= 100 ? 'critical' : loadPercent >= 80 ? 'warning' : 'good';
                 html += `
-                    <div class="metric-box">
-                        <div class="metric-label">Load (1/5/15m)</div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-label">CPU Load</span>
+                            <span class="metric-icon">⚡</span>
+                        </div>
                         <div class="metric-value ${loadClass}">${host.load_avg_1m.toFixed(2)}</div>
                         <div class="metric-detail">${host.load_avg_5m?.toFixed(2) || '?'} / ${host.load_avg_15m?.toFixed(2) || '?'}${host.cpu_cores ? ' (' + host.cpu_cores + ' cores)' : ''}</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill ${loadClass}" style="width: ${Math.min(loadPercent, 100)}%"></div>
+                        <div class="metric-bar">
+                            <div class="metric-bar-fill ${loadClass}" style="width: ${loadPercent}%"></div>
                         </div>
                     </div>
                 `;
@@ -843,12 +1393,15 @@
                     gpuDetail += ` (${host.gpu_utilization.toFixed(0)}% util)`;
                 }
                 html += `
-                    <div class="metric-box">
-                        <div class="metric-label">GPU Memory</div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-label">GPU Memory</span>
+                            <span class="metric-icon">🎮</span>
+                        </div>
                         <div class="metric-value ${gpuClass}">${host.gpu_memory_percent.toFixed(0)}%</div>
                         <div class="metric-detail">${gpuDetail}</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill ${gpuClass}" style="width: ${host.gpu_memory_percent}%"></div>
+                        <div class="metric-bar">
+                            <div class="metric-bar-fill ${gpuClass}" style="width: ${host.gpu_memory_percent}%"></div>
                         </div>
                     </div>
                 `;
@@ -862,32 +1415,24 @@
                     tempDetail += ` (${host.gpu_power_watts.toFixed(0)}W)`;
                 }
                 html += `
-                    <div class="metric-box">
-                        <div class="metric-label">GPU Temp</div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-label">GPU Temp</span>
+                            <span class="metric-icon">🌡️</span>
+                        </div>
                         <div class="metric-value ${tempClass}">${host.gpu_temp_c.toFixed(0)}°C</div>
                         <div class="metric-detail">${tempDetail}</div>
                     </div>
                 `;
             }
 
-            // CPU Temp (if available and no GPU)
-            if (host.cpu_temp_c !== null && host.cpu_temp_c !== undefined && host.gpu_temp_c === null) {
-                const tempClass = host.cpu_temp_c >= 80 ? 'critical' : host.cpu_temp_c >= 70 ? 'warning' : 'good';
-                html += `
-                    <div class="metric-box">
-                        <div class="metric-label">CPU Temp</div>
-                        <div class="metric-value ${tempClass}">${host.cpu_temp_c.toFixed(0)}°C</div>
-                    </div>
-                `;
-            }
-
-            html += `</div>`; // Close metrics-grid
+            html += '</div>'; // Close metrics-grid
 
             // Volumes (for NAS)
             if (host.volumes && host.volumes.length > 0) {
                 html += `
                     <div class="volumes-section">
-                        <div class="volumes-title">Volumes</div>
+                        <div class="volumes-title">📂 Volumes</div>
                 `;
                 for (const vol of host.volumes) {
                     const volClass = getProgressClass(vol.percent);
@@ -896,8 +1441,8 @@
                             <span class="volume-path">${vol.path}</span>
                             <span class="volume-stats ${volClass}">${vol.percent.toFixed(0)}% (${vol.free_gb.toFixed(0)}GB free)</span>
                         </div>
-                        <div class="progress-bar" style="margin-top: 4px; margin-bottom: 8px;">
-                            <div class="progress-fill ${volClass}" style="width: ${vol.percent}%"></div>
+                        <div class="metric-bar" style="margin-bottom: 8px;">
+                            <div class="metric-bar-fill ${volClass}" style="width: ${vol.percent}%"></div>
                         </div>
                     `;
                 }
@@ -908,8 +1453,9 @@
             if (host.raid_status) {
                 const raidClass = host.raid_status === 'HEALTHY' ? 'healthy' : 'degraded';
                 html += `
-                    <div style="margin-top: 12px;">
-                        <span class="raid-status ${raidClass}">RAID: ${host.raid_status}</span>
+                    <div class="raid-badge ${raidClass}">
+                        <span>${raidClass === 'healthy' ? '✓' : '⚠️'}</span>
+                        RAID: ${host.raid_status}
                     </div>
                 `;
             }
@@ -920,81 +1466,73 @@
             if (serviceKeys.length > 0 || services.checkpoints !== undefined) {
                 html += `
                     <div class="services-section">
-                        <div class="services-title">Services</div>
+                        <div class="services-title">🔌 Services</div>
                         <div class="services-list">
                 `;
 
                 for (const key of serviceKeys) {
                     const value = services[key];
                     const badgeClass = value === 'up' ? 'up' : value === 'down' ? 'down' : 'error';
-                    html += `<span class="service-badge ${badgeClass}">${key}: ${value}</span>`;
+                    html += `
+                        <span class="service-badge ${badgeClass}">
+                            <span class="service-dot"></span>
+                            ${key}
+                        </span>
+                    `;
                 }
 
                 if (services.checkpoints !== undefined) {
-                    html += `<span class="service-badge up">checkpoints: ${services.checkpoints}</span>`;
+                    html += `
+                        <span class="service-badge up">
+                            <span class="service-dot"></span>
+                            ${services.checkpoints} checkpoints
+                        </span>
+                    `;
                 }
 
-                html += `</div></div>`;
+                html += '</div></div>';
             }
 
             // Issues
             if (host.issues && host.issues.length > 0) {
-                html += `<div class="issues-section">`;
+                html += '<div class="issues-section">';
                 for (const issue of host.issues) {
-                    html += `<div class="issue-item">&#9888; ${issue}</div>`;
+                    html += `<div class="issue-item"><span>⚠️</span> ${issue}</div>`;
                 }
-                html += `</div>`;
+                html += '</div>';
             }
 
             // Uptime
             if (host.uptime) {
-                html += `<div class="uptime">Uptime: ${host.uptime}</div>`;
+                html += `<div class="uptime"><span>⏱️</span> Uptime: ${host.uptime}</div>`;
             }
 
-            html += `</div>`; // Close host-card
+            html += '</div></div>'; // Close host-body and host-card
             return html;
         }
 
+        // Main render function
         function renderStatus(data) {
             statusData = data;
 
             // Update header stats
             const hostCount = Object.keys(data.hosts || {}).length;
-            const hostCountEl = document.getElementById('hostCount');
-            if (hostCountEl) hostCountEl.textContent = hostCount;
+            document.getElementById('hostCount').textContent = hostCount;
+            document.getElementById('hostsBadge').textContent = `${hostCount} hosts`;
 
             const status = data.overall_status || 'unknown';
             const statusIcons = { healthy: '🟢', warning: '🟡', critical: '🔴', unknown: '⚪', offline: '⚫' };
-            const statusIconEl = document.getElementById('statusIcon');
-            const statusTextEl = document.getElementById('statusText');
-            if (statusIconEl) statusIconEl.textContent = statusIcons[status] || '⚪';
-            if (statusTextEl) statusTextEl.textContent = status.toUpperCase();
+            document.getElementById('statusIcon').textContent = statusIcons[status] || '⚪';
+            document.getElementById('statusText').textContent = status.toUpperCase();
 
-            // Update banner
-            const banner = document.getElementById('status-banner');
-            const bannerIcons = { healthy: '&#10003;', warning: '&#9888;', critical: '&#10007;', unknown: '?', offline: '&#9675;' };
-            if (banner) {
-                banner.className = `status-banner status-${status}`;
-                banner.innerHTML = `
-                    <span class="status-icon">${bannerIcons[status] || '?'}</span>
-                    <span>Fleet Status: ${status.toUpperCase()}</span>
-                `;
-            }
-
-            // Render alerts
+            // Render components
+            renderFleetBanner(data);
             renderAlerts(data.alerts);
-
-            // Render locations summary
             renderLocations(data.hosts || {});
-
-            // Render zones
             renderZones(data.zones);
 
-            // Render hosts (sorted by role priority)
+            // Render hosts (sorted by priority)
             const container = document.getElementById('hosts-container');
-            let html = '';
-
-            // Sort hosts: trainer > inference > storage > workers
             const sortedHosts = Object.entries(data.hosts || {}).sort(([, a], [, b]) => {
                 const priority = (host) => {
                     const roles = host.roles || [];
@@ -1006,34 +1544,45 @@
                 return priority(a) - priority(b);
             });
 
+            let html = '';
             for (const [hostId, host] of sortedHosts) {
                 html += renderHost(hostId, host);
             }
+            container.innerHTML = html || '<p style="text-align: center; color: #888;">No hosts found</p>';
 
-            if (container) container.innerHTML = html || '<p>No hosts found</p>';
-
-            // Update timestamp with cache info
+            // Update timestamp
             const lastUpdated = document.getElementById('last-updated');
             if (lastUpdated) {
                 let timeText = `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
                 if (data._cached) {
                     const ageMin = Math.floor(data._cache_age_seconds / 60);
                     const ageSec = Math.floor(data._cache_age_seconds % 60);
-                    timeText += ` (cached ${ageMin}m ${ageSec}s ago)`;
+                    timeText += ` <span class="cache-badge cached">cached ${ageMin}m ${ageSec}s ago</span>`;
                 } else {
-                    timeText += ' (live)';
+                    timeText += ' <span class="cache-badge live">live</span>';
                 }
-                lastUpdated.textContent = timeText;
+                lastUpdated.innerHTML = timeText;
             }
         }
 
         async function refreshStatus(forceFresh = false) {
             const container = document.getElementById('hosts-container');
+            const scanBtn = document.getElementById('scanBtn');
+            const scanAction = document.getElementById('scanAction');
+
             try {
-                const loadingMsg = forceFresh ? 'Scanning fleet...' : 'Refreshing...';
-                if (container) {
-                    container.innerHTML = `<div class="loading"><div class="spinner"></div><p>${loadingMsg}</p></div>`;
+                // Show scanning state
+                if (forceFresh) {
+                    if (scanBtn) scanBtn.classList.add('scanning');
+                    if (scanAction) scanAction.classList.add('scanning');
                 }
+
+                container.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p class="loading-text">${forceFresh ? 'Scanning fleet...' : 'Refreshing...'}</p>
+                    </div>
+                `;
 
                 const url = forceFresh ? '/api/garrison?fresh=true' : '/api/garrison';
                 const response = await fetch(url);
@@ -1044,15 +1593,21 @@
                 renderStatus(data);
             } catch (error) {
                 console.error('Failed to fetch status:', error);
-                if (container) {
-                    container.innerHTML =
-                        `<p style="color: #f44336;">Failed to load fleet status: ${error.message}</p>`;
-                }
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #f44336;">
+                        <p style="font-size: 2rem; margin-bottom: 16px;">⚠️</p>
+                        <p>Failed to connect to fleet</p>
+                        <p style="color: #888; font-size: 0.9rem; margin-top: 8px;">${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                if (scanBtn) scanBtn.classList.remove('scanning');
+                if (scanAction) scanAction.classList.remove('scanning');
             }
         }
 
         async function runMaintenance() {
-            if (!confirm('Run maintenance tasks? This will clean up old checkpoints.')) {
+            if (!confirm('Run maintenance tasks on all hosts?\n\nThis will:\n• Clean up old checkpoints\n• Remove stale log files\n• Clear orphaned PIDs')) {
                 return;
             }
 
@@ -1062,15 +1617,15 @@
 
                 if (data.success) {
                     const actions = data.actions.length > 0
-                        ? data.actions.join('\n')
+                        ? data.actions.join('\n• ')
                         : 'No maintenance needed';
-                    alert('Maintenance complete:\n\n' + actions);
-                    refreshStatus();
+                    alert('✅ Maintenance complete:\n\n• ' + actions);
+                    refreshStatus(true);
                 } else {
-                    alert('Maintenance failed: ' + (data.error || 'Unknown error'));
+                    alert('❌ Maintenance failed:\n\n' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
-                alert('Failed to run maintenance: ' + error.message);
+                alert('❌ Failed to run maintenance:\n\n' + error.message);
             }
         }
 

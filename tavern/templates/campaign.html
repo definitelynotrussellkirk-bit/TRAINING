@@ -9,12 +9,226 @@
     <link rel="stylesheet" href="/static/css/game.css?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        /* ═══════════════════════════════════════════════════════════
+           CAMPAIGN PAGE - Journey Management
+           ═══════════════════════════════════════════════════════════ */
+
+        /* ─────────────────────────────────────────────────────────────
+           CAMPAIGN BANNER - Hero's Current Journey
+           ───────────────────────────────────────────────────────────── */
+        .campaign-banner {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border: 1px solid var(--border-color);
+            border-bottom: 3px solid var(--color-gold);
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            position: relative;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .campaign-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at 30% 50%, rgba(139, 92, 246, 0.15) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .banner-hero-frame {
+            position: relative;
+            width: 70px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .banner-hero-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 3px solid var(--color-gold);
+            border-radius: 50%;
+            animation: bannerGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes bannerGlow {
+            0%, 100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.3); }
+            50% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.6); }
+        }
+
+        .banner-hero-icon {
+            font-size: 2.5rem;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+
+        .banner-info {
+            flex: 1;
+            z-index: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .banner-hero-name {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            color: var(--color-gold);
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .banner-campaign-name {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin: 0.15rem 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .banner-hero-title {
+            color: #a78bfa;
+            font-style: italic;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .banner-stats {
+            display: flex;
+            gap: 1rem;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .banner-stat {
+            text-align: center;
+            min-width: 50px;
+        }
+
+        .banner-stat-value {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            color: var(--color-gold);
+            display: block;
+        }
+
+        .banner-stat-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .banner-status {
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.4rem;
+            flex-shrink: 0;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.active {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #22c55e;
+        }
+
+        .status-badge.paused {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: var(--color-gold);
+        }
+
+        .status-badge.archived {
+            background: rgba(107, 114, 128, 0.2);
+            border: 1px solid rgba(107, 114, 128, 0.4);
+            color: #9ca3af;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .status-badge.active .status-dot {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .banner-actions {
+            display: flex;
+            gap: 0.35rem;
+        }
+
+        .banner-btn {
+            padding: 0.3rem 0.6rem;
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .banner-btn:hover {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: var(--color-gold);
+            color: var(--color-gold);
+        }
+
+        .banner-btn.primary {
+            background: linear-gradient(135deg, var(--color-gold), #d97706);
+            border-color: var(--color-gold);
+            color: #000;
+            font-weight: 600;
+        }
+
+        .banner-btn.primary:hover {
+            filter: brightness(1.1);
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           MAIN LAYOUT
+           ───────────────────────────────────────────────────────────── */
         .campaign-main {
             display: grid;
-            grid-template-columns: 1fr 350px;
+            grid-template-columns: 1fr 320px;
             gap: 1.5rem;
             padding: 1.5rem;
-            height: calc(100vh - 120px);
+            height: calc(100vh - 200px);
         }
 
         .campaign-content {
@@ -23,188 +237,185 @@
             padding-bottom: 3rem;
         }
 
-        .sidebar {
-            overflow-y: auto;
-            max-height: 100%;
-        }
-
-        /* Current Campaign Card */
-        .current-campaign {
-            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(139, 92, 246, 0.1) 100%);
-            border: 2px solid var(--color-gold);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .campaign-header {
+        /* ─────────────────────────────────────────────────────────────
+           SKILL BADGES
+           ───────────────────────────────────────────────────────────── */
+        .campaign-skills {
             display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
+            gap: 0.5rem;
+            margin: 1rem 0;
         }
 
-        .campaign-hero-portrait {
-            width: 80px;
-            height: 80px;
+        .skill-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
             background: var(--bg-surface);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem;
-            border: 2px solid var(--border-color);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.85rem;
         }
 
-        .campaign-hero-info h2 {
+        .skill-badge.sy {
+            border-left: 3px solid #a78bfa;
+        }
+
+        .skill-badge.bin {
+            border-left: 3px solid #3b82f6;
+        }
+
+        .skill-badge-icon {
+            font-size: 0.9rem;
+        }
+
+        .skill-badge-level {
+            color: var(--color-gold);
+            font-weight: 600;
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           SECTION CARDS
+           ───────────────────────────────────────────────────────────── */
+        .section-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, transparent 100%);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
             font-family: var(--font-display);
             color: var(--color-gold);
             margin: 0;
-            font-size: 1.5rem;
+            font-size: 1.1rem;
         }
 
-        .campaign-hero-info .subtitle {
+        .section-icon {
+            font-size: 1.2rem;
+        }
+
+        .section-badge {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--color-gold);
+            padding: 0.2rem 0.6rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .section-body {
+            padding: 1.25rem;
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           MILESTONES
+           ───────────────────────────────────────────────────────────── */
+        .milestone-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .milestone-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 0.75rem;
+            background: var(--bg-surface);
+            border-radius: 8px;
+            border-left: 3px solid var(--color-gold);
+        }
+
+        .milestone-step {
+            font-family: var(--font-display);
+            font-weight: 600;
+            color: var(--color-gold);
+            min-width: 90px;
+            font-size: 0.9rem;
+        }
+
+        .milestone-note {
+            flex: 1;
             color: var(--text-secondary);
             font-size: 0.9rem;
         }
 
-        .campaign-hero-info .hero-title {
-            color: var(--text-muted);
-            font-style: italic;
-        }
-
-        .campaign-stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin: 1.5rem 0;
-        }
-
-        .campaign-stat {
-            background: var(--bg-surface);
-            border-radius: 8px;
-            padding: 0.75rem;
-            text-align: center;
-        }
-
-        .campaign-stat-value {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--color-gold);
-        }
-
-        .campaign-stat-label {
+        .milestone-date {
             font-size: 0.75rem;
             color: var(--text-muted);
-            text-transform: uppercase;
         }
 
-        .campaign-skills {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-
-        .campaign-skill-badge {
-            background: var(--bg-surface);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 0.25rem 0.75rem;
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        /* Campaign Actions */
-        .campaign-actions {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-        }
-
-        .campaign-btn {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--bg-surface);
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
+        .add-milestone-btn {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
+            width: 100%;
+            padding: 0.75rem;
+            margin-top: 0.75rem;
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .campaign-btn:hover {
+        .add-milestone-btn:hover {
             border-color: var(--color-gold);
-            background: rgba(245, 158, 11, 0.1);
+            color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.05);
         }
 
-        .campaign-btn.primary {
-            background: linear-gradient(135deg, var(--color-gold) 0%, #D97706 100%);
-            border-color: var(--color-gold);
-            color: #000;
-            font-weight: 600;
-        }
-
-        .campaign-btn.primary:hover {
-            filter: brightness(1.1);
-        }
-
-        .campaign-btn.danger {
-            border-color: #EF4444;
-        }
-
-        .campaign-btn.danger:hover {
-            background: rgba(239, 68, 68, 0.1);
-            border-color: #EF4444;
-        }
-
-        /* Campaign List */
-        .campaign-section {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .campaign-section h3 {
-            font-family: var(--font-display);
-            color: var(--text-primary);
-            margin: 0 0 1rem 0;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
+        /* ─────────────────────────────────────────────────────────────
+           CAMPAIGN LIST
+           ───────────────────────────────────────────────────────────── */
         .campaign-list {
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
-            max-height: 400px;
+            gap: 1rem;
+            max-height: 450px;
             overflow-y: auto;
-            padding-bottom: 2rem;
         }
 
         .campaign-group {
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
         }
 
         .campaign-group-header {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            font-weight: 600;
-            color: var(--color-gold);
+            gap: 0.75rem;
+            padding: 0.5rem 0;
             margin-bottom: 0.5rem;
-            font-size: 0.9rem;
         }
 
-        .campaign-group-count {
+        .group-icon {
+            font-size: 1.25rem;
+        }
+
+        .group-name {
+            font-family: var(--font-display);
+            font-weight: 600;
+            color: var(--color-gold);
+            font-size: 0.95rem;
+        }
+
+        .group-count {
             background: var(--bg-surface);
             padding: 0.15rem 0.5rem;
             border-radius: 10px;
@@ -218,6 +429,7 @@
             border-radius: 8px;
             padding: 1rem;
             transition: all 0.2s ease;
+            border-left: 4px solid transparent;
         }
 
         .campaign-item.clickable {
@@ -225,30 +437,27 @@
         }
 
         .campaign-item.clickable:hover {
-            border-color: var(--color-gold);
+            border-left-color: var(--color-gold);
             background: rgba(139, 92, 246, 0.1);
             transform: translateX(4px);
         }
 
         .campaign-item.active {
-            border-color: var(--color-gold);
+            border-left-color: var(--color-gold);
             background: rgba(245, 158, 11, 0.1);
-            cursor: default;
-        }
-
-        .campaign-item.active .campaign-item-step {
-            color: var(--color-gold);
-            font-weight: 600;
+            border-color: rgba(245, 158, 11, 0.3);
         }
 
         .campaign-item-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 0.25rem;
         }
 
         .campaign-item-name {
             font-weight: 500;
+            color: var(--text-primary);
         }
 
         .campaign-item-step {
@@ -256,31 +465,66 @@
             color: var(--text-muted);
         }
 
+        .campaign-item.active .campaign-item-step {
+            color: var(--color-gold);
+            font-weight: 600;
+        }
+
         .campaign-item-date {
             font-size: 0.75rem;
             color: var(--text-muted);
-            margin-top: 0.25rem;
         }
 
-        /* Sidebar - Hero Selection */
+        /* ─────────────────────────────────────────────────────────────
+           SIDEBAR - HERO ROSTER
+           ───────────────────────────────────────────────────────────── */
         .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+            max-height: 100%;
+        }
+
+        .sidebar-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 1.5rem;
-            height: fit-content;
+            overflow: hidden;
+            flex-shrink: 0;
         }
 
-        .sidebar h3 {
+        .sidebar-card.scrollable {
+            flex-shrink: 1;
+            min-height: 150px;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, transparent 100%);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-title {
             font-family: var(--font-display);
             color: var(--color-gold);
-            margin: 0 0 1rem 0;
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .sidebar-body {
+            padding: 1rem;
         }
 
         .hero-list {
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
+            max-height: 280px;
+            overflow-y: auto;
         }
 
         .hero-item {
@@ -293,14 +537,17 @@
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
+            border-left: 3px solid transparent;
         }
 
         .hero-item:hover {
-            border-color: var(--border-gold);
+            border-left-color: #a78bfa;
+            background: rgba(167, 139, 250, 0.1);
         }
 
         .hero-item.active {
-            border-color: var(--color-gold);
+            border-left-color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.1);
         }
 
         .hero-icon {
@@ -313,6 +560,7 @@
 
         .hero-name {
             font-weight: 500;
+            color: var(--text-primary);
         }
 
         .hero-model {
@@ -320,38 +568,55 @@
             color: var(--text-muted);
         }
 
-        /* Milestones */
-        .milestone-list {
+        .hero-campaigns {
+            font-size: 0.7rem;
+            color: #a78bfa;
+        }
+
+        /* Quick Info */
+        .quick-info {
+            padding: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .info-item {
             display: flex;
-            flex-direction: column;
+            align-items: flex-start;
             gap: 0.5rem;
-        }
-
-        .milestone-item {
-            display: flex;
-            gap: 0.75rem;
-            padding: 0.5rem;
-            background: var(--bg-surface);
-            border-radius: 6px;
-        }
-
-        .milestone-step {
-            font-weight: 600;
-            color: var(--color-gold);
-            min-width: 80px;
-        }
-
-        .milestone-note {
-            flex: 1;
+            margin-bottom: 0.75rem;
+            font-size: 0.85rem;
             color: var(--text-secondary);
         }
 
-        .milestone-date {
-            font-size: 0.8rem;
-            color: var(--text-muted);
+        .info-icon {
+            color: var(--color-gold);
         }
 
-        /* Empty state */
+        .info-label {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           HALL OF LEGENDS (Archived)
+           ───────────────────────────────────────────────────────────── */
+        .legend-item {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            border-left: 4px solid #6b7280;
+            opacity: 0.8;
+        }
+
+        .legend-item:hover {
+            opacity: 1;
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           EMPTY STATE
+           ───────────────────────────────────────────────────────────── */
         .empty-state {
             text-align: center;
             padding: 2rem;
@@ -361,17 +626,56 @@
         .empty-state-icon {
             font-size: 3rem;
             margin-bottom: 1rem;
+            opacity: 0.5;
         }
 
-        /* Modal */
+        .empty-state h3 {
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           NO CAMPAIGN STATE
+           ───────────────────────────────────────────────────────────── */
+        .no-campaign-banner {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .no-campaign-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.6;
+        }
+
+        .no-campaign-title {
+            font-family: var(--font-display);
+            color: var(--color-gold);
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .no-campaign-text {
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           MODAL
+           ───────────────────────────────────────────────────────────── */
         .modal-overlay {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
             z-index: 100;
             align-items: center;
             justify-content: center;
+            backdrop-filter: blur(4px);
         }
 
         .modal-overlay.active {
@@ -379,24 +683,40 @@
         }
 
         .modal {
-            background: var(--bg-card);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 1.5rem;
+            padding: 0;
             max-width: 500px;
             width: 90%;
             max-height: 80vh;
-            overflow-y: auto;
+            overflow: hidden;
         }
 
-        .modal h3 {
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1.25rem;
+            background: rgba(139, 92, 246, 0.1);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-header h3 {
             font-family: var(--font-display);
             color: var(--color-gold);
-            margin: 0 0 1rem 0;
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            max-height: 60vh;
         }
 
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 1.25rem;
         }
 
         .form-group label {
@@ -404,6 +724,7 @@
             margin-bottom: 0.5rem;
             color: var(--text-secondary);
             font-size: 0.9rem;
+            font-weight: 500;
         }
 
         .form-group input,
@@ -423,28 +744,88 @@
         .form-group textarea:focus {
             outline: none;
             border-color: var(--color-gold);
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.1);
         }
 
-        .modal-actions {
+        .skill-checkboxes {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .skill-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .skill-checkbox:has(input:checked) {
+            border-color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .skill-checkbox input {
+            width: auto;
+            margin: 0;
+        }
+
+        .modal-footer {
             display: flex;
             gap: 0.75rem;
-            margin-top: 1.5rem;
+            padding: 1rem 1.5rem;
+            background: rgba(0,0,0,0.2);
+            border-top: 1px solid var(--border-color);
         }
 
-        /* Toast notification */
+        .modal-btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-btn:hover {
+            border-color: var(--color-gold);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .modal-btn.primary {
+            background: linear-gradient(135deg, var(--color-gold) 0%, #D97706 100%);
+            border-color: var(--color-gold);
+            color: #000;
+            font-weight: 600;
+        }
+
+        .modal-btn.primary:hover {
+            filter: brightness(1.1);
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           TOAST
+           ───────────────────────────────────────────────────────────── */
         .toast {
             position: fixed;
             bottom: 2rem;
             right: 2rem;
-            background: var(--color-gold);
+            background: linear-gradient(135deg, var(--color-gold), #d97706);
             color: #000;
             padding: 1rem 1.5rem;
             border-radius: 8px;
             font-weight: 500;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
             z-index: 9999;
             animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
-            opacity: 1;
         }
 
         @keyframes slideIn {
@@ -455,6 +836,22 @@
         @keyframes fadeOut {
             from { opacity: 1; }
             to { opacity: 0; }
+        }
+
+        /* ─────────────────────────────────────────────────────────────
+           RESPONSIVE
+           ───────────────────────────────────────────────────────────── */
+        @media (max-width: 1024px) {
+            .campaign-main {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                order: -1;
+                max-height: none;
+            }
+            .banner-stats {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -483,94 +880,115 @@
         </div>
     </header>
 
+    <!-- CAMPAIGN BANNER -->
+    <div class="campaign-banner" id="campaignBanner">
+        <div class="banner-hero-frame">
+            <div class="banner-hero-ring"></div>
+            <span class="banner-hero-icon" id="bannerHeroIcon">🦸</span>
+        </div>
+        <div class="banner-info">
+            <h2 class="banner-hero-name" id="bannerHeroName">Loading...</h2>
+            <div class="banner-campaign-name" id="bannerCampaignName">-</div>
+            <div class="banner-hero-title" id="bannerHeroTitle">-</div>
+        </div>
+        <div class="banner-stats" id="bannerStats">
+            <div class="banner-stat">
+                <span class="banner-stat-value" id="bannerStep">-</span>
+                <span class="banner-stat-label">Step</span>
+            </div>
+            <div class="banner-stat">
+                <span class="banner-stat-value" id="bannerDays">-</span>
+                <span class="banner-stat-label">Days</span>
+            </div>
+            <div class="banner-stat">
+                <span class="banner-stat-value" id="bannerEvals">-</span>
+                <span class="banner-stat-label">Evals</span>
+            </div>
+            <div class="banner-stat">
+                <span class="banner-stat-value" id="bannerCheckpoints">-</span>
+                <span class="banner-stat-label">Saves</span>
+            </div>
+        </div>
+        <div class="banner-status">
+            <div class="status-badge active" id="bannerStatusBadge">
+                <span class="status-dot"></span>
+                <span id="bannerStatusText">Active</span>
+            </div>
+            <div class="banner-actions">
+                <button class="banner-btn primary" onclick="showNewCampaignModal()">+ New</button>
+                <button class="banner-btn" onclick="switchCampaign()">Switch</button>
+                <button class="banner-btn" onclick="archiveCampaign()">Archive</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NO CAMPAIGN STATE -->
+    <div class="no-campaign-banner" id="noCampaignBanner" style="display: none; margin: 1.5rem;">
+        <div class="no-campaign-icon">📜</div>
+        <h2 class="no-campaign-title">No Active Campaign</h2>
+        <p class="no-campaign-text">Begin a new journey by creating a campaign for one of your heroes.</p>
+        <button class="banner-btn primary" onclick="showNewCampaignModal()" style="padding: 0.75rem 2rem; font-size: 1rem;">
+            Start New Campaign
+        </button>
+    </div>
+
     <!-- MAIN -->
     <main class="campaign-main">
         <div class="campaign-content">
-            <!-- Current Campaign -->
-            <div class="current-campaign" id="currentCampaign">
-                <div class="campaign-header">
-                    <div class="campaign-hero-portrait" id="heroPortrait">🦸</div>
-                    <div class="campaign-hero-info">
-                        <h2 id="heroName">Loading...</h2>
-                        <div class="subtitle" id="campaignName">-</div>
-                        <div class="hero-title" id="heroTitle">-</div>
-                    </div>
-                </div>
-
-                <div class="campaign-stats" style="grid-template-columns: repeat(5, 1fr);">
-                    <div class="campaign-stat">
-                        <div class="campaign-stat-value" id="statStep">-</div>
-                        <div class="campaign-stat-label">Step</div>
-                    </div>
-                    <div class="campaign-stat">
-                        <div class="campaign-stat-value" id="statDays">-</div>
-                        <div class="campaign-stat-label">Days</div>
-                    </div>
-                    <div class="campaign-stat">
-                        <div class="campaign-stat-value" id="statEvals">-</div>
-                        <div class="campaign-stat-label">Evals</div>
-                    </div>
-                    <div class="campaign-stat">
-                        <div class="campaign-stat-value" id="statCheckpoints">-</div>
-                        <div class="campaign-stat-label">Checkpoints</div>
-                    </div>
-                    <div class="campaign-stat">
-                        <div class="campaign-stat-value" id="statStatus">-</div>
-                        <div class="campaign-stat-label">Status</div>
-                    </div>
-                </div>
-
-                <div class="campaign-skills" id="campaignSkills">
-                    <!-- Skill badges populated by JS -->
-                </div>
-
-                <div class="campaign-actions">
-                    <button class="campaign-btn primary" onclick="showNewCampaignModal()">
-                        New Campaign
-                    </button>
-                    <button class="campaign-btn" onclick="switchCampaign()">
-                        Switch
-                    </button>
-                    <button class="campaign-btn danger" onclick="archiveCampaign()">
-                        Archive
-                    </button>
-                </div>
-            </div>
-
-            <!-- No Campaign State -->
-            <div class="campaign-section" id="noCampaign" style="display: none;">
-                <div class="empty-state">
-                    <div class="empty-state-icon">📜</div>
-                    <h3>No Active Campaign</h3>
-                    <p>Run the migration script or create a new campaign to begin.</p>
-                    <button class="campaign-btn primary" onclick="showNewCampaignModal()" style="margin-top: 1rem;">
-                        Start New Campaign
-                    </button>
-                </div>
+            <!-- Skills Focus -->
+            <div class="campaign-skills" id="campaignSkills">
+                <!-- Skill badges populated by JS -->
             </div>
 
             <!-- Milestones -->
-            <div class="campaign-section" id="milestonesSection">
-                <h3>Campaign Milestones</h3>
-                <div class="milestone-list" id="milestoneList">
-                    <!-- Populated by JS -->
+            <div class="section-card" id="milestonesSection">
+                <div class="section-header">
+                    <h3 class="section-title">
+                        <span class="section-icon">🏆</span>
+                        Campaign Milestones
+                    </h3>
+                    <span class="section-badge" id="milestoneCount">0</span>
+                </div>
+                <div class="section-body">
+                    <div class="milestone-list" id="milestoneList">
+                        <!-- Populated by JS -->
+                    </div>
+                    <button class="add-milestone-btn" onclick="addMilestone()">
+                        + Add Milestone
+                    </button>
                 </div>
             </div>
 
             <!-- All Campaigns -->
-            <div class="campaign-section">
-                <h3>All Campaigns <span id="campaignCount" style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;"></span></h3>
-                <div class="campaign-list" id="campaignList">
-                    <!-- Populated by JS -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3 class="section-title">
+                        <span class="section-icon">📚</span>
+                        All Campaigns
+                    </h3>
+                    <span class="section-badge" id="campaignCount">0</span>
+                </div>
+                <div class="section-body">
+                    <div class="campaign-list" id="campaignList">
+                        <!-- Populated by JS -->
+                    </div>
                 </div>
             </div>
 
             <!-- Hall of Legends (Archived) -->
-            <div class="campaign-section" id="archiveSection">
-                <h3>Hall of Legends (Archived)</h3>
-                <div class="campaign-list" id="archiveList">
-                    <div class="empty-state">
-                        <p>No archived campaigns yet.</p>
+            <div class="section-card" id="archiveSection">
+                <div class="section-header">
+                    <h3 class="section-title">
+                        <span class="section-icon">🏛️</span>
+                        Hall of Legends
+                    </h3>
+                    <span class="section-badge" id="archiveCount">0</span>
+                </div>
+                <div class="section-body">
+                    <div class="campaign-list" id="archiveList">
+                        <div class="empty-state">
+                            <p>No archived campaigns yet.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -578,17 +996,48 @@
 
         <!-- Sidebar - Heroes -->
         <div class="sidebar">
-            <h3>Available Heroes</h3>
-            <div class="hero-list" id="heroList">
-                <!-- Populated by JS -->
+            <div class="sidebar-card scrollable">
+                <div class="sidebar-header">
+                    <span style="font-size: 1.25rem;">⚔️</span>
+                    <h3 class="sidebar-title">Hero Roster</h3>
+                </div>
+                <div class="sidebar-body" style="overflow-y: auto; max-height: 300px;">
+                    <div class="hero-list" id="heroList">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
             </div>
 
-            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                <h3>Quick Info</h3>
-                <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">
-                    <p><strong>Campaign</strong> = A training run for a hero</p>
-                    <p><strong>Hero</strong> = A model architecture</p>
-                    <p><strong>Archive</strong> = Move to Hall of Legends</p>
+            <div class="sidebar-card">
+                <div class="sidebar-header">
+                    <span style="font-size: 1.25rem;">📖</span>
+                    <h3 class="sidebar-title">Quick Reference</h3>
+                </div>
+                <div class="quick-info">
+                    <div class="info-item">
+                        <span class="info-icon">🏰</span>
+                        <div>
+                            <span class="info-label">Campaign</span> — A training run for a hero
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">🦸</span>
+                        <div>
+                            <span class="info-label">Hero</span> — A model architecture
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">🏛️</span>
+                        <div>
+                            <span class="info-label">Archive</span> — Move to Hall of Legends
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">🏆</span>
+                        <div>
+                            <span class="info-label">Milestone</span> — Notable achievement
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -597,31 +1046,36 @@
     <!-- New Campaign Modal -->
     <div class="modal-overlay" id="newCampaignModal">
         <div class="modal">
-            <h3>Start New Campaign</h3>
+            <div class="modal-header">
+                <span style="font-size: 1.5rem;">🏰</span>
+                <h3>Start New Campaign</h3>
+            </div>
             <form id="newCampaignForm">
-                <div class="form-group">
-                    <label>Hero</label>
-                    <select id="newHeroSelect">
-                        <!-- Populated by JS -->
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Campaign Name</label>
-                    <input type="text" id="newCampaignName" placeholder="e.g., Binary Focus Training">
-                </div>
-                <div class="form-group">
-                    <label>Description (optional)</label>
-                    <textarea id="newCampaignDesc" rows="2" placeholder="What is this campaign about?"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Skills Focus</label>
-                    <div id="skillsCheckboxes" style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                        <!-- Populated by JS -->
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Select Hero</label>
+                        <select id="newHeroSelect">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Campaign Name</label>
+                        <input type="text" id="newCampaignName" placeholder="e.g., Binary Focus Training">
+                    </div>
+                    <div class="form-group">
+                        <label>Description (optional)</label>
+                        <textarea id="newCampaignDesc" rows="2" placeholder="What is this campaign about?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Skills Focus</label>
+                        <div class="skill-checkboxes" id="skillsCheckboxes">
+                            <!-- Populated by JS -->
+                        </div>
                     </div>
                 </div>
-                <div class="modal-actions">
-                    <button type="button" class="campaign-btn" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="campaign-btn primary">Create Campaign</button>
+                <div class="modal-footer">
+                    <button type="button" class="modal-btn" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="modal-btn primary">Create Campaign</button>
                 </div>
             </form>
         </div>
@@ -664,7 +1118,7 @@
                 activeCampaign = data.active;
                 campaigns = data.campaigns || {};
 
-                renderActiveCampaign();
+                renderBanner();
                 renderCampaignList();
                 renderArchiveList();
             } catch (err) {
@@ -676,12 +1130,19 @@
             const list = document.getElementById('heroList');
             const select = document.getElementById('newHeroSelect');
 
+            // Count campaigns per hero
+            const campaignCounts = {};
+            for (const [heroId, heroCampaigns] of Object.entries(campaigns)) {
+                campaignCounts[heroId] = heroCampaigns.filter(c => c.status !== 'archived').length;
+            }
+
             list.innerHTML = heroes.map(h => `
                 <div class="hero-item ${activeCampaign?.hero_id === h.id ? 'active' : ''}" data-id="${h.id}">
                     <div class="hero-icon">${h.display?.emoji || '🦸'}</div>
                     <div class="hero-details">
                         <div class="hero-name">${h.name}</div>
                         <div class="hero-model">${h.model?.hf_name || 'Unknown'}</div>
+                        <div class="hero-campaigns">${campaignCounts[h.id] || 0} campaigns</div>
                     </div>
                 </div>
             `).join('');
@@ -693,73 +1154,87 @@
             // Skills checkboxes
             const skills = ['bin', 'sy'];
             document.getElementById('skillsCheckboxes').innerHTML = skills.map(s => `
-                <label style="display: flex; align-items: center; gap: 0.25rem;">
+                <label class="skill-checkbox">
                     <input type="checkbox" name="skills" value="${s}" checked>
-                    ${s.toUpperCase()}
+                    <span>${s.toUpperCase()}</span>
                 </label>
             `).join('');
         }
 
-        function renderActiveCampaign() {
-            const container = document.getElementById('currentCampaign');
-            const noCampaign = document.getElementById('noCampaign');
+        function renderBanner() {
+            const banner = document.getElementById('campaignBanner');
+            const noBanner = document.getElementById('noCampaignBanner');
+            const content = document.querySelector('.campaign-content');
+            const milestonesSection = document.getElementById('milestonesSection');
 
             if (!activeCampaign) {
-                container.style.display = 'none';
-                noCampaign.style.display = 'block';
-                document.getElementById('milestonesSection').style.display = 'none';
+                banner.style.display = 'none';
+                noBanner.style.display = 'block';
+                content.style.display = 'none';
                 return;
             }
 
-            container.style.display = 'block';
-            noCampaign.style.display = 'none';
-            document.getElementById('milestonesSection').style.display = 'block';
+            banner.style.display = 'flex';
+            noBanner.style.display = 'none';
+            content.style.display = 'block';
 
             // Find hero
             const hero = heroes.find(h => h.id === activeCampaign.hero_id) || {};
 
-            document.getElementById('heroPortrait').textContent = hero.display?.emoji || '🦸';
-            document.getElementById('heroName').textContent = hero.name || activeCampaign.hero_id;
-            document.getElementById('campaignName').textContent = activeCampaign.name;
-            document.getElementById('heroTitle').textContent = hero.rpg_name || '';
+            document.getElementById('bannerHeroIcon').textContent = hero.display?.emoji || '🦸';
+            document.getElementById('bannerHeroName').textContent = hero.name || activeCampaign.hero_id;
+            document.getElementById('bannerCampaignName').textContent = activeCampaign.name;
+            document.getElementById('bannerHeroTitle').textContent = hero.rpg_name || '';
 
-            document.getElementById('statStep').textContent = (activeCampaign.current_step || 0).toLocaleString();
-            document.getElementById('statStatus').textContent = activeCampaign.status || 'active';
+            document.getElementById('bannerStep').textContent = (activeCampaign.current_step || 0).toLocaleString();
+            document.getElementById('headerStep').textContent = (activeCampaign.current_step || 0).toLocaleString();
 
             // Calculate days
             const created = new Date(activeCampaign.created_at);
             const days = Math.floor((Date.now() - created) / (1000 * 60 * 60 * 24));
-            document.getElementById('statDays').textContent = days;
+            document.getElementById('bannerDays').textContent = days;
 
-            // Checkpoints - would need API
-            document.getElementById('statCheckpoints').textContent = '-';
+            // Checkpoints
+            document.getElementById('bannerCheckpoints').textContent = '-';
 
             // Fetch passive evals count from skills API
             fetch('/api/skills')
                 .then(r => r.json())
                 .then(data => {
                     const totalEvals = data.total_passive_evals || 0;
-                    document.getElementById('statEvals').textContent = totalEvals.toLocaleString();
+                    document.getElementById('bannerEvals').textContent = totalEvals.toLocaleString();
                 })
                 .catch(() => {
-                    document.getElementById('statEvals').textContent = '-';
+                    document.getElementById('bannerEvals').textContent = '-';
                 });
+
+            // Status badge
+            const statusBadge = document.getElementById('bannerStatusBadge');
+            const status = activeCampaign.status || 'active';
+            statusBadge.className = `status-badge ${status}`;
+            document.getElementById('bannerStatusText').textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            document.getElementById('campaignStatus').textContent = status.charAt(0).toUpperCase() + status.slice(1);
 
             // Skills
             const skills = activeCampaign.skills_focus || [];
+            const skillIcons = { sy: '🧩', bin: '🔢' };
             document.getElementById('campaignSkills').innerHTML = skills.map(s => `
-                <span class="campaign-skill-badge">${s.toUpperCase()}</span>
+                <span class="skill-badge ${s}">
+                    <span class="skill-badge-icon">${skillIcons[s] || '⚔️'}</span>
+                    <span>${s.toUpperCase()}</span>
+                </span>
             `).join('');
 
             // Milestones
             const milestones = activeCampaign.milestones || [];
+            document.getElementById('milestoneCount').textContent = milestones.length;
             document.getElementById('milestoneList').innerHTML = milestones.length ? milestones.map(m => `
                 <div class="milestone-item">
                     <span class="milestone-step">Step ${m.step.toLocaleString()}</span>
                     <span class="milestone-note">${m.note}</span>
                     <span class="milestone-date">${m.date}</span>
                 </div>
-            `).join('') : '<div class="empty-state">No milestones recorded yet.</div>';
+            `).join('') : '<div class="empty-state">No milestones recorded yet. Mark notable achievements!</div>';
         }
 
         function renderCampaignList() {
@@ -777,19 +1252,25 @@
                 }
             }
 
+            document.getElementById('campaignCount').textContent = totalCount;
+
             if (totalCount === 0) {
-                list.innerHTML = '<div class="empty-state">No campaigns yet. Create one to start!</div>';
+                list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📜</div><p>No campaigns yet. Create one to start!</p></div>';
                 return;
             }
 
             // Render grouped by hero
             let html = '';
             for (const [heroId, heroCampaigns] of Object.entries(heroGroups)) {
-                const heroName = heroId.split('-')[0].toUpperCase();
+                const hero = heroes.find(h => h.id === heroId) || {};
+                const heroName = hero.name || heroId.split('-')[0].toUpperCase();
+                const heroEmoji = hero.display?.emoji || '🦸';
+
                 html += `<div class="campaign-group">`;
                 html += `<div class="campaign-group-header">
-                    <span>${heroName}</span>
-                    <span class="campaign-group-count">${heroCampaigns.length}</span>
+                    <span class="group-icon">${heroEmoji}</span>
+                    <span class="group-name">${heroName}</span>
+                    <span class="group-count">${heroCampaigns.length}</span>
                 </div>`;
 
                 for (const c of heroCampaigns) {
@@ -810,13 +1291,6 @@
             }
 
             list.innerHTML = html;
-
-            // Update count in header
-            const countEl = document.getElementById('campaignCount');
-            if (countEl) {
-                const heroCount = Object.keys(heroGroups).length;
-                countEl.textContent = `(${totalCount} across ${heroCount} heroes)`;
-            }
         }
 
         function renderArchiveList() {
@@ -831,20 +1305,24 @@
                 }
             }
 
+            document.getElementById('archiveCount').textContent = archived.length;
+
             if (archived.length === 0) {
-                list.innerHTML = '<div class="empty-state">No archived campaigns.</div>';
+                list.innerHTML = '<div class="empty-state"><p>No archived campaigns. Complete a journey to preserve it here.</p></div>';
                 return;
             }
 
-            list.innerHTML = archived.map(c => `
-                <div class="campaign-item" data-hero="${c.hero_id}" data-id="${c.id}">
+            list.innerHTML = archived.map(c => {
+                const hero = heroes.find(h => h.id === c.hero_id) || {};
+                return `
+                <div class="legend-item" data-hero="${c.hero_id}" data-id="${c.id}">
                     <div class="campaign-item-header">
-                        <span class="campaign-item-name">${c.name}</span>
+                        <span class="campaign-item-name">${hero.display?.emoji || '🦸'} ${c.name}</span>
                         <span class="campaign-item-step">Final Step ${(c.current_step || 0).toLocaleString()}</span>
                     </div>
-                    <div class="campaign-item-date">${c.hero_id} - Archived ${new Date(c.archived_at).toLocaleDateString()}</div>
+                    <div class="campaign-item-date">Archived ${new Date(c.archived_at).toLocaleDateString()}</div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         // Modal
@@ -854,6 +1332,15 @@
 
         function closeModal() {
             document.getElementById('newCampaignModal').classList.remove('active');
+        }
+
+        // Add milestone (placeholder)
+        function addMilestone() {
+            const note = prompt('Enter milestone note:');
+            if (!note) return;
+
+            // Would need API endpoint
+            showToast('Milestone feature coming soon!');
         }
 
         // Form submission
@@ -879,13 +1366,10 @@
                 });
 
                 if (resp.ok) {
-                    const result = await resp.json();
                     closeModal();
                     await loadData();
-                    // Show success message
-                    showToast(`Campaign "${name}" created for ${heroId.split('-')[0].toUpperCase()}!`);
-                    // Scroll to campaigns list
-                    document.getElementById('campaignList').scrollIntoView({ behavior: 'smooth' });
+                    const hero = heroes.find(h => h.id === heroId) || {};
+                    showToast(`Campaign "${name}" created for ${hero.name || heroId}!`);
                 } else {
                     const err = await resp.json();
                     alert('Error: ' + (err.error || 'Failed to create campaign'));
@@ -913,6 +1397,7 @@
 
                 if (resp.ok) {
                     loadData();
+                    showToast('Campaign activated!');
                 } else {
                     const err = await resp.json();
                     alert('Error: ' + (err.error || 'Failed to activate'));
@@ -923,7 +1408,6 @@
         }
 
         async function switchCampaign() {
-            // Scroll to campaign list
             document.getElementById('campaignList').scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -946,6 +1430,7 @@
 
                 if (resp.ok) {
                     loadData();
+                    showToast('Campaign archived to Hall of Legends!');
                 } else {
                     const err = await resp.json();
                     alert('Error: ' + (err.error || 'Failed to archive'));

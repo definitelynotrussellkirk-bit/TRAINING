@@ -401,6 +401,141 @@
             background: linear-gradient(90deg, var(--color-warning), var(--color-danger));
         }
 
+        /* Campaign Banner */
+        .campaign-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            margin: 0 20px 12px 20px;
+            background: linear-gradient(135deg, rgba(30, 30, 50, 0.95) 0%, rgba(40, 35, 60, 0.95) 100%);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.1);
+        }
+
+        .campaign-hero {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .campaign-hero-icon {
+            font-size: 2.5rem;
+            filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.5));
+        }
+
+        .campaign-hero-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .campaign-hero-name {
+            font-family: 'Cinzel', serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+        }
+
+        .campaign-id {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .campaign-stats {
+            display: flex;
+            gap: 32px;
+        }
+
+        .campaign-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .campaign-stat .stat-value {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .campaign-stat .stat-label {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .campaign-toggle {
+            display: flex;
+            align-items: center;
+        }
+
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .toggle-label:hover {
+            color: #ccc;
+        }
+
+        .toggle-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        /* Best loss badge */
+        .best-loss-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            margin-left: 8px;
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 10px;
+            font-size: 0.7rem;
+            color: #22c55e;
+        }
+
+        .hero-group-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .hero-group-header .hero-icon {
+            font-size: 1.2rem;
+        }
+
+        .hero-group-header .hero-name {
+            font-family: 'Cinzel', serif;
+            font-weight: 600;
+            color: #ffd700;
+        }
+
+        .hero-group-header .campaign-label {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .inactive-campaign {
+            filter: grayscale(0.3);
+        }
+
         .section-divider {
             border-top: 1px solid var(--border-color);
             margin: 0.5rem 0;
@@ -469,6 +604,37 @@
             <div class="time-display" id="timeDisplay">--:--:--</div>
         </div>
     </header>
+
+    <!-- ACTIVE CAMPAIGN BANNER -->
+    <div class="campaign-banner" id="campaignBanner">
+        <div class="campaign-hero">
+            <span class="campaign-hero-icon" id="campaignHeroIcon">⚡</span>
+            <div class="campaign-hero-info">
+                <span class="campaign-hero-name" id="campaignHeroName">Loading...</span>
+                <span class="campaign-id" id="campaignId">--</span>
+            </div>
+        </div>
+        <div class="campaign-stats">
+            <div class="campaign-stat">
+                <span class="stat-value" id="campaignCheckpoints">0</span>
+                <span class="stat-label">Checkpoints</span>
+            </div>
+            <div class="campaign-stat">
+                <span class="stat-value" id="campaignBestLoss">--</span>
+                <span class="stat-label">Best Loss</span>
+            </div>
+            <div class="campaign-stat">
+                <span class="stat-value" id="campaignLatestStep">--</span>
+                <span class="stat-label">Latest Step</span>
+            </div>
+        </div>
+        <div class="campaign-toggle">
+            <label class="toggle-label">
+                <input type="checkbox" id="showAllToggle" onchange="toggleShowAll()">
+                <span>Show all campaigns</span>
+            </label>
+        </div>
+    </div>
 
     <!-- LEDGER SUMMARY -->
     <div class="ledger-summary" id="ledgerSummary">
@@ -586,6 +752,14 @@
         // ============================================
 
         let vaultData = null;
+        let showAllCampaigns = false;
+
+        function toggleShowAll() {
+            showAllCampaigns = $('#showAllToggle').checked;
+            if (vaultData) {
+                renderAssets(vaultData);
+            }
+        }
 
         // Hero icon mapping
         // - Active heroes from configs/heroes/*.yaml use display.emoji
@@ -681,7 +855,46 @@
             }
         }
 
+        function updateCampaignBanner(data) {
+            // Get hero name from hero_id (e.g., "ojas-qwen3-8b" -> "OJAS")
+            const heroId = data.active_hero_id || '';
+            const heroName = heroId.split('-')[0].toUpperCase();
+            const heroIcon = getHeroIcon(heroName);
+            const campaignId = data.active_campaign_id || '--';
+
+            setText('#campaignHeroIcon', heroIcon);
+            setText('#campaignHeroName', heroName || 'No Active Campaign');
+            setText('#campaignId', campaignId);
+
+            // Calculate campaign stats
+            const activeCheckpoints = (data.checkpoints || []).filter(cp => cp.is_active_campaign);
+            setText('#campaignCheckpoints', activeCheckpoints.length);
+
+            // Find best loss
+            const losses = activeCheckpoints
+                .filter(cp => cp.train_loss != null)
+                .map(cp => cp.train_loss);
+            const bestLoss = losses.length > 0 ? Math.min(...losses) : null;
+            setText('#campaignBestLoss', bestLoss != null ? bestLoss.toFixed(4) : '--');
+
+            // Latest step
+            const latestStep = activeCheckpoints.length > 0
+                ? Math.max(...activeCheckpoints.map(cp => cp.step))
+                : null;
+            setText('#campaignLatestStep', latestStep ? latestStep.toLocaleString() : '--');
+
+            // Mark best loss checkpoints
+            if (bestLoss != null) {
+                data.checkpoints.forEach(cp => {
+                    cp.is_best = (cp.train_loss === bestLoss && cp.is_active_campaign);
+                });
+            }
+        }
+
         function updateUI(data) {
+            // Update campaign banner first
+            updateCampaignBanner(data);
+
             // Base model
             if (data.base_model) {
                 setText('#baseModelName', data.base_model.display_name || data.base_model.name);
@@ -928,12 +1141,14 @@
             if (data.checkpoints?.length > 0) {
                 const activeCheckpoints = data.checkpoints.filter(cp => cp.is_active_campaign);
                 const otherCheckpoints = data.checkpoints.filter(cp => !cp.is_active_campaign);
+                const activeHeroName = data.active_hero_id ? data.active_hero_id.split('-')[0].toUpperCase() : 'Hero';
+                const activeHeroIcon = getHeroIcon(activeHeroName);
 
                 // Active campaign checkpoints
                 if (activeCheckpoints.length > 0) {
                     html += `
                         <div class="section-divider">
-                            <h4>Active Campaign (${activeCheckpoints.length})</h4>
+                            <h4>${activeHeroIcon} ${activeHeroName} - ${data.active_campaign_id || 'Active Campaign'} (${activeCheckpoints.length})</h4>
                         </div>
                     `;
                     for (const cp of activeCheckpoints) {
@@ -941,16 +1156,44 @@
                     }
                 }
 
-                // Other campaigns (grayed out)
-                if (otherCheckpoints.length > 0) {
+                // Other campaigns - only show if toggle is on
+                if (showAllCampaigns && otherCheckpoints.length > 0) {
+                    // Group by hero_id/campaign_id
+                    const grouped = {};
+                    for (const cp of otherCheckpoints) {
+                        const key = `${cp.hero_id || 'unknown'}/${cp.campaign_id || 'unknown'}`;
+                        if (!grouped[key]) {
+                            grouped[key] = {
+                                hero_id: cp.hero_id,
+                                campaign_id: cp.campaign_id,
+                                checkpoints: []
+                            };
+                        }
+                        grouped[key].checkpoints.push(cp);
+                    }
+
+                    for (const [key, group] of Object.entries(grouped)) {
+                        const heroName = group.hero_id ? group.hero_id.split('-')[0].toUpperCase() : 'Unknown';
+                        const heroIcon = getHeroIcon(heroName);
+                        html += `
+                            <div class="section-divider" style="opacity: 0.6;">
+                                <h4>${heroIcon} ${heroName} - ${group.campaign_id || 'Unknown'} (${group.checkpoints.length})</h4>
+                            </div>
+                        `;
+                        for (const cp of group.checkpoints) {
+                            html += renderCheckpointCard(cp, true);
+                        }
+                    }
+                } else if (!showAllCampaigns && otherCheckpoints.length > 0) {
+                    // Show collapsed summary
                     html += `
-                        <div class="section-divider" style="opacity: 0.6;">
-                            <h4>Other Campaigns (${otherCheckpoints.length})</h4>
+                        <div class="section-divider" style="opacity: 0.4; text-align: center; padding: 12px;">
+                            <span style="font-size: 0.85rem;">
+                                + ${otherCheckpoints.length} checkpoints from other campaigns
+                                <br><span style="font-size: 0.75rem; color: #666;">Toggle "Show all campaigns" above to view</span>
+                            </span>
                         </div>
                     `;
-                    for (const cp of otherCheckpoints) {
-                        html += renderCheckpointCard(cp, true);
-                    }
                 }
             } else {
                 html += `
@@ -968,11 +1211,18 @@
                 const classes = ['asset-card'];
                 if (cp.is_champion) classes.push('champion');
                 if (cp.is_latest && cp.is_active_campaign) classes.push('latest');
+                if (cp.is_best) classes.push('best-loss');
                 if (isInactive) classes.push('inactive-campaign');
                 if (!cp.is_local) classes.push('remote-only');
 
-                const icon = cp.is_champion ? '👑' : (cp.is_latest && cp.is_active_campaign ? '✨' : '⚱️');
-                const heroLabel = cp.hero_id ? cp.hero_id.split('-')[0].toUpperCase() : '';
+                // Hero info
+                const heroName = cp.hero_id ? cp.hero_id.split('-')[0].toUpperCase() : '';
+                const heroIcon = getHeroIcon(heroName);
+
+                // Status icon
+                const statusIcon = cp.is_champion ? '👑' :
+                                   (cp.is_best ? '🏆' :
+                                   (cp.is_latest && cp.is_active_campaign ? '✨' : heroIcon));
 
                 // Location badges
                 let locationBadges = '';
@@ -992,16 +1242,24 @@
                     locationBadges = '<span class="loc-badge unknown" title="Unknown location">❓</span>';
                 }
 
+                // Best loss badge
+                const bestBadge = cp.is_best ? '<span class="best-loss-badge">🏆 Best</span>' : '';
+
                 // Loss display
-                const lossDisplay = cp.train_loss ? `<span class="loss-badge" title="Train loss">${cp.train_loss.toFixed(3)}</span>` : '';
+                const lossDisplay = cp.train_loss != null
+                    ? `<span class="loss-badge" title="Train loss">${cp.train_loss.toFixed(4)}</span>`
+                    : '';
+
+                // Short name without "checkpoint-" prefix
+                const shortName = (cp.name || 'checkpoint-' + cp.step).replace('checkpoint-', '');
 
                 return `
                     <div class="${classes.join(' ')}" data-step="${cp.step}" data-path="${cp.path || ''}" ${isInactive ? 'style="opacity: 0.5;"' : ''}>
-                        <div class="asset-icon" style="cursor: pointer;" onclick="viewCheckpoint(${cp.step})">${icon}</div>
+                        <div class="asset-icon" style="cursor: pointer;" onclick="viewCheckpoint(${cp.step})">${statusIcon}</div>
                         <div class="asset-info" style="cursor: pointer;" onclick="viewCheckpoint(${cp.step})">
-                            <div class="asset-name">${cp.name || 'checkpoint-' + cp.step}</div>
+                            <div class="asset-name">${heroName} #${shortName}${bestBadge}</div>
                             <div class="asset-meta">
-                                <span>${heroLabel ? heroLabel + ' · ' : ''}Step ${cp.step.toLocaleString()}</span>
+                                <span>Step ${cp.step.toLocaleString()}</span>
                                 <span class="location-badges">${locationBadges}</span>
                                 ${lossDisplay}
                             </div>

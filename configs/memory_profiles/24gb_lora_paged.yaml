@@ -1,0 +1,120 @@
+# =============================================================================
+# MEMORY PROFILE: 24GB LoRA with Paged Optimizer
+# =============================================================================
+# LoRA on full-precision base with paged optimizer for memory spikes
+# More VRAM headroom than standard LoRA profile
+# Best for: 5B-7B models with longer sequences
+# =============================================================================
+
+id: 24gb_lora_paged
+name: "24GB LoRA Paged Profile"
+rpg_name: "The Patient Artisan"
+icon: "🔨"
+description: |
+  LoRA with paged optimizer for handling memory spikes.
+
+  Trade-offs vs standard LoRA:
+  + Handles longer sequences (up to 4096)
+  + More stable memory usage
+  - Slightly slower (CPU<->GPU transfers)
+
+  Use when: Standard LoRA OOMs on longer sequences.
+
+target_vram_gb: 24
+
+# =============================================================================
+# PEFT CONFIGURATION
+# =============================================================================
+peft:
+  method: "lora"
+
+  lora:
+    r: 64
+    alpha: 128
+    dropout: 0.05
+    target_modules:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+      - gate_proj
+      - up_proj
+      - down_proj
+    bias: "none"
+    task_type: "CAUSAL_LM"
+
+  galore:
+    rank: 1024
+    update_proj_gap: 200
+    scale: 0.25
+    proj_type: "std"
+
+# =============================================================================
+# QUANTIZATION - DISABLED
+# =============================================================================
+quantization:
+  load_in_4bit: false
+  load_in_8bit: false
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: false
+
+# =============================================================================
+# MEMORY-EFFICIENT IMPLEMENTATIONS
+# =============================================================================
+memory:
+  gradient_checkpointing: true
+  flash_attention: true
+  paged_optimizer: true      # KEY: Offload optimizer spikes to CPU
+  cpu_offload: false
+
+# =============================================================================
+# OPTIMIZER CONFIGURATION
+# Paged 32-bit optimizer for stability + memory efficiency
+# =============================================================================
+optimizer:
+  type: "paged_adamw_32bit"  # Offloads to CPU on memory spikes
+
+  adamw:
+    lr: 2e-4
+    betas: [0.9, 0.999]
+    eps: 1e-8
+    weight_decay: 0.01
+
+  muon:
+    hidden_lr: 0.02
+    aux_lr: 3e-4
+    momentum: 0.95
+    weight_decay: 0
+
+# =============================================================================
+# TRAINING CONSTRAINTS
+# =============================================================================
+constraints:
+  max_batch_size: 1
+  recommended_grad_accum: 8
+  max_sequence_length: 4096  # Can handle longer sequences
+  precision: "bf16"
+
+# =============================================================================
+# MODEL SIZE RECOMMENDATIONS
+# =============================================================================
+recommendations:
+  max_model_size_b: 7
+  optimal_model_sizes:
+    - "5B"
+    - "7B"
+  tested_models:
+    - "Qwen3-4B"
+    - "Mistral-7B"
+  notes: |
+    LoRA with paged optimizer for 5-7B models.
+
+    Expected VRAM usage (7B model, 4096 seq):
+    - Model (bf16): ~14GB
+    - LoRA adapters: ~0.5GB
+    - Activations: ~8GB (with checkpointing)
+    - Optimizer: ~0.5GB resident (rest paged to CPU)
+    - Total: ~22-23GB peak (spikes handled by paging)
+
+    Use for longer context training where standard LoRA OOMs.

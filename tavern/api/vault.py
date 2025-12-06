@@ -32,6 +32,8 @@ def serve_ledger_list(handler: "TavernHandler", query: dict):
     - skill: Filter by skill name
     - include_base: Include base model as step 0 (default true)
     """
+    import re
+
     try:
         from core.checkpoint_ledger import get_ledger
 
@@ -48,6 +50,29 @@ def serve_ledger_list(handler: "TavernHandler", query: dict):
             records = ledger.list_all(limit=limit)
 
         checkpoints = []
+
+        # Get active campaign
+        active_hero_id = None
+        active_campaign_id = None
+        try:
+            from guild.campaigns import get_active_campaign
+            active = get_active_campaign(base_dir)
+            if active:
+                active_hero_id = active.hero_id
+                active_campaign_id = active.id
+        except Exception:
+            pass
+
+        # Get eval counts per checkpoint
+        eval_counts = {}
+        try:
+            from core.evaluation_ledger import get_ledger as get_eval_ledger
+            eval_ledger = get_eval_ledger()
+            for record in eval_ledger.list_all():
+                step = record.get("checkpoint_step", 0)
+                eval_counts[step] = eval_counts.get(step, 0) + 1
+        except Exception:
+            pass
 
         # Add base model as step 0 if requested
         if include_base and not skill:
@@ -83,11 +108,32 @@ def serve_ledger_list(handler: "TavernHandler", query: dict):
                         "hidden_size": model_info.get("hidden_size"),
                         "num_layers": model_info.get("num_hidden_layers"),
                         "vocab_size": model_info.get("vocab_size"),
+                        "hero_id": None,
+                        "campaign_id": None,
+                        "is_local": True,
+                        "locations": [],
+                        "eval_count": 0,
+                        "is_active_campaign": False,
                     })
                 except Exception as e:
                     logger.warning(f"Failed to get base model info: {e}")
 
         for r in records:
+            # Extract hero/campaign from path
+            hero_id = None
+            campaign_id = None
+            if r.path:
+                match = re.search(r'campaigns/([^/]+)/([^/]+)/', r.path)
+                if match:
+                    hero_id = match.group(1)
+                    campaign_id = match.group(2)
+
+            # Check if path exists locally
+            is_local = r.path and Path(r.path).exists()
+
+            # Get locations
+            locations = r.locations if r.locations else []
+
             checkpoints.append({
                 "step": r.step,
                 "canonical_name": r.canonical_name,
@@ -98,14 +144,22 @@ def serve_ledger_list(handler: "TavernHandler", query: dict):
                 "skill_name": r.skill_name,
                 "skill_level": r.skill_level,
                 "size_gb": r.size_gb,
-                "age_hours": round(r.age_hours, 1),
+                "age_hours": round(r.age_hours, 1) if r.age_hours else None,
                 "path": r.path,
                 "is_base": False,
+                "hero_id": hero_id,
+                "campaign_id": campaign_id,
+                "is_local": is_local,
+                "locations": locations,
+                "eval_count": eval_counts.get(r.step, 0),
+                "is_active_campaign": (hero_id == active_hero_id and campaign_id == active_campaign_id),
             })
 
         handler._send_json({
             "checkpoints": checkpoints,
             "count": len(checkpoints),
+            "active_hero_id": active_hero_id,
+            "active_campaign_id": active_campaign_id,
         })
 
     except ImportError:

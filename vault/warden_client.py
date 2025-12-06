@@ -137,6 +137,117 @@ class WardenClient:
             return False
 
 
+def check_service_health(host: str, port: int, health_path: str = "/health",
+                         timeout: int = 3) -> bool:
+    """Check if a service is reachable via its health endpoint."""
+    try:
+        url = f"http://{host}:{port}{health_path}"
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status == 200
+    except:
+        return False
+
+
+def check_host_ping(host: str, timeout: int = 2) -> bool:
+    """Check if a host is reachable via ICMP ping."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["ping", "-c", "1", "-W", str(timeout), host],
+            capture_output=True,
+            timeout=timeout + 1
+        )
+        return result.returncode == 0
+    except:
+        return False
+
+
+def fallback_zone_status(zone_id: str, timeout: int = 3) -> ZoneHealthResult:
+    """
+    Check zone status by querying actual services from hosts.json.
+
+    Used when ZoneWarden is unavailable. Checks critical services
+    defined in hosts.json and returns aggregated status.
+    """
+    config = load_hosts_config()
+    zone_config = config.get("hosts", {}).get(zone_id)
+
+    if not zone_config:
+        return ZoneHealthResult(
+            zone_id=zone_id,
+            reachable=False,
+            status="unknown",
+            error=f"Zone {zone_id} not found in hosts.json",
+        )
+
+    host = zone_config.get("host", "localhost")
+    services = zone_config.get("services", {})
+
+    # Track which services are up
+    checked = {}
+    critical_up = 0
+    critical_total = 0
+    any_up = False
+
+    for svc_id, svc_config in services.items():
+        # Skip process-type services (can't check remotely)
+        if svc_config.get("type") == "process":
+            continue
+
+        port = svc_config.get("port")
+        if not port:
+            continue
+
+        health_path = svc_config.get("health", "/health")
+        is_critical = svc_config.get("critical", False)
+
+        is_up = check_service_health(host, port, health_path, timeout)
+        checked[svc_id] = {"up": is_up, "port": port, "critical": is_critical}
+
+        if is_up:
+            any_up = True
+        if is_critical:
+            critical_total += 1
+            if is_up:
+                critical_up += 1
+
+    # Determine status based on critical services
+    if critical_total == 0:
+        if len(checked) == 0:
+            # No HTTP services defined - fall back to ping
+            ping_ok = check_host_ping(host, timeout)
+            status = "online" if ping_ok else "offline"
+            any_up = ping_ok
+        else:
+            # Non-critical services only - use "any service up" logic
+            status = "online" if any_up else "offline"
+    elif critical_up == critical_total:
+        status = "online"
+    elif critical_up > 0:
+        status = "degraded"
+    else:
+        status = "offline"
+
+    up_count = sum(1 for s in checked.values() if s["up"])
+    down_count = len(checked) - up_count
+
+    return ZoneHealthResult(
+        zone_id=zone_id,
+        reachable=any_up,
+        status=status,
+        zone_name=zone_config.get("name"),
+        zone_role=zone_config.get("role"),
+        host=host,
+        services=checked,
+        summary={"online": up_count,
+                 "total": len(checked),
+                 "offline": down_count,
+                 "critical_up": critical_up,
+                 "critical_total": critical_total},
+    )
+
+
 def query_zone_warden(zone_id: str, host: str, port: int = DEFAULT_PORT,
                       timeout: int = DEFAULT_TIMEOUT) -> ZoneHealthResult:
     """
@@ -173,30 +284,10 @@ def query_zone_warden(zone_id: str, host: str, port: int = DEFAULT_PORT,
             last_patrol=data.get("last_patrol"),
         )
 
-    except urllib.error.URLError as e:
-        return ZoneHealthResult(
-            zone_id=zone_id,
-            reachable=False,
-            status="unreachable",
-            host=host,
-            error=f"Connection failed: {e.reason}",
-        )
-    except socket.timeout:
-        return ZoneHealthResult(
-            zone_id=zone_id,
-            reachable=False,
-            status="unreachable",
-            host=host,
-            error="Connection timeout",
-        )
-    except Exception as e:
-        return ZoneHealthResult(
-            zone_id=zone_id,
-            reachable=False,
-            status="unreachable",
-            host=host,
-            error=str(e),
-        )
+    except (urllib.error.URLError, socket.timeout, Exception) as e:
+        # Warden unavailable - fallback to checking actual services
+        logger.debug(f"Warden unavailable for {zone_id}, using service fallback: {e}")
+        return fallback_zone_status(zone_id, timeout)
 
 
 def get_all_zone_health(timeout: int = DEFAULT_TIMEOUT,

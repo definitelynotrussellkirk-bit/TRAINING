@@ -357,6 +357,8 @@ def suggest_profile(
     model_size_b: float,
     vram_gb: int = 24,
     prefer_full_training: bool = False,
+    prefer_quality: bool = False,
+    max_efficiency: bool = False,
 ) -> MemoryProfile:
     """
     Suggest the best memory profile for a given model size and VRAM.
@@ -364,37 +366,84 @@ def suggest_profile(
     Args:
         model_size_b: Model size in billions of parameters
         vram_gb: Available VRAM in GB
-        prefer_full_training: If True, prefer full training over PEFT
+        prefer_full_training: If True, prefer full training over PEFT methods
+        prefer_quality: If True, prefer higher quality (less quantization)
+        max_efficiency: If True, maximize memory efficiency (more aggressive)
 
     Returns:
         Recommended MemoryProfile
+
+    Profile Selection Matrix (24GB VRAM):
+    ┌─────────────┬─────────────────────┬────────────────────────────────┐
+    │ Model Size  │ Default             │ With Preferences               │
+    ├─────────────┼─────────────────────┼────────────────────────────────┤
+    │ ≤2B         │ 24gb_full_small     │ prefer_full always works       │
+    │ 2B-4B       │ 24gb_full_8bit_opt  │ prefer_full→24gb_full_small    │
+    │ 4B-7B       │ 24gb_lora           │ prefer_quality→24gb_lora_paged │
+    │ 7B-8B       │ 24gb_qlora          │ prefer_quality→24gb_lora_8bit  │
+    │ 8B+         │ 24gb_qlora_8bit_opt │ max_efficiency→same            │
+    └─────────────┴─────────────────────┴────────────────────────────────┘
     """
     if vram_gb >= 48:
         # High VRAM - can do full training for most models
         if model_size_b <= 8:
-            return get_profile("24gb_full_small")  # Overkill but works
+            return get_profile("24gb_full_small")
+        elif model_size_b <= 13:
+            return get_profile("24gb_lora")
         else:
-            return get_profile("24gb_qlora")  # Still need QLoRA for 13B+
+            return get_profile("24gb_qlora")
 
     elif vram_gb >= 24:
-        if model_size_b <= 4 and prefer_full_training:
+        # Standard 24GB VRAM (RTX 3090/4090)
+
+        if model_size_b <= 2:
+            # Tiny models - full training always works
             return get_profile("24gb_full_small")
+
+        elif model_size_b <= 4:
+            # Small models (2B-4B)
+            if prefer_full_training:
+                return get_profile("24gb_full_small")
+            else:
+                # Default: 8-bit optimizer saves memory
+                return get_profile("24gb_full_8bit_opt")
+
+        elif model_size_b <= 7:
+            # Medium models (4B-7B)
+            if prefer_full_training:
+                return get_profile("24gb_full_8bit_opt")
+            elif prefer_quality:
+                # LoRA with paged optimizer for longer sequences
+                return get_profile("24gb_lora_paged")
+            else:
+                # Default: LoRA with 8-bit optimizer
+                return get_profile("24gb_lora")
+
         elif model_size_b <= 8:
-            return get_profile("24gb_qlora")
+            # Large models (7B-8B)
+            if prefer_quality:
+                # 8-bit base better quality than 4-bit
+                return get_profile("24gb_lora_8bit_base")
+            elif max_efficiency:
+                return get_profile("24gb_qlora_8bit_opt")
+            else:
+                # Default: QLoRA (gold standard)
+                return get_profile("24gb_qlora")
+
         else:
-            # Model too large for 24GB even with QLoRA
+            # Very large models (8B+)
             logger.warning(
-                f"Model size {model_size_b}B may not fit in {vram_gb}GB VRAM. "
-                f"Consider using DeepSpeed ZeRO-3 or multi-GPU."
+                f"Model size {model_size_b}B may be tight in {vram_gb}GB VRAM. "
+                f"Using maximum efficiency settings."
             )
-            return get_profile("24gb_qlora")
+            return get_profile("24gb_qlora_8bit_opt")
 
     else:
-        # Low VRAM - always use QLoRA with aggressive settings
+        # Low VRAM (<24GB) - always use most aggressive settings
         logger.warning(
-            f"VRAM {vram_gb}GB is limited. Using aggressive memory settings."
+            f"VRAM {vram_gb}GB is limited. Using maximum efficiency settings."
         )
-        return get_profile("24gb_qlora")
+        return get_profile("24gb_qlora_8bit_opt")
 
 
 def get_all_profiles() -> Dict[str, MemoryProfile]:

@@ -3844,9 +3844,16 @@ class TavernHandler(SimpleHTTPRequestHandler):
                     hero_id = getattr(record, "hero_id", None)
                     campaign_id = getattr(record, "campaign_id", None)
 
-                    # Try to infer from path
+                    # Try to infer from path: campaigns/{hero_id}/{campaign_id}/checkpoints/...
                     if not hero_id and primary_path:
-                        if "dio" in primary_path.lower() or "current_model" in primary_path:
+                        import re
+                        # Match campaigns/{hero-id}/{campaign-id}/
+                        match = re.search(r'campaigns/([^/]+)/([^/]+)/', primary_path)
+                        if match:
+                            hero_id = match.group(1)
+                            campaign_id = match.group(2)
+                        # Fallback for old paths
+                        elif "dio" in primary_path.lower() or "current_model" in primary_path:
                             hero_id = "dio-qwen3-0.6b"
                             campaign_id = "campaign-001"
                         elif "gou" in primary_path.lower() or "4b" in primary_path.lower():
@@ -4639,7 +4646,46 @@ class TavernHandler(SimpleHTTPRequestHandler):
                     except Exception as e:
                         logger.warning(f"Failed to get base model info: {e}")
 
+            # Get active campaign
+            active_hero_id = None
+            active_campaign_id = None
+            try:
+                from guild.campaigns import get_active_campaign
+                active = get_active_campaign(BASE_DIR)
+                if active:
+                    active_hero_id = active.hero_id
+                    active_campaign_id = active.id
+            except Exception:
+                pass
+
+            # Get eval counts
+            eval_counts = {}
+            try:
+                from core.evaluation_ledger import get_ledger as get_eval_ledger
+                eval_ledger = get_eval_ledger()
+                for record in eval_ledger.list_all():
+                    step = record.get("checkpoint_step", 0)
+                    eval_counts[step] = eval_counts.get(step, 0) + 1
+            except Exception:
+                pass
+
             for r in records:
+                # Extract hero/campaign from path
+                hero_id = None
+                campaign_id = None
+                if r.path:
+                    import re
+                    match = re.search(r'campaigns/([^/]+)/([^/]+)/', r.path)
+                    if match:
+                        hero_id = match.group(1)
+                        campaign_id = match.group(2)
+
+                # Check if path exists locally
+                is_local = r.path and Path(r.path).exists()
+
+                # Get locations
+                locations = r.locations if r.locations else []
+
                 checkpoints.append({
                     "step": r.step,
                     "canonical_name": r.canonical_name,
@@ -4650,14 +4696,22 @@ class TavernHandler(SimpleHTTPRequestHandler):
                     "skill_name": r.skill_name,
                     "skill_level": r.skill_level,
                     "size_gb": r.size_gb,
-                    "age_hours": round(r.age_hours, 1),
+                    "age_hours": round(r.age_hours, 1) if r.age_hours else None,
                     "path": r.path,
                     "is_base": False,
+                    "hero_id": hero_id,
+                    "campaign_id": campaign_id,
+                    "is_local": is_local,
+                    "locations": locations,
+                    "eval_count": eval_counts.get(r.step, 0),
+                    "is_active_campaign": (hero_id == active_hero_id and campaign_id == active_campaign_id),
                 })
 
             self._send_json({
                 "checkpoints": checkpoints,
                 "count": len(checkpoints),
+                "active_hero_id": active_hero_id,
+                "active_campaign_id": active_campaign_id,
             })
 
         except ImportError:

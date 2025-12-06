@@ -8,184 +8,360 @@
     <link rel="stylesheet" href="/static/css/game.css?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        .temple-main {
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            gap: 1.5rem;
-            padding: 1.5rem;
-            height: calc(100vh - 140px);
-            overflow: hidden;
+        /* Temple Enhanced Styles */
+        .temple-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
         }
 
-        /* Cleric panel */
+        /* Hero Banner */
+        .hero-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, rgba(30, 30, 50, 0.95) 0%, rgba(40, 35, 60, 0.95) 100%);
+            border: 1px solid rgba(200, 230, 255, 0.3);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .hero-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .hero-icon-large {
+            font-size: 2.5rem;
+            filter: drop-shadow(0 0 10px rgba(200, 230, 255, 0.5));
+        }
+
+        .hero-details h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.3rem;
+            color: #c8e6ff;
+            margin: 0;
+        }
+
+        .hero-details .subtitle {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        .realm-health {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .health-stat {
+            text-align: center;
+        }
+
+        .health-stat .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .health-stat .value.healthy { color: var(--color-success); }
+        .health-stat .value.warning { color: #ffa726; }
+        .health-stat .value.danger { color: var(--color-danger); }
+        .health-stat .value.unknown { color: var(--text-muted); }
+
+        .health-stat .label {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Nine Orders Grid */
+        .orders-section {
+            margin-bottom: 20px;
+        }
+
+        .orders-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 8px;
+        }
+
+        .order-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .order-card:hover {
+            border-color: rgba(200, 230, 255, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .order-card.critical {
+            border-color: rgba(255, 215, 0, 0.4);
+        }
+
+        .order-card.critical::after {
+            content: '★';
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            font-size: 0.6rem;
+            color: var(--color-gold);
+        }
+
+        .order-card.running {
+            border-color: #00ffff;
+            animation: orderPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes orderPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.3); }
+            50% { box-shadow: 0 0 20px 5px rgba(0, 255, 255, 0.2); }
+        }
+
+        .order-card.passed {
+            border-color: var(--color-success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .order-card.warned {
+            border-color: #ffa726;
+            background: rgba(255, 167, 38, 0.1);
+        }
+
+        .order-card.failed {
+            border-color: var(--color-danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .order-icon {
+            font-size: 1.8rem;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .order-name {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .order-status {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Main Layout */
+        .temple-main {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 20px;
+            height: calc(100vh - 320px);
+            min-height: 400px;
+        }
+
+        /* Cleric Panel */
         .cleric-panel {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 1.5rem;
+            padding: 24px;
             display: flex;
             flex-direction: column;
             overflow-y: auto;
         }
 
+        .cleric-container {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
         .cleric-portrait {
-            width: 100px;
-            height: 100px;
+            width: 120px;
+            height: 120px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             background: linear-gradient(135deg, #1a1a2e 0%, #2a2a4e 100%);
-            border: 3px solid rgba(200, 230, 255, 0.4);
-            margin: 0 auto 1rem;
-            font-size: 3.5rem;
-            box-shadow: 0 0 30px rgba(200, 230, 255, 0.15);
-            transition: all 0.3s ease;
+            border: 4px solid rgba(200, 230, 255, 0.4);
+            margin: 0 auto 16px;
+            font-size: 4rem;
+            box-shadow: 0 0 40px rgba(200, 230, 255, 0.2);
+            transition: all 0.5s ease;
         }
 
         .cleric-portrait.casting {
-            animation: castingPulse 1s ease-in-out infinite;
+            animation: castingGlow 1.2s ease-in-out infinite;
             border-color: #00ffff;
-            box-shadow: 0 0 40px rgba(0, 255, 255, 0.3);
+        }
+
+        @keyframes castingGlow {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 40px rgba(0, 255, 255, 0.3);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 60px rgba(0, 255, 255, 0.5);
+            }
         }
 
         .cleric-portrait.healthy {
             border-color: #4CAF50;
-            box-shadow: 0 0 30px rgba(76, 175, 80, 0.3);
+            box-shadow: 0 0 40px rgba(76, 175, 80, 0.4);
         }
 
         .cleric-portrait.warning {
             border-color: #ffa726;
-            box-shadow: 0 0 30px rgba(255, 167, 38, 0.3);
+            box-shadow: 0 0 40px rgba(255, 167, 38, 0.4);
         }
 
         .cleric-portrait.danger {
             border-color: #ff6b6b;
-            box-shadow: 0 0 30px rgba(255, 107, 107, 0.3);
+            box-shadow: 0 0 40px rgba(255, 107, 107, 0.4);
+            animation: dangerShake 0.5s ease-in-out;
         }
 
-        @keyframes castingPulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+        @keyframes dangerShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
 
         .cleric-title {
-            text-align: center;
-            font-family: var(--font-display);
-            font-size: 1.2rem;
-            color: var(--color-gold);
-            margin-bottom: 0.5rem;
+            font-family: 'Cinzel', serif;
+            font-size: 1.3rem;
+            color: #c8e6ff;
+            margin-bottom: 8px;
         }
 
         .cleric-dialogue {
-            text-align: center;
             color: var(--text-secondary);
             font-style: italic;
             font-size: 0.9rem;
-            line-height: 1.5;
-            margin-bottom: 1.5rem;
+            line-height: 1.6;
             min-height: 3rem;
-            transition: opacity 0.3s ease;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            border-left: 3px solid rgba(200, 230, 255, 0.3);
         }
 
-        /* Rituals section */
-        .rituals-section h3 {
-            font-family: var(--font-display);
-            color: var(--color-gold);
-            font-size: 1rem;
-            margin-bottom: 0.75rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border-color);
+        /* Blessing Display */
+        .blessing-section {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(200, 180, 100, 0.05) 100%);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 20px;
         }
 
-        .ritual-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .ritual-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .ritual-group-label {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            padding: 0.25rem 0;
-            border-bottom: 1px solid var(--border-color);
-            margin-bottom: 0.25rem;
-        }
-
-        .ritual-btn {
+        .blessing-header {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem 1rem;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .blessing-header h3 {
+            font-family: 'Cinzel', serif;
+            font-size: 1rem;
+            color: var(--color-gold);
+            margin: 0;
+        }
+
+        .blessing-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .blessing-stat {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .blessing-stat .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--color-gold);
+        }
+
+        .blessing-stat .label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .quick-btn {
+            padding: 14px 12px;
             background: var(--bg-dark);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
             cursor: pointer;
             transition: all 0.2s;
-            text-align: left;
-            color: var(--text-primary);
-            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
         }
 
-        .ritual-btn:hover {
-            border-color: var(--color-gold);
-            background: var(--bg-card);
+        .quick-btn:hover {
+            border-color: rgba(200, 230, 255, 0.5);
+            background: rgba(200, 230, 255, 0.05);
         }
 
-        .ritual-btn:disabled {
+        .quick-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
 
-        .ritual-btn.running {
-            border-color: #00ffff;
-            animation: runningPulse 1.5s ease-in-out infinite;
+        .quick-btn .icon {
+            font-size: 1.5rem;
         }
 
-        @keyframes runningPulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.3); }
-            50% { box-shadow: 0 0 15px 3px rgba(0, 255, 255, 0.2); }
-        }
-
-        .ritual-icon {
-            font-size: 1.3rem;
-            width: 28px;
-            text-align: center;
-        }
-
-        .ritual-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .ritual-name {
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-
-        .ritual-desc {
+        .quick-btn .label {
             font-size: 0.75rem;
             color: var(--text-muted);
-            margin-top: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
-        /* Results panel */
+        .quick-btn.primary {
+            background: linear-gradient(135deg, rgba(200, 230, 255, 0.2) 0%, rgba(100, 150, 200, 0.1) 100%);
+            border-color: rgba(200, 230, 255, 0.4);
+        }
+
+        /* Results Panel */
         .results-panel {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 1.5rem;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -195,60 +371,70 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
+            padding: 16px 20px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .results-header h2 {
-            font-family: var(--font-display);
-            color: var(--color-gold);
-            font-size: 1.2rem;
+            font-family: 'Cinzel', serif;
+            color: #c8e6ff;
+            font-size: 1.1rem;
             margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .results-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
         }
 
         .result-summary {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            padding: 1rem;
+            gap: 16px;
+            padding: 16px 20px;
             background: var(--bg-dark);
-            border-radius: 8px;
-            margin-bottom: 1rem;
+            margin: 16px;
+            border-radius: 10px;
+            border-left: 4px solid var(--text-muted);
         }
 
-        .result-summary.ok { border-left: 4px solid #4CAF50; }
-        .result-summary.warn { border-left: 4px solid #ffa726; }
-        .result-summary.fail { border-left: 4px solid #ff6b6b; }
-        .result-summary.skip { border-left: 4px solid #666; }
+        .result-summary.ok { border-left-color: #4CAF50; }
+        .result-summary.warn { border-left-color: #ffa726; }
+        .result-summary.fail { border-left-color: #ff6b6b; }
 
         .summary-icon {
-            font-size: 2rem;
+            font-size: 2.5rem;
         }
 
         .summary-text h3 {
             margin: 0;
-            font-size: 1rem;
+            font-size: 1.1rem;
             color: var(--text-primary);
         }
 
         .summary-meta {
             color: var(--text-muted);
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             margin-top: 4px;
         }
 
         .summary-counts {
             display: flex;
-            gap: 1rem;
+            gap: 12px;
             margin-left: auto;
         }
 
         .count-badge {
             display: flex;
             align-items: center;
-            gap: 0.25rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.8rem;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
             font-weight: 600;
         }
 
@@ -256,26 +442,28 @@
         .count-badge.warn { background: rgba(255, 167, 38, 0.2); color: #ffa726; }
         .count-badge.fail { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
 
-        /* Checks list */
+        /* Checks Container */
         .checks-container {
             flex: 1;
             overflow-y: auto;
+            padding: 0 20px 20px;
         }
 
         .category-group {
-            margin-bottom: 1rem;
+            margin-bottom: 16px;
         }
 
         .category-header {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem;
+            gap: 10px;
+            padding: 10px 12px;
             background: var(--bg-dark);
-            border-radius: 6px;
-            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            margin-bottom: 8px;
             cursor: pointer;
             user-select: none;
+            transition: background 0.2s;
         }
 
         .category-header:hover {
@@ -283,12 +471,12 @@
         }
 
         .category-icon {
-            font-size: 1rem;
+            font-size: 1.2rem;
         }
 
         .category-name {
-            font-weight: 500;
-            font-size: 0.85rem;
+            font-weight: 600;
+            font-size: 0.9rem;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -296,23 +484,23 @@
 
         .category-count {
             margin-left: auto;
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             color: var(--text-muted);
         }
 
         .checks-list {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 8px;
         }
 
         .check-row {
             display: flex;
             align-items: flex-start;
-            gap: 0.75rem;
-            padding: 0.75rem 1rem;
+            gap: 12px;
+            padding: 12px 16px;
             background: var(--bg-dark);
-            border-radius: 8px;
+            border-radius: 10px;
             border: 1px solid transparent;
             cursor: pointer;
             transition: all 0.2s;
@@ -322,17 +510,14 @@
             border-color: var(--border-color);
         }
 
-        .check-row.ok { border-left: 3px solid #4CAF50; }
-        .check-row.warn { border-left: 3px solid #ffa726; }
-        .check-row.fail { border-left: 3px solid #ff6b6b; }
-        .check-row.skip { border-left: 3px solid #666; }
+        .check-row.ok { border-left: 4px solid #4CAF50; }
+        .check-row.warn { border-left: 4px solid #ffa726; }
+        .check-row.fail { border-left: 4px solid #ff6b6b; }
+        .check-row.skip { border-left: 4px solid #666; }
 
         .check-icon {
-            font-size: 1rem;
-            width: 20px;
-            text-align: center;
+            font-size: 1.2rem;
             flex-shrink: 0;
-            margin-top: 2px;
         }
 
         .check-content {
@@ -341,23 +526,23 @@
         }
 
         .check-name {
-            font-weight: 500;
-            font-size: 0.9rem;
+            font-weight: 600;
+            font-size: 0.95rem;
         }
 
         .check-desc {
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             color: var(--text-muted);
-            margin-top: 2px;
+            margin-top: 4px;
         }
 
         .check-remediation {
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             color: #ffa726;
-            margin-top: 6px;
-            padding: 4px 8px;
+            margin-top: 8px;
+            padding: 8px 12px;
             background: rgba(255, 167, 38, 0.1);
-            border-radius: 4px;
+            border-radius: 6px;
             display: none;
         }
 
@@ -367,12 +552,12 @@
         }
 
         .check-details {
-            margin-top: 8px;
-            padding: 8px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 0.7rem;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
             color: var(--text-muted);
             display: none;
             white-space: pre-wrap;
@@ -385,150 +570,231 @@
 
         .check-duration {
             color: var(--text-muted);
-            font-size: 0.75rem;
-            font-family: monospace;
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
             flex-shrink: 0;
         }
 
-        /* Empty state */
+        /* Empty State */
         .empty-state {
             text-align: center;
-            padding: 3rem;
+            padding: 60px 40px;
             color: var(--text-muted);
+        }
+
+        .empty-state .icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
         }
 
         .empty-state h3 {
             color: var(--text-secondary);
-            margin-bottom: 0.5rem;
+            margin-bottom: 10px;
         }
 
-        /* Ritual selector badges */
-        .ritual-category-badge {
-            font-size: 0.65rem;
-            padding: 2px 6px;
-            border-radius: 3px;
-            background: var(--bg-card);
-            color: var(--text-muted);
-            margin-left: auto;
+        /* Responsive */
+        @media (max-width: 1100px) {
+            .orders-grid {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .temple-main {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .orders-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
         }
     </style>
 </head>
 <body>
-    <!-- TITLE BAR -->
+    <!-- Header -->
     <header class="game-header">
         <div class="header-left">
-            <h1 class="game-title">🏛️ Temple of Diagnostics</h1>
+            <h1 class="game-title">Realm of Training</h1>
         </div>
         <div class="header-center">
-            <div class="resource-bar">
-                <div class="resource">
-                    <span class="resource-icon">🩺</span>
-                    <span class="resource-label">CHECKS</span>
-                    <span class="resource-value" id="totalChecks">0</span>
-                </div>
-                <div class="resource">
-                    <span class="resource-icon">✅</span>
-                    <span class="resource-label">PASSED</span>
-                    <span class="resource-value" id="passedChecks">0</span>
-                </div>
-            </div>
+            <span class="realm-subtitle">Temple of Diagnostics</span>
         </div>
         <div class="header-right">
-            <div class="time-display" id="timeDisplay">--:--:--</div>
+            <span id="timeDisplay" class="time-display"></span>
         </div>
     </header>
 
-    <!-- MAIN TEMPLE AREA -->
-    <main class="temple-main">
-        <!-- Cleric Panel -->
-        <aside class="cleric-panel">
-            <div class="cleric-portrait" id="clericPortrait">🧙</div>
-            <div class="cleric-title">The Cleric</div>
-            <p class="cleric-dialogue" id="clericDialogue">
-                "Speak your doubts, and I shall test the Realm.
-                Through sacred rituals, we reveal what lies hidden."
-            </p>
+    <main class="temple-container">
+        <!-- Hero Banner -->
+        <div class="hero-banner">
+            <div class="hero-info">
+                <span class="hero-icon-large">🏛️</span>
+                <div class="hero-details">
+                    <h2 id="heroName">Temple of the Nine Orders</h2>
+                    <div class="subtitle" id="heroSubtitle">Validate training through sacred rituals</div>
+                </div>
+            </div>
+            <div class="realm-health">
+                <div class="health-stat">
+                    <div class="value unknown" id="overallHealth">--</div>
+                    <div class="label">Realm Health</div>
+                </div>
+                <div class="health-stat">
+                    <div class="value" id="passedCount">0</div>
+                    <div class="label">Passed</div>
+                </div>
+                <div class="health-stat">
+                    <div class="value" id="totalCount">0</div>
+                    <div class="label">Total</div>
+                </div>
+            </div>
+        </div>
 
-            <div class="rituals-section">
-                <h3>Sacred Rituals</h3>
-                <div class="ritual-list" id="ritualList">
-                    <div class="empty-state">
-                        <p>Loading rituals...</p>
+        <!-- Nine Orders Grid -->
+        <div class="orders-section">
+            <div class="orders-grid" id="ordersGrid">
+                <div class="order-card critical" data-order="quick" onclick="runRitual('quick')">
+                    <span class="order-icon">⚡</span>
+                    <div class="order-name">Quick</div>
+                    <div class="order-status">Fast checks</div>
+                </div>
+                <div class="order-card" data-order="api" onclick="runRitual('api')">
+                    <span class="order-icon">🌐</span>
+                    <div class="order-name">API</div>
+                    <div class="order-status">Endpoints</div>
+                </div>
+                <div class="order-card critical" data-order="forge" onclick="runRitual('forge')">
+                    <span class="order-icon">🔥</span>
+                    <div class="order-name">Forge</div>
+                    <div class="order-status">GPU/Hardware</div>
+                </div>
+                <div class="order-card" data-order="weaver" onclick="runRitual('weaver')">
+                    <span class="order-icon">🕸️</span>
+                    <div class="order-name">Weaver</div>
+                    <div class="order-status">Daemons</div>
+                </div>
+                <div class="order-card critical" data-order="champion" onclick="runRitual('champion')">
+                    <span class="order-icon">🏆</span>
+                    <div class="order-name">Champion</div>
+                    <div class="order-status">Checkpoints</div>
+                </div>
+                <div class="order-card critical" data-order="oracle" onclick="runRitual('oracle')">
+                    <span class="order-icon">🔮</span>
+                    <div class="order-name">Oracle</div>
+                    <div class="order-status">Inference</div>
+                </div>
+                <div class="order-card" data-order="guild" onclick="runRitual('guild')">
+                    <span class="order-icon">⚔️</span>
+                    <div class="order-name">Guild</div>
+                    <div class="order-status">Skills</div>
+                </div>
+                <div class="order-card" data-order="scribe" onclick="runRitual('scribe')">
+                    <span class="order-icon">📜</span>
+                    <div class="order-name">Scribe</div>
+                    <div class="order-status">Evals</div>
+                </div>
+                <div class="order-card" data-order="deep" onclick="runRitual('deep')">
+                    <span class="order-icon">🌊</span>
+                    <div class="order-name">Deep</div>
+                    <div class="order-status">Comprehensive</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Temple Area -->
+        <div class="temple-main">
+            <!-- Cleric Panel -->
+            <aside class="cleric-panel">
+                <div class="cleric-container">
+                    <div class="cleric-portrait" id="clericPortrait">🧙</div>
+                    <div class="cleric-title">The Cleric</div>
+                    <p class="cleric-dialogue" id="clericDialogue">
+                        "Speak your doubts, and I shall test the Realm.
+                        Through sacred rituals, we reveal what lies hidden."
+                    </p>
+                </div>
+
+                <!-- Blessing Display -->
+                <div class="blessing-section" id="blessingSection" style="display: none;">
+                    <div class="blessing-header">
+                        <span>✨</span>
+                        <h3>Last Blessing</h3>
+                    </div>
+                    <div class="blessing-stats">
+                        <div class="blessing-stat">
+                            <div class="value" id="blessingQuality">--</div>
+                            <div class="label">Quality</div>
+                        </div>
+                        <div class="blessing-stat">
+                            <div class="value" id="blessingXP">--</div>
+                            <div class="label">Experience</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </aside>
 
-        <!-- Results Panel -->
-        <section class="results-panel">
-            <div class="results-header">
-                <h2>Ritual Results</h2>
-                <span id="lastRunTime" style="color: var(--text-muted); font-size: 0.8rem;"></span>
-            </div>
-
-            <div id="resultSummary" class="result-summary" style="display: none;">
-                <div class="summary-icon" id="summaryIcon"></div>
-                <div class="summary-text">
-                    <h3 id="summaryTitle">-</h3>
-                    <div class="summary-meta" id="summaryMeta">-</div>
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <button class="quick-btn primary" onclick="runAllCritical()" id="btnRunCritical">
+                        <span class="icon">⚡</span>
+                        <span class="label">Run Critical</span>
+                    </button>
+                    <button class="quick-btn" onclick="runRitual('deep')" id="btnRunDeep">
+                        <span class="icon">🌊</span>
+                        <span class="label">Deep Scan</span>
+                    </button>
+                    <button class="quick-btn" onclick="refreshOrders()">
+                        <span class="icon">🔄</span>
+                        <span class="label">Refresh</span>
+                    </button>
+                    <button class="quick-btn" onclick="clearResults()">
+                        <span class="icon">🗑️</span>
+                        <span class="label">Clear</span>
+                    </button>
                 </div>
-                <div class="summary-counts" id="summaryCounts"></div>
-            </div>
+            </aside>
 
-            <div class="checks-container" id="checksContainer">
-                <div class="empty-state">
-                    <h3>No Ritual Cast</h3>
-                    <p>Select a ritual from the left to begin diagnostics</p>
+            <!-- Results Panel -->
+            <section class="results-panel">
+                <div class="results-header">
+                    <h2>
+                        <span>📋</span>
+                        <span>Ritual Results</span>
+                    </h2>
+                    <span class="results-meta" id="lastRunTime"></span>
                 </div>
-            </div>
-        </section>
+
+                <div id="resultSummary" class="result-summary" style="display: none;">
+                    <div class="summary-icon" id="summaryIcon"></div>
+                    <div class="summary-text">
+                        <h3 id="summaryTitle">-</h3>
+                        <div class="summary-meta" id="summaryMeta">-</div>
+                    </div>
+                    <div class="summary-counts" id="summaryCounts"></div>
+                </div>
+
+                <div class="checks-container" id="checksContainer">
+                    <div class="empty-state">
+                        <div class="icon">🏛️</div>
+                        <h3>No Ritual Cast</h3>
+                        <p>Click an Order above or use Quick Actions to begin diagnostics</p>
+                    </div>
+                </div>
+            </section>
+        </div>
     </main>
 
-    <!-- NAVIGATION (dynamic) -->
+    <!-- Navigation -->
     <nav class="game-nav" id="bottomNav"></nav>
     <script src="/static/js/nav.js"></script>
 
     <script>
         // Constants
-        const STATUS_ICONS = {
-            'ok': '✅',
-            'warn': '⚠️',
-            'fail': '❌',
-            'skip': '⏭️'
-        };
-
-        const RITUAL_ICONS = {
-            'quick': '⚡',
-            'api': '🌐',
-            'forge': '🔥',
-            'weaver': '🕸️',
-            'champion': '🏆',
-            'oracle': '🔮',
-            'guild': '⚔️',
-            'scribe': '📜',
-            'deep': '🌊'
-        };
-
-        const KIND_LABELS = {
-            'healthcheck': '🩺 Health Checks',
-            'eval': '📊 Evaluation',
-            'training': '🎯 Training',
-            'infra': '🔧 Infrastructure',
-            'meta': '✨ Meta'
-        };
-
-        const KIND_ORDER = ['healthcheck', 'eval', 'training', 'infra', 'meta'];
-
+        const STATUS_ICONS = { 'ok': '✅', 'warn': '⚠️', 'fail': '❌', 'skip': '⏭️' };
         const CATEGORY_ICONS = {
-            'network': '🌐',
-            'storage': '💾',
-            'hardware': '🖥️',
-            'daemon': '👻',
-            'model': '🤖',
-            'inference': '🔮',
-            'skills': '📚',
-            'ritual': '✨',
-            'default': '📋'
+            'network': '🌐', 'storage': '💾', 'hardware': '🖥️', 'daemon': '👻',
+            'model': '🤖', 'inference': '🔮', 'skills': '📚', 'ritual': '✨', 'default': '📋'
         };
 
         const CLERIC_DIALOGUES = {
@@ -560,15 +826,35 @@
         };
 
         let currentRunning = null;
+        let orderResults = {};
+        let totalPassed = 0;
+        let totalChecks = 0;
 
-        // Time display
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setClericDialogue('idle');
+            updateTime();
+            setInterval(updateTime, 1000);
+            loadHeroInfo();
+        });
+
+        async function loadHeroInfo() {
+            try {
+                const resp = await fetch('/api/campaigns/active');
+                if (resp.ok) {
+                    const campaign = await resp.json();
+                    document.getElementById('heroSubtitle').textContent =
+                        `${campaign.id} - Validate training through sacred rituals`;
+                }
+            } catch (err) {
+                console.error('Failed to load campaign info:', err);
+            }
+        }
+
         function updateTime() {
             document.getElementById('timeDisplay').textContent = new Date().toLocaleTimeString();
         }
-        setInterval(updateTime, 1000);
-        updateTime();
 
-        // Cleric dialogue
         function setClericDialogue(category) {
             const dialogues = CLERIC_DIALOGUES[category] || CLERIC_DIALOGUES.idle;
             const dialogue = dialogues[Math.floor(Math.random() * dialogues.length)];
@@ -581,84 +867,32 @@
             if (state) portrait.classList.add(state);
         }
 
-        // Load rituals
-        async function loadRituals() {
-            try {
-                const res = await fetch('/api/temple/rituals');
-                const data = await res.json();
+        function setOrderState(orderId, state) {
+            const card = document.querySelector(`[data-order="${orderId}"]`);
+            if (card) {
+                card.classList.remove('running', 'passed', 'warned', 'failed');
+                if (state) card.classList.add(state);
 
-                if (!data.ok) throw new Error(data.error || 'Failed to load');
-
-                const rituals = data.rituals || {};
-                const listEl = document.getElementById('ritualList');
-
-                if (Object.keys(rituals).length === 0) {
-                    listEl.innerHTML = '<div class="empty-state"><p>No rituals available</p></div>';
-                    return;
+                const statusEl = card.querySelector('.order-status');
+                if (statusEl) {
+                    if (state === 'passed') statusEl.textContent = '✓ Passed';
+                    else if (state === 'warned') statusEl.textContent = '⚠ Warnings';
+                    else if (state === 'failed') statusEl.textContent = '✗ Failed';
+                    else if (state === 'running') statusEl.textContent = 'Running...';
                 }
-
-                // Group by kind
-                const byKind = {};
-                Object.values(rituals).forEach(r => {
-                    const kind = r.kind || 'healthcheck';
-                    if (!byKind[kind]) byKind[kind] = [];
-                    byKind[kind].push(r);
-                });
-
-                // Build HTML with groups
-                let html = '';
-                KIND_ORDER.forEach(kind => {
-                    if (!byKind[kind] || byKind[kind].length === 0) return;
-
-                    const kindLabel = KIND_LABELS[kind] || kind;
-                    const ritualList = byKind[kind].sort((a, b) => {
-                        // Quick first, deep last within kind
-                        if (a.id === 'quick') return -1;
-                        if (b.id === 'quick') return 1;
-                        if (a.id === 'deep') return 1;
-                        if (b.id === 'deep') return -1;
-                        return a.name.localeCompare(b.name);
-                    });
-
-                    html += `<div class="ritual-group">
-                        <div class="ritual-group-label">${kindLabel}</div>
-                        ${ritualList.map(r => `
-                            <button class="ritual-btn" data-ritual="${r.id}" onclick="runRitual('${r.id}')">
-                                <span class="ritual-icon">${r.icon || RITUAL_ICONS[r.id] || '🔮'}</span>
-                                <div class="ritual-info">
-                                    <div class="ritual-name">${r.name}</div>
-                                    <div class="ritual-desc">${r.description}</div>
-                                </div>
-                            </button>
-                        `).join('')}
-                    </div>`;
-                });
-
-                listEl.innerHTML = html;
-
-            } catch (err) {
-                console.error('Failed to load rituals:', err);
-                document.getElementById('ritualList').innerHTML =
-                    `<div class="empty-state"><p>Error: ${err.message}</p></div>`;
             }
         }
 
-        // Run ritual
         async function runRitual(ritualId) {
             if (currentRunning) return;
 
             currentRunning = ritualId;
-            const btn = document.querySelector(`[data-ritual="${ritualId}"]`);
-            if (btn) {
-                btn.classList.add('running');
-                btn.disabled = true;
-            }
-
+            setOrderState(ritualId, 'running');
             setClericState('casting');
             setClericDialogue('casting');
 
             document.getElementById('checksContainer').innerHTML =
-                '<div class="empty-state"><p>Casting ritual...</p></div>';
+                '<div class="empty-state"><div class="icon">🔮</div><p>Casting ritual...</p></div>';
             document.getElementById('resultSummary').style.display = 'none';
 
             try {
@@ -671,25 +905,96 @@
                 const data = await res.json();
                 if (!data.ok) throw new Error(data.error || 'Ritual failed');
 
+                orderResults[ritualId] = data.ritual;
                 renderResults(data.ritual);
+                updateOrderCard(ritualId, data.ritual);
+                updateOverallHealth();
+                updateBlessing(data.ritual);
 
             } catch (err) {
                 console.error('Ritual failed:', err);
                 document.getElementById('checksContainer').innerHTML =
-                    `<div class="empty-state"><h3>Ritual Failed</h3><p>${err.message}</p></div>`;
+                    `<div class="empty-state"><div class="icon">❌</div><h3>Ritual Failed</h3><p>${err.message}</p></div>`;
                 setClericState('danger');
                 setClericDialogue('danger');
+                setOrderState(ritualId, 'failed');
             } finally {
                 currentRunning = null;
-                if (btn) {
-                    btn.classList.remove('running');
-                    btn.disabled = false;
-                }
             }
         }
 
+        async function runAllCritical() {
+            const criticalOrders = ['quick', 'forge', 'champion', 'oracle'];
+            for (const order of criticalOrders) {
+                await runRitual(order);
+                await new Promise(r => setTimeout(r, 500)); // Brief pause between
+            }
+        }
+
+        function updateOrderCard(ritualId, ritual) {
+            if (ritual.status === 'ok') {
+                setOrderState(ritualId, 'passed');
+            } else if (ritual.status === 'warn') {
+                setOrderState(ritualId, 'warned');
+            } else {
+                setOrderState(ritualId, 'failed');
+            }
+        }
+
+        function updateOverallHealth() {
+            let passed = 0, total = 0, hasFailures = false, hasWarnings = false;
+
+            Object.values(orderResults).forEach(ritual => {
+                (ritual.checks || []).forEach(check => {
+                    total++;
+                    if (check.status === 'ok') passed++;
+                    if (check.status === 'fail') hasFailures = true;
+                    if (check.status === 'warn') hasWarnings = true;
+                });
+            });
+
+            totalPassed = passed;
+            totalChecks = total;
+
+            document.getElementById('passedCount').textContent = passed;
+            document.getElementById('totalCount').textContent = total;
+
+            const healthEl = document.getElementById('overallHealth');
+            if (total === 0) {
+                healthEl.textContent = '--';
+                healthEl.className = 'value unknown';
+            } else if (hasFailures) {
+                healthEl.textContent = '✗';
+                healthEl.className = 'value danger';
+            } else if (hasWarnings) {
+                healthEl.textContent = '⚠';
+                healthEl.className = 'value warning';
+            } else {
+                healthEl.textContent = '✓';
+                healthEl.className = 'value healthy';
+            }
+        }
+
+        function updateBlessing(ritual) {
+            const section = document.getElementById('blessingSection');
+            section.style.display = 'block';
+
+            // Calculate quality factor (passed / total)
+            const checks = ritual.checks || [];
+            const passed = checks.filter(c => c.status === 'ok').length;
+            const quality = checks.length > 0 ? passed / checks.length : 0;
+
+            // Simulate experience calculation (effort × quality)
+            const effort = ritual.duration_ms ? ritual.duration_ms / 100 : 10;
+            const experience = Math.round(effort * quality);
+
+            document.getElementById('blessingQuality').textContent =
+                (quality * 100).toFixed(0) + '%';
+            document.getElementById('blessingXP').textContent = experience + ' XP';
+        }
+
         function renderResults(ritual) {
-            // Update Cleric state based on results
+            // Update Cleric state
             if (ritual.status === 'ok') {
                 setClericState('healthy');
                 setClericDialogue('healthy');
@@ -721,10 +1026,6 @@
                 <span class="count-badge warn">⚠️ ${counts.warn}</span>
                 <span class="count-badge fail">❌ ${counts.fail}</span>
             `;
-
-            // Update header stats
-            document.getElementById('totalChecks').textContent = ritual.checks?.length || 0;
-            document.getElementById('passedChecks').textContent = counts.ok;
 
             document.getElementById('lastRunTime').textContent =
                 `Last run: ${new Date().toLocaleTimeString()}`;
@@ -790,17 +1091,44 @@
             `;
         }
 
+        function refreshOrders() {
+            orderResults = {};
+            document.querySelectorAll('.order-card').forEach(card => {
+                card.classList.remove('passed', 'warned', 'failed');
+                const status = card.querySelector('.order-status');
+                if (status) {
+                    const order = card.dataset.order;
+                    const defaultStatus = {
+                        quick: 'Fast checks', api: 'Endpoints', forge: 'GPU/Hardware',
+                        weaver: 'Daemons', champion: 'Checkpoints', oracle: 'Inference',
+                        guild: 'Skills', scribe: 'Evals', deep: 'Comprehensive'
+                    };
+                    status.textContent = defaultStatus[order] || 'Ready';
+                }
+            });
+            updateOverallHealth();
+            setClericDialogue('idle');
+            setClericState(null);
+        }
+
+        function clearResults() {
+            document.getElementById('checksContainer').innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">🏛️</div>
+                    <h3>No Ritual Cast</h3>
+                    <p>Click an Order above or use Quick Actions to begin diagnostics</p>
+                </div>
+            `;
+            document.getElementById('resultSummary').style.display = 'none';
+            document.getElementById('blessingSection').style.display = 'none';
+            refreshOrders();
+        }
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            loadRituals();
-            setClericDialogue('idle');
-        });
     </script>
 </body>
 </html>

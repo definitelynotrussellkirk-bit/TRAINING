@@ -171,6 +171,109 @@
             margin-bottom: 1rem;
         }
 
+        /* Campaign Banner */
+        .campaign-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, rgba(30, 30, 50, 0.95) 0%, rgba(40, 35, 60, 0.95) 100%);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 10px;
+        }
+
+        .campaign-hero {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .campaign-hero-icon {
+            font-size: 2rem;
+        }
+
+        .campaign-hero-name {
+            font-family: 'Cinzel', serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #ffd700;
+        }
+
+        .campaign-id {
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .campaign-stats {
+            display: flex;
+            gap: 24px;
+        }
+
+        .campaign-stat {
+            text-align: center;
+        }
+
+        .campaign-stat .stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .campaign-stat .stat-label {
+            font-size: 0.65rem;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        /* Status indicators */
+        .status-icon {
+            margin-right: 4px;
+        }
+
+        .status-local { color: var(--color-success); }
+        .status-remote { color: #8b5cf6; }
+        .status-missing { color: var(--color-danger); }
+
+        .eval-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 5px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: var(--bg-dark);
+            color: var(--text-muted);
+        }
+
+        .eval-badge.has-evals {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .eval-badge.many-evals {
+            background: rgba(168, 85, 247, 0.2);
+            color: #a855f7;
+        }
+
+        .hero-cell {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hero-icon {
+            font-size: 1rem;
+        }
+
+        .hero-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
         .best-badge {
             background: linear-gradient(135deg, var(--color-gold), #b8860b);
             color: var(--bg-dark);
@@ -227,6 +330,31 @@
     </header>
 
     <main class="ledger-main">
+        <!-- Campaign Banner -->
+        <div class="campaign-banner" id="campaignBanner">
+            <div class="campaign-hero">
+                <span class="campaign-hero-icon" id="campaignHeroIcon">⚡</span>
+                <div>
+                    <div class="campaign-hero-name" id="campaignHeroName">Loading...</div>
+                    <div class="campaign-id" id="campaignId">--</div>
+                </div>
+            </div>
+            <div class="campaign-stats">
+                <div class="campaign-stat">
+                    <div class="stat-value" id="localCount">--</div>
+                    <div class="stat-label">Local</div>
+                </div>
+                <div class="campaign-stat">
+                    <div class="stat-value" id="remoteCount">--</div>
+                    <div class="stat-label">Remote</div>
+                </div>
+                <div class="campaign-stat">
+                    <div class="stat-value" id="totalEvals">--</div>
+                    <div class="stat-label">Evals</div>
+                </div>
+            </div>
+        </div>
+
         <div class="ledger-header">
             <h2 class="ledger-title">
                 <span>📖</span> Checkpoint Ledger
@@ -285,12 +413,12 @@
             <table class="ledger-table">
                 <thead>
                     <tr>
-                        <th>Step</th>
+                        <th>Hero</th>
+                        <th>Checkpoint</th>
                         <th>Loss</th>
-                        <th>LR</th>
-                        <th>Locations</th>
-                        <th>Created</th>
-                        <th>Last Used</th>
+                        <th>Status</th>
+                        <th>Evals</th>
+                        <th>Age</th>
                     </tr>
                 </thead>
                 <tbody id="ledgerBody">
@@ -317,6 +445,32 @@
         let currentPage = 1;
         let totalPages = 1;
         let bestStep = null;
+        let activeHeroId = null;
+        let activeCampaignId = null;
+
+        // Hero icon mapping
+        const HERO_ICONS = {
+            'DIO': '🧔🏽', 'FLO': '👩', 'ZENO': '♾️', 'VERO': '✅', 'NERO': '🌑',
+            'ORO': '🪙', 'LOBO': '🐺', 'TORO': '🐂', 'MONO': '🐒', 'OJO': '👁',
+            'GOU': '🐕', 'TAO': '☯️', 'MO': '✒️', 'SHOU': '🛡', 'NEKO': '🐈',
+            'KUMO': '🕸', 'TOMO': '🤝', 'AO': '🌊', 'MOMO': '🍑', 'MOYO': '❤️',
+            'MOTO': '🔥', 'OMO': '🧒', 'MIRO': '🕊', 'LUMO': '💡', 'OM': '🕉️',
+            'OJAS': '⚡', 'BODHI': '🧘', 'DAYA': '🙏', 'AGNI': '🔥', 'KAVI': '✍️',
+            'MITRA': '🤗', 'NOOR': '🌟', 'SABR': '⏳', 'FIKR': '🤔', 'RUH': '👻',
+            'OR': '🕯️', 'EMET': '⚖️', 'LEV': '💜', 'CHEN': '✨', 'KAI': '🌊',
+            'MANA': '⚡', 'OLA': '🌱',
+        };
+
+        function getHeroIcon(heroName) {
+            if (!heroName) return '🏺';
+            const key = heroName.toUpperCase();
+            return HERO_ICONS[key] || '🏺';
+        }
+
+        function getHeroName(heroId) {
+            if (!heroId) return 'Unknown';
+            return heroId.split('-')[0].toUpperCase();
+        }
 
         async function loadLedger() {
             const sortBy = document.getElementById('sortBy').value;
@@ -328,7 +482,7 @@
                 const summaryRes = await fetch('/ledger/summary');
                 const summary = await summaryRes.json();
 
-                document.getElementById('totalCheckpoints').textContent = summary.total_checkpoints?.toLocaleString() || '0';
+                document.getElementById('totalCheckpoints').textContent = summary.count?.toLocaleString() || '0';
                 document.getElementById('totalLocations').textContent = Object.keys(summary.by_device || {}).length;
 
                 // Load best checkpoint
@@ -342,11 +496,16 @@
                 }
 
                 // Load checkpoint list
-                let url = `/ledger?limit=${pageSize}&offset=${(currentPage - 1) * pageSize}`;
+                let url = `/ledger?limit=${pageSize}&offset=${(currentPage - 1) * pageSize}&include_base=false`;
                 if (device) url += `&device=${device}`;
 
                 const res = await fetch(url);
                 const data = await res.json();
+
+                // Update campaign banner
+                activeHeroId = data.active_hero_id;
+                activeCampaignId = data.active_campaign_id;
+                updateCampaignBanner(data);
 
                 const checkpoints = data.checkpoints || [];
                 totalPages = Math.ceil((data.total || checkpoints.length) / pageSize);
@@ -365,6 +524,25 @@
                     </tr>
                 `;
             }
+        }
+
+        function updateCampaignBanner(data) {
+            const heroName = getHeroName(data.active_hero_id);
+            const heroIcon = getHeroIcon(heroName);
+
+            document.getElementById('campaignHeroIcon').textContent = heroIcon;
+            document.getElementById('campaignHeroName').textContent = heroName || 'No Active Campaign';
+            document.getElementById('campaignId').textContent = data.active_campaign_id || '--';
+
+            // Count local vs remote
+            const checkpoints = data.checkpoints || [];
+            const localCount = checkpoints.filter(c => c.is_local).length;
+            const remoteCount = checkpoints.filter(c => !c.is_local && c.locations?.length > 0).length;
+            const totalEvals = checkpoints.reduce((sum, c) => sum + (c.eval_count || 0), 0);
+
+            document.getElementById('localCount').textContent = localCount;
+            document.getElementById('remoteCount').textContent = remoteCount;
+            document.getElementById('totalEvals').textContent = totalEvals;
         }
 
         function renderTable(checkpoints) {
@@ -386,33 +564,62 @@
             }
 
             tbody.innerHTML = checkpoints.map(ckpt => {
+                if (ckpt.is_base) return ''; // Skip base model
+
                 const step = ckpt.step;
                 const isBest = step === bestStep;
                 const loss = ckpt.train_loss;
-                const lossClass = loss ? (loss < 0.5 ? 'good' : loss < 1.0 ? 'medium' : 'high') : '';
+                const lossClass = loss ? (loss < 0.02 ? 'good' : loss < 0.05 ? 'medium' : 'high') : '';
 
-                const locations = ckpt.locations || [];
-                const primaryDevice = ckpt.device_id;
+                // Hero info
+                const heroName = getHeroName(ckpt.hero_id);
+                const heroIcon = getHeroIcon(heroName);
+                const isActive = ckpt.is_active_campaign;
 
-                const locationsHtml = locations.map(loc => {
-                    const isPrimary = loc === primaryDevice;
-                    return `<span class="location-badge${isPrimary ? ' primary' : ''}">${loc}</span>`;
-                }).join('');
+                // Status indicator
+                let statusHtml;
+                if (ckpt.is_local) {
+                    statusHtml = '<span class="status-icon status-local" title="Local">💻</span> Local';
+                } else if (ckpt.locations?.length > 0) {
+                    const locs = ckpt.locations.join(', ');
+                    statusHtml = `<span class="status-icon status-remote" title="${locs}">☁️</span> Remote`;
+                } else {
+                    statusHtml = '<span class="status-icon status-missing" title="Not found">❌</span> Missing';
+                }
 
-                const created = ckpt.created_at ? new Date(ckpt.created_at).toLocaleString() : '--';
-                const lastUsed = ckpt.last_used ? new Date(ckpt.last_used).toLocaleString() : '--';
+                // Eval badge
+                const evalCount = ckpt.eval_count || 0;
+                const evalClass = evalCount >= 5 ? 'many-evals' : evalCount > 0 ? 'has-evals' : '';
+                const evalHtml = evalCount > 0
+                    ? `<span class="eval-badge ${evalClass}">${evalCount}</span>`
+                    : '<span class="eval-badge">0</span>';
+
+                // Canonical name (shortened)
+                const shortName = (ckpt.canonical_name || `checkpoint-${step}`)
+                    .replace('checkpoint-', '')
+                    .split('-').slice(0, 2).join('-');
+
+                // Age
+                const ageHtml = ckpt.age_hours != null
+                    ? (ckpt.age_hours < 24 ? `${Math.round(ckpt.age_hours)}h` : `${Math.round(ckpt.age_hours / 24)}d`)
+                    : '--';
 
                 return `
-                    <tr>
+                    <tr style="${isActive ? '' : 'opacity: 0.6;'}">
                         <td>
-                            <a href="/checkpoint/${step}" class="step-link">${step.toLocaleString()}</a>
+                            <div class="hero-cell">
+                                <span class="hero-icon">${heroIcon}</span>
+                                <span class="hero-name">${heroName}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <a href="/checkpoint/${step}" class="step-link">#${shortName}</a>
                             ${isBest ? '<span class="best-badge">BEST</span>' : ''}
                         </td>
                         <td class="loss-value ${lossClass}">${loss?.toFixed(4) || '--'}</td>
-                        <td class="loss-value">${ckpt.learning_rate?.toExponential(2) || '--'}</td>
-                        <td>${locationsHtml || '<span class="location-badge">unknown</span>'}</td>
-                        <td class="timestamp">${created}</td>
-                        <td class="timestamp">${lastUsed}</td>
+                        <td>${statusHtml}</td>
+                        <td>${evalHtml}</td>
+                        <td class="timestamp">${ageHtml}</td>
                     </tr>
                 `;
             }).join('');

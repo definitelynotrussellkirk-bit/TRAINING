@@ -3,422 +3,780 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guild Hall - Skills</title>
-    <!-- Shared theme -->
+    <title>Guild Hall | Realm of Training</title>
     <link rel="stylesheet" href="/static/css/theme.css?v=1">
     <link rel="stylesheet" href="/static/css/game.css?v=4">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* Guild-specific styles - uses theme.css variables */
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: var(--font-body), system-ui, sans-serif;
+            font-family: 'Inter', system-ui, sans-serif;
             background: var(--bg-dark);
             color: var(--text-primary);
             min-height: 100vh;
+            padding-bottom: 80px;
         }
 
-        .header {
-            background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-card) 100%);
-            border-bottom: 1px solid var(--border-gold);
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
+        /* ═══════════════════════════════════════════════════════════
+           HERO BANNER - Guild Master
+           ═══════════════════════════════════════════════════════════ */
+        .guild-banner {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-bottom: 3px solid var(--border-gold);
+            padding: 20px 24px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 24px;
             align-items: center;
+            position: relative;
+            overflow: hidden;
         }
 
-        .header h1 {
+        .guild-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at 30% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .guild-icon-container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .guild-icon {
+            font-size: 3.5rem;
+            filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.5));
+        }
+
+        .guild-info {
+            z-index: 1;
+        }
+
+        .guild-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+            margin-bottom: 4px;
+        }
+
+        .guild-subtitle {
+            color: #a78bfa;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .guild-stats {
+            display: flex;
+            gap: 24px;
+        }
+
+        .guild-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .guild-stat-value {
             font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .guild-stat-value.gold { color: #ffd700; }
+        .guild-stat-value.purple { color: #a78bfa; }
+        .guild-stat-value.green { color: #4ade80; }
+
+        .guild-stat-label {
+            font-size: 0.7rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .guild-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 1;
+        }
+
+        .guild-action {
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            color: var(--text-gold);
-            font-family: var(--font-title), serif;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .nav-links a {
-            color: var(--text-secondary);
+            gap: 8px;
+            white-space: nowrap;
             text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: var(--radius-md);
-            transition: all 0.2s;
         }
 
-        .nav-links a:hover {
-            background: var(--bg-highlight);
-            color: var(--text-primary);
+        .guild-action:hover {
+            background: rgba(139, 92, 246, 0.2);
+            border-color: rgba(139, 92, 246, 0.5);
+            transform: translateX(4px);
         }
 
+        /* Container */
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 24px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           SUMMARY CARDS
+           ═══════════════════════════════════════════════════════════ */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #252538 0%, #1a1a2e 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--border-gold), #a78bfa);
+        }
+
+        .summary-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #ffd700;
+            line-height: 1.2;
+        }
+
+        .summary-label {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           SECTION HEADERS
+           ═══════════════════════════════════════════════════════════ */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
         }
 
         .section-title {
-            font-size: 1.25rem;
-            color: var(--text-primary);
-            margin-bottom: 1rem;
+            font-family: 'Cinzel', serif;
+            font-size: 1.2rem;
+            color: #ffd700;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 10px;
         }
 
-        /* Skills Grid */
+        .section-badge {
+            background: rgba(139, 92, 246, 0.2);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: #a78bfa;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           HERO'S JOURNEY - Personal Best
+           ═══════════════════════════════════════════════════════════ */
+        .journey-section {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.05) 0%, #1a1a2e 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .journey-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(180deg, #ffd700, #a78bfa);
+        }
+
+        .journey-summary {
+            font-size: 1.1rem;
+            color: #ffd700;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .peaks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .peaks-column h4 {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .peak-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            list-style: none;
+        }
+
+        .peak-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .peak-item .skill-name {
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .peak-item .skill-level {
+            color: #ffd700;
+            font-weight: 700;
+        }
+
+        .peak-item .metric-icon {
+            font-size: 1rem;
+        }
+
+        .peak-item .metric-value {
+            color: #4ade80;
+            font-weight: 600;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           SKILLS GRID
+           ═══════════════════════════════════════════════════════════ */
+        .skills-section {
+            margin-bottom: 32px;
+        }
+
         .skills-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
         }
 
         .skill-card {
-            background: var(--bg-card);
+            background: linear-gradient(180deg, #252538 0%, #1a1a2e 100%);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-xl);
-            padding: 1.5rem;
+            border-radius: 16px;
+            padding: 0;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            position: relative;
         }
+
+        .skill-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            transition: all 0.3s;
+        }
+
+        .skill-card.sy::before { background: #8b5cf6; }
+        .skill-card.bin::before { background: #10b981; }
 
         .skill-card:hover {
             border-color: var(--border-gold);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 20px var(--glow-gold);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
         }
 
         .skill-header {
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .skill-identity {
+            display: flex;
             align-items: center;
-            margin-bottom: 1rem;
+            gap: 14px;
         }
 
         .skill-icon {
-            font-size: 2rem;
-            width: 50px;
-            height: 50px;
+            font-size: 2.2rem;
+            width: 55px;
+            height: 55px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--bg-highlight);
-            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
         }
 
         .skill-name {
-            font-size: 1.25rem;
+            font-size: 1.2rem;
             font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .skill-description {
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        .skill-level-badge {
+            text-align: right;
         }
 
         .skill-level {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--border-gold);
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ffd700;
+            line-height: 1;
+        }
+
+        .strain-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-top: 6px;
+        }
+
+        .skill-body {
+            padding: 20px;
         }
 
         .skill-progress {
-            margin: 1rem 0;
+            margin-bottom: 16px;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 0.8rem;
+        }
+
+        .progress-label {
+            color: #888;
+        }
+
+        .progress-value {
+            font-weight: 600;
         }
 
         .progress-bar {
-            height: 8px;
-            background: var(--bg-dark);
-            border-radius: 4px;
+            height: 10px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 5px;
             overflow: hidden;
         }
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--border-gold), #a78bfa);
-            border-radius: 4px;
-            transition: width 0.3s;
+            border-radius: 5px;
+            transition: width 0.5s ease;
+            position: relative;
         }
 
-        .skill-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--border-color);
+        .progress-fill.sy {
+            background: linear-gradient(90deg, #8b5cf6, #a78bfa);
         }
 
-        .stat {
-            text-align: center;
+        .progress-fill.bin {
+            background: linear-gradient(90deg, #10b981, #34d399);
         }
 
-        .stat-value {
-            font-size: 1.25rem;
-            font-weight: bold;
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 100%);
         }
 
-        .stat-label {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-        }
-
-        /* Level Accuracy Breakdown */
+        /* Level Accuracy Blocks */
         .level-accuracy-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 3px;
-            margin: 0.75rem 0;
-            padding: 0.5rem;
-            background: var(--bg-dark);
-            border-radius: 6px;
+            gap: 4px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
         }
 
         .level-accuracy-row .level-title {
             width: 100%;
             font-size: 0.7rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.25rem;
+            color: #888;
+            margin-bottom: 6px;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .level-block {
-            width: 20px;
-            height: 20px;
-            border-radius: 3px;
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.6rem;
-            font-weight: bold;
-            color: rgba(0,0,0,0.7);
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: rgba(0,0,0,0.8);
             cursor: default;
-            transition: transform 0.1s;
+            transition: transform 0.15s;
         }
 
         .level-block:hover {
-            transform: scale(1.2);
+            transform: scale(1.3);
             z-index: 1;
         }
 
-        .level-block.mastered { background: var(--color-success); }
-        .level-block.training { background: var(--color-warning); }
-        .level-block.struggling { background: var(--color-danger); }
-        .level-block.unknown { background: var(--bg-highlight); color: var(--text-secondary); }
+        .level-block.mastered { background: linear-gradient(135deg, #22c55e, #4ade80); }
+        .level-block.training { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+        .level-block.struggling { background: linear-gradient(135deg, #ef4444, #f87171); }
+        .level-block.unknown { background: #333; color: #666; }
 
-        /* Strain Zone Badge */
-        .strain-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
+        .skill-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .stat-label {
             font-size: 0.7rem;
-            font-weight: 600;
+            color: #888;
             text-transform: uppercase;
+            margin-top: 2px;
         }
 
-        .strain-badge .zone-icon {
-            font-size: 0.85rem;
-        }
-
-        /* Passives Section */
+        /* ═══════════════════════════════════════════════════════════
+           PASSIVES SECTION
+           ═══════════════════════════════════════════════════════════ */
         .passives-section {
-            margin-top: 2rem;
+            margin-bottom: 32px;
         }
 
         .passives-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
         }
 
         .passive-card {
-            background: var(--bg-card);
+            background: linear-gradient(135deg, #252538 0%, #1a1a2e 100%);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 1rem;
+            border-radius: 10px;
+            padding: 16px;
+            transition: all 0.2s;
+        }
+
+        .passive-card:hover {
+            border-color: #444;
+            transform: translateY(-2px);
         }
 
         .passive-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 0.5rem;
+            margin-bottom: 10px;
         }
 
         .passive-name {
             font-weight: 600;
+            font-size: 0.9rem;
         }
 
         .passive-version {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            background: var(--bg-highlight);
+            font-size: 0.65rem;
+            color: #666;
+            background: rgba(255, 255, 255, 0.05);
             padding: 2px 6px;
             border-radius: 4px;
         }
 
         .passive-accuracy {
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin: 0.5rem 0;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 8px 0;
         }
 
-        .passive-accuracy.good { color: var(--color-success); }
-        .passive-accuracy.ok { color: var(--color-warning); }
-        .passive-accuracy.bad { color: var(--color-danger); }
-        .passive-accuracy.none { color: var(--text-secondary); }
+        .passive-accuracy.good { color: #4ade80; }
+        .passive-accuracy.ok { color: #fbbf24; }
+        .passive-accuracy.bad { color: #f87171; }
+        .passive-accuracy.none { color: #666; }
 
         .passive-meta {
             font-size: 0.75rem;
-            color: var(--text-secondary);
+            color: #666;
         }
 
-        /* Primitives Section */
+        /* ═══════════════════════════════════════════════════════════
+           PRIMITIVES SECTION
+           ═══════════════════════════════════════════════════════════ */
         .primitives-section {
-            margin-top: 2rem;
+            margin-bottom: 32px;
         }
 
         .primitives-tracks {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
         }
 
         .track-card {
-            background: var(--bg-card);
+            background: linear-gradient(180deg, #252538 0%, #1a1a2e 100%);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 1rem;
+            overflow: hidden;
         }
 
         .track-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border-color);
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .track-name {
             font-weight: 600;
             font-size: 1rem;
-            text-transform: capitalize;
+            text-transform: uppercase;
         }
 
         .track-count {
             font-size: 0.75rem;
-            color: var(--text-secondary);
-            background: var(--bg-highlight);
-            padding: 2px 8px;
-            border-radius: 4px;
+            color: #888;
         }
 
         .primitive-list {
+            padding: 12px;
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 6px;
+            max-height: 300px;
+            overflow-y: auto;
         }
 
         .primitive-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.5rem;
-            background: var(--bg-highlight);
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.2);
             border-radius: 6px;
             font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+
+        .primitive-item:hover {
+            background: rgba(0, 0, 0, 0.4);
         }
 
         .primitive-name {
-            color: var(--text-primary);
+            color: #ccc;
         }
 
         .primitive-accuracy {
             font-weight: 600;
-            padding: 2px 8px;
+            padding: 3px 10px;
             border-radius: 4px;
-            font-size: 0.75rem;
+            font-size: 0.8rem;
         }
 
-        .primitive-accuracy.good { color: var(--color-success); background: rgba(34, 197, 94, 0.1); }
-        .primitive-accuracy.ok { color: var(--color-warning); background: rgba(245, 158, 11, 0.1); }
-        .primitive-accuracy.bad { color: var(--color-danger); background: rgba(239, 68, 68, 0.1); }
-        .primitive-accuracy.none { color: var(--text-secondary); }
+        .primitive-accuracy.good { color: #4ade80; background: rgba(34, 197, 94, 0.15); }
+        .primitive-accuracy.ok { color: #fbbf24; background: rgba(245, 158, 11, 0.15); }
+        .primitive-accuracy.bad { color: #f87171; background: rgba(239, 68, 68, 0.15); }
+        .primitive-accuracy.none { color: #666; }
 
-        .drift-indicator {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 600;
+        /* ═══════════════════════════════════════════════════════════
+           TASK MASTER SECTION
+           ═══════════════════════════════════════════════════════════ */
+        .task-master-section {
+            margin-bottom: 32px;
         }
 
-        .drift-positive { background: rgba(34, 197, 94, 0.2); color: var(--color-success); }
-        .drift-neutral { background: rgba(128, 128, 144, 0.2); color: var(--text-secondary); }
-        .drift-negative { background: rgba(239, 68, 68, 0.2); color: var(--color-danger); }
-
-        /* Summary Cards */
-        .summary-row {
+        .task-master-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
         }
 
-        .summary-card {
-            background: var(--bg-card);
+        .task-card {
+            background: linear-gradient(135deg, #252538 0%, #1a1a2e 100%);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 1.5rem;
+            border-radius: 12px;
+            padding: 20px;
             text-align: center;
         }
 
-        .summary-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: var(--border-gold);
+        .task-status {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 8px;
         }
 
-        .summary-label {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
+        .task-label {
+            color: #888;
+            font-size: 0.85rem;
         }
 
-        /* Loading */
+        .task-meta {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .task-stats-row {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 10px;
+        }
+
+        .task-stat {
+            text-align: center;
+        }
+
+        .task-stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .task-stat-label {
+            font-size: 0.65rem;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           UTILITIES
+           ═══════════════════════════════════════════════════════════ */
         .loading {
             text-align: center;
-            padding: 2rem;
-            color: var(--text-secondary);
+            padding: 40px;
+            color: #666;
         }
 
         .error {
             background: rgba(239, 68, 68, 0.1);
-            border: 1px solid var(--color-danger);
-            color: var(--color-danger);
-            padding: 1rem;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            padding: 16px;
             border-radius: 8px;
-            margin: 1rem 0;
+            margin: 16px 0;
+        }
+
+        .section-description {
+            color: #666;
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .guild-banner {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .guild-stats {
+                justify-content: center;
+            }
+
+            .guild-actions {
+                flex-direction: row;
+                justify-content: center;
+            }
+
+            .skills-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Shared game header -->
+    <!-- HEADER -->
     <header class="game-header">
         <div class="header-left">
-            <h1 class="game-title">🏰 Guild Hall</h1>
+            <h1 class="game-title">Guild Hall</h1>
         </div>
         <div class="header-center">
             <div class="resource-bar">
                 <div class="resource steps">
-                    <span class="resource-icon">⚡</span>
+                    <span class="resource-icon">&#9889;</span>
                     <span class="resource-label">STEPS</span>
                     <span class="resource-value" id="totalSteps">0</span>
                 </div>
                 <div class="resource evals">
-                    <span class="resource-icon">🎯</span>
+                    <span class="resource-icon">&#127919;</span>
                     <span class="resource-label">EVALS</span>
                     <span class="resource-value" id="totalEvals">0</span>
                 </div>
@@ -426,22 +784,55 @@
         </div>
         <div class="header-right">
             <div class="realm-mode-toggle" id="realmModeToggle">
-                <button class="mode-btn mode-training" id="btnTraining" title="Enable auto-training">TRAIN</button>
-                <button class="mode-btn mode-idle" id="btnIdle" title="Pause auto-training">IDLE</button>
+                <button class="mode-btn mode-training" id="btnTraining">TRAIN</button>
+                <button class="mode-btn mode-idle" id="btnIdle">IDLE</button>
             </div>
-            <div class="health-indicator" id="healthIndicator" title="Realm health">
-                <span class="health-icon" id="healthIcon">⚪</span>
+            <div class="health-indicator" id="healthIndicator">
+                <span class="health-icon" id="healthIcon">&#9898;</span>
             </div>
             <div class="idle-indicator" id="idleIndicator">
-                <span class="idle-icon" id="modeIcon">💤</span>
+                <span class="idle-icon" id="modeIcon">&#128164;</span>
                 <span class="idle-text" id="modeText">IDLE</span>
             </div>
             <div class="time-display" id="timeDisplay">--:--:--</div>
         </div>
     </header>
 
+    <!-- GUILD BANNER -->
+    <div class="guild-banner">
+        <div class="guild-icon-container">
+            <span class="guild-icon">&#127984;</span>
+        </div>
+        <div class="guild-info">
+            <h2 class="guild-title">Guild Hall</h2>
+            <div class="guild-subtitle">Skill Mastery & Progression</div>
+            <div class="guild-stats" id="guildStats">
+                <div class="guild-stat">
+                    <span class="guild-stat-value gold" id="bannerTotalLevel">--</span>
+                    <span class="guild-stat-label">Total Level</span>
+                </div>
+                <div class="guild-stat">
+                    <span class="guild-stat-value purple" id="bannerSkillCount">--</span>
+                    <span class="guild-stat-label">Skills</span>
+                </div>
+                <div class="guild-stat">
+                    <span class="guild-stat-value green" id="bannerPassives">--</span>
+                    <span class="guild-stat-label">Passives OK</span>
+                </div>
+            </div>
+        </div>
+        <div class="guild-actions">
+            <a href="/primitives" class="guild-action">
+                <span>&#128200;</span> Primitives Radar
+            </a>
+            <a href="/achievements" class="guild-action">
+                <span>&#127942;</span> Achievements
+            </a>
+        </div>
+    </div>
+
     <main class="container">
-        <!-- Summary -->
+        <!-- Summary Cards -->
         <div class="summary-row" id="summary">
             <div class="summary-card">
                 <div class="summary-value" id="totalLevel">--</div>
@@ -462,35 +853,46 @@
         </div>
 
         <!-- Hero's Journey - Personal Best -->
-        <div class="campaign-peaks-section" id="campaignPeaks" style="margin-bottom: 2rem; display: none;">
-            <h2 class="section-title">🏆 Hero's Journey - Personal Best</h2>
-            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem;">
-                <p id="journeySummary" style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--border-gold);">Loading...</p>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
-                    <!-- Peak Skills -->
-                    <div>
-                        <h4 style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Peak Skill Levels</h4>
-                        <ul id="peakSkillList" style="list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem;"></ul>
-                    </div>
-                    <!-- Peak Metrics -->
-                    <div>
-                        <h4 style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Best Metrics</h4>
-                        <ul id="peakMetricList" style="list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem;"></ul>
-                    </div>
+        <div class="journey-section" id="campaignPeaks" style="display: none;">
+            <div class="section-header">
+                <div class="section-title">
+                    <span>&#127942;</span> Hero's Journey - Personal Best
+                </div>
+            </div>
+            <p class="journey-summary" id="journeySummary">Loading...</p>
+            <div class="peaks-grid">
+                <div class="peaks-column">
+                    <h4>Peak Skill Levels</h4>
+                    <ul class="peak-list" id="peakSkillList"></ul>
+                </div>
+                <div class="peaks-column">
+                    <h4>Best Metrics</h4>
+                    <ul class="peak-list" id="peakMetricList"></ul>
                 </div>
             </div>
         </div>
 
         <!-- Active Skills -->
-        <h2 class="section-title">⚔️ Active Skills</h2>
-        <div class="skills-grid" id="skillsGrid">
-            <div class="loading">Loading skills...</div>
+        <div class="skills-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <span>&#9876;</span> Active Skills
+                    <span class="section-badge" id="skillsBadge">0 skills</span>
+                </div>
+            </div>
+            <div class="skills-grid" id="skillsGrid">
+                <div class="loading">Loading skills...</div>
+            </div>
         </div>
 
         <!-- Passives -->
         <div class="passives-section">
-            <h2 class="section-title">🛡️ Passives (Transfer Learning)</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.875rem;">
+            <div class="section-header">
+                <div class="section-title">
+                    <span>&#128737;</span> Passives (Transfer Learning)
+                </div>
+            </div>
+            <p class="section-description">
                 General abilities tested independently of active training. Detects catastrophic forgetting.
             </p>
             <div class="passives-grid" id="passivesGrid">
@@ -498,10 +900,14 @@
             </div>
         </div>
 
-        <!-- Primitives (Skill Engine) -->
+        <!-- Primitives -->
         <div class="primitives-section">
-            <h2 class="section-title">🧩 Primitives (Per-Concept Accuracy)</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.875rem;">
+            <div class="section-header">
+                <div class="section-title">
+                    <span>&#129513;</span> Primitives (Per-Concept Accuracy)
+                </div>
+            </div>
+            <p class="section-description">
                 Fine-grained accuracy tracking for atomic concepts within each skill. Identifies specific weaknesses.
             </p>
             <div class="primitives-tracks" id="primitivesGrid">
@@ -509,90 +915,80 @@
             </div>
         </div>
 
-        <!-- Task Master (Background Tasks) -->
-        <div class="task-master-section" style="margin-top: 2rem;">
-            <h2 class="section-title">🤖 Task Master (3090)</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.875rem;">
+        <!-- Task Master -->
+        <div class="task-master-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <span>&#129302;</span> Task Master (3090)
+                </div>
+            </div>
+            <p class="section-description">
                 Background tasks running on the inference GPU when idle.
             </p>
-            <div class="task-master-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                <!-- GPU Status Card -->
-                <div class="summary-card" id="taskMasterGpu">
-                    <div class="summary-value" id="gpuStatus">--</div>
-                    <div class="summary-label">3090 Status</div>
-                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                        <span id="gpuMemory">--</span> GB used
-                    </div>
+            <div class="task-master-grid">
+                <div class="task-card">
+                    <div class="task-status" id="gpuStatus">--</div>
+                    <div class="task-label">3090 Status</div>
+                    <div class="task-meta"><span id="gpuMemory">--</span> GB used</div>
                 </div>
-                <!-- Last Task Card -->
-                <div class="summary-card" id="taskMasterLast">
-                    <div class="summary-value" id="lastTaskName" style="font-size: 1rem;">--</div>
-                    <div class="summary-label">Last Task</div>
-                    <div style="font-size: 0.75rem; margin-top: 0.5rem;">
+                <div class="task-card">
+                    <div class="task-status" id="lastTaskName" style="font-size: 1rem;">--</div>
+                    <div class="task-label">Last Task</div>
+                    <div class="task-meta">
                         <span id="lastTaskStatus">--</span>
-                        <span id="lastTaskTime" style="color: var(--text-secondary);">--</span>
+                        <span id="lastTaskTime" style="color: #888;">--</span>
                     </div>
                 </div>
-                <!-- Stats Card -->
-                <div class="summary-card" id="taskMasterStats">
-                    <div style="display: flex; justify-content: space-around;">
-                        <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--border-gold);" id="tasksRun">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-secondary);">RUN</div>
+                <div class="task-card">
+                    <div class="task-stats-row">
+                        <div class="task-stat">
+                            <div class="task-stat-value" id="tasksRun" style="color: #ffd700;">0</div>
+                            <div class="task-stat-label">Run</div>
                         </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--color-success);" id="tasksSucceeded">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-secondary);">OK</div>
+                        <div class="task-stat">
+                            <div class="task-stat-value" id="tasksSucceeded" style="color: #4ade80;">0</div>
+                            <div class="task-stat-label">OK</div>
                         </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--color-danger);" id="tasksFailed">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-secondary);">FAIL</div>
+                        <div class="task-stat">
+                            <div class="task-stat-value" id="tasksFailed" style="color: #f87171;">0</div>
+                            <div class="task-stat-label">Fail</div>
                         </div>
                     </div>
-                    <div class="summary-label" style="margin-top: 0.5rem;">Task Stats</div>
+                    <div class="task-label">Task Stats</div>
                 </div>
-                <!-- Daemon Status Card -->
-                <div class="summary-card" id="taskMasterDaemon">
-                    <div class="summary-value" id="daemonStatus" style="font-size: 1rem;">--</div>
-                    <div class="summary-label">Daemon</div>
-                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;" id="lastCheck">
-                        Last check: --
-                    </div>
+                <div class="task-card">
+                    <div class="task-status" id="daemonStatus" style="font-size: 1rem;">--</div>
+                    <div class="task-label">Daemon</div>
+                    <div class="task-meta" id="lastCheck">Last check: --</div>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- NAVIGATION (dynamic) -->
+    <!-- NAVIGATION -->
     <nav class="game-nav" id="bottomNav"></nav>
     <script src="/static/js/nav.js"></script>
     <script src="/static/js/events.js"></script>
     <script src="/static/js/realm-state.js?v=1"></script>
-    <!-- Shared modules -->
     <script src="/static/js/formatters.js?v=1"></script>
 
     <script>
         async function loadGuildData() {
             try {
-                // Load skills
                 const skillsRes = await fetch('/api/skills');
                 const skillsData = await skillsRes.json();
-                const skills = skillsData.skills || skillsData;  // Handle both formats
+                const skills = skillsData.skills || skillsData;
                 renderSkills(skills);
 
-                // Load passives
                 const passivesRes = await fetch('/api/passives/summary');
                 const passives = await passivesRes.json();
                 renderPassives(passives);
 
-                // Load curriculum state for summary
                 const curriculumRes = await fetch('/api/curriculum');
                 const curriculum = await curriculumRes.json();
                 renderSummary(skills, passives, curriculum, skillsData.total_mastered || 0);
 
-                // Load primitives (Skill Engine)
                 loadPrimitives();
-
             } catch (err) {
                 console.error('Failed to load guild data:', err);
                 document.getElementById('skillsGrid').innerHTML =
@@ -602,21 +998,20 @@
 
         function renderSkills(skills) {
             const grid = document.getElementById('skillsGrid');
+            document.getElementById('skillsBadge').textContent = `${skills.length} skills`;
 
             if (!skills || skills.length === 0) {
-                grid.innerHTML = '<div class="loading">No skills configured<br><small style="opacity: 0.7">Define skills in configs/skills/*.yaml to see them here.</small></div>';
+                grid.innerHTML = '<div class="loading">No skills configured</div>';
                 return;
             }
 
             grid.innerHTML = skills.map(skill => {
-                // Build level accuracy blocks
                 const levelAccuracy = skill.level_accuracy || {};
                 const masteredLevel = skill.mastered_level || 0;
-                const trainingLevel = skill.training_level || masteredLevel + 1;
                 const maxLevel = skill.max_level || 30;
-
-                // Generate level blocks (show up to 20 or max_level, whichever is smaller)
                 const showLevels = Math.min(maxLevel, 20);
+                const skillClass = skill.id || 'sy';
+
                 let levelBlocks = '';
                 for (let lvl = 1; lvl <= showLevels; lvl++) {
                     const acc = levelAccuracy[lvl];
@@ -635,11 +1030,9 @@
                             tooltip = `L${lvl}: ${(acc * 100).toFixed(0)}% (struggling)`;
                         }
                     }
-
                     levelBlocks += `<div class="level-block ${blockClass}" title="${tooltip}">${lvl}</div>`;
                 }
 
-                // Only show level accuracy row if there's any data
                 const hasLevelData = Object.keys(levelAccuracy).length > 0;
                 const levelAccuracyRow = hasLevelData ? `
                     <div class="level-accuracy-row">
@@ -648,58 +1041,53 @@
                     </div>
                 ` : '';
 
-                // Build strain zone badge
                 const zoneColor = skill.zone_color || '#6b7280';
                 const zoneIcon = skill.zone_icon || '?';
                 const zoneName = skill.zone || 'unknown';
                 const zoneHint = skill.zone_hint || '';
 
                 return `
-                <div class="skill-card" onclick="window.location.href='/skill/${skill.id}'">
+                <div class="skill-card ${skillClass}" onclick="window.location.href='/skill/${skill.id}'">
                     <div class="skill-header">
-                        <div style="display: flex; align-items: center; gap: 1rem;">
-                            <div class="skill-icon">${skill.icon || '⚔️'}</div>
+                        <div class="skill-identity">
+                            <div class="skill-icon">${skill.icon || '&#9876;'}</div>
                             <div>
                                 <div class="skill-name">${skill.name}</div>
-                                <div style="color: var(--text-secondary); font-size: 0.875rem;">
-                                    ${skill.description || ''}
-                                </div>
+                                <div class="skill-description">${skill.description || ''}</div>
                             </div>
                         </div>
-                        <div style="text-align: right;">
-                            <div class="skill-level">L${skill.mastered_level || 0}</div>
+                        <div class="skill-level-badge">
+                            <div class="skill-level">L${masteredLevel}</div>
                             <div class="strain-badge" title="${zoneHint}" style="background: ${zoneColor}20; color: ${zoneColor}; border: 1px solid ${zoneColor}40;">
-                                <span class="zone-icon">${zoneIcon}</span>
+                                <span>${zoneIcon}</span>
                                 <span>${zoneName}</span>
                             </div>
                         </div>
                     </div>
-                    <div class="skill-progress">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                            <span style="font-size: 0.75rem; color: var(--text-secondary);">
-                                Training L${skill.training_level || (skill.mastered_level || 0) + 1}
-                            </span>
-                            <span style="font-size: 0.75rem;">
-                                ${skill.accuracy || 0}%
-                            </span>
+                    <div class="skill-body">
+                        <div class="skill-progress">
+                            <div class="progress-header">
+                                <span class="progress-label">Training L${skill.training_level || masteredLevel + 1}</span>
+                                <span class="progress-value">${skill.accuracy || 0}%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill ${skillClass}" style="width: ${Math.min(skill.accuracy || 0, 100)}%"></div>
+                            </div>
                         </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${Math.min(skill.accuracy || 0, 100)}%"></div>
-                        </div>
-                    </div>
-                    ${levelAccuracyRow}
-                    <div class="skill-stats">
-                        <div class="stat">
-                            <div class="stat-value">${skill.accuracy || 0}%</div>
-                            <div class="stat-label">Recent Acc</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${skill.eval_count || 0}</div>
-                            <div class="stat-label">Evals</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${skill.max_level || '?'}</div>
-                            <div class="stat-label">Max Level</div>
+                        ${levelAccuracyRow}
+                        <div class="skill-stats">
+                            <div class="stat">
+                                <div class="stat-value">${skill.accuracy || 0}%</div>
+                                <div class="stat-label">Recent Acc</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${skill.eval_count || 0}</div>
+                                <div class="stat-label">Evals</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${skill.max_level || '?'}</div>
+                                <div class="stat-label">Max Level</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -709,7 +1097,6 @@
         function renderPassives(data) {
             const grid = document.getElementById('passivesGrid');
 
-            // Get passive definitions
             fetch('/api/passives/definitions').then(r => r.json()).then(definitions => {
                 const results = data.by_passive || {};
 
@@ -741,22 +1128,19 @@
         }
 
         function renderSummary(skills, passives, curriculum, totalMastered) {
-            // Total level = sum of all skill levels
-            const totalLevel = skills.reduce((sum, s) => sum + (s.current_level || 0), 0);
+            const totalLevel = skills.reduce((sum, s) => sum + (s.current_level || s.mastered_level || 0), 0);
             document.getElementById('totalLevel').textContent = totalLevel;
+            document.getElementById('bannerTotalLevel').textContent = totalLevel;
 
-            // Active skills count
             document.getElementById('activeSkills').textContent = skills.length;
+            document.getElementById('bannerSkillCount').textContent = skills.length;
 
-            // Passives healthy (>= 50% accuracy)
             const passiveResults = passives.by_passive || {};
-            const healthyCount = Object.values(passiveResults)
-                .filter(p => (p.best_lite || 0) >= 0.5).length;
+            const healthyCount = Object.values(passiveResults).filter(p => (p.best_lite || 0) >= 0.5).length;
             const totalPassives = Object.keys(passiveResults).length || '?';
-            document.getElementById('passivesHealthy').textContent =
-                `${healthyCount}/${totalPassives}`;
+            document.getElementById('passivesHealthy').textContent = `${healthyCount}/${totalPassives}`;
+            document.getElementById('bannerPassives').textContent = `${healthyCount}/${totalPassives}`;
 
-            // Last eval time
             if (curriculum && curriculum.last_eval_time) {
                 const date = new Date(curriculum.last_eval_time);
                 const ago = Math.round((Date.now() - date) / 60000);
@@ -765,14 +1149,12 @@
             }
         }
 
-        // Primitives - Skill Engine per-concept accuracy
         async function loadPrimitives() {
             try {
                 const res = await fetch('/api/engine/primitive-summary');
                 const data = await res.json();
                 renderPrimitives(data);
             } catch (err) {
-                console.error('Failed to load primitives:', err);
                 document.getElementById('primitivesGrid').innerHTML =
                     '<div class="loading">Skill Engine not available</div>';
             }
@@ -787,7 +1169,6 @@
                 return;
             }
 
-            // Group primitives by skill
             const html = Object.entries(skillStates).map(([skillId, state]) => {
                 const primitiveAcc = state.primitive_accuracy || {};
                 const primitives = Object.entries(primitiveAcc);
@@ -797,18 +1178,15 @@
                         <div class="track-card">
                             <div class="track-header">
                                 <span class="track-name">${skillId.toUpperCase()}</span>
-                                <span class="track-count">L${state.level} · ${state.total_evals || 0} evals</span>
+                                <span class="track-count">L${state.level} &bull; ${state.total_evals || 0} evals</span>
                             </div>
                             <div class="primitive-list">
-                                <div style="color: var(--text-secondary); font-size: 0.85rem; text-align: center; padding: 1rem;">
-                                    No primitive data yet
-                                </div>
+                                <div style="color: #666; text-align: center; padding: 20px;">No primitive data yet</div>
                             </div>
                         </div>
                     `;
                 }
 
-                // Sort by accuracy (worst first) to highlight weaknesses
                 primitives.sort((a, b) => a[1] - b[1]);
 
                 const primitiveHtml = primitives.map(([name, acc]) => {
@@ -830,13 +1208,11 @@
                         <div class="track-header">
                             <span class="track-name">${skillId.toUpperCase()}</span>
                             <span class="track-count">
-                                L${state.level} · ${primitives.length} primitives ·
+                                L${state.level} &bull; ${primitives.length} primitives &bull;
                                 <span class="primitive-accuracy ${avgClass}" style="display: inline;">${(avgAcc * 100).toFixed(0)}% avg</span>
                             </span>
                         </div>
-                        <div class="primitive-list">
-                            ${primitiveHtml}
-                        </div>
+                        <div class="primitive-list">${primitiveHtml}</div>
                     </div>
                 `;
             }).join('');
@@ -844,7 +1220,6 @@
             grid.innerHTML = html;
         }
 
-        // Task Master - Background task status
         async function loadTaskMaster() {
             try {
                 const res = await fetch('/api/task-master');
@@ -856,164 +1231,130 @@
         }
 
         function renderTaskMaster(data) {
-            // GPU Status
             const gpu = data.gpus?.['3090'];
             if (gpu) {
                 const statusEl = document.getElementById('gpuStatus');
                 if (!gpu.available) {
-                    statusEl.textContent = '❌ Offline';
-                    statusEl.style.color = 'var(--color-danger)';
+                    statusEl.textContent = '&#10060; Offline';
+                    statusEl.style.color = '#f87171';
                 } else if (gpu.is_idle) {
-                    statusEl.textContent = '✓ Idle';
-                    statusEl.style.color = 'var(--color-success)';
+                    statusEl.textContent = '&#10003; Idle';
+                    statusEl.style.color = '#4ade80';
                 } else {
-                    statusEl.textContent = '⏳ Busy';
-                    statusEl.style.color = 'var(--color-warning)';
+                    statusEl.textContent = '&#9203; Busy';
+                    statusEl.style.color = '#fbbf24';
                 }
-                document.getElementById('gpuMemory').textContent =
-                    gpu.memory_used_gb?.toFixed(1) || '--';
+                document.getElementById('gpuMemory').textContent = gpu.memory_used_gb?.toFixed(1) || '--';
             } else if (!data.available) {
                 document.getElementById('gpuStatus').textContent = 'Not Run';
-                document.getElementById('gpuStatus').style.color = 'var(--text-secondary)';
+                document.getElementById('gpuStatus').style.color = '#666';
             }
 
-            // Last Task
             const lastTask = data.last_task;
             if (lastTask && lastTask.name) {
                 document.getElementById('lastTaskName').textContent = lastTask.name;
-
-                const statusSpan = document.getElementById('lastTaskStatus');
-                if (lastTask.success) {
-                    statusSpan.textContent = '✅';
-                } else {
-                    statusSpan.textContent = '❌';
-                }
-
-                // Time ago
+                document.getElementById('lastTaskStatus').textContent = lastTask.success ? '&#9989;' : '&#10060;';
                 if (lastTask.timestamp) {
-                    const date = new Date(lastTask.timestamp);
-                    const ago = Math.round((Date.now() - date) / 60000);
+                    const ago = Math.round((Date.now() - new Date(lastTask.timestamp)) / 60000);
                     document.getElementById('lastTaskTime').textContent =
                         ago < 60 ? `${ago}m ago` : `${Math.round(ago/60)}h ago`;
                 }
             }
 
-            // Stats
             const stats = data.stats || {};
             document.getElementById('tasksRun').textContent = stats.tasks_run || 0;
             document.getElementById('tasksSucceeded').textContent = stats.tasks_succeeded || 0;
             document.getElementById('tasksFailed').textContent = stats.tasks_failed || 0;
 
-            // Daemon Status
             const daemonEl = document.getElementById('daemonStatus');
             if (data.daemon_running) {
-                daemonEl.textContent = '🟢 Running';
-                daemonEl.style.color = 'var(--color-success)';
+                daemonEl.innerHTML = '&#128994; Running';
+                daemonEl.style.color = '#4ade80';
             } else {
-                daemonEl.textContent = '⚪ Stopped';
-                daemonEl.style.color = 'var(--text-secondary)';
+                daemonEl.innerHTML = '&#9898; Stopped';
+                daemonEl.style.color = '#666';
             }
 
-            // Last check time
             if (stats.last_check) {
-                const date = new Date(stats.last_check);
-                const ago = Math.round((Date.now() - date) / 60000);
+                const ago = Math.round((Date.now() - new Date(stats.last_check)) / 60000);
                 document.getElementById('lastCheck').textContent =
                     `Last check: ${ago < 60 ? `${ago}m ago` : `${Math.round(ago/60)}h ago`}`;
             }
         }
 
-        // Campaign Peaks - Personal Best tracking
         async function loadCampaignPeaks() {
             try {
                 const res = await fetch('/api/campaigns/active');
                 if (!res.ok) return;
-
                 const c = await res.json();
                 if (!c || !c.id) {
-                    // No active campaign - hide section
                     document.getElementById('campaignPeaks').style.display = 'none';
                     return;
                 }
 
-                // Show the section
                 document.getElementById('campaignPeaks').style.display = 'block';
-
-                // Journey summary
                 document.getElementById('journeySummary').textContent =
                     c.journey_summary || `${c.name} - Step ${(c.current_step || 0).toLocaleString()}`;
 
-                // Peak skills
                 const skillsUl = document.getElementById('peakSkillList');
                 const peaks = c.peak_skill_levels || {};
                 const skillKeys = Object.keys(peaks);
 
-                if (skillKeys.length === 0) {
-                    skillsUl.innerHTML = '<li style="color: var(--text-secondary);">No skills peaked yet</li>';
-                } else {
-                    skillsUl.innerHTML = skillKeys.map(skillId => `
-                        <li style="background: var(--bg-highlight); padding: 0.5rem 1rem; border-radius: 6px;">
-                            <span style="font-weight: 600; text-transform: uppercase;">${skillId}</span>:
-                            <span style="color: var(--border-gold);">L${peaks[skillId]}</span>
+                skillsUl.innerHTML = skillKeys.length === 0
+                    ? '<li class="peak-item" style="color: #666;">No skills peaked yet</li>'
+                    : skillKeys.map(id => `
+                        <li class="peak-item">
+                            <span class="skill-name">${id}</span>:
+                            <span class="skill-level">L${peaks[id]}</span>
                         </li>
                     `).join('');
-                }
 
-                // Peak metrics
                 const metricsUl = document.getElementById('peakMetricList');
                 const metrics = c.peak_metrics || {};
                 const metricKeys = Object.keys(metrics);
 
-                if (metricKeys.length === 0) {
-                    metricsUl.innerHTML = '<li style="color: var(--text-secondary);">No metrics tracked yet</li>';
-                } else {
-                    metricsUl.innerHTML = metricKeys.map(name => {
+                metricsUl.innerHTML = metricKeys.length === 0
+                    ? '<li class="peak-item" style="color: #666;">No metrics tracked yet</li>'
+                    : metricKeys.map(name => {
                         const value = metrics[name];
                         const displayValue = name.includes('accuracy')
                             ? `${(value * 100).toFixed(1)}%`
                             : value.toFixed(4);
-                        const icon = name.includes('loss') ? '📉' : name.includes('accuracy') ? '🎯' : '📊';
+                        const icon = name.includes('loss') ? '&#128201;' : name.includes('accuracy') ? '&#127919;' : '&#128202;';
                         const displayName = name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                         return `
-                            <li style="background: var(--bg-highlight); padding: 0.5rem 1rem; border-radius: 6px;">
-                                ${icon} ${displayName}:
-                                <span style="color: var(--color-success); font-weight: 600;">${displayValue}</span>
+                            <li class="peak-item">
+                                <span class="metric-icon">${icon}</span>
+                                ${displayName}:
+                                <span class="metric-value">${displayValue}</span>
                             </li>
                         `;
                     }).join('');
-                }
             } catch (err) {
                 console.error('Failed to load campaign peaks:', err);
             }
         }
 
-        // Subscribe to RealmState SSE for instant skill updates
         function initSSE() {
             if (window.RealmState && typeof window.RealmState.subscribe === 'function') {
                 RealmState.connectSSE();
-
-                // Subscribe to skills updates - refreshes when eval completes
-                RealmState.subscribe('skills', (skillsData) => {
-                    console.log('[Guild] SSE skills update, refreshing...');
+                RealmState.subscribe('skills', () => {
                     loadGuildData();
                     loadCampaignPeaks();
                 });
-                console.log('[Guild] SSE subscription active');
             } else {
                 setTimeout(initSSE, 500);
             }
         }
 
-        // Load on page load
         loadGuildData();
         loadTaskMaster();
         loadCampaignPeaks();
         initSSE();
 
-        // Reduced polling (SSE provides instant updates)
-        setInterval(loadGuildData, 120000);  // 2 min fallback
-        setInterval(loadTaskMaster, 60000);   // 1 min (doesn't use SSE)
-        setInterval(loadCampaignPeaks, 120000); // 2 min fallback
+        setInterval(loadGuildData, 120000);
+        setInterval(loadTaskMaster, 60000);
+        setInterval(loadCampaignPeaks, 120000);
     </script>
 </body>
 </html>

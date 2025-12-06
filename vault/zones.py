@@ -166,41 +166,87 @@ class ZoneClient:
         client = ZoneClient(zone)
         status = client.get_status()
         assets = client.list_assets(asset_type="checkpoint")
+
+    Features:
+        - Automatic retry with exponential backoff for connection errors
+        - Configurable timeout and retry settings
     """
 
-    def __init__(self, zone: Zone, timeout: int = 10):
+    def __init__(
+        self,
+        zone: Zone,
+        timeout: int = 10,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+    ):
         self.zone = zone
         self.timeout = timeout
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
 
     def _request(
         self,
         endpoint: str,
         method: str = "GET",
         data: Optional[Dict] = None,
+        retries: Optional[int] = None,
     ) -> Optional[Dict]:
-        """Make HTTP request to Branch Officer."""
+        """
+        Make HTTP request to Branch Officer with retry support.
+
+        Args:
+            endpoint: API endpoint path
+            method: HTTP method (GET, POST, etc.)
+            data: Request body data (for POST)
+            retries: Override max_retries for this request
+
+        Returns:
+            Response dict or None on failure
+        """
+        import time
+
         url = f"{self.zone.url}{endpoint}"
+        max_attempts = (retries if retries is not None else self.max_retries) + 1
+        last_error = None
 
-        try:
-            if method == "GET":
-                req = Request(url)
-            else:
-                body = json.dumps(data).encode("utf-8") if data else None
-                req = Request(url, data=body, method=method)
-                req.add_header("Content-Type", "application/json")
+        for attempt in range(max_attempts):
+            try:
+                if method == "GET":
+                    req = Request(url)
+                else:
+                    body = json.dumps(data).encode("utf-8") if data else None
+                    req = Request(url, data=body, method=method)
+                    req.add_header("Content-Type", "application/json")
 
-            with urlopen(req, timeout=self.timeout) as response:
-                return json.loads(response.read().decode("utf-8"))
+                with urlopen(req, timeout=self.timeout) as response:
+                    return json.loads(response.read().decode("utf-8"))
 
-        except HTTPError as e:
-            logger.warning(f"HTTP error from {self.zone.zone_id}: {e.code}")
-            return None
-        except URLError as e:
-            logger.warning(f"Connection failed to {self.zone.zone_id}: {e.reason}")
-            return None
-        except Exception as e:
-            logger.warning(f"Request failed to {self.zone.zone_id}: {e}")
-            return None
+            except HTTPError as e:
+                # Don't retry on client errors (4xx)
+                if 400 <= e.code < 500:
+                    logger.warning(f"HTTP {e.code} from {self.zone.zone_id}: {endpoint}")
+                    return None
+                # Retry on server errors (5xx)
+                last_error = f"HTTP {e.code}"
+                logger.debug(f"HTTP {e.code} from {self.zone.zone_id}, attempt {attempt + 1}/{max_attempts}")
+
+            except URLError as e:
+                # Retry on connection errors
+                last_error = str(e.reason)
+                logger.debug(f"Connection to {self.zone.zone_id} failed, attempt {attempt + 1}/{max_attempts}: {e.reason}")
+
+            except Exception as e:
+                last_error = str(e)
+                logger.debug(f"Request to {self.zone.zone_id} failed, attempt {attempt + 1}/{max_attempts}: {e}")
+
+            # Wait before retry (exponential backoff)
+            if attempt < max_attempts - 1:
+                delay = self.retry_delay * (2 ** attempt)
+                time.sleep(delay)
+
+        # All retries exhausted
+        logger.warning(f"All {max_attempts} attempts to {self.zone.zone_id}{endpoint} failed: {last_error}")
+        return None
 
     def is_online(self) -> bool:
         """Check if zone is reachable."""

@@ -1,0 +1,125 @@
+# =============================================================================
+# MEMORY PROFILE: 24GB QLoRA with 8-bit Paged Optimizer
+# =============================================================================
+# Maximum memory efficiency: 4-bit model + 8-bit paged optimizer
+# Squeeze every last bit of VRAM
+# Best for: 8B+ models or very long sequences on 8B
+# =============================================================================
+
+id: 24gb_qlora_8bit_opt
+name: "24GB QLoRA 8-bit Optimizer"
+rpg_name: "The Ascetic's Way"
+icon: "🧘"
+description: |
+  Maximum memory efficiency combining:
+  - QLoRA (4-bit quantized base)
+  - 8-bit paged optimizer (half the memory of 32-bit)
+
+  Trade-offs vs standard QLoRA:
+  + ~20% less VRAM usage
+  + Enables longer sequences or larger batch accumulation
+  - Slightly less stable training (8-bit optimizer)
+  - Slower (more CPU<->GPU transfers)
+
+  Use when: Standard QLoRA is just barely OOMing.
+
+target_vram_gb: 24
+
+# =============================================================================
+# PEFT CONFIGURATION
+# =============================================================================
+peft:
+  method: "qlora"
+
+  lora:
+    r: 64
+    alpha: 128
+    dropout: 0.05
+    target_modules:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+      - gate_proj
+      - up_proj
+      - down_proj
+    bias: "none"
+    task_type: "CAUSAL_LM"
+
+  galore:
+    rank: 1024
+    update_proj_gap: 200
+    scale: 0.25
+    proj_type: "std"
+
+# =============================================================================
+# QUANTIZATION - 4-BIT
+# =============================================================================
+quantization:
+  load_in_4bit: true
+  load_in_8bit: false
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+
+# =============================================================================
+# MEMORY-EFFICIENT IMPLEMENTATIONS
+# =============================================================================
+memory:
+  gradient_checkpointing: true
+  flash_attention: true
+  paged_optimizer: true
+  cpu_offload: false
+
+# =============================================================================
+# OPTIMIZER CONFIGURATION
+# 8-bit paged optimizer - maximum efficiency
+# =============================================================================
+optimizer:
+  type: "paged_adamw_8bit"  # KEY: 8-bit + paged = minimum memory
+
+  adamw:
+    lr: 5e-5                 # Slightly lower LR for 8-bit stability
+    betas: [0.9, 0.999]
+    eps: 1e-8
+    weight_decay: 0.01
+
+  muon:
+    hidden_lr: 0.02
+    aux_lr: 3e-4
+    momentum: 0.95
+    weight_decay: 0
+
+# =============================================================================
+# TRAINING CONSTRAINTS
+# =============================================================================
+constraints:
+  max_batch_size: 1
+  recommended_grad_accum: 16  # Can accumulate more with savings
+  max_sequence_length: 2048
+  precision: "bf16"
+
+# =============================================================================
+# MODEL SIZE RECOMMENDATIONS
+# =============================================================================
+recommendations:
+  max_model_size_b: 13
+  optimal_model_sizes:
+    - "8B"
+    - "13B"
+  tested_models:
+    - "Qwen3-8B"
+    - "Llama-3-8B"
+    - "Llama-2-13B"
+  notes: |
+    Maximum efficiency QLoRA for 8B-13B models.
+
+    Expected VRAM usage (8B model):
+    - Model (4-bit): ~5GB
+    - LoRA adapters: ~1GB
+    - Activations: ~8GB (with checkpointing)
+    - Optimizer (8-bit paged): ~2GB resident
+    - Total: ~16-18GB peak
+
+    Can potentially fit 13B models with careful settings.
+    Monitor for training instability from 8-bit optimizer.

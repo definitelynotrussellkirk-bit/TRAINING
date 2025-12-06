@@ -9,14 +9,561 @@
     <!-- Main game styles -->
     <link rel="stylesheet" href="/static/css/game.css?v=15">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* ═══════════════════════════════════════════════════════════
+           ENHANCED GAME UI - Campaign Focus
+           ═══════════════════════════════════════════════════════════ */
+
+        /* Campaign Banner - The Hero's Identity */
+        .campaign-banner {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-bottom: 3px solid var(--border-gold);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .campaign-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at 20% 50%, rgba(255, 215, 0, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .campaign-hero-portrait {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #252538 0%, #1a1a2e 100%);
+            border: 3px solid var(--border-gold);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            z-index: 1;
+        }
+
+        .campaign-hero-portrait.training {
+            animation: portrait-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes portrait-pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(255, 100, 0, 0.5), 0 0 60px rgba(255, 215, 0, 0.3); }
+        }
+
+        .campaign-hero-icon {
+            font-size: 3rem;
+            filter: drop-shadow(0 0 10px rgba(0, 255, 100, 0.5));
+        }
+
+        .campaign-info {
+            flex: 1;
+            z-index: 1;
+        }
+
+        .campaign-hero-name {
+            font-family: 'Cinzel', serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+            margin: 0 0 4px 0;
+        }
+
+        .campaign-hero-title {
+            font-size: 0.9rem;
+            color: #a78bfa;
+            font-style: italic;
+            margin-bottom: 8px;
+        }
+
+        .campaign-stats {
+            display: flex;
+            gap: 24px;
+        }
+
+        .campaign-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .campaign-stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: #fff;
+        }
+
+        .campaign-stat-value.gold { color: #ffd700; }
+        .campaign-stat-value.purple { color: #a78bfa; }
+        .campaign-stat-value.green { color: #4ade80; }
+        .campaign-stat-value.cyan { color: #22d3ee; }
+
+        .campaign-stat-label {
+            font-size: 0.7rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .campaign-training-status {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            z-index: 1;
+        }
+
+        .training-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .training-badge.active {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(249, 115, 22, 0.2));
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #f87171;
+            animation: training-glow 2s ease-in-out infinite;
+        }
+
+        .training-badge.idle {
+            background: rgba(100, 100, 100, 0.2);
+            border: 1px solid rgba(100, 100, 100, 0.4);
+            color: #888;
+        }
+
+        .training-badge.paused {
+            background: rgba(251, 191, 36, 0.2);
+            border: 1px solid rgba(251, 191, 36, 0.5);
+            color: #fbbf24;
+        }
+
+        @keyframes training-glow {
+            0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); }
+        }
+
+        .training-badge-icon {
+            font-size: 1.1rem;
+        }
+
+        .current-skill-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(6, 182, 212, 0.15);
+            border: 1px solid rgba(6, 182, 212, 0.4);
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+
+        .current-skill-badge .skill-icon {
+            font-size: 1rem;
+        }
+
+        .current-skill-badge .skill-name {
+            color: #22d3ee;
+            font-weight: 600;
+        }
+
+        .current-skill-badge .skill-level {
+            color: #4ade80;
+            font-weight: 700;
+        }
+
+        /* Enhanced Hero Panel */
+        .hero-panel {
+            background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-panel) 100%);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .hero-frame {
+            background: linear-gradient(180deg, #1a1e28 0%, #12151c 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem;
+            position: relative;
+        }
+
+        .hero-frame::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at center bottom, rgba(255, 140, 0, 0.1) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        /* Enhanced Battle Panel */
+        .battle-panel {
+            background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-panel) 100%);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .battle-status {
+            border-radius: 0;
+            border: none;
+            border-bottom: 1px solid var(--border-color);
+            background: transparent;
+        }
+
+        .battle-status.fighting {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, transparent 50%);
+            border-left: 4px solid var(--color-danger);
+        }
+
+        /* Room Description Enhancement */
+        .room-description {
+            background: linear-gradient(90deg, rgba(40, 35, 25, 0.9) 0%, rgba(30, 25, 18, 0.7) 100%);
+            border-left: 4px solid var(--color-gold);
+            margin: 0;
+            border-radius: 0;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Next Action Enhancement */
+        .next-action-card {
+            margin: 1rem;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.05) 0%, var(--bg-card) 100%);
+        }
+
+        /* Activity Log Enhancement */
+        .activity-log {
+            margin: 0;
+            border-radius: 0;
+            border: none;
+            border-top: 1px solid var(--border-color);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .activity-log h4 {
+            padding: 0.75rem 1rem;
+            margin: 0;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid var(--border-color);
+            font-family: 'Cinzel', serif;
+            color: var(--color-gold);
+        }
+
+        .log-entries {
+            padding: 0.5rem 1rem;
+            max-height: 250px;
+        }
+
+        /* Enhanced Guild Panel */
+        .guild-panel {
+            background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-panel) 100%);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .guild-panel .panel-header {
+            border-radius: 0;
+            border: none;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .guild-panel .panel-header h3 {
+            font-size: 1rem;
+        }
+
+        #skillsContainer {
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        /* Enhanced Skill Cards */
+        .skill-card {
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(0, 0, 0, 0.3) 100%);
+            border-radius: 12px;
+            padding: 1rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .skill-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            transition: all 0.3s;
+        }
+
+        .skill-card.sy::before { background: #8b5cf6; }
+        .skill-card.bin::before { background: #10b981; }
+
+        .skill-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .skill-card.active {
+            border-color: var(--skill-color, #8b5cf6);
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+        }
+
+        .skill-card.active::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .skill-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .skill-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .skill-info {
+            flex: 1;
+        }
+
+        .skill-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 2px;
+        }
+
+        .skill-level {
+            font-size: 0.8rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .skill-level.sy { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+        .skill-level.bin { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+
+        .skill-bar-container {
+            height: 10px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .skill-bar {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .skill-bar.sy {
+            background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+        }
+
+        .skill-bar.bin {
+            background: linear-gradient(90deg, #10b981, #34d399);
+        }
+
+        .skill-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 100%);
+        }
+
+        /* Forge Card Enhancement */
+        .forge-card {
+            margin: 0.75rem;
+            background: linear-gradient(135deg, rgba(255, 100, 0, 0.05) 0%, var(--bg-card) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .forge-card .panel-header {
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Vault Card Enhancement */
+        .vault-card {
+            margin: 0.75rem;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, var(--bg-card) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .vault-card .panel-header {
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Efficiency & Transitions Cards */
+        .efficiency-card,
+        .transitions-card {
+            margin: 0 0.75rem 0.75rem;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(0, 0, 0, 0.2) 100%);
+        }
+
+        .efficiency-card .panel-header,
+        .transitions-card .panel-header {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Loss Graph Enhancement */
+        .loss-graph-container {
+            margin: 0.75rem;
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(0, 0, 0, 0.3) 100%);
+            border-radius: 12px;
+        }
+
+        /* Training Controls Enhancement */
+        .training-controls {
+            padding: 0 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .control-btn {
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Momentum Card Enhancement */
+        .momentum-card {
+            margin: 0 0.75rem 0.75rem;
+            border-radius: 12px;
+        }
+
+        /* Quick Stats Bar in Battle Status */
+        .battle-stats {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin: 0 0 0.75rem;
+        }
+
+        .battle-stat {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1400px) {
+            .campaign-banner {
+                padding: 12px 16px;
+            }
+
+            .campaign-hero-portrait {
+                width: 60px;
+                height: 60px;
+            }
+
+            .campaign-hero-icon {
+                font-size: 2.2rem;
+            }
+
+            .campaign-hero-name {
+                font-size: 1.4rem;
+            }
+
+            .campaign-stats {
+                gap: 16px;
+            }
+
+            .campaign-stat-value {
+                font-size: 1.2rem;
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .campaign-banner {
+                flex-wrap: wrap;
+            }
+
+            .campaign-training-status {
+                width: 100%;
+                flex-direction: row;
+                justify-content: flex-end;
+                margin-top: 8px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .campaign-banner {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .campaign-stats {
+                justify-content: center;
+            }
+
+            .campaign-training-status {
+                align-items: center;
+                justify-content: center;
+            }
+        }
+    </style>
 </head>
 <body>
-    <!-- 🔥 RPG FLAIR: Global Overlays -->
+    <!-- RPG FLAIR: Global Overlays -->
     <div class="critical-hit-overlay" id="critOverlay">
         <span class="critical-hit-text">CRITICAL!</span>
     </div>
     <div class="achievement-toast" id="achievementToast">
-        <span class="achievement-icon" id="achievementIcon">🏆</span>
+        <span class="achievement-icon" id="achievementIcon">&#127942;</span>
         <div class="achievement-text">
             <div class="achievement-title">Achievement Unlocked</div>
             <div class="achievement-name" id="achievementName">First Steps</div>
@@ -36,12 +583,12 @@
         <div class="header-center">
             <div class="resource-bar">
                 <div class="resource steps">
-                    <span class="resource-icon">👣</span>
+                    <span class="resource-icon">&#128099;</span>
                     <span class="resource-label">STEPS</span>
                     <span class="resource-value" id="totalSteps">0</span>
                 </div>
                 <div class="resource evals">
-                    <span class="resource-icon">⚖️</span>
+                    <span class="resource-icon">&#9878;</span>
                     <span class="resource-label">EVALS</span>
                     <span class="resource-value" id="totalEvals">0</span>
                 </div>
@@ -55,27 +602,67 @@
             </div>
             <!-- HEALTH INDICATOR -->
             <div class="health-indicator" id="healthIndicator" title="Realm health">
-                <span class="health-icon" id="healthIcon">⚪</span>
+                <span class="health-icon" id="healthIcon">&#9898;</span>
             </div>
             <!-- SOUND TOGGLE -->
             <button class="sound-toggle" id="soundToggle" onclick="toggleSound()" title="Toggle sound effects">
-                <span id="soundIcon">🔊</span>
+                <span id="soundIcon">&#128266;</span>
             </button>
             <!-- IDLE INDICATOR (now shows actual realm mode) -->
             <div class="idle-indicator" id="idleIndicator">
-                <span class="idle-icon" id="modeIcon">💤</span>
+                <span class="idle-icon" id="modeIcon">&#128164;</span>
                 <span class="idle-text" id="modeText">IDLE</span>
             </div>
             <div class="time-display" id="timeDisplay">--:--:--</div>
         </div>
     </header>
 
-    <!-- 🎮 MUD CONSOLE (toggle with ` backtick) -->
+    <!-- CAMPAIGN BANNER - Hero Identity -->
+    <div class="campaign-banner" id="campaignBanner">
+        <div class="campaign-hero-portrait" id="heroPortraitBanner">
+            <span class="campaign-hero-icon" id="heroBannerIcon">&#129492;&#127997;</span>
+        </div>
+        <div class="campaign-info">
+            <h2 class="campaign-hero-name" id="heroBannerName">Loading...</h2>
+            <div class="campaign-hero-title" id="heroBannerTitle">Awakening...</div>
+            <div class="campaign-stats" id="campaignStats">
+                <div class="campaign-stat">
+                    <span class="campaign-stat-value gold" id="bannerLevel">--</span>
+                    <span class="campaign-stat-label">Total Level</span>
+                </div>
+                <div class="campaign-stat">
+                    <span class="campaign-stat-value purple" id="bannerStep">--</span>
+                    <span class="campaign-stat-label">Step</span>
+                </div>
+                <div class="campaign-stat">
+                    <span class="campaign-stat-value green" id="bannerAccuracy">--%</span>
+                    <span class="campaign-stat-label">Accuracy</span>
+                </div>
+                <div class="campaign-stat">
+                    <span class="campaign-stat-value cyan" id="bannerClarity">--</span>
+                    <span class="campaign-stat-label">Clarity</span>
+                </div>
+            </div>
+        </div>
+        <div class="campaign-training-status" id="trainingStatusBanner">
+            <div class="training-badge idle" id="trainingBadge">
+                <span class="training-badge-icon">&#128164;</span>
+                <span id="trainingBadgeText">Idle</span>
+            </div>
+            <div class="current-skill-badge" id="currentSkillBadgeBanner">
+                <span class="skill-icon" id="skillBadgeIcon">&#129513;</span>
+                <span class="skill-name" id="skillBadgeName">--</span>
+                <span class="skill-level" id="skillBadgeLevel">L--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MUD CONSOLE (toggle with ` backtick) -->
     <div class="realm-console collapsed" id="realmConsole">
         <div class="console-header">
-            <span class="console-title">⌨️ Realm Console</span>
-            <span class="console-hint">Press <kbd>`</kbd> to toggle • <kbd>↑↓</kbd> history</span>
-            <button class="console-close" onclick="RealmConsole.toggle()">×</button>
+            <span class="console-title">&#9000; Realm Console</span>
+            <span class="console-hint">Press <kbd>`</kbd> to toggle &bull; <kbd>&#8593;&#8595;</kbd> history</span>
+            <button class="console-close" onclick="RealmConsole.toggle()">&times;</button>
         </div>
         <div class="console-output" id="consoleOutput">
             <div class="console-line console-system">You stand at the entrance to the Realm. Type <span class="cmd">help</span> to begin...</div>
@@ -94,47 +681,47 @@
                 <div class="hero-portrait" id="heroPortrait">
                     <!-- MUD-style ASCII frame -->
                     <div class="mud-frame">
-                        <div class="mud-frame-row">╔══════════════╗</div>
+                        <div class="mud-frame-row">&#9556;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9559;</div>
                         <div class="mud-frame-row mud-frame-middle">
-                            <span class="mud-frame-side">║</span>
+                            <span class="mud-frame-side">&#9553;</span>
                             <div class="hero-ascii">
-                                <div class="dio-icon" id="heroSprite">🧔🏽</div>
+                                <div class="dio-icon" id="heroSprite">&#129492;&#127997;</div>
                             </div>
-                            <span class="mud-frame-side">║</span>
+                            <span class="mud-frame-side">&#9553;</span>
                         </div>
-                        <div class="mud-frame-row">╚══════════════╝</div>
+                        <div class="mud-frame-row">&#9562;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9565;</div>
                     </div>
-                    <!-- ✨ Sparkle overlay -->
-                    <span class="hero-sparkle">✨</span>
+                    <!-- Sparkle overlay -->
+                    <span class="hero-sparkle">&#10024;</span>
                 </div>
                 <div class="hero-glow"></div>
 
-                <!-- 🗺️ Mini-Map -->
+                <!-- Mini-Map -->
                 <div class="realm-minimap" id="realmMinimap" title="The Realm">
                     <!-- Populated by JS -->
                 </div>
             </div>
 
-            <!-- 💚💙💛 HP/MP/Stamina Resource Bars (WoW Style + MUD Text) -->
+            <!-- HP/MP/Stamina Resource Bars (WoW Style + MUD Text) -->
             <div class="hero-resources">
                 <div class="resource-bar-wow hp" title="VRAM - Hero's health">
                     <span class="bar-label">VRAM</span>
                     <div class="bar-fill" id="hpBarFill" style="width: 50%"></div>
                     <span class="bar-text" id="hpBarText">12 / 24 GB</span>
                 </div>
-                <div class="mud-bar hp" id="mudBarHp">[<span class="mud-bar-fill">████████</span><span class="mud-bar-empty">░░░░</span>]</div>
+                <div class="mud-bar hp" id="mudBarHp">[<span class="mud-bar-fill">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span><span class="mud-bar-empty">&#9617;&#9617;&#9617;&#9617;</span>]</div>
                 <div class="resource-bar-wow mp" title="RAM - Hero's mana">
                     <span class="bar-label">RAM</span>
                     <div class="bar-fill" id="mpBarFill" style="width: 50%"></div>
                     <span class="bar-text" id="mpBarText">32 / 64 GB</span>
                 </div>
-                <div class="mud-bar mp" id="mudBarMp">[<span class="mud-bar-fill">████████</span><span class="mud-bar-empty">░░░░</span>]</div>
+                <div class="mud-bar mp" id="mudBarMp">[<span class="mud-bar-fill">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span><span class="mud-bar-empty">&#9617;&#9617;&#9617;&#9617;</span>]</div>
                 <div class="resource-bar-wow stamina" title="GPU Utilization - Hero's stamina">
                     <span class="bar-label">STAM</span>
                     <div class="bar-fill" id="staminaBarFill" style="width: 0%"></div>
                     <span class="bar-text" id="staminaBarText">0%</span>
                 </div>
-                <div class="mud-bar stamina" id="mudBarStamina">[<span class="mud-bar-fill"></span><span class="mud-bar-empty">░░░░░░░░░░░░</span>]</div>
+                <div class="mud-bar stamina" id="mudBarStamina">[<span class="mud-bar-fill"></span><span class="mud-bar-empty">&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;</span>]</div>
             </div>
 
             <div class="hero-info">
@@ -155,21 +742,21 @@
             <div class="hero-stats">
                 <div class="stat-row">
                     <div class="stat" title="Curriculum evaluation accuracy. Higher = better skill mastery.">
-                        <span class="stat-icon">🎯</span>
+                        <span class="stat-icon">&#127919;</span>
                         <span class="stat-label">ACCURACY</span>
                         <span class="stat-value" id="statAcc">0%</span>
                     </div>
                 </div>
                 <div class="stat-row">
                     <div class="stat" title="Clarity = 1/Perplexity. Higher = less confused, sharper understanding.">
-                        <span class="stat-icon">💎</span>
+                        <span class="stat-icon">&#128142;</span>
                         <span class="stat-label">CLARITY</span>
                         <span class="stat-value" id="statClarity">--</span>
                     </div>
                 </div>
                 <div class="stat-row">
                     <div class="stat" title="Strain = Training Loss. Lower = easier learning, less struggle.">
-                        <span class="stat-icon">💪</span>
+                        <span class="stat-icon">&#128170;</span>
                         <span class="stat-label">STRAIN</span>
                         <span class="stat-value" id="statStrain">--</span>
                         <span class="strain-zone" id="strainZone" title="Training Zone"></span>
@@ -180,7 +767,7 @@
 
         <!-- CENTER: BATTLE/QUEST AREA -->
         <section class="battle-panel">
-            <!-- 📜 MUD ROOM DESCRIPTION -->
+            <!-- MUD ROOM DESCRIPTION -->
             <div class="room-description" id="roomDescription">
                 You stand in the Training Grounds. The air crackles with gradients.
                 Distant echoes of loss curves rumble like thunder across the Realm.
@@ -198,13 +785,13 @@
 
             <!-- POLICY 3: STALENESS WARNING BANNER -->
             <div id="dataFreshnessWarning" class="warning-banner" style="display:none;">
-                ⚠️ <span id="freshnessMessage"></span>
+                &#9888; <span id="freshnessMessage"></span>
             </div>
 
             <!-- BATTLE STATUS -->
             <div class="battle-status" id="battleStatus">
                 <div class="battle-header">
-                    <span class="battle-icon" id="battleIcon">💤</span>
+                    <span class="battle-icon" id="battleIcon">&#128164;</span>
                     <h3 class="battle-title" id="battleTitle">Awaiting Orders</h3>
                 </div>
 
@@ -255,13 +842,13 @@
                 <!-- TRAINING CONTROLS -->
                 <div class="training-controls" id="trainingControls">
                     <button class="control-btn pause" id="btnPause" onclick="controlTraining('pause')" title="Pause training after current step">
-                        <span class="btn-icon">⏸</span> Pause
+                        <span class="btn-icon">&#9208;</span> Pause
                     </button>
                     <button class="control-btn resume" id="btnResume" onclick="controlTraining('resume')" title="Resume training" style="display: none;">
-                        <span class="btn-icon">▶</span> Resume
+                        <span class="btn-icon">&#9654;</span> Resume
                     </button>
                     <button class="control-btn stop" id="btnStop" onclick="controlTraining('stop')" title="Stop training completely">
-                        <span class="btn-icon">⏹</span> Stop
+                        <span class="btn-icon">&#9209;</span> Stop
                     </button>
                 </div>
 
@@ -269,7 +856,7 @@
                 <div class="momentum-card" id="momentumCard" style="display: none;">
                     <div class="momentum-header">
                         <span class="momentum-badge" id="momentumBadge">
-                            <span class="momentum-icon">⚡</span>
+                            <span class="momentum-icon">&#9889;</span>
                             <span class="momentum-status" id="momentumStatus">GO</span>
                         </span>
                         <span class="momentum-title">Forward Momentum</span>
@@ -285,7 +872,7 @@
 
             <!-- RECENT ACTIVITY -->
             <div class="activity-log">
-                <h4>Battle Log</h4>
+                <h4>&#9876; Battle Log</h4>
                 <div class="log-entries" id="logEntries">
                     <!-- Populated by JavaScript -->
                 </div>
@@ -295,7 +882,7 @@
         <!-- RIGHT: SKILLS & GUILD -->
         <section class="guild-panel">
             <div class="panel-header">
-                <h3>🏰 Guild Skills</h3>
+                <h3>&#127984; Guild Skills</h3>
             </div>
 
             <!-- SKILLS (Loaded dynamically from YAML configs) -->
@@ -303,7 +890,7 @@
                 <!-- Skills will be rendered here by JavaScript -->
                 <div class="skill-card loading">
                     <div class="skill-header">
-                        <span class="skill-icon">⏳</span>
+                        <span class="skill-icon">&#8987;</span>
                         <span class="skill-name">Loading...</span>
                     </div>
                 </div>
@@ -312,7 +899,7 @@
             <!-- EFFICIENCY DASHBOARD -->
             <div class="efficiency-card" id="efficiencyCard">
                 <div class="panel-header">
-                    <h3>📊 Learning Efficiency</h3>
+                    <h3>&#128200; Learning Efficiency</h3>
                 </div>
                 <div class="efficiency-bars" id="efficiencyBars">
                     <!-- Filled by JavaScript -->
@@ -323,7 +910,7 @@
             <!-- LEVEL TRANSITIONS (MILESTONES) -->
             <div class="transitions-card" id="transitionsCard">
                 <div class="panel-header">
-                    <h3>🏆 Recent Milestones</h3>
+                    <h3>&#127942; Recent Milestones</h3>
                 </div>
                 <div class="transitions-list" id="transitionsList">
                     <!-- Filled by JavaScript -->
@@ -334,7 +921,7 @@
             <!-- VAULT SUMMARY -->
             <div class="vault-card">
                 <div class="panel-header">
-                    <h3>🗝️ Vault</h3>
+                    <h3>&#128477; Vault</h3>
                 </div>
                 <div class="vault-stats">
                     <div class="vault-stat">
@@ -355,9 +942,9 @@
             <!-- FORGE STATUS -->
             <div class="forge-card">
                 <div class="panel-header forge-header">
-                    <span class="forge-torch forge-torch-left">🔥</span>
-                    <h3>⚒️ The Forge (4090)</h3>
-                    <span class="forge-torch forge-torch-right">🔥</span>
+                    <span class="forge-torch forge-torch-left">&#128293;</span>
+                    <h3>&#9874; The Forge (4090)</h3>
+                    <span class="forge-torch forge-torch-right">&#128293;</span>
                 </div>
                 <div class="forge-stats">
                     <div class="forge-meter">
@@ -372,7 +959,7 @@
                         <div class="meter-bar-container temp">
                             <div class="meter-bar" id="forgeTempBar"></div>
                         </div>
-                        <span class="meter-value" id="forgeTemp">--°C</span>
+                        <span class="meter-value" id="forgeTemp">--&#176;C</span>
                     </div>
                 </div>
             </div>
@@ -397,6 +984,100 @@
     <!-- Unified Realm State (single source of truth) -->
     <script src="/static/js/realm-state.js?v=1"></script>
     <!-- Main game logic -->
-    <script src="/static/js/game.js?v=43"></script>
+    <script src="/static/js/game.js?v=44"></script>
+
+    <!-- Campaign Banner Updates -->
+    <script>
+        // Update campaign banner from GameState
+        function updateCampaignBanner() {
+            if (typeof GameState === 'undefined') return;
+
+            // Hero name and title
+            const heroName = document.getElementById('heroBannerName');
+            const heroTitle = document.getElementById('heroBannerTitle');
+
+            if (GameState.heroName && heroName) {
+                heroName.textContent = GameState.heroName;
+            }
+            if (GameState.heroTitle && heroTitle) {
+                heroTitle.textContent = GameState.heroTitle;
+            }
+
+            // Stats
+            const levelEl = document.getElementById('bannerLevel');
+            const stepEl = document.getElementById('bannerStep');
+            const accEl = document.getElementById('bannerAccuracy');
+            const clarityEl = document.getElementById('bannerClarity');
+
+            if (levelEl) {
+                levelEl.textContent = GameState.totalLevel || 0;
+            }
+            if (stepEl) {
+                stepEl.textContent = (GameState.step || 0).toLocaleString();
+            }
+            if (accEl) {
+                const acc = GameState.accuracy;
+                accEl.textContent = (typeof acc === 'number') ?
+                    (acc * 100).toFixed(0) + '%' : (acc || '--');
+            }
+            if (clarityEl) {
+                const clarity = GameState.clarity || (GameState.perplexity ? (1/GameState.perplexity) : null);
+                clarityEl.textContent = clarity ? clarity.toFixed(2) : '--';
+            }
+
+            // Training status
+            const trainingBadge = document.getElementById('trainingBadge');
+            const trainingBadgeText = document.getElementById('trainingBadgeText');
+            const heroPortrait = document.getElementById('heroPortraitBanner');
+
+            const isTraining = GameState.isTraining;
+            const isPaused = GameState.isPaused;
+
+            if (trainingBadge) {
+                trainingBadge.className = 'training-badge ' +
+                    (isTraining ? 'active' : (isPaused ? 'paused' : 'idle'));
+
+                const icon = trainingBadge.querySelector('.training-badge-icon');
+                if (icon) {
+                    icon.innerHTML = isTraining ? '&#9876;' :
+                        (isPaused ? '&#9208;' : '&#128164;');
+                }
+                if (trainingBadgeText) {
+                    trainingBadgeText.textContent = isTraining ? 'Training' :
+                        (isPaused ? 'Paused' : 'Idle');
+                }
+
+                if (heroPortrait) {
+                    heroPortrait.classList.toggle('training', isTraining);
+                }
+            }
+
+            // Current skill badge
+            const skillIcon = document.getElementById('skillBadgeIcon');
+            const skillNameEl = document.getElementById('skillBadgeName');
+            const skillLevelEl = document.getElementById('skillBadgeLevel');
+
+            const currentSkill = GameState.currentSkill || 'sy';
+            const currentLevel = GameState.currentSkillLevel || 1;
+
+            if (skillIcon) {
+                skillIcon.innerHTML = currentSkill === 'sy' ? '&#129513;' : '&#128290;';
+            }
+            if (skillNameEl) {
+                skillNameEl.textContent = currentSkill.toUpperCase();
+            }
+            if (skillLevelEl) {
+                skillLevelEl.textContent = 'L' + currentLevel;
+            }
+        }
+
+        // Hook into the update cycle - run after game.js initializes
+        document.addEventListener('DOMContentLoaded', function() {
+            // Update every second along with the game
+            setInterval(updateCampaignBanner, 1000);
+            // Initial update after a brief delay
+            setTimeout(updateCampaignBanner, 500);
+        });
+    </script>
 </body>
 </html>

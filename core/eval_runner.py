@@ -864,13 +864,22 @@ class EvalRunner:
             if self.api_key:
                 headers["X-API-Key"] = self.api_key
 
+            # For Qwen3: add /no_think suffix to disable thinking mode
+            # This is interpreted by the chat template to skip <think> blocks
+            eval_prompt = prompt
+            if not prompt.rstrip().endswith("/no_think"):
+                eval_prompt = prompt.rstrip() + " /no_think"
+
             response = requests.post(
                 f"{self.inference_url}/v1/chat/completions",
                 json={
                     "model": self._current_model_id,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 512,
+                    "messages": [{"role": "user", "content": eval_prompt}],
+                    "max_tokens": 1024,  # Increased from 512 for longer outputs
                     "temperature": 0,  # Deterministic for evaluation
+                    "extra_body": {
+                        "chat_template_kwargs": {"enable_thinking": False}
+                    },
                 },
                 headers=headers,
                 timeout=60,

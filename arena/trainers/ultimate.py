@@ -117,6 +117,8 @@ class UltimateTrainerWrapper(BaseTrainer):
                     "hyperparams.fp_precision": training_defaults.get("precision", "bf16"),
                     "hyperparams.use_gradient_checkpointing": training_defaults.get("gradient_checkpointing", True),
                     "hyperparams.save_total_limit": training_defaults.get("save_total_limit", 5),
+                    # Disable HuggingFace's built-in eval - we use our own eval system
+                    "hyperparams.eval_strategy": "no",
                 }
             )
 

@@ -84,11 +84,16 @@ def main():
 
     print(f"Starting hero_loop for: {campaign_path}")
 
-    # Build command
+    # Build command - hero_loop expects path WITHOUT "campaigns/" prefix
+    # because it adds "campaigns/" itself
+    short_path = campaign_path
+    if campaign_path.startswith("campaigns/"):
+        short_path = campaign_path[len("campaigns/"):]
+
     cmd = [
         sys.executable,
         "-m", "arena.hero_loop",
-        campaign_path
+        short_path
     ]
 
     # Start the hero_loop as subprocess

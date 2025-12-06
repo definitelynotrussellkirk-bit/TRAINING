@@ -1013,7 +1013,10 @@
                 levelEl.textContent = GameState.totalLevel || 0;
             }
             if (stepEl) {
-                stepEl.textContent = (GameState.step || 0).toLocaleString();
+                // Use campaign-scoped step, only include live step when training
+                const liveStep = GameState.isTraining ? (GameState.step || 0) : 0;
+                const stepCount = Math.max(GameState.campaignMaxStep || 0, liveStep);
+                stepEl.textContent = stepCount.toLocaleString();
             }
             if (accEl) {
                 const acc = GameState.accuracy;

@@ -1131,7 +1131,23 @@ class TavernHandler(SimpleHTTPRequestHandler):
             data = get_realm_state()
 
             if data and "state" in data:
-                # Return service data directly
+                # Enrich with campaign-scoped info
+                try:
+                    from core.checkpoint_ledger import get_ledger
+                    from guild.campaigns.loader import load_active_campaign
+                    campaign = load_active_campaign()
+                    if campaign:
+                        ledger = get_ledger()
+                        max_step = ledger.get_campaign_max_step(campaign.hero_id, campaign.id)
+                        # Add campaign info to state
+                        data["campaign"] = {
+                            "hero_id": campaign.hero_id,
+                            "campaign_id": campaign.id,
+                            "campaign_max_step": max_step,
+                        }
+                except Exception:
+                    pass  # Campaign info is best-effort
+                # Return service data
                 self._send_json(data)
             else:
                 # Fall back to legacy sources if service unavailable
@@ -1738,19 +1754,50 @@ class TavernHandler(SimpleHTTPRequestHandler):
             except Exception as e:
                 logger.warning(f"Failed to get vault data: {e}")
 
-            # 5. Best checkpoint (from ledger)
+            # 5. Best checkpoint (from ledger) - campaign-scoped
             try:
                 from core.checkpoint_ledger import get_ledger
+                from guild.campaigns.loader import load_active_campaign
                 ledger = get_ledger()
-                best = ledger.get_best(metric="train_loss")
+
+                # Get active campaign for scoped queries
+                campaign = load_active_campaign()
+                hero_id = campaign.hero_id if campaign else None
+                campaign_id = campaign.id if campaign else None
+
+                if hero_id and campaign_id:
+                    # Campaign-scoped best checkpoint
+                    best = ledger.get_campaign_best(hero_id, campaign_id, metric="train_loss")
+                    max_step = ledger.get_campaign_max_step(hero_id, campaign_id)
+                else:
+                    # Fallback to global (no active campaign)
+                    best = ledger.get_best(metric="train_loss")
+                    max_step = best.step if best else 0
+
                 if best:
                     response["comparison"] = {
                         "best_checkpoint": f"checkpoint-{best.step}",
                         "best_step": best.step,
                         "best_loss": best.train_loss,
+                        "campaign_max_step": max_step,  # For header display
+                    }
+                else:
+                    # No checkpoints for this campaign - show 0
+                    response["comparison"] = {
+                        "best_checkpoint": None,
+                        "best_step": 0,
+                        "best_loss": None,
+                        "campaign_max_step": 0,
                     }
             except Exception as e:
                 logger.warning(f"Failed to get best checkpoint: {e}")
+                # Ensure comparison is always set (even on error)
+                response["comparison"] = {
+                    "best_checkpoint": None,
+                    "best_step": 0,
+                    "best_loss": None,
+                    "campaign_max_step": 0,
+                }
 
             self._send_json(response)
 

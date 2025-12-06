@@ -62,9 +62,9 @@ class Hyperparams:
     save_steps: int = 1000
     save_total_limit: int = 3        # Keep last N checkpoints
 
-    # Evaluation
-    eval_steps: int = 50
-    eval_strategy: Literal["steps", "epoch", "no"] = "steps"
+    # Evaluation (disabled by default - we use our own eval system)
+    eval_steps: int = 500
+    eval_strategy: Literal["steps", "epoch", "no"] = "no"
 
     # Memory optimization
     use_gradient_checkpointing: bool = True  # Essential for 24GB GPU

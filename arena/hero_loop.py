@@ -74,6 +74,9 @@ class HeroLoop:
         self.data_dir.mkdir(exist_ok=True)
         self.completed_dir = campaign_path / "data" / "completed"
         self.completed_dir.mkdir(exist_ok=True)
+
+        # Global inbox for dropping files (checked in addition to data_dir)
+        self.inbox_dir = campaign_path.parent.parent.parent / "inbox"
         
         # Create trainer
         self.trainer = create_trainer(self.hero_config, campaign_path)
@@ -94,7 +97,26 @@ class HeroLoop:
         self.logger.info(f"  Trainer: {self.trainer.name}")
     
     def _get_pending_files(self) -> List[Path]:
-        """Get training files waiting in the queue."""
+        """Get training files waiting in the queue.
+
+        Checks both the campaign's data directory and the global inbox.
+        Files from inbox are moved to data_dir with training_ prefix.
+        """
+        # First, check inbox for any .jsonl files and move them to data_dir
+        if self.inbox_dir.exists():
+            import shutil
+            for inbox_file in self.inbox_dir.glob("*.jsonl"):
+                # Skip stats files
+                if inbox_file.name.endswith("_stats.json"):
+                    continue
+                # Add training_ prefix if not present
+                new_name = inbox_file.name
+                if not new_name.startswith("training_"):
+                    new_name = f"training_{new_name}"
+                dest = self.data_dir / new_name
+                self.logger.info(f"[Inbox] Moving {inbox_file.name} → {dest.name}")
+                shutil.move(str(inbox_file), str(dest))
+
         files = list(self.data_dir.glob("training_*.jsonl"))
         # Sort by modification time (oldest first)
         return sorted(files, key=lambda p: p.stat().st_mtime)
@@ -108,11 +130,17 @@ class HeroLoop:
         """
         idle_config = self.hero_config.get("idle_behavior", {})
         if not idle_config.get("enabled", True):
-            self.logger.info("Idle generation disabled")
+            self.logger.info("Idle behavior disabled")
             return None
-        
+
         skill_priorities = idle_config.get("skill_priorities", {})
         gen_config = idle_config.get("generation", {})
+
+        # Check if generation is explicitly disabled
+        if not gen_config.get("enabled", True):
+            self.logger.debug("Auto-generation disabled in hero config")
+            return None
+
         batch_size = gen_config.get("batch_size", 1000)
         levels = gen_config.get("levels", [1, 2, 3])
         

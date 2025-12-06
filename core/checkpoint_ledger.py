@@ -816,6 +816,93 @@ class CheckpointLedger:
             records = records[:limit]
         return records
 
+    def list_by_campaign(
+        self,
+        hero_id: str,
+        campaign_id: str,
+        limit: Optional[int] = None,
+    ) -> List[CheckpointRecord]:
+        """
+        List checkpoints for a specific campaign, newest first.
+
+        Args:
+            hero_id: Hero ID to filter by
+            campaign_id: Campaign ID to filter by
+            limit: Maximum number of records to return
+
+        Returns:
+            List of checkpoint records for that campaign
+        """
+        self._ensure_fresh()
+        records = []
+        campaign_path_fragment = f"campaigns/{hero_id}/{campaign_id}"
+
+        for record in self._index.values():
+            # Direct match on campaign_id
+            if record.campaign_id == campaign_id and record.hero_id == hero_id:
+                records.append(record)
+                continue
+
+            # Legacy records: check if path contains campaign fragment
+            if record.campaign_id is None and campaign_path_fragment in (record.path or ""):
+                records.append(record)
+
+        records.sort(key=lambda r: r.step, reverse=True)
+        if limit:
+            records = records[:limit]
+        return records
+
+    def get_campaign_max_step(self, hero_id: str, campaign_id: str) -> int:
+        """
+        Get the maximum step for a campaign.
+
+        Args:
+            hero_id: Hero ID
+            campaign_id: Campaign ID
+
+        Returns:
+            Maximum step number, or 0 if no checkpoints
+        """
+        records = self.list_by_campaign(hero_id, campaign_id, limit=1)
+        if records:
+            return records[0].step
+        return 0
+
+    def get_campaign_best(
+        self,
+        hero_id: str,
+        campaign_id: str,
+        metric: str = "train_loss",
+        lower_is_better: bool = True,
+    ) -> Optional[CheckpointRecord]:
+        """
+        Get the best checkpoint for a specific campaign.
+
+        Args:
+            hero_id: Hero ID
+            campaign_id: Campaign ID
+            metric: Metric name (train_loss, val_loss, accuracy)
+            lower_is_better: Whether lower values are better
+
+        Returns:
+            Best checkpoint record or None
+        """
+        records = self.list_by_campaign(hero_id, campaign_id)
+        if not records:
+            return None
+
+        candidates = []
+        for record in records:
+            value = getattr(record, metric, None)
+            if value is not None:
+                candidates.append((value, record))
+
+        if not candidates:
+            return None
+
+        candidates.sort(key=lambda x: x[0], reverse=not lower_is_better)
+        return candidates[0][1]
+
     def list_all(self, limit: Optional[int] = None) -> List[CheckpointRecord]:
         """List all checkpoint records, newest first."""
         self._ensure_fresh()

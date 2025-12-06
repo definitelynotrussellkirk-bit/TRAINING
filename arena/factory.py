@@ -66,17 +66,17 @@ def load_hero_config(hero_id: str) -> Dict[str, Any]:
 
 def load_campaign_config(campaign_path: Path) -> Dict[str, Any]:
     """
-    Load campaign configuration from campaign_path/config.json
-    
+    Load campaign configuration from campaign_path/campaign.json
+
     Args:
         campaign_path: Path to campaign directory
-        
+
     Returns:
         Campaign configuration dictionary
     """
     import json
-    
-    config_file = campaign_path / "config.json"
+
+    config_file = campaign_path / "campaign.json"
     if not config_file.exists():
         raise FileNotFoundError(f"Campaign config not found: {config_file}")
     

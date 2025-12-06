@@ -31,6 +31,11 @@ const RealmState = {
     // STATE SECTIONS (mirrors backend realm_store.py)
     // =================================================================
 
+    // Campaign tracking (for reset on campaign change)
+    campaignId: null,
+    heroId: null,
+    campaignMaxStep: 0,  // Max step from ledger for current campaign
+
     training: {
         status: 'idle',      // idle, training, paused, stopped
         step: 0,
@@ -419,6 +424,21 @@ const RealmState = {
             }
         }
 
+        // Campaign state (campaign-scoped step count)
+        const campaign = data.campaign;
+        if (campaign) {
+            // Detect campaign change and reset cached values
+            if (campaign.campaign_id !== this.campaignId || campaign.hero_id !== this.heroId) {
+                console.log(`[RealmState] Campaign changed: ${this.heroId}/${this.campaignId} -> ${campaign.hero_id}/${campaign.campaign_id}`);
+                // Reset campaign-specific cached values
+                this.campaignMaxStep = 0;
+            }
+            // Update campaign tracking
+            this.heroId = campaign.hero_id;
+            this.campaignId = campaign.campaign_id;
+            this.campaignMaxStep = campaign.campaign_max_step || 0;
+        }
+
         // Mode state
         const modeInfo = state.mode_info || {};
         const newMode = modeInfo.mode || state.mode || 'idle';
@@ -801,10 +821,15 @@ function updateHeaderUI() {
     }
 
     // Update total steps/evals in header
+    // campaignMaxStep = authoritative historical max from ledger (campaign-scoped)
+    // training.step = live step during active training
+    // Only use training.step when actively training to avoid stale data
     const totalSteps = document.getElementById('totalSteps');
     const totalEvals = document.getElementById('totalEvals');
     if (totalSteps) {
-        totalSteps.textContent = RealmState.training.step.toLocaleString();
+        const liveStep = RealmState.isTraining ? (RealmState.training.step || 0) : 0;
+        const stepCount = Math.max(RealmState.campaignMaxStep || 0, liveStep);
+        totalSteps.textContent = stepCount.toLocaleString();
     }
     if (totalEvals) {
         totalEvals.textContent = RealmState.hero.level || 0;

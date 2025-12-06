@@ -322,12 +322,17 @@ const GameState = {
     currentSkillTraining: 1,   // Level being trained (mastered + 1)
     currentSkillAcc: 0,
 
+    // Campaign tracking (for reset on campaign change)
+    campaignId: null,
+    heroId: null,
+
     // Training
     isTraining: false,
     isPaused: false,
     currentQuest: null,
     questProgress: 0,
     totalSteps: 0,
+    campaignMaxStep: 0, // Max step from ledger for this campaign
     loss: 0,            // Strain
     valLoss: 0,         // Val Strain
     perplexity: 0,      // For Clarity calculation
@@ -840,7 +845,12 @@ function setWidth(selector, percent) {
 // ============================================
 
 function updateHeader() {
-    setText('#totalSteps', formatNumber(GameState.currentStep));
+    // campaignMaxStep = authoritative historical max from ledger (campaign-scoped)
+    // currentStep = live step during active training
+    // Only use currentStep when actively training to avoid stale data
+    const liveStep = GameState.isTraining ? GameState.currentStep : 0;
+    const stepCount = Math.max(GameState.campaignMaxStep, liveStep);
+    setText('#totalSteps', formatNumber(stepCount));
     setText('#totalEvals', formatNumber(GameState.totalEvals));
 }
 
@@ -1773,9 +1783,13 @@ function processGameData(data) {
         }
     }
 
-    // Model comparison
+    // Model comparison (campaign-scoped)
     const comparison = data.comparison;
     if (comparison) {
+        // Use campaign_max_step for header display (campaign-scoped)
+        if (comparison.campaign_max_step !== undefined) {
+            GameState.campaignMaxStep = comparison.campaign_max_step;
+        }
         if (comparison.best_checkpoint) {
             // Extract step number from checkpoint name
             const match = comparison.best_checkpoint.match(/checkpoint-(\d+)/);
@@ -3638,7 +3652,8 @@ const RPGFlair = {
         heroEl.textContent = this.heroBase;
 
         // Occasional sparkle (every ~5 seconds when training)
-        setInterval(() => {
+        // Store interval ID for cleanup on page unload
+        this._heroWalkInterval = setInterval(() => {
             if (GameState.isTraining) {
                 heroEl.parentElement?.parentElement?.classList.add('hero-walking');
             } else {
@@ -3651,7 +3666,8 @@ const RPGFlair = {
      * Start the mini-map hero wandering
      */
     startMinimapWander() {
-        setInterval(() => {
+        // Store interval ID for cleanup on page unload
+        this._minimapWanderInterval = setInterval(() => {
             const heroEl = document.getElementById('minimapHero');
             if (!heroEl) return;
 
@@ -3986,3 +4002,21 @@ if (document.readyState === 'loading') {
     RealmConsole.init();
     RPGFlair.init();
 }
+
+// Clean up all resources on page unload to prevent memory leaks
+window.addEventListener('beforeunload', () => {
+    // Stop all pollers
+    if (typeof pollers !== 'undefined') {
+        pollers.stopAll();
+    }
+
+    // Clear RPGFlair intervals
+    if (RPGFlair._heroWalkInterval) {
+        clearInterval(RPGFlair._heroWalkInterval);
+    }
+    if (RPGFlair._minimapWanderInterval) {
+        clearInterval(RPGFlair._minimapWanderInterval);
+    }
+
+    console.log('[Game] Cleanup complete');
+});

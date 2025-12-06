@@ -39,8 +39,8 @@ memory_profile: "24gb_qlora"
 training_defaults:
   precision: "bf16"
   load_in_4bit: true  # Required for QLoRA
-  batch_size: 1  # Conservative for 24GB VRAM
-  gradient_accumulation: 8  # Compensate for small batch
+  batch_size: 2  # Increased from 1 - VRAM at 58% has headroom
+  gradient_accumulation: 4  # Reduced from 8 - same effective batch (2*4=8)
   learning_rate: 0.00005
   warmup_steps: 200
   max_length: 1024  # Conservative for 24GB VRAM
@@ -111,8 +111,9 @@ idle_behavior:
     bin: 0.5
     sy: 0.5
   generation:
+    enabled: false  # Disabled - no auto data generation
     batch_size: 1000
-    levels: [8, 9, 10]
+    levels: [1, 2, 3]
     min_queue_depth: 1
 
 # =============================================================================

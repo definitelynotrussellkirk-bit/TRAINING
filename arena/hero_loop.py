@@ -100,26 +100,49 @@ class HeroLoop:
         """Get training files waiting in the queue.
 
         Checks both the campaign's data directory and the global inbox.
-        Files from inbox are moved to data_dir with training_ prefix.
+        Files from inbox are moved to data_dir with priority prefix.
+
+        Priority folders (processed in order):
+          inbox/high/*.jsonl   → training_0high_*.jsonl  (first)
+          inbox/normal/*.jsonl → training_1normal_*.jsonl
+          inbox/*.jsonl        → training_1normal_*.jsonl
+          inbox/low/*.jsonl    → training_2low_*.jsonl   (last)
         """
-        # First, check inbox for any .jsonl files and move them to data_dir
+        import shutil
+
+        # Priority mapping: folder name -> (sort_prefix, display_name)
+        PRIORITY_MAP = {
+            "high": ("0high", "HIGH"),
+            "normal": ("1normal", "NORMAL"),
+            "low": ("2low", "LOW"),
+        }
+
+        # Process inbox with priority folders
         if self.inbox_dir.exists():
-            import shutil
+            # Check priority subdirs first
+            for priority_name, (prefix, display) in PRIORITY_MAP.items():
+                priority_dir = self.inbox_dir / priority_name
+                if priority_dir.exists():
+                    for inbox_file in priority_dir.glob("*.jsonl"):
+                        if inbox_file.name.endswith("_stats.json"):
+                            continue
+                        new_name = f"training_{prefix}_{inbox_file.name}"
+                        dest = self.data_dir / new_name
+                        self.logger.info(f"[Inbox/{display}] Moving {inbox_file.name} → {dest.name}")
+                        shutil.move(str(inbox_file), str(dest))
+
+            # Root inbox files get normal priority
             for inbox_file in self.inbox_dir.glob("*.jsonl"):
-                # Skip stats files
                 if inbox_file.name.endswith("_stats.json"):
                     continue
-                # Add training_ prefix if not present
-                new_name = inbox_file.name
-                if not new_name.startswith("training_"):
-                    new_name = f"training_{new_name}"
+                new_name = f"training_1normal_{inbox_file.name}"
                 dest = self.data_dir / new_name
                 self.logger.info(f"[Inbox] Moving {inbox_file.name} → {dest.name}")
                 shutil.move(str(inbox_file), str(dest))
 
         files = list(self.data_dir.glob("training_*.jsonl"))
-        # Sort by modification time (oldest first)
-        return sorted(files, key=lambda p: p.stat().st_mtime)
+        # Sort by filename (priority prefix) then by mtime within same priority
+        return sorted(files, key=lambda p: (p.name.split('_')[1] if '_' in p.name else '1normal', p.stat().st_mtime))
     
     def _generate_data(self) -> Optional[Path]:
         """

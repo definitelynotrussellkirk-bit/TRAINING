@@ -131,8 +131,7 @@ Six schools define HOW the Hero learns:
 
 ## GAME STATUS
 
-**Phases 1-5: Complete** - Full game UI, notifications, achievements, strain visualization
-**Phase 6: Planned** - Quest modules & primitives (not yet implemented)
+**Phases 1-6: Complete** - Full game UI, notifications, achievements, strain visualization, quest modules & primitives
 
 **See CHANGELOG.md for full history.**
 

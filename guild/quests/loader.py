@@ -105,6 +105,10 @@ def _dict_to_quest_template(data: dict, default_id: str = "") -> QuestTemplate:
 
     # Optional
     tags = data.get("tags", [])
+    primitives = data.get("primitives", [])
+    if isinstance(primitives, str):
+        primitives = [primitives]
+    module_id = data.get("module_id")
     enabled = data.get("enabled", True)
 
     return QuestTemplate(
@@ -121,6 +125,8 @@ def _dict_to_quest_template(data: dict, default_id: str = "") -> QuestTemplate:
         evaluator_params=evaluator_params,
         base_xp=base_xp,
         tags=tags,
+        primitives=primitives,
+        module_id=module_id,
         enabled=enabled,
     )
 

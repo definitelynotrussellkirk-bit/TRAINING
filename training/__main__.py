@@ -3,8 +3,10 @@
 TRAINING CLI - Main entry point for Realm of Training.
 
 Usage:
+    python -m training setup        # First-time setup wizard
     python -m training play         # Enter the realm - start everything
     python -m training doctor       # Check environment and services
+    python -m training validate     # Validate training data files
     python -m training start-all    # Start all services for dev
     python -m training stop-all     # Stop all services
     python -m training status       # Show current status
@@ -20,6 +22,34 @@ def main():
         description="Realm of Training - CLI for managing training infrastructure"
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # setup command - FIRST TIME setup wizard
+    p_setup = subparsers.add_parser(
+        "setup",
+        help="First-time setup wizard - configure model, create campaign"
+    )
+
+    # validate command - check data files
+    p_validate = subparsers.add_parser(
+        "validate",
+        help="Validate JSONL training data files before use"
+    )
+    p_validate.add_argument(
+        "files",
+        nargs="*",
+        default=[],
+        help="JSONL files to validate (supports globs)"
+    )
+    p_validate.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Show detailed error messages"
+    )
+    p_validate.add_argument(
+        "-q", "--quiet",
+        action="store_true",
+        help="Only output if there are errors"
+    )
 
     # play command - THE main entry point
     p_play = subparsers.add_parser(

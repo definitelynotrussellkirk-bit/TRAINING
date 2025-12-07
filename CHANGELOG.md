@@ -4,6 +4,38 @@ Track changes and updates to the system.
 
 ---
 
+## 2025-12-06 - Phase 6: Quest Modules & Primitives + UI Toggle
+
+### Quest Modules System
+
+Self-contained training packs (like DLC) that bundle quests targeting specific primitives:
+
+**New Files:**
+- `guild/quests/modules/types.py` - QuestModule and ModulePrerequisite dataclasses
+- `guild/quests/modules/loader.py` - YAML manifest loading with caching
+- `guild/quests/modules/registry.py` - Central registry with search methods
+- `tavern/api/modules.py` - API endpoints for module browsing
+- `tavern/templates/modules.html` - UI page for displaying modules
+- `configs/quests/modules/arithmetic_foundations/` - Example module with 4 quest templates
+
+**Modified Files:**
+- `guild/quests/types.py` - Added `primitives` and `module_id` fields to QuestTemplate
+- `guild/quests/loader.py` - Parse new primitives/module_id fields
+- `guild/quests/registry.py` - Added `by_primitive()` and `by_module()` methods
+- `guild/quests/forge.py` - Added `create_for_primitive()` and `create_for_module()`
+- `tavern/server.py` - Added /modules page and /api/modules endpoints
+
+### Resource Bars Toggle
+
+Click VRAM/RAM/STAM bars to toggle between graphic (WoW-style) and zMUD text mode:
+
+**Changes:**
+- `tavern/templates/game.html` - Wrapped bars in `.resource-bars-graphic` and `.resource-bars-mud` divs
+- `tavern/static/css/game.css` - Added `.mud-mode` toggle CSS
+- `tavern/static/js/game.js` - Added click handler with localStorage persistence
+
+---
+
 ## 2025-12-02 - RealmState SSE & Ledger Cleanup
 
 ### The Problem

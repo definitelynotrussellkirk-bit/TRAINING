@@ -62,6 +62,8 @@ class QuestTemplate:
     evaluator_params: dict = field(default_factory=dict)
     base_xp: dict[str, int] = field(default_factory=dict)  # skill_id -> base XP
     tags: list[str] = field(default_factory=list)
+    primitives: list[str] = field(default_factory=list)  # Primitive IDs this quest trains
+    module_id: Optional[str] = None  # Parent module if part of a module
     enabled: bool = True
 
 

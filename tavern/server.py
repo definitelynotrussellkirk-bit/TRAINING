@@ -66,6 +66,7 @@ from tavern.api import fleet as fleet_api
 from tavern.api import arcana as arcana_api
 from tavern.api import strain as strain_api
 from tavern.api import primitives as primitives_api
+from tavern.api import modules as modules_api
 
 # Import events system
 try:
@@ -539,6 +540,24 @@ class TavernHandler(SimpleHTTPRequestHandler):
             primitives_api.serve_primitives(self)
         elif path == "/api/primitives/stats":
             primitives_api.serve_primitive_stats(self)
+        elif path == "/modules":
+            self._serve_template("modules.html")
+        elif path == "/api/modules":
+            modules_api.serve_modules(self)
+        elif path.startswith("/api/modules/"):
+            # Extract module_id from path: /api/modules/<module_id>
+            module_id = path.split("/")[3] if len(path.split("/")) > 3 else None
+            if module_id:
+                modules_api.serve_module_detail(self, module_id)
+            else:
+                self._send_json({"error": "Module ID required"})
+        elif path.startswith("/api/quests/by-primitive/"):
+            # Extract primitive from path: /api/quests/by-primitive/<primitive>
+            primitive = path.split("/")[-1] if len(path.split("/")) > 4 else None
+            if primitive:
+                modules_api.serve_quests_by_primitive(self, primitive)
+            else:
+                self._send_json({"error": "Primitive ID required"})
         elif path == "/api/hero":
             heroes_api.serve_hero_info(self)
         elif path.startswith("/api/hero-config/"):

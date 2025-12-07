@@ -140,6 +140,22 @@ class QuestRegistry:
             if region in quest.regions
         ]
 
+    def by_primitive(self, primitive: str) -> list[QuestTemplate]:
+        """Get all quests that train a specific primitive."""
+        self._ensure_loaded()
+        return [
+            quest for quest in self._loader.load_all().values()
+            if primitive in quest.primitives
+        ]
+
+    def by_module(self, module_id: str) -> list[QuestTemplate]:
+        """Get all quests from a specific module."""
+        self._ensure_loaded()
+        return [
+            quest for quest in self._loader.load_all().values()
+            if quest.module_id == module_id
+        ]
+
     def enabled_only(self) -> list[QuestTemplate]:
         """Get only enabled quest templates."""
         self._ensure_loaded()

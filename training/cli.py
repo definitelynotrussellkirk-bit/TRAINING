@@ -37,6 +37,8 @@ def get_base_dir() -> Path:
 def run_command(command: str, args) -> int:
     """Dispatch to the appropriate command handler."""
     handlers = {
+        "setup": cmd_setup,
+        "validate": cmd_validate,
         "play": cmd_play,
         "doctor": cmd_doctor,
         "start-all": cmd_start_all,
@@ -50,6 +52,43 @@ def run_command(command: str, args) -> int:
         return handler(args)
     print(f"Unknown command: {command}")
     return 1
+
+
+# =============================================================================
+# SETUP COMMAND - First-time wizard
+# =============================================================================
+
+def cmd_setup(args) -> int:
+    """Run the first-time setup wizard."""
+    from training.setup_wizard import run_setup_wizard
+    return run_setup_wizard()
+
+
+# =============================================================================
+# VALIDATE COMMAND - Check training data
+# =============================================================================
+
+def cmd_validate(args) -> int:
+    """Validate JSONL training data files."""
+    from training.validate import run_validate
+
+    files = getattr(args, 'files', [])
+    if not files:
+        # Default to inbox
+        base_dir = get_base_dir()
+        inbox = base_dir / "inbox"
+        if inbox.exists():
+            files = [str(f) for f in inbox.glob("*.jsonl")]
+
+    if not files:
+        print("No files to validate.")
+        print("Usage: python -m training validate <file.jsonl> [file2.jsonl ...]")
+        return 1
+
+    verbose = getattr(args, 'verbose', False)
+    quiet = getattr(args, 'quiet', False)
+
+    return run_validate(files, verbose=verbose, quiet=quiet)
 
 
 # =============================================================================
@@ -364,7 +403,28 @@ def cmd_doctor(args) -> int:
     checks.append(DoctorCheck("Disk space", disk_status, disk_msg))
     print(checks[-1])
 
-    # 9. Hardcode check (optional)
+    # 9. Model configuration
+    print("\n[Model]")
+    model_status, model_msg = check_model_path(base_dir)
+    checks.append(DoctorCheck("Model path", model_status, model_msg))
+    print(checks[-1])
+
+    vram_status, vram_msg = check_vram_estimate(base_dir)
+    if vram_status != "skip":
+        checks.append(DoctorCheck("VRAM estimate", vram_status, vram_msg))
+        print(checks[-1])
+
+    # 10. Active campaign
+    print("\n[Campaign]")
+    campaign_status, campaign_msg = check_active_campaign(base_dir)
+    checks.append(DoctorCheck("Active campaign", campaign_status, campaign_msg))
+    print(checks[-1])
+
+    failed_status, failed_msg = check_failed_files(base_dir)
+    checks.append(DoctorCheck("Failed files", failed_status, failed_msg))
+    print(checks[-1])
+
+    # 11. Hardcode check (optional)
     if args.check_hardcodes:
         print("\n[Hardcode Audit]")
         hardcode_status, hardcode_msg = check_hardcodes(base_dir)
@@ -411,13 +471,141 @@ def check_gpu() -> Tuple[str, str]:
         if torch.cuda.is_available():
             name = torch.cuda.get_device_name(0)
             count = torch.cuda.device_count()
-            return "pass", f"{count} GPU(s): {name}"
+            vram_bytes = torch.cuda.get_device_properties(0).total_memory
+            vram_gb = vram_bytes / (1024**3)
+            return "pass", f"{count} GPU(s): {name} ({vram_gb:.0f}GB VRAM)"
         else:
             return "warn", "CUDA not available"
     except ImportError:
         return "warn", "PyTorch not installed"
     except Exception as e:
         return "warn", str(e)
+
+
+def check_vram_estimate(base_dir: Path) -> Tuple[str, str]:
+    """Check if VRAM is sufficient for configured training."""
+    try:
+        import torch
+
+        if not torch.cuda.is_available():
+            return "skip", "No GPU to check"
+
+        vram_bytes = torch.cuda.get_device_properties(0).total_memory
+        vram_gb = vram_bytes / (1024**3)
+
+        # Load config
+        config_path = base_dir / "config.json"
+        if not config_path.exists():
+            return "skip", "No config.json"
+
+        with open(config_path) as f:
+            config = json.load(f)
+
+        model_path = config.get("model_path", "")
+        batch_size = config.get("batch_size", 1)
+        max_length = config.get("max_length", 2048)
+        load_4bit = config.get("load_in_4bit", False)
+
+        # Rough VRAM estimates
+        if "8B" in model_path or "8b" in model_path:
+            base_vram = 18 if load_4bit else 40
+        elif "4B" in model_path or "4b" in model_path:
+            base_vram = 10 if load_4bit else 20
+        elif "1.7B" in model_path or "1.7b" in model_path:
+            base_vram = 6 if load_4bit else 12
+        elif "0.6B" in model_path or "0.6b" in model_path:
+            base_vram = 4 if load_4bit else 8
+        else:
+            return "skip", "Unknown model size"
+
+        # Add batch overhead
+        batch_overhead = batch_size * (max_length / 1024) * 1.5
+        estimated = base_vram + batch_overhead
+
+        if estimated > vram_gb:
+            return "warn", f"May OOM: ~{estimated:.0f}GB needed, {vram_gb:.0f}GB available"
+        else:
+            return "pass", f"~{estimated:.0f}GB needed, {vram_gb:.0f}GB available"
+
+    except Exception as e:
+        return "skip", f"Could not estimate: {e}"
+
+
+def check_model_path(base_dir: Path) -> Tuple[str, str]:
+    """Check if configured model path exists."""
+    config_path = base_dir / "config.json"
+    if not config_path.exists():
+        return "warn", "No config.json"
+
+    try:
+        with open(config_path) as f:
+            config = json.load(f)
+
+        model_path = config.get("model_path", "")
+        if not model_path:
+            return "warn", "No model_path configured"
+
+        full_path = base_dir / model_path
+        if not full_path.exists():
+            return "fail", f"Model not found: {model_path}"
+
+        # Check for key files
+        has_safetensors = any(full_path.glob("*.safetensors"))
+        has_bin = any(full_path.glob("*.bin"))
+        has_config = (full_path / "config.json").exists()
+
+        if has_config and (has_safetensors or has_bin):
+            return "pass", f"{model_path} (ready)"
+        else:
+            return "warn", f"{model_path} (incomplete)"
+
+    except Exception as e:
+        return "fail", str(e)
+
+
+def check_failed_files(base_dir: Path) -> Tuple[str, str]:
+    """Check for failed training files."""
+    failed_count = 0
+
+    # Check queue/failed
+    queue_failed = base_dir / "queue" / "failed"
+    if queue_failed.exists():
+        failed_count += len(list(queue_failed.glob("*.jsonl")))
+
+    # Check campaign data/failed directories
+    campaigns_dir = base_dir / "campaigns"
+    if campaigns_dir.exists():
+        for failed_dir in campaigns_dir.glob("*/*/data/failed"):
+            failed_count += len(list(failed_dir.glob("*.jsonl")))
+
+    if failed_count > 0:
+        return "warn", f"{failed_count} failed file(s) found"
+    return "pass", "No failed files"
+
+
+def check_active_campaign(base_dir: Path) -> Tuple[str, str]:
+    """Check if there's an active campaign configured."""
+    active_file = base_dir / "control" / "active_campaign.json"
+    if not active_file.exists():
+        return "warn", "No active campaign (run: python -m training setup)"
+
+    try:
+        with open(active_file) as f:
+            data = json.load(f)
+
+        campaign_path = data.get("campaign_path", "")
+        if not campaign_path:
+            return "warn", "Invalid active_campaign.json"
+
+        full_path = base_dir / campaign_path
+        if not full_path.exists():
+            return "fail", f"Campaign not found: {campaign_path}"
+
+        hero_id = data.get("hero_id", "unknown")
+        return "pass", f"{hero_id}/{full_path.name}"
+
+    except Exception as e:
+        return "fail", str(e)
 
 
 def check_disk(base_dir: Path) -> Tuple[str, str]:

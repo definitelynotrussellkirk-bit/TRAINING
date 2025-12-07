@@ -2,6 +2,72 @@
 
 Get up and running with the Realm of Training in 10 minutes.
 
+---
+
+## SIMPLE MODE: Drag & Drop Training
+
+**Just want to train on your own data? Skip the RPG features:**
+
+### 1. Data Format (JSONL)
+
+```jsonl
+{"messages": [{"role": "user", "content": "What is 2+2?"}, {"role": "assistant", "content": "4"}]}
+{"messages": [{"role": "user", "content": "Solve x^2=4"}, {"role": "assistant", "content": "x = 2 or x = -2"}]}
+```
+
+### 2. Drop Files & Train
+
+```bash
+# Drop your data file
+cp my_training_data.jsonl inbox/
+
+# Start training (uses active campaign)
+python3 -m arena.hero_loop ojas-qwen3-8b/campaign-004
+```
+
+That's it. Files are processed oldest-first, moved to `completed/` when done.
+
+### 3. Priority Folders (Optional)
+
+```
+inbox/
+  high/    ← Processed FIRST
+  normal/  ← Default priority (or just inbox/)
+  low/     ← Processed LAST
+```
+
+```bash
+# High priority - train on this immediately
+cp urgent_data.jsonl inbox/high/
+
+# Low priority - train when nothing else queued
+cp background_data.jsonl inbox/low/
+```
+
+### 4. Disable Auto-Generation
+
+Edit your hero config (`configs/heroes/<hero>.yaml`):
+
+```yaml
+idle_behavior:
+  enabled: true
+  generation:
+    enabled: false  # ← Disables auto data generation when idle
+```
+
+This makes the system wait for your data instead of generating its own.
+
+### 5. Feature Toggles (Hero Config)
+
+| Feature | Config Key | Default | Effect |
+|---------|------------|---------|--------|
+| Auto-generation | `idle_behavior.generation.enabled` | true | Generate data when queue empty |
+| Idle behavior | `idle_behavior.enabled` | true | Any idle actions at all |
+| QLoRA | `qlora.enabled` | varies | Use adapter training |
+| Gradient checkpointing | `training_defaults.gradient_checkpointing` | true | Save VRAM |
+
+---
+
 ## Prerequisites
 
 - **GPU:** 24GB VRAM (RTX 3090, RTX 4090, A5000, etc.)
@@ -44,21 +110,28 @@ huggingface-cli download Qwen/Qwen3-1.7B --local-dir models/Qwen3-1.7B
 huggingface-cli download Qwen/Qwen3-4B --local-dir models/Qwen3-4B
 ```
 
-**Model recommendations by VRAM:**
+**Which hero/model for your GPU?**
 
-| VRAM | Recommended Models |
-|------|-------------------|
-| 24GB | Qwen3-0.6B, Qwen3-1.7B (full fine-tuning) |
-| 24GB | Qwen3-4B, Qwen3-8B (with GaLore/LoRA/QLoRA) |
+| Your VRAM | Recommended Hero | Model | Training Method | Download Size |
+|-----------|------------------|-------|-----------------|---------------|
+| 8-16GB | **DIO** | Qwen3-0.6B | Full fine-tuning | 1.2GB |
+| 16-20GB | **GOU** | Qwen3-4B | Full or QLoRA | 8GB |
+| 24GB+ | **OJAS** | Qwen3-8B | QLoRA required | 16GB |
+
+**Quick decision:**
+- **Learning/experimenting?** → DIO (fast, forgiving)
+- **Serious training, 24GB GPU?** → OJAS (most capable)
+- **In between?** → GOU (good balance)
 
 ## Step 3: Create Your Hero
 
-Heroes are defined in `configs/heroes/`. Two heroes are pre-configured:
+Heroes are defined in `configs/heroes/`. Three heroes are pre-configured:
 
 | Hero | Model | Description |
 |------|-------|-------------|
 | **DIO** | Qwen3-0.6B | The Skeptic - fast training, good for learning |
-| **GOU** | Qwen3-4B | The Hound - larger model, more capable |
+| **GOU** | Qwen3-4B | The Hound - balanced power and speed |
+| **OJAS** | Qwen3-8B | The Vital Force - maximum capability (needs QLoRA) |
 
 To create a new hero, copy the template:
 

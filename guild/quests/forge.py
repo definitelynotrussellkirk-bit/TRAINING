@@ -306,6 +306,94 @@ class QuestForge:
         template = templates[0]
         return self.create(template, params)
 
+    def create_for_primitive(
+        self,
+        primitive: str,
+        difficulty_level: Optional[int] = None,
+        params: Optional[dict] = None,
+    ) -> Optional[QuestInstance]:
+        """
+        Create a quest instance that trains a specific primitive.
+
+        Args:
+            primitive: Primitive ID to train (e.g., "add_single_digit_no_carry")
+            difficulty_level: Target difficulty (1-10)
+            params: Optional override parameters
+
+        Returns:
+            QuestInstance or None if no suitable template found
+        """
+        registry = get_quest_registry()
+        templates = registry.by_primitive(primitive)
+
+        if not templates:
+            logger.warning(f"No quest templates found for primitive: {primitive}")
+            return None
+
+        # Filter by difficulty if specified
+        if difficulty_level is not None:
+            level_templates = [
+                t for t in templates
+                if t.difficulty_level == difficulty_level
+            ]
+            if level_templates:
+                templates = level_templates
+            else:
+                # Find closest level
+                templates.sort(
+                    key=lambda t: abs(t.difficulty_level - difficulty_level)
+                )
+
+        if not templates:
+            return None
+
+        # Use first matching template
+        template = templates[0]
+        return self.create(template, params)
+
+    def create_for_module(
+        self,
+        module_id: str,
+        difficulty_level: Optional[int] = None,
+        params: Optional[dict] = None,
+    ) -> Optional[QuestInstance]:
+        """
+        Create a quest instance from a specific module.
+
+        Args:
+            module_id: Module to select from
+            difficulty_level: Target difficulty (1-10)
+            params: Optional override parameters
+
+        Returns:
+            QuestInstance or None if no suitable template found
+        """
+        registry = get_quest_registry()
+        templates = registry.by_module(module_id)
+
+        if not templates:
+            logger.warning(f"No quest templates found for module: {module_id}")
+            return None
+
+        # Filter by difficulty if specified
+        if difficulty_level is not None:
+            level_templates = [
+                t for t in templates
+                if t.difficulty_level == difficulty_level
+            ]
+            if level_templates:
+                templates = level_templates
+            else:
+                templates.sort(
+                    key=lambda t: abs(t.difficulty_level - difficulty_level)
+                )
+
+        if not templates:
+            return None
+
+        template = templates[0]
+        return self.create(template, params)
+
 
 # Global forge instance
 _forge: Optional[QuestForge] = None
@@ -350,6 +438,24 @@ def create_quest_for_skill(
 ) -> Optional[QuestInstance]:
     """Create a quest instance for a skill."""
     return get_forge().create_for_skill(skill_id, difficulty_level, params)
+
+
+def create_quest_for_primitive(
+    primitive: str,
+    difficulty_level: Optional[int] = None,
+    params: Optional[dict] = None,
+) -> Optional[QuestInstance]:
+    """Create a quest instance for a primitive."""
+    return get_forge().create_for_primitive(primitive, difficulty_level, params)
+
+
+def create_quest_for_module(
+    module_id: str,
+    difficulty_level: Optional[int] = None,
+    params: Optional[dict] = None,
+) -> Optional[QuestInstance]:
+    """Create a quest instance from a module."""
+    return get_forge().create_for_module(module_id, difficulty_level, params)
 
 
 def register_generator(generator: QuestGenerator):

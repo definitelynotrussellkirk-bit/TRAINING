@@ -35,9 +35,59 @@ echo "  $ROOT_DIR"
 echo ""
 
 # -----------------------------------------------------------------------------
+# 0. Check prerequisites
+# -----------------------------------------------------------------------------
+echo -e "${YELLOW}[0/6] Checking prerequisites${NC}"
+
+# Check Python version
+PYTHON_VERSION=$(python3 --version 2>&1 | grep -oP '\d+\.\d+' | head -1)
+PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
+PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
+
+if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]); then
+    echo -e "  ${RED}✗${NC} Python 3.10+ required (you have $PYTHON_VERSION)"
+    echo -e "  ${YELLOW}!${NC} Please upgrade Python before continuing"
+    exit 1
+else
+    echo -e "  ${GREEN}✓${NC} Python $PYTHON_VERSION"
+fi
+
+# Check pip
+if command -v pip3 &> /dev/null; then
+    echo -e "  ${GREEN}✓${NC} pip3 available"
+else
+    echo -e "  ${RED}✗${NC} pip3 not found"
+    echo -e "  ${YELLOW}!${NC} Install with: sudo apt install python3-pip"
+    exit 1
+fi
+
+# Check GPU (optional but warned)
+if command -v nvidia-smi &> /dev/null; then
+    GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
+    GPU_VRAM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null | head -1)
+    if [ -n "$GPU_NAME" ]; then
+        echo -e "  ${GREEN}✓${NC} GPU: $GPU_NAME ($GPU_VRAM)"
+    else
+        echo -e "  ${YELLOW}!${NC} nvidia-smi found but no GPU detected"
+    fi
+else
+    echo -e "  ${YELLOW}!${NC} nvidia-smi not found (GPU training may not work)"
+fi
+
+# Check disk space
+FREE_GB=$(df -BG "$ROOT_DIR" | awk 'NR==2 {gsub("G",""); print $4}')
+if [ "$FREE_GB" -lt 20 ]; then
+    echo -e "  ${YELLOW}!${NC} Low disk space: ${FREE_GB}GB free (recommend 50GB+)"
+else
+    echo -e "  ${GREEN}✓${NC} Disk space: ${FREE_GB}GB free"
+fi
+
+echo ""
+
+# -----------------------------------------------------------------------------
 # 1. Create .env from .env.example if it doesn't exist
 # -----------------------------------------------------------------------------
-echo -e "${YELLOW}[1/5] Environment configuration${NC}"
+echo -e "${YELLOW}[1/6] Environment configuration${NC}"
 
 if [ -f "$ROOT_DIR/.env" ]; then
     echo -e "  ${GREEN}✓${NC} .env already exists"
@@ -64,7 +114,7 @@ fi
 # -----------------------------------------------------------------------------
 # 2. Create config/devices.json if missing
 # -----------------------------------------------------------------------------
-echo -e "${YELLOW}[2/5] Device configuration${NC}"
+echo -e "${YELLOW}[2/6] Device configuration${NC}"
 
 DEVICES_JSON="$ROOT_DIR/config/devices.json"
 if [ -f "$DEVICES_JSON" ]; then
@@ -91,7 +141,7 @@ fi
 # -----------------------------------------------------------------------------
 # 3. Create config/hosts.json from example if missing
 # -----------------------------------------------------------------------------
-echo -e "${YELLOW}[3/5] Host configuration${NC}"
+echo -e "${YELLOW}[3/6] Host configuration${NC}"
 
 HOSTS_JSON="$ROOT_DIR/config/hosts.json"
 HOSTS_EXAMPLE="$ROOT_DIR/config/hosts.example.json"
@@ -131,7 +181,7 @@ fi
 # -----------------------------------------------------------------------------
 # 4. Create required directories
 # -----------------------------------------------------------------------------
-echo -e "${YELLOW}[4/5] Creating directories${NC}"
+echo -e "${YELLOW}[4/6] Creating directories${NC}"
 
 DIRS=(
     "models"
@@ -164,7 +214,7 @@ echo -e "  ${GREEN}✓${NC} All directories present"
 # -----------------------------------------------------------------------------
 # 5. Initialize databases (if needed)
 # -----------------------------------------------------------------------------
-echo -e "${YELLOW}[5/5] Database initialization${NC}"
+echo -e "${YELLOW}[5/6] Database initialization${NC}"
 
 # Check if vault/catalog.db exists
 if [ -f "$ROOT_DIR/vault/catalog.db" ]; then
@@ -181,6 +231,24 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# 6. Check for Python dependencies
+# -----------------------------------------------------------------------------
+echo -e "${YELLOW}[6/6] Checking Python dependencies${NC}"
+
+if python3 -c "import torch" 2>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} PyTorch installed"
+else
+    echo -e "  ${YELLOW}!${NC} PyTorch not installed"
+    echo -e "      Run: pip install torch"
+fi
+
+if python3 -c "import transformers" 2>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} transformers installed"
+else
+    echo -e "  ${YELLOW}!${NC} transformers not installed"
+    echo -e "      Run: pip install -e \".[training]\""
+fi
+
 # Summary
 # -----------------------------------------------------------------------------
 echo ""
@@ -190,14 +258,19 @@ echo -e "${BLUE}============================================================${NC
 echo ""
 echo "Next steps:"
 echo ""
-echo "  1. Run the doctor to verify everything:"
+echo "  1. Install dependencies (if not done):"
+echo -e "     ${YELLOW}pip install -e \".[training]\"${NC}"
+echo ""
+echo "  2. Run the setup wizard (RECOMMENDED for first-time):"
+echo -e "     ${YELLOW}python3 -m training setup${NC}"
+echo ""
+echo "  OR manually:"
+echo ""
+echo "  3. Run the doctor to verify everything:"
 echo -e "     ${YELLOW}python3 -m training doctor${NC}"
 echo ""
-echo "  2. Start the services:"
+echo "  4. Start the services:"
 echo -e "     ${YELLOW}python3 -m training start-all${NC}"
-echo ""
-echo "  3. Open the Tavern UI:"
-echo -e "     ${YELLOW}open http://localhost:8888${NC}"
 echo ""
 echo "For multi-machine setups, edit:"
 echo "  - .env (network hosts)"

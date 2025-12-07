@@ -179,6 +179,9 @@ function updateWorldStateUI() {
     }
 }
 
+// Store interval ID for cleanup
+let _worldStatePollInterval = null;
+
 /**
  * Initialize world state polling and event handlers
  */
@@ -186,8 +189,8 @@ function initWorldState() {
     // Initial fetch
     fetchWorldState();
 
-    // Poll every 5 seconds
-    setInterval(fetchWorldState, 5000);
+    // Poll every 5 seconds (store ID for cleanup)
+    _worldStatePollInterval = setInterval(fetchWorldState, 5000);
 
     // Mode toggle button handlers
     const btnTraining = document.getElementById('btnTraining');
@@ -220,3 +223,11 @@ if (document.readyState === 'loading') {
 } else {
     initWorldState();
 }
+
+// Clean up on page unload to prevent memory leaks
+window.addEventListener('beforeunload', () => {
+    if (_worldStatePollInterval) {
+        clearInterval(_worldStatePollInterval);
+        _worldStatePollInterval = null;
+    }
+});

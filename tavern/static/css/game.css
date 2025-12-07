@@ -1745,6 +1745,37 @@ body {
     opacity: 0.8;
 }
 
+/* Style Toggle Button (Modern/MUD) */
+.style-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'Courier New', monospace;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--text-secondary);
+}
+
+.style-toggle:hover {
+    background: var(--bg-hover);
+    border-color: var(--color-gold);
+    color: var(--color-gold);
+}
+
+.style-toggle.mud-active {
+    background: var(--bg-highlight);
+    border-color: var(--color-gold);
+    color: var(--color-gold);
+}
+
 /* Mode Indicator (replacing idle indicator) */
 .idle-indicator {
     display: flex;
@@ -2260,6 +2291,583 @@ body {
     padding: 0.5rem;
     background: var(--bg-dark);
     border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.hero-resources:hover {
+    background: var(--bg-panel);
+}
+
+/* Resource bars toggle - graphic vs MUD mode */
+.resource-bars-graphic,
+.resource-bars-mud {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+/* Default: show graphic, hide MUD */
+.resource-bars-graphic { display: flex; }
+.resource-bars-mud { display: none; }
+
+/* MUD mode (global - applies via body class): hide graphic, show MUD */
+body.mud-mode .resource-bars-graphic { display: none; }
+body.mud-mode .resource-bars-mud { display: flex; }
+
+/* ========================================
+   SKILL CARDS - DUAL MODE (Graphic/MUD)
+   ======================================== */
+
+/* Default: show graphic mode, hide MUD mode */
+.skill-graphic { display: block; }
+.skill-mud { display: none; }
+
+/* MUD mode: hide graphic, show MUD (but NOT in bottom-nav) */
+body.mud-mode .skill-graphic { display: none; }
+body.mud-mode .skill-mud { display: block; }
+
+/* MUD skill card styling */
+.skill-mud {
+    font-family: 'Courier New', monospace;
+}
+
+.mud-skill-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.mud-skill-name {
+    font-weight: bold;
+    color: var(--text-gold);
+}
+
+.mud-skill-level {
+    color: var(--text-secondary);
+    font-size: 0.85em;
+}
+
+.skill-mud .mud-bar {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
+.skill-mud .mud-bar.effort {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+/* MUD mode: simplify skill card styling */
+body.mud-mode .skill-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: none;
+}
+
+body.mud-mode .skill-card::before {
+    display: none;
+}
+
+body.mud-mode .skill-card:hover {
+    transform: none;
+    border-color: var(--text-gold);
+}
+
+/* ========================================
+   QUEST PROGRESS - DUAL MODE (Graphic/MUD)
+   ======================================== */
+
+/* Default: show graphic, hide MUD */
+.quest-progress-graphic { display: block; }
+.quest-progress-mud { display: none; }
+
+/* MUD mode */
+body.mud-mode .quest-progress-graphic { display: none; }
+body.mud-mode .quest-progress-mud { display: block; }
+
+.mud-quest-bar {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* ========================================
+   BATTLE STATS - DUAL MODE (Graphic/MUD)
+   ======================================== */
+
+/* Default: show graphic, hide MUD */
+.battle-stats-graphic { display: grid; }
+.battle-stats-mud { display: none; }
+
+/* MUD mode */
+body.mud-mode .battle-stats-graphic { display: none; }
+body.mud-mode .battle-stats-mud { display: block; }
+
+.battle-stats-mud {
+    font-family: 'Courier New', monospace;
+}
+
+.mud-stats-block {
+    margin: 0;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    background: var(--bg-panel);
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: pre;
+    letter-spacing: 0;
+}
+
+.mud-stats-block span {
+    font-family: inherit;
+    color: var(--color-gold);
+    font-weight: bold;
+}
+
+/* ========================================
+   EFFORT HISTORY - DUAL MODE (Graphic/MUD)
+   ======================================== */
+
+/* Default: show graphic, hide MUD */
+.loss-graph-graphic { display: block; }
+.loss-graph-mud { display: none; }
+
+/* MUD mode */
+body.mud-mode .loss-graph-graphic { display: none; }
+body.mud-mode .loss-graph-mud { display: block; }
+
+.loss-graph-mud {
+    font-family: 'Courier New', monospace;
+}
+
+.mud-effort-block {
+    margin: 0;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.7rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    background: var(--bg-panel);
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: pre;
+    letter-spacing: 0;
+}
+
+.mud-effort-block span {
+    font-family: inherit;
+    color: var(--text-primary);
+}
+
+#mudEffortChart {
+    color: var(--color-gold);
+}
+
+/* ========================================
+   ICONS - DUAL MODE (Emoji/ASCII)
+   ======================================== */
+
+/* Default: show emoji icons, hide MUD icons */
+.icon-emoji { display: inline; }
+.icon-mud { display: none; }
+
+/* MUD mode: hide emoji, show ASCII */
+body.mud-mode .icon-emoji { display: none; }
+body.mud-mode .icon-mud { display: inline; }
+
+/* MUD icon styling */
+.icon-mud {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+}
+
+/* Section headers - replace emoji with ASCII brackets */
+body.mud-mode h3,
+body.mud-mode h4,
+body.mud-mode .panel-header,
+body.mud-mode .section-title {
+    font-family: 'Courier New', monospace;
+}
+
+/* Battle icon in MUD mode */
+body.mud-mode .battle-icon {
+    font-family: 'Courier New', monospace;
+    font-size: 2rem;
+}
+
+/* Hero portrait in MUD mode - ASCII art style */
+body.mud-mode .campaign-hero-portrait {
+    border-radius: 4px;
+    border: 2px solid var(--border-gold);
+    background: var(--bg-panel);
+}
+
+body.mud-mode .campaign-hero-icon {
+    font-family: 'Courier New', monospace;
+    font-size: 1.5rem;
+}
+
+/* Stat icons in MUD mode */
+body.mud-mode .stat-icon {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+/* Hero sprite frame in MUD mode - already ASCII, enhance it */
+body.mud-mode .dio-icon {
+    font-family: 'Courier New', monospace;
+    font-size: 2rem;
+}
+
+/* Console title in MUD mode */
+body.mud-mode .console-title {
+    font-family: 'Courier New', monospace;
+}
+
+/* Achievement icon in MUD mode */
+body.mud-mode .achievement-icon {
+    font-family: 'Courier New', monospace;
+}
+
+/* Forge section in MUD mode */
+body.mud-mode .forge-torch {
+    font-family: 'Courier New', monospace;
+}
+
+/* General panel simplification in MUD mode */
+body.mud-mode .game-panel {
+    border-radius: 4px;
+    box-shadow: none;
+}
+
+body.mud-mode .game-panel::before {
+    display: none;
+}
+
+/* ========================================
+   MUD MODE - COMPREHENSIVE ICON MAPPING
+   zMUD-style ASCII replacements
+   ======================================== */
+
+/* --- Header Icons --- */
+body.mud-mode .resource-icon {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+/* Health indicator in MUD mode */
+body.mud-mode .health-icon {
+    font-family: 'Courier New', monospace;
+}
+
+/* Sound toggle in MUD mode */
+body.mud-mode .sound-toggle {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Training Badge Icons --- */
+body.mud-mode .training-badge-icon {
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+}
+
+/* --- Panel Headers with ASCII Borders --- */
+body.mud-mode .panel-header h3 {
+    letter-spacing: 0.5px;
+}
+
+body.mud-mode .panel-header::before {
+    content: ">> ";
+    color: var(--text-gold);
+}
+
+body.mud-mode .panel-header::after {
+    content: " <<";
+    color: var(--text-gold);
+}
+
+/* --- Battle Icon States --- */
+body.mud-mode .battle-icon {
+    font-family: 'Courier New', monospace;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+/* --- Hero Section MUD Styling --- */
+body.mud-mode .hero-name {
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+}
+
+body.mud-mode .hero-title {
+    font-family: 'Courier New', monospace;
+    font-style: normal;
+}
+
+body.mud-mode .hero-class {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Level Badge MUD Style --- */
+body.mud-mode .level-badge {
+    font-family: 'Courier New', monospace;
+    border-radius: 2px;
+}
+
+body.mud-mode .current-skill {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Stat Row Icons --- */
+body.mud-mode .stat {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .stat-icon {
+    min-width: 20px;
+    text-align: center;
+}
+
+/* --- Section Title Icons (Panel Headers) --- */
+body.mud-mode .forge-header {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .forge-torch {
+    opacity: 0.7;
+}
+
+/* --- Room Description MUD Enhancement --- */
+body.mud-mode .room-description {
+    font-family: 'Courier New', monospace;
+    border-left: 2px solid var(--text-gold);
+    background: rgba(0,0,0,0.4);
+}
+
+body.mud-mode .room-exits {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .room-exits a {
+    color: var(--color-gold);
+    text-decoration: none;
+}
+
+body.mud-mode .room-exits a:hover {
+    text-decoration: underline;
+}
+
+/* --- Next Action Card MUD Style --- */
+body.mud-mode .next-action-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-gold);
+    border-radius: 2px;
+}
+
+body.mud-mode .next-action-title {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .next-action-body {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .next-action-btn {
+    font-family: 'Courier New', monospace;
+    border-radius: 2px;
+}
+
+/* --- Training Controls MUD Style --- */
+body.mud-mode .control-btn {
+    font-family: 'Courier New', monospace;
+    border-radius: 2px;
+}
+
+body.mud-mode .control-btn .btn-icon {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Activity Log MUD Enhancement --- */
+body.mud-mode .activity-log h4 {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .log-entry {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+}
+
+/* --- Vault Stats MUD Style --- */
+body.mud-mode .vault-stats {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .vault-stat {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Efficiency Card MUD Style --- */
+body.mud-mode .efficiency-card {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Transitions Card MUD Style --- */
+body.mud-mode .transitions-card {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Meter Bars MUD Style --- */
+body.mud-mode .forge-meter {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Campaign Banner MUD Styling --- */
+body.mud-mode .campaign-banner {
+    background: linear-gradient(135deg, #0a0a12 0%, #12121e 100%);
+    border-bottom: 2px solid var(--border-gold);
+}
+
+body.mud-mode .campaign-banner::before {
+    display: none;
+}
+
+body.mud-mode .campaign-hero-name {
+    font-family: 'Courier New', monospace;
+    text-shadow: none;
+}
+
+body.mud-mode .campaign-hero-title {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .campaign-stat-value {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .campaign-stat-label {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Skill Badge MUD Style --- */
+body.mud-mode .current-skill-badge {
+    font-family: 'Courier New', monospace;
+    border-radius: 2px;
+}
+
+body.mud-mode .current-skill-badge .skill-icon {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Achievement Toast MUD Style --- */
+body.mud-mode .achievement-toast {
+    font-family: 'Courier New', monospace;
+    border-radius: 2px;
+}
+
+/* --- Zone Discovery MUD Style --- */
+body.mud-mode .zone-discovery {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .zone-discovery-title {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Critical Hit Overlay MUD Style --- */
+body.mud-mode .critical-hit-text {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Game Title MUD Style --- */
+body.mud-mode .game-title {
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+}
+
+/* --- Remove Gradients & Glows in MUD Mode --- */
+body.mud-mode .hero-glow {
+    display: none;
+}
+
+body.mud-mode .hero-sparkle {
+    display: none;
+}
+
+body.mud-mode .hero-panel,
+body.mud-mode .battle-panel,
+body.mud-mode .guild-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+}
+
+body.mud-mode .hero-frame {
+    background: var(--bg-card);
+}
+
+body.mud-mode .hero-frame::after {
+    display: none;
+}
+
+body.mud-mode .campaign-hero-portrait {
+    box-shadow: none;
+    animation: none !important;
+}
+
+body.mud-mode .training-badge.active {
+    animation: none;
+    box-shadow: none;
+}
+
+/* --- Momentum Card MUD Style --- */
+body.mud-mode .momentum-card {
+    font-family: 'Courier New', monospace;
+    border-radius: 2px;
+}
+
+body.mud-mode .momentum-badge {
+    font-family: 'Courier New', monospace;
+}
+
+/* --- Quest Info MUD Style --- */
+body.mud-mode .quest-name {
+    font-family: 'Courier New', monospace;
+}
+
+body.mud-mode .action-hint {
+    font-family: 'Courier New', monospace;
+}
+
+/* MUD bars in resource area - match graphic bar height */
+.resource-bars-mud .mud-bar {
+    height: 18px;
+    line-height: 18px;
+    display: flex;
+    align-items: center;
+    background: #1a1a1a;
+    border-radius: 3px;
+    border: 1px solid #333;
+    padding: 0 4px;
+    font-size: 0.65rem;
+}
+
+.resource-bars-mud .mud-bar .bar-label {
+    color: rgba(255,255,255,0.7);
+    font-weight: 700;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    min-width: 32px;
+}
+
+.resource-bars-mud .mud-bar .bar-value {
+    margin-left: auto;
+    color: #fff;
+    font-size: 0.6rem;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
 }
 
 .resource-bar-wow {
@@ -2802,6 +3410,89 @@ body.dawn-mode {
    MUD-STYLE / TEXT-BASED GRAPHICS
    zMUD-inspired visual enhancements
    ======================================== */
+
+/* === DUAL MODE HERO PORTRAIT === */
+
+/* --- Emoji Mode Portrait (Default) --- */
+.portrait-emoji {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 100px;
+    height: 100px;
+}
+
+.portrait-glow {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
+    animation: portrait-glow-pulse 3s ease-in-out infinite;
+}
+
+@keyframes portrait-glow-pulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+}
+
+.portrait-character {
+    font-size: 3.5rem;
+    z-index: 2;
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
+}
+
+.portrait-sparkle {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    font-size: 1rem;
+    animation: sparkle-float 2s ease-in-out infinite;
+    z-index: 3;
+}
+
+@keyframes sparkle-float {
+    0%, 100% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    50% { transform: translateY(-5px) rotate(15deg); opacity: 0.7; }
+}
+
+/* Training state animation */
+.hero-portrait.training .portrait-glow {
+    animation: portrait-glow-training 1.5s ease-in-out infinite;
+    background: radial-gradient(circle, rgba(255, 100, 0, 0.5) 0%, rgba(255, 215, 0, 0.3) 50%, transparent 70%);
+}
+
+@keyframes portrait-glow-training {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.15); }
+}
+
+.hero-portrait.training .portrait-character {
+    animation: character-battle 1s ease-in-out infinite;
+}
+
+@keyframes character-battle {
+    0%, 100% { transform: translateY(0); }
+    25% { transform: translateY(-3px) rotate(-2deg); }
+    75% { transform: translateY(-3px) rotate(2deg); }
+}
+
+/* --- MUD Mode Portrait (Hidden by default) --- */
+.portrait-mud {
+    display: none;
+}
+
+/* --- MODE SWITCHING --- */
+
+/* In MUD mode: hide emoji portrait, show ASCII frame */
+body.mud-mode .portrait-emoji {
+    display: none;
+}
+
+body.mud-mode .portrait-mud {
+    display: block;
+}
 
 /* === ASCII Hero Frame === */
 .mud-frame {

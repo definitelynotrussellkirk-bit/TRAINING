@@ -270,6 +270,80 @@ const MudStyle = {
 // Export for global use
 window.MudStyle = MudStyle;
 
+/**
+ * Update quest progress bar (both graphic and MUD versions)
+ */
+function updateQuestProgress(percent, label = null) {
+    // Update graphical bar
+    setWidth('#questProgressBar', percent);
+    setText('#questProgressText', label || `${percent.toFixed(1)}%`);
+
+    // Update MUD bar
+    const mudBar = document.getElementById('mudQuestBar');
+    if (mudBar) {
+        const bar = MudStyle.progressBar(percent, 10);
+        mudBar.textContent = `[${bar.text}] ${label || percent.toFixed(1) + '%'}`;
+    }
+}
+
+/**
+ * Update battle stats in both graphic and MUD modes
+ */
+function updateBattleStats(step, speed, strain, eta) {
+    // Graphic mode
+    setText('#battleStep', step);
+    setText('#battleSpeed', speed);
+    setText('#battleStrain', strain);
+    setText('#battleETA', eta);
+
+    // MUD mode (fixed-width 7 chars for alignment in ASCII box)
+    setText('#mudBattleStep', step.padStart(7).slice(-7));
+    setText('#mudBattleSpeed', speed.padStart(7).slice(-7));
+    setText('#mudBattleStrain', strain.padStart(7).slice(-7));
+    setText('#mudBattleETA', eta.padStart(7).slice(-7));
+}
+
+/**
+ * Update loss graph stats in MUD mode
+ */
+function updateMudLossStats(min, max, trend) {
+    setText('#mudLossMin', min.slice(0, 4).padStart(4));
+    setText('#mudLossMax', max.slice(0, 4).padStart(4));
+    setText('#mudLossTrend', trend.slice(0, 8).padEnd(8));
+}
+
+/**
+ * Set dual icons (emoji and MUD ASCII) for elements with icon-emoji/icon-mud children
+ * @param {string} emojiId - ID of the emoji span (without #)
+ * @param {string} mudId - ID of the MUD span (without #)
+ * @param {string} emoji - The emoji character/HTML
+ * @param {string} mudText - The ASCII text for MUD mode
+ */
+function setDualIcon(emojiId, mudId, emoji, mudText) {
+    const emojiEl = document.getElementById(emojiId);
+    const mudEl = document.getElementById(mudId);
+    if (emojiEl) emojiEl.innerHTML = emoji;
+    if (mudEl) mudEl.textContent = mudText;
+}
+
+/**
+ * Update battle icon in both graphic and MUD modes
+ * @param {string} emoji - The emoji character
+ * @param {string} mudText - The ASCII text for MUD mode
+ */
+function updateBattleIcon(emoji, mudText) {
+    setDualIcon('battleIconEmoji', 'battleIconMud', emoji, mudText);
+}
+
+/**
+ * Update mode indicator icon in both graphic and MUD modes
+ * @param {string} emoji - The emoji character
+ * @param {string} mudText - The ASCII text for MUD mode
+ */
+function updateModeIcon(emoji, mudText) {
+    setDualIcon('modeIconEmoji', 'modeIconMud', emoji, mudText);
+}
+
 // Global toggle function for HTML onclick
 function toggleSound() {
     const muted = SoundManager.toggle();
@@ -291,6 +365,44 @@ function toggleSound() {
     console.log(`[Sound] ${muted ? 'Muted' : 'Unmuted'}`);
 }
 
+// Global toggle function for MUD/Modern mode
+function toggleMudMode() {
+    const body = document.body;
+    const isMudMode = body.classList.toggle('mud-mode');
+
+    // Persist preference
+    localStorage.setItem('mudMode', isMudMode ? 'true' : 'false');
+
+    // Update toggle button icon
+    const icon = document.getElementById('styleIcon');
+    if (icon) {
+        icon.textContent = isMudMode ? '>' : '*';
+    }
+
+    const btn = document.getElementById('styleToggle');
+    if (btn) {
+        btn.classList.toggle('mud-active', isMudMode);
+        btn.title = isMudMode ? 'MUD Mode (click for Modern)' : 'Modern Mode (click for MUD)';
+    }
+
+    console.log(`[Style] ${isMudMode ? 'MUD Mode' : 'Modern Mode'}`);
+}
+
+// Initialize MUD mode from localStorage
+function initMudMode() {
+    const saved = localStorage.getItem('mudMode');
+    if (saved === 'true') {
+        document.body.classList.add('mud-mode');
+        const icon = document.getElementById('styleIcon');
+        if (icon) icon.textContent = '>';
+        const btn = document.getElementById('styleToggle');
+        if (btn) {
+            btn.classList.add('mud-active');
+            btn.title = 'MUD Mode (click for Modern)';
+        }
+    }
+}
+
 // Initialize sound toggle button state on load
 document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('soundToggle');
@@ -302,6 +414,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (icon && SoundManager.muted) {
         icon.textContent = '🔇';
     }
+
+    // Initialize MUD mode from localStorage (unified toggle)
+    initMudMode();
+
+    // Legacy: any element with .toggle-bar-mode class will also toggle the global mode
+    document.querySelectorAll('.toggle-bar-mode').forEach(el => {
+        el.addEventListener('click', () => {
+            toggleMudMode();
+            SoundManager.click();
+        });
+    });
 });
 
 // ============================================
@@ -893,20 +1016,15 @@ function updateBattleStatus() {
         battleStatus.classList.add('no-campaign');
         idleIndicator.classList.remove('active');
         idleIndicator.classList.add('error');
-        setText('.idle-icon', '⚠️');
+        updateModeIcon('⚠️', '[!!]');
         setText('.idle-text', 'NO CAMPAIGN');
 
-        setText('#battleIcon', '🚫');
+        updateBattleIcon('🚫', '[X]');
         setText('#battleTitle', 'No Campaign Active');
         setText('#questName', 'Start a campaign to begin training');
 
-        setWidth('#questProgressBar', 0);
-        setText('#questProgressText', '--');
-
-        setText('#battleStep', '--');
-        setText('#battleSpeed', '--');
-        setText('#battleStrain', '--');
-        setText('#battleETA', '--');
+        updateQuestProgress(0, '--');
+        updateBattleStats('--', '--', '--', '--');
 
     } else if (GameState.isTraining) {
         // Priority 2: Training mode
@@ -914,22 +1032,23 @@ function updateBattleStatus() {
         battleStatus.classList.add('fighting');
         idleIndicator.classList.remove('error');
         idleIndicator.classList.add('active');
-        setText('.idle-icon', '⚔️');
+        updateModeIcon('⚔️', '[***]');
         setText('.idle-text', 'TRAINING');
 
-        setText('#battleIcon', '⚔️');
+        updateBattleIcon('⚔️', '[***]');
         setText('#battleTitle', 'Training in Progress');
 
         const questName = GameState.currentQuest || 'Unknown file';
         setText('#questName', questName.length > 50 ? questName.slice(0, 47) + '...' : questName);
 
-        setWidth('#questProgressBar', GameState.questProgress);
-        setText('#questProgressText', `${GameState.questProgress.toFixed(1)}%`);
+        updateQuestProgress(GameState.questProgress);
 
-        setText('#battleStep', `${GameState.currentStep.toLocaleString()}/${GameState.totalSteps.toLocaleString()}`);
-        setText('#battleSpeed', GameState.stepsPerSecond > 0 ? `${GameState.stepsPerSecond.toFixed(2)}/s` : '--');
-        setText('#battleStrain', formatStrain(GameState.loss));
-        setText('#battleETA', formatETA(GameState.etaSeconds));
+        updateBattleStats(
+            `${GameState.currentStep.toLocaleString()}/${GameState.totalSteps.toLocaleString()}`,
+            GameState.stepsPerSecond > 0 ? `${GameState.stepsPerSecond.toFixed(2)}/s` : '--',
+            formatStrain(GameState.loss),
+            formatETA(GameState.etaSeconds)
+        );
 
     } else {
         // Priority 3: Idle mode (campaign active but not training)
@@ -937,20 +1056,15 @@ function updateBattleStatus() {
         battleStatus.classList.remove('no-campaign');
         idleIndicator.classList.remove('active');
         idleIndicator.classList.remove('error');
-        setText('.idle-icon', '💤');
+        updateModeIcon('💤', '[ZZZ]');
         setText('.idle-text', 'IDLE');
 
-        setText('#battleIcon', '💤');
+        updateBattleIcon('💤', '[ZZZ]');
         setText('#battleTitle', 'Awaiting Orders');
         setText('#questName', 'Drop training files in inbox/');
 
-        setWidth('#questProgressBar', 0);
-        setText('#questProgressText', '0%');
-
-        setText('#battleStep', '--');
-        setText('#battleSpeed', '--');
-        setText('#battleStrain', '--');
-        setText('#battleETA', '--');
+        updateQuestProgress(0, '0%');
+        updateBattleStats('--', '--', '--', '--');
     }
 
     // Update control buttons
@@ -1044,26 +1158,38 @@ function renderSkills() {
         const effortPct = Math.min(100, (skillEffort / 100) * 100);
         const effortDisplay = skillEffort > 0 ? skillEffort.toFixed(1) : '0';
 
-        // Generate MUD-style text bar for progress
+        // Generate MUD-style text bars
         const mudProgress = MudStyle.progressBar(progressPct, 12);
+        const mudEffort = MudStyle.progressBar(effortPct, 8);
 
         return `
             <div class="skill-card clickable ${isActive ? 'active' : ''}" data-skill="${skill.id}" style="--skill-color: ${skill.color}">
-                <div class="skill-header">
-                    <span class="skill-icon">${skill.icon}</span>
-                    <span class="skill-name">${skill.short_name}</span>
-                    <span class="skill-level">${progressPct.toFixed(0)}%</span>
-                </div>
-                <div class="skill-bar-container">
-                    <div class="skill-bar" style="width: ${progressPct}%; background: ${skill.color}"></div>
-                </div>
-                <div class="mud-bar ${skill.id}" title="Progress: ${progressPct.toFixed(0)}%">[${mudProgress.html}]</div>
-                <div class="skill-effort" title="Cumulative effort invested in this skill">
-                    <span class="effort-label">Effort</span>
-                    <div class="effort-bar-container">
-                        <div class="effort-bar" style="width: ${effortPct}%"></div>
+                <!-- Modern/Graphical Mode -->
+                <div class="skill-graphic">
+                    <div class="skill-header">
+                        <span class="skill-icon">${skill.icon}</span>
+                        <span class="skill-name">${skill.short_name}</span>
+                        <span class="skill-level">${progressPct.toFixed(0)}%</span>
                     </div>
-                    <span class="effort-value">${effortDisplay}</span>
+                    <div class="skill-bar-container">
+                        <div class="skill-bar" style="width: ${progressPct}%; background: ${skill.color}"></div>
+                    </div>
+                    <div class="skill-effort" title="Cumulative effort invested in this skill">
+                        <span class="effort-label">Effort</span>
+                        <div class="effort-bar-container">
+                            <div class="effort-bar" style="width: ${effortPct}%"></div>
+                        </div>
+                        <span class="effort-value">${effortDisplay}</span>
+                    </div>
+                </div>
+                <!-- zMUD Mode -->
+                <div class="skill-mud">
+                    <div class="mud-skill-header">
+                        <span class="mud-skill-name">${skill.short_name.toUpperCase()}</span>
+                        <span class="mud-skill-level">L${skill.mastered_level}</span>
+                    </div>
+                    <div class="mud-bar ${skill.id}" title="Progress">[${mudProgress.html}] ${progressPct.toFixed(0)}%</div>
+                    <div class="mud-bar effort" title="Effort">Eff[${mudEffort.html}] ${effortDisplay}</div>
                 </div>
                 <div class="skill-meta">
                     <span class="skill-acc">${lastAccDisplay}</span>
@@ -1497,13 +1623,10 @@ function showSchemaError(errors) {
     if (!battleStatus) return;
 
     battleStatus.classList.add('error-state');
-    setText('#battleIcon', '⚠️');
+    updateBattleIcon('⚠️', '[ERR]');
     setText('#battleTitle', 'DATA PIPELINE BROKEN');
     setText('#questName', 'Schema validation failed - check console for details');
-    setText('#battleStep', '--');
-    setText('#battleSpeed', '--');
-    setText('#battleStrain', '--');
-    setText('#battleETA', '--');
+    updateBattleStats('--', '--', '--', '--');
 
     // Log to battle log
     addLocalLog(`Schema validation failed: ${errors[0]}`, 'error');
@@ -1871,7 +1994,11 @@ async function fetchCampaignData() {
         const nameEl = document.getElementById('heroName');
         const titleEl = document.getElementById('heroTitle');
         const classEl = document.getElementById('heroClass');
-        const iconEl = document.querySelector('.dio-icon');
+
+        // Dual-mode hero portrait (emoji and MUD)
+        const emojiPortrait = document.getElementById('heroSpriteEmoji');
+        const mudPortrait = document.getElementById('heroSpriteMud');
+        const heroIcon = hero.icon || '🦸';
 
         if (nameEl) nameEl.textContent = hero.name;
 
@@ -1886,7 +2013,15 @@ async function fetchCampaignData() {
         }
 
         if (classEl) classEl.textContent = hero.model_name || hero.hero_id;
-        if (iconEl) iconEl.textContent = hero.icon || '🦸';
+
+        // Set emoji portrait character
+        if (emojiPortrait) emojiPortrait.textContent = heroIcon;
+
+        // Set MUD portrait ASCII (use first letter of hero_id or @ symbol)
+        if (mudPortrait) {
+            const mudChar = hero.hero_id ? hero.hero_id.charAt(0).toUpperCase() : '@';
+            mudPortrait.textContent = `[${mudChar}]`;
+        }
 
         // Store hero info for other uses
         GameState.heroName = hero.name;
@@ -3032,6 +3167,11 @@ const RealmConsole = {
         line.innerHTML = text;
         output.appendChild(line);
         output.scrollTop = output.scrollHeight;
+
+        // Prevent memory leak - keep only last 100 lines
+        while (output.children.length > 100) {
+            output.removeChild(output.firstChild);
+        }
     },
 
     updatePrompt() {
@@ -3645,19 +3785,15 @@ const RPGFlair = {
      * Start the hero animation - subtle sparkle only, no frame swapping
      */
     startHeroAnimation() {
-        const heroEl = document.getElementById('heroSprite');
-        if (!heroEl) return;
+        const portraitEl = document.getElementById('heroPortrait');
+        if (!portraitEl) return;
 
-        // Set base hero and let CSS handle the breathing animation
-        heroEl.textContent = this.heroBase;
-
-        // Occasional sparkle (every ~5 seconds when training)
         // Store interval ID for cleanup on page unload
         this._heroWalkInterval = setInterval(() => {
             if (GameState.isTraining) {
-                heroEl.parentElement?.parentElement?.classList.add('hero-walking');
+                portraitEl.classList.add('training');
             } else {
-                heroEl.parentElement?.parentElement?.classList.remove('hero-walking');
+                portraitEl.classList.remove('training');
             }
         }, 2000);
     },
@@ -3847,10 +3983,13 @@ const RPGFlair = {
         const staminaFill = document.getElementById('staminaBarFill');
         const staminaText = document.getElementById('staminaBarText');
 
-        // MUD bar elements
+        // MUD bar elements and value displays
         const mudHp = document.getElementById('mudBarHp');
         const mudMp = document.getElementById('mudBarMp');
         const mudStamina = document.getElementById('mudBarStamina');
+        const mudHpValue = document.getElementById('mudHpValue');
+        const mudMpValue = document.getElementById('mudMpValue');
+        const mudStamValue = document.getElementById('mudStamValue');
 
         // VRAM as HP (round total to nearest integer for cleaner display)
         const vramTotalRounded = Math.round(GameState.vramTotal || 24);
@@ -3859,13 +3998,20 @@ const RPGFlair = {
             hpPct = (GameState.vramUsed / GameState.vramTotal) * 100;
             hpFill.style.width = `${hpPct}%`;
         }
+        const hpValueText = `${GameState.vramUsed?.toFixed(1) || '--'} / ${vramTotalRounded} GB`;
         if (hpText) {
-            hpText.textContent = `${GameState.vramUsed?.toFixed(1) || '--'} / ${vramTotalRounded} GB`;
+            hpText.textContent = hpValueText;
         }
-        // Update MUD HP bar
+        // Update MUD HP bar (just the bar portion, leave label and value alone)
         if (mudHp) {
-            const bar = MudStyle.progressBar(hpPct, 12);
-            mudHp.innerHTML = `[${bar.html}]`;
+            const bar = MudStyle.progressBar(hpPct, 10);
+            const barSpan = mudHp.querySelector('.mud-bar-fill');
+            const emptySpan = mudHp.querySelector('.mud-bar-empty');
+            if (barSpan) barSpan.innerHTML = bar.filled;
+            if (emptySpan) emptySpan.innerHTML = bar.empty;
+        }
+        if (mudHpValue) {
+            mudHpValue.textContent = hpValueText;
         }
 
         // RAM as MP
@@ -3875,30 +4021,45 @@ const RPGFlair = {
             mpPct = (GameState.ramUsed / GameState.ramTotal) * 100;
             mpFill.style.width = `${mpPct}%`;
         }
+        let mpValueText = '-- / -- GB';
         if (mpText) {
             if (GameState.ramTotal > 0) {
-                mpText.textContent = `${GameState.ramUsed?.toFixed(1) || '--'} / ${ramTotalRounded} GB`;
+                mpValueText = `${GameState.ramUsed?.toFixed(1) || '--'} / ${ramTotalRounded} GB`;
+                mpText.textContent = mpValueText;
             } else {
-                mpText.textContent = '-- / -- GB';
+                mpText.textContent = mpValueText;
             }
         }
         // Update MUD MP bar
         if (mudMp) {
-            const bar = MudStyle.progressBar(mpPct, 12);
-            mudMp.innerHTML = `[${bar.html}]`;
+            const bar = MudStyle.progressBar(mpPct, 10);
+            const barSpan = mudMp.querySelector('.mud-bar-fill');
+            const emptySpan = mudMp.querySelector('.mud-bar-empty');
+            if (barSpan) barSpan.innerHTML = bar.filled;
+            if (emptySpan) emptySpan.innerHTML = bar.empty;
+        }
+        if (mudMpValue) {
+            mudMpValue.textContent = mpValueText;
         }
 
         // GPU Utilization as Stamina
         if (staminaFill) {
             staminaFill.style.width = `${GameState.gpuUtil}%`;
         }
+        const stamValueText = `${Math.round(GameState.gpuUtil)}%`;
         if (staminaText) {
-            staminaText.textContent = `${Math.round(GameState.gpuUtil)}%`;
+            staminaText.textContent = stamValueText;
         }
         // Update MUD Stamina bar
         if (mudStamina) {
-            const bar = MudStyle.progressBar(GameState.gpuUtil || 0, 12);
-            mudStamina.innerHTML = `[${bar.html}]`;
+            const bar = MudStyle.progressBar(GameState.gpuUtil || 0, 10);
+            const barSpan = mudStamina.querySelector('.mud-bar-fill');
+            const emptySpan = mudStamina.querySelector('.mud-bar-empty');
+            if (barSpan) barSpan.innerHTML = bar.filled;
+            if (emptySpan) emptySpan.innerHTML = bar.empty;
+        }
+        if (mudStamValue) {
+            mudStamValue.textContent = stamValueText;
         }
     },
 

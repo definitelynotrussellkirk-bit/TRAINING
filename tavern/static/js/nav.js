@@ -341,8 +341,8 @@ async function weaverStop() {
     }
 }
 
-// Update weaver status periodically
-setInterval(updateWeaverStatus, 30000);
+// Update weaver status periodically (store ID for cleanup)
+let _navWeaverPollInterval = setInterval(updateWeaverStatus, 30000);
 
 /**
  * Auto-detect current page and render nav
@@ -384,3 +384,11 @@ function autoRenderNav() {
 
 // Auto-render on DOMContentLoaded if bottomNav container exists
 document.addEventListener('DOMContentLoaded', autoRenderNav);
+
+// Clean up on page unload to prevent memory leaks
+window.addEventListener('beforeunload', () => {
+    if (_navWeaverPollInterval) {
+        clearInterval(_navWeaverPollInterval);
+        _navWeaverPollInterval = null;
+    }
+});

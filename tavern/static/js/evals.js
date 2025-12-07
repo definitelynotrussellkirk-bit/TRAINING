@@ -327,6 +327,9 @@ function clearFilters() {
     loadEvals();
 }
 
+// Store interval ID for cleanup
+let _evalsRefreshInterval = null;
+
 /**
  * Initialize page
  */
@@ -346,9 +349,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Auto-refresh every 30 seconds
-    setInterval(() => {
+    // Auto-refresh every 30 seconds (store ID for cleanup)
+    _evalsRefreshInterval = setInterval(() => {
         loadSummary();
         loadEvals();
     }, 30000);
+});
+
+// Clean up on page unload to prevent memory leaks
+window.addEventListener('beforeunload', () => {
+    if (_evalsRefreshInterval) {
+        clearInterval(_evalsRefreshInterval);
+        _evalsRefreshInterval = null;
+    }
 });

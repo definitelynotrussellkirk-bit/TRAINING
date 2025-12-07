@@ -7,7 +7,7 @@
     <!-- Shared theme (design tokens, badges, components) -->
     <link rel="stylesheet" href="/static/css/theme.css?v=1">
     <!-- Main game styles -->
-    <link rel="stylesheet" href="/static/css/game.css?v=15">
+    <link rel="stylesheet" href="/static/css/game.css?v=20">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         /* ═══════════════════════════════════════════════════════════
@@ -563,7 +563,7 @@
         <span class="critical-hit-text">CRITICAL!</span>
     </div>
     <div class="achievement-toast" id="achievementToast">
-        <span class="achievement-icon" id="achievementIcon">&#127942;</span>
+        <span class="achievement-icon" id="achievementIcon"><span class="icon-emoji">&#127942;</span><span class="icon-mud">[!]</span></span>
         <div class="achievement-text">
             <div class="achievement-title">Achievement Unlocked</div>
             <div class="achievement-name" id="achievementName">First Steps</div>
@@ -583,12 +583,12 @@
         <div class="header-center">
             <div class="resource-bar">
                 <div class="resource steps">
-                    <span class="resource-icon">&#128099;</span>
+                    <span class="resource-icon"><span class="icon-emoji">&#128099;</span><span class="icon-mud">[#]</span></span>
                     <span class="resource-label">STEPS</span>
                     <span class="resource-value" id="totalSteps">0</span>
                 </div>
                 <div class="resource evals">
-                    <span class="resource-icon">&#9878;</span>
+                    <span class="resource-icon"><span class="icon-emoji">&#9878;</span><span class="icon-mud">[=]</span></span>
                     <span class="resource-label">EVALS</span>
                     <span class="resource-value" id="totalEvals">0</span>
                 </div>
@@ -602,15 +602,19 @@
             </div>
             <!-- HEALTH INDICATOR -->
             <div class="health-indicator" id="healthIndicator" title="Realm health">
-                <span class="health-icon" id="healthIcon">&#9898;</span>
+                <span class="health-icon" id="healthIcon"><span class="icon-emoji">&#9898;</span><span class="icon-mud">[*]</span></span>
             </div>
+            <!-- STYLE TOGGLE (Modern/MUD) -->
+            <button class="style-toggle" id="styleToggle" onclick="toggleMudMode()" title="Toggle visual style (Modern/MUD)">
+                <span id="styleIcon">></span>
+            </button>
             <!-- SOUND TOGGLE -->
             <button class="sound-toggle" id="soundToggle" onclick="toggleSound()" title="Toggle sound effects">
-                <span id="soundIcon">&#128266;</span>
+                <span id="soundIcon"><span class="icon-emoji">&#128266;</span><span class="icon-mud">SND</span></span>
             </button>
             <!-- IDLE INDICATOR (now shows actual realm mode) -->
             <div class="idle-indicator" id="idleIndicator">
-                <span class="idle-icon" id="modeIcon">&#128164;</span>
+                <span class="idle-icon" id="modeIcon"><span class="icon-emoji" id="modeIconEmoji">&#128164;</span><span class="icon-mud" id="modeIconMud">[Z]</span></span>
                 <span class="idle-text" id="modeText">IDLE</span>
             </div>
             <div class="time-display" id="timeDisplay">--:--:--</div>
@@ -620,7 +624,7 @@
     <!-- CAMPAIGN BANNER - Hero Identity -->
     <div class="campaign-banner" id="campaignBanner">
         <div class="campaign-hero-portrait" id="heroPortraitBanner">
-            <span class="campaign-hero-icon" id="heroBannerIcon">&#129492;&#127997;</span>
+            <span class="campaign-hero-icon" id="heroBannerIcon"><span class="icon-emoji" id="heroBannerIconEmoji">&#129492;&#127997;</span><span class="icon-mud" id="heroBannerIconMud">[@]</span></span>
         </div>
         <div class="campaign-info">
             <h2 class="campaign-hero-name" id="heroBannerName">Loading...</h2>
@@ -646,11 +650,11 @@
         </div>
         <div class="campaign-training-status" id="trainingStatusBanner">
             <div class="training-badge idle" id="trainingBadge">
-                <span class="training-badge-icon">&#128164;</span>
+                <span class="training-badge-icon"><span class="icon-emoji" id="trainBadgeIconEmoji">&#128164;</span><span class="icon-mud" id="trainBadgeIconMud">[Z]</span></span>
                 <span id="trainingBadgeText">Idle</span>
             </div>
             <div class="current-skill-badge" id="currentSkillBadgeBanner">
-                <span class="skill-icon" id="skillBadgeIcon">&#129513;</span>
+                <span class="skill-icon" id="skillBadgeIcon"><span class="icon-emoji" id="skillBadgeIconEmoji">&#129513;</span><span class="icon-mud" id="skillBadgeIconMud">[S]</span></span>
                 <span class="skill-name" id="skillBadgeName">--</span>
                 <span class="skill-level" id="skillBadgeLevel">L--</span>
             </div>
@@ -679,20 +683,26 @@
         <section class="hero-panel">
             <div class="hero-frame">
                 <div class="hero-portrait" id="heroPortrait">
-                    <!-- MUD-style ASCII frame -->
-                    <div class="mud-frame">
-                        <div class="mud-frame-row">&#9556;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9559;</div>
-                        <div class="mud-frame-row mud-frame-middle">
-                            <span class="mud-frame-side">&#9553;</span>
-                            <div class="hero-ascii">
-                                <div class="dio-icon" id="heroSprite">&#129492;&#127997;</div>
-                            </div>
-                            <span class="mud-frame-side">&#9553;</span>
-                        </div>
-                        <div class="mud-frame-row">&#9562;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9565;</div>
+                    <!-- EMOJI MODE: Graphical portrait with glow effects -->
+                    <div class="portrait-emoji">
+                        <div class="portrait-glow"></div>
+                        <div class="portrait-character" id="heroSpriteEmoji">&#129492;&#127997;</div>
+                        <div class="portrait-sparkle">&#10024;</div>
                     </div>
-                    <!-- Sparkle overlay -->
-                    <span class="hero-sparkle">&#10024;</span>
+                    <!-- MUD MODE: ASCII frame (hidden unless body.mud-mode) -->
+                    <div class="portrait-mud">
+                        <div class="mud-frame">
+                            <div class="mud-frame-row">&#9556;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9559;</div>
+                            <div class="mud-frame-row mud-frame-middle">
+                                <span class="mud-frame-side">&#9553;</span>
+                                <div class="hero-ascii">
+                                    <div class="dio-icon" id="heroSpriteMud">[@]</div>
+                                </div>
+                                <span class="mud-frame-side">&#9553;</span>
+                            </div>
+                            <div class="mud-frame-row">&#9562;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9552;&#9565;</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="hero-glow"></div>
 
@@ -702,26 +712,32 @@
                 </div>
             </div>
 
-            <!-- HP/MP/Stamina Resource Bars (WoW Style + MUD Text) -->
-            <div class="hero-resources">
-                <div class="resource-bar-wow hp" title="VRAM - Hero's health">
-                    <span class="bar-label">VRAM</span>
-                    <div class="bar-fill" id="hpBarFill" style="width: 50%"></div>
-                    <span class="bar-text" id="hpBarText">12 / 24 GB</span>
+            <!-- HP/MP/Stamina Resource Bars (WoW Style + MUD Text) - Click to toggle -->
+            <div class="hero-resources toggle-bar-mode" id="heroResources" title="Click to toggle display mode">
+                <!-- Graphical bars (WoW style) -->
+                <div class="resource-bars-graphic">
+                    <div class="resource-bar-wow hp" title="VRAM - Hero's health">
+                        <span class="bar-label">VRAM</span>
+                        <div class="bar-fill" id="hpBarFill" style="width: 50%"></div>
+                        <span class="bar-text" id="hpBarText">12 / 24 GB</span>
+                    </div>
+                    <div class="resource-bar-wow mp" title="RAM - Hero's mana">
+                        <span class="bar-label">RAM</span>
+                        <div class="bar-fill" id="mpBarFill" style="width: 50%"></div>
+                        <span class="bar-text" id="mpBarText">32 / 64 GB</span>
+                    </div>
+                    <div class="resource-bar-wow stamina" title="GPU Utilization - Hero's stamina">
+                        <span class="bar-label">STAM</span>
+                        <div class="bar-fill" id="staminaBarFill" style="width: 0%"></div>
+                        <span class="bar-text" id="staminaBarText">0%</span>
+                    </div>
                 </div>
-                <div class="mud-bar hp" id="mudBarHp">[<span class="mud-bar-fill">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span><span class="mud-bar-empty">&#9617;&#9617;&#9617;&#9617;</span>]</div>
-                <div class="resource-bar-wow mp" title="RAM - Hero's mana">
-                    <span class="bar-label">RAM</span>
-                    <div class="bar-fill" id="mpBarFill" style="width: 50%"></div>
-                    <span class="bar-text" id="mpBarText">32 / 64 GB</span>
+                <!-- MUD text bars (zMUD style) -->
+                <div class="resource-bars-mud">
+                    <div class="mud-bar hp" id="mudBarHp"><span class="bar-label">VRAM</span>[<span class="mud-bar-fill">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span><span class="mud-bar-empty">&#9617;&#9617;&#9617;&#9617;</span>]<span class="bar-value" id="mudHpValue">-- GB</span></div>
+                    <div class="mud-bar mp" id="mudBarMp"><span class="bar-label">RAM</span>[<span class="mud-bar-fill">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span><span class="mud-bar-empty">&#9617;&#9617;&#9617;&#9617;</span>]<span class="bar-value" id="mudMpValue">-- GB</span></div>
+                    <div class="mud-bar stamina" id="mudBarStamina"><span class="bar-label">STAM</span>[<span class="mud-bar-fill"></span><span class="mud-bar-empty">&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;</span>]<span class="bar-value" id="mudStamValue">--%</span></div>
                 </div>
-                <div class="mud-bar mp" id="mudBarMp">[<span class="mud-bar-fill">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span><span class="mud-bar-empty">&#9617;&#9617;&#9617;&#9617;</span>]</div>
-                <div class="resource-bar-wow stamina" title="GPU Utilization - Hero's stamina">
-                    <span class="bar-label">STAM</span>
-                    <div class="bar-fill" id="staminaBarFill" style="width: 0%"></div>
-                    <span class="bar-text" id="staminaBarText">0%</span>
-                </div>
-                <div class="mud-bar stamina" id="mudBarStamina">[<span class="mud-bar-fill"></span><span class="mud-bar-empty">&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;</span>]</div>
             </div>
 
             <div class="hero-info">
@@ -742,21 +758,21 @@
             <div class="hero-stats">
                 <div class="stat-row">
                     <div class="stat" title="Curriculum evaluation accuracy. Higher = better skill mastery.">
-                        <span class="stat-icon">&#127919;</span>
+                        <span class="stat-icon"><span class="icon-emoji">&#127919;</span><span class="icon-mud">ACC</span></span>
                         <span class="stat-label">ACCURACY</span>
                         <span class="stat-value" id="statAcc">0%</span>
                     </div>
                 </div>
                 <div class="stat-row">
                     <div class="stat" title="Clarity = 1/Perplexity. Higher = less confused, sharper understanding.">
-                        <span class="stat-icon">&#128142;</span>
+                        <span class="stat-icon"><span class="icon-emoji">&#128142;</span><span class="icon-mud">CLR</span></span>
                         <span class="stat-label">CLARITY</span>
                         <span class="stat-value" id="statClarity">--</span>
                     </div>
                 </div>
                 <div class="stat-row">
                     <div class="stat" title="Strain = Training Loss. Lower = easier learning, less struggle.">
-                        <span class="stat-icon">&#128170;</span>
+                        <span class="stat-icon"><span class="icon-emoji">&#128170;</span><span class="icon-mud">STR</span></span>
                         <span class="stat-label">STRAIN</span>
                         <span class="stat-value" id="statStrain">--</span>
                         <span class="strain-zone" id="strainZone" title="Training Zone"></span>
@@ -791,7 +807,7 @@
             <!-- BATTLE STATUS -->
             <div class="battle-status" id="battleStatus">
                 <div class="battle-header">
-                    <span class="battle-icon" id="battleIcon">&#128164;</span>
+                    <span class="battle-icon" id="battleIcon"><span class="icon-emoji" id="battleIconEmoji">&#128164;</span><span class="icon-mud" id="battleIconMud">[ZZZ]</span></span>
                     <h3 class="battle-title" id="battleTitle">Awaiting Orders</h3>
                 </div>
 
@@ -800,13 +816,21 @@
 
                 <div class="quest-info" id="questInfo">
                     <div class="quest-name" id="questName">No active quest</div>
-                    <div class="quest-progress-container">
-                        <div class="quest-progress-bar" id="questProgressBar"></div>
-                        <span class="quest-progress-text" id="questProgressText">0%</span>
+                    <!-- Graphical progress bar -->
+                    <div class="quest-progress-graphic">
+                        <div class="quest-progress-container">
+                            <div class="quest-progress-bar" id="questProgressBar"></div>
+                            <span class="quest-progress-text" id="questProgressText">0%</span>
+                        </div>
+                    </div>
+                    <!-- MUD text progress bar -->
+                    <div class="quest-progress-mud">
+                        <span class="mud-quest-bar" id="mudQuestBar">[░░░░░░░░░░] 0%</span>
                     </div>
                 </div>
 
-                <div class="battle-stats" id="battleStats">
+                <!-- Battle Stats - Graphic Mode -->
+                <div class="battle-stats battle-stats-graphic" id="battleStats">
                     <div class="battle-stat" title="Current training step">
                         <span class="bs-label">Step</span>
                         <span class="bs-value" id="battleStep">--</span>
@@ -824,9 +848,18 @@
                         <span class="bs-value" id="battleETA">--</span>
                     </div>
                 </div>
+                <!-- Battle Stats - MUD Mode -->
+                <div class="battle-stats-mud" id="battleStatsMud">
+                    <pre class="mud-stats-block">+-------------------+
+| Step:   <span id="mudBattleStep">-------</span>   |
+| Speed:  <span id="mudBattleSpeed">-------</span>   |
+| Strain: <span id="mudBattleStrain">-------</span>   |
+| ETA:    <span id="mudBattleETA">-------</span>   |
++-------------------+</pre>
+                </div>
 
-                <!-- LOSS GRAPH -->
-                <div class="loss-graph-container">
+                <!-- LOSS GRAPH - Graphic Mode -->
+                <div class="loss-graph-container loss-graph-graphic">
                     <div class="loss-graph-header">
                         <span class="loss-graph-title">Effort History (Cumulative Strain)</span>
                         <span class="loss-graph-range" id="lossGraphRange">Last 200 steps</span>
@@ -837,6 +870,15 @@
                         <span class="loss-trend" id="lossTrend">--</span>
                         <span class="loss-max" id="lossMax">--</span>
                     </div>
+                </div>
+                <!-- LOSS GRAPH - MUD Mode -->
+                <div class="loss-graph-mud">
+                    <pre class="mud-effort-block">+-- EFFORT HISTORY --+
+| <span id="mudEffortChart">..................</span> |
++--------------------+
+| Min:<span id="mudLossMin">----</span> Max:<span id="mudLossMax">----</span>  |
+| Trend: <span id="mudLossTrend">--------</span>    |
++--------------------+</pre>
                 </div>
 
                 <!-- TRAINING CONTROLS -->
@@ -872,7 +914,7 @@
 
             <!-- RECENT ACTIVITY -->
             <div class="activity-log">
-                <h4>&#9876; Battle Log</h4>
+                <h4><span class="icon-emoji">&#9876;</span><span class="icon-mud">[*]</span> Battle Log</h4>
                 <div class="log-entries" id="logEntries">
                     <!-- Populated by JavaScript -->
                 </div>
@@ -882,7 +924,7 @@
         <!-- RIGHT: SKILLS & GUILD -->
         <section class="guild-panel">
             <div class="panel-header">
-                <h3>&#127984; Guild Skills</h3>
+                <h3><span class="icon-emoji">&#127984;</span><span class="icon-mud">[G]</span> Guild Skills</h3>
             </div>
 
             <!-- SKILLS (Loaded dynamically from YAML configs) -->
@@ -899,7 +941,7 @@
             <!-- EFFICIENCY DASHBOARD -->
             <div class="efficiency-card" id="efficiencyCard">
                 <div class="panel-header">
-                    <h3>&#128200; Learning Efficiency</h3>
+                    <h3><span class="icon-emoji">&#128200;</span><span class="icon-mud">[^]</span> Learning Efficiency</h3>
                 </div>
                 <div class="efficiency-bars" id="efficiencyBars">
                     <!-- Filled by JavaScript -->
@@ -910,7 +952,7 @@
             <!-- LEVEL TRANSITIONS (MILESTONES) -->
             <div class="transitions-card" id="transitionsCard">
                 <div class="panel-header">
-                    <h3>&#127942; Recent Milestones</h3>
+                    <h3><span class="icon-emoji">&#127942;</span><span class="icon-mud">[!]</span> Recent Milestones</h3>
                 </div>
                 <div class="transitions-list" id="transitionsList">
                     <!-- Filled by JavaScript -->
@@ -921,7 +963,7 @@
             <!-- VAULT SUMMARY -->
             <div class="vault-card">
                 <div class="panel-header">
-                    <h3>&#128477; Vault</h3>
+                    <h3><span class="icon-emoji">&#128477;</span><span class="icon-mud">[V]</span> Vault</h3>
                 </div>
                 <div class="vault-stats">
                     <div class="vault-stat">
@@ -942,9 +984,9 @@
             <!-- FORGE STATUS -->
             <div class="forge-card">
                 <div class="panel-header forge-header">
-                    <span class="forge-torch forge-torch-left">&#128293;</span>
-                    <h3>&#9874; The Forge (4090)</h3>
-                    <span class="forge-torch forge-torch-right">&#128293;</span>
+                    <span class="forge-torch forge-torch-left"><span class="icon-emoji">&#128293;</span><span class="icon-mud">{*</span></span>
+                    <h3><span class="icon-emoji">&#9874;</span><span class="icon-mud">[F]</span> The Forge (4090)</h3>
+                    <span class="forge-torch forge-torch-right"><span class="icon-emoji">&#128293;</span><span class="icon-mud">*}</span></span>
                 </div>
                 <div class="forge-stats">
                     <div class="forge-meter">
@@ -984,7 +1026,7 @@
     <!-- Unified Realm State (single source of truth) -->
     <script src="/static/js/realm-state.js?v=1"></script>
     <!-- Main game logic -->
-    <script src="/static/js/game.js?v=44"></script>
+    <script src="/static/js/game.js?v=47"></script>
 
     <!-- Campaign Banner Updates -->
     <script>
@@ -1040,10 +1082,16 @@
                 trainingBadge.className = 'training-badge ' +
                     (isTraining ? 'active' : (isPaused ? 'paused' : 'idle'));
 
-                const icon = trainingBadge.querySelector('.training-badge-icon');
-                if (icon) {
-                    icon.innerHTML = isTraining ? '&#9876;' :
+                // Update emoji icons
+                const iconEmoji = document.getElementById('trainBadgeIconEmoji');
+                const iconMud = document.getElementById('trainBadgeIconMud');
+                if (iconEmoji) {
+                    iconEmoji.innerHTML = isTraining ? '&#9876;' :
                         (isPaused ? '&#9208;' : '&#128164;');
+                }
+                if (iconMud) {
+                    iconMud.textContent = isTraining ? '[***]' :
+                        (isPaused ? '[||]' : '[Z]');
                 }
                 if (trainingBadgeText) {
                     trainingBadgeText.textContent = isTraining ? 'Training' :
@@ -1056,15 +1104,19 @@
             }
 
             // Current skill badge
-            const skillIcon = document.getElementById('skillBadgeIcon');
+            const skillIconEmoji = document.getElementById('skillBadgeIconEmoji');
+            const skillIconMud = document.getElementById('skillBadgeIconMud');
             const skillNameEl = document.getElementById('skillBadgeName');
             const skillLevelEl = document.getElementById('skillBadgeLevel');
 
             const currentSkill = GameState.currentSkill || 'sy';
             const currentLevel = GameState.currentSkillLevel || 1;
 
-            if (skillIcon) {
-                skillIcon.innerHTML = currentSkill === 'sy' ? '&#129513;' : '&#128290;';
+            if (skillIconEmoji) {
+                skillIconEmoji.innerHTML = currentSkill === 'sy' ? '&#129513;' : '&#128290;';
+            }
+            if (skillIconMud) {
+                skillIconMud.textContent = currentSkill === 'sy' ? '[S]' : '[B]';
             }
             if (skillNameEl) {
                 skillNameEl.textContent = currentSkill.toUpperCase();

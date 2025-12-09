@@ -20,6 +20,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import queue
 import sqlite3
 import threading
@@ -184,10 +185,110 @@ class RealmStateDB:
             try:
                 time.sleep(30)  # Check every 30 seconds
                 self._mark_stale_workers()
+                self._check_training_staleness()
                 self._prune_old_events()
                 self._prune_old_history()
             except Exception as e:
                 logger.error(f"Cleanup error: {e}")
+
+    def _is_process_alive(self, pid: int) -> bool:
+        """Check if a process with the given PID is alive."""
+        try:
+            os.kill(pid, 0)  # Signal 0 just checks if process exists
+            return True
+        except (OSError, TypeError, ProcessLookupError):
+            return False
+
+    def _check_training_staleness(self):
+        """Check if training status says 'training' but process is dead, and reset if so."""
+        try:
+            # Get base dir
+            try:
+                from core.paths import get_base_dir
+                base_dir = get_base_dir()
+            except ImportError:
+                base_dir = Path(__file__).parent.parent
+
+            # Check PID file
+            pid_file = base_dir / ".pids" / "hero_loop.pid"
+            control_state_file = base_dir / "control" / "state.json"
+            training_status_file = base_dir / "status" / "training_status.json"
+
+            # Read current state
+            is_training_state = False
+            if control_state_file.exists():
+                try:
+                    with open(control_state_file, 'r') as f:
+                        control_state = json.load(f)
+                    is_training_state = control_state.get("mode") == "training"
+                except Exception:
+                    pass
+
+            is_training_status = False
+            if training_status_file.exists():
+                try:
+                    with open(training_status_file, 'r') as f:
+                        training_status = json.load(f)
+                    is_training_status = training_status.get("status") == "training"
+                except Exception:
+                    pass
+
+            # If neither says training, nothing to check
+            if not is_training_state and not is_training_status:
+                return
+
+            # Check if process is alive
+            process_alive = False
+            if pid_file.exists():
+                try:
+                    pid = int(pid_file.read_text().strip())
+                    process_alive = self._is_process_alive(pid)
+                except Exception:
+                    pass
+
+            # If status says training but process is dead, reset state
+            if (is_training_state or is_training_status) and not process_alive:
+                logger.warning("Training state stale: status='training' but hero_loop process is dead. Resetting to idle.")
+
+                # Reset control/state.json
+                if control_state_file.exists():
+                    try:
+                        with open(control_state_file, 'r') as f:
+                            state = json.load(f)
+                        state["mode"] = "idle"
+                        state["started_at"] = None
+                        with open(control_state_file, 'w') as f:
+                            json.dump(state, f, indent=2)
+                        logger.info("  Reset control/state.json to idle")
+                    except Exception as e:
+                        logger.error(f"  Failed to reset control/state.json: {e}")
+
+                # Reset status/training_status.json
+                if training_status_file.exists():
+                    try:
+                        with open(training_status_file, 'r') as f:
+                            status = json.load(f)
+                        status["status"] = "idle"
+                        status["timestamp"] = datetime.now().isoformat()
+                        with open(training_status_file, 'w') as f:
+                            json.dump(status, f, indent=2)
+                        logger.info("  Reset status/training_status.json to idle")
+                    except Exception as e:
+                        logger.error(f"  Failed to reset status/training_status.json: {e}")
+
+                # Clean up stale PID file
+                if pid_file.exists():
+                    try:
+                        pid_file.unlink()
+                        logger.info("  Removed stale PID file")
+                    except Exception:
+                        pass
+
+                # Broadcast the state change
+                self._sse.broadcast("training", {"status": "idle", "stale_reset": True})
+
+        except Exception as e:
+            logger.error(f"Training staleness check error: {e}")
 
     def _mark_stale_workers(self):
         """Mark workers as stale if no recent heartbeat."""

@@ -1,0 +1,147 @@
+# =============================================================================
+# HERO: ZARA - The Luminous One
+# =============================================================================
+# ZARA (زهرة / Zahra) means "radiant, luminous, flower" in Arabic/Persian.
+# The largest Qwen3 hero, requiring aggressive memory optimization on 24GB.
+# =============================================================================
+
+id: zara-qwen3-14b
+name: "ZARA"
+rpg_name: "The Luminous One"
+description: >
+  A radiant spirit of immense power and depth.
+  ZARA possesses the greatest capacity for understanding,
+  but channeling such brilliance demands extreme resource discipline.
+
+# =============================================================================
+# MODEL IDENTITY
+# =============================================================================
+model:
+  hf_name: "Qwen/Qwen3-14B"
+  family: "qwen3"
+  architecture: "Qwen3ForCausalLM"
+  size_b: 14.0
+  vocab_size: 151936
+  context_length: 4096
+  rope_scaling: "dynamic"
+
+# =============================================================================
+# MEMORY PROFILE (THE KNOB)
+# =============================================================================
+# 14B requires aggressive optimization for 24GB VRAM
+memory_profile: "24gb_qlora"
+
+# =============================================================================
+# DEFAULT TRAINING SETTINGS
+# =============================================================================
+# Requires maximum memory optimization for 24GB VRAM
+training_defaults:
+  precision: "bf16"
+  load_in_4bit: true  # Required - cannot fit otherwise
+  batch_size: 1  # Minimum batch size
+  gradient_accumulation: 8  # Effective batch of 8
+  learning_rate: 0.00003  # Lower LR for larger model
+  warmup_steps: 300
+  max_length: 512  # Very conservative for memory
+  gradient_checkpointing: true
+  save_steps: 500
+  save_total_limit: 10
+  # Optimizer - paged required for 14B
+  optimizer_type: "paged_adamw_8bit"
+
+# =============================================================================
+# QLORA CONFIGURATION
+# =============================================================================
+# Required for 14B on 24GB
+qlora:
+  enabled: true
+  r: 32  # Lower rank to save memory
+  alpha: 64
+  dropout: 0.02
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+# =============================================================================
+# CHAT TEMPLATE
+# =============================================================================
+chat:
+  template: "qwen3_chat"
+  system_token: "<|im_start|>system"
+  user_token: "<|im_start|>user"
+  assistant_token: "<|im_start|>assistant"
+  end_token: "<|im_end|>"
+
+# =============================================================================
+# VRAM PROFILE
+# =============================================================================
+vram:
+  base_memory_gb: 20.0
+  per_batch_gb: 3.0
+  optimizer_overhead_gb: 48.0  # Very high - must use QLoRA + 8bit
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+display:
+  portrait: "portraits/zara.png"
+  color: "#A855F7"  # Purple - wisdom and depth
+  emoji: "🌟"
+
+# =============================================================================
+# SKILLS AFFINITY
+# =============================================================================
+skills_affinity:
+  - bin
+  - sy
+
+# =============================================================================
+# IDLE BEHAVIOR
+# =============================================================================
+idle_behavior:
+  enabled: true
+  skill_priorities:
+    bin: 0.5
+    sy: 0.5
+  generation:
+    enabled: false
+    batch_size: 500
+    levels: [1, 2, 3]
+    min_queue_depth: 1
+
+# =============================================================================
+# TRAINER TYPE
+# =============================================================================
+trainer:
+  type: "ultimate"
+  optimizer: "galore_8bit"
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes: |
+  ZARA (Qwen3-14B) Training Notes:
+
+  Etymology: زهرة (zahra) means "radiant, luminous, flower" in Arabic/Persian
+
+  CRITICAL: Maximum memory optimization required for 24GB VRAM!
+  - MUST use QLoRA with 4-bit quantization
+  - MUST use 8-bit paged optimizer
+  - Very limited batch size (1) and context length (512)
+  - Consider gradient checkpointing mandatory
+
+  Strengths:
+  - Highest capacity in Qwen3 series (trainable on 24GB)
+  - Superior reasoning and complex task handling
+  - Can achieve the highest skill levels
+
+  Constraints:
+  - Slowest training speed
+  - Severely reduced max_length (512) for memory
+  - Lower LoRA rank (32) to fit in memory
+  - Requires careful monitoring to avoid OOM

@@ -1,7 +1,5 @@
 # The Realm of Training
 
-> **Contributing/Forking?** See [`SHARING.md`](SHARING.md) before pushing to public repos.
-
 > *We propose a surjective morphism* **T: ML** *&rarr;* **RPG** *which maps the high-dimensional manifold of machine learning operations onto the more cognitively tractable space of role-playing game mechanics. This transformation preserves essential structure while minimizing the Kolmogorov complexity of the user's mental model. Empirically, we observe that framing gradient descent as "battle damage" and checkpoint management as "treasure vaults" yields a mass reduction in the probability of the developer staring blankly at terminal output wondering if anything is actually happening.*
 >
 > *&mdash; Definitely Not A Real Paper, 2025*
@@ -178,7 +176,7 @@ At that point, the project becomes a sandbox where humans and models co-evolve a
 
 **Work in Progress.** The system is functional but under active development.
 
-See [`SHARING.md`](SHARING.md) for sharing guidelines and [`CHANGELOG.md`](CHANGELOG.md) for recent updates.
+See [`CHANGELOG.md`](CHANGELOG.md) for recent updates.
 
 ---
 

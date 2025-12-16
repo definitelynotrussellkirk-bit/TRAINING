@@ -63,10 +63,18 @@ from transformers import (
 )
 from datasets import Dataset
 
-# Add paths for modules in other directories
-sys.path.insert(0, str(Path(__file__).parent.parent))  # For trainer/ module
-sys.path.insert(0, str(Path(__file__).parent.parent / "management"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "monitoring" / "servers"))
+# Add paths for modules in other directories (consolidated, deduplicated)
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_EXTRA_PATHS = [
+    _REPO_ROOT,                              # For trainer/ module
+    _REPO_ROOT / "management",               # For model_db, time_estimator
+    _REPO_ROOT / "monitoring" / "servers",   # For live_monitor, evolution_tracker
+    _REPO_ROOT / "data_manager",             # For remote_evaluator
+]
+for _p in _EXTRA_PATHS:
+    _p_str = str(_p)
+    if _p_str not in sys.path:
+        sys.path.insert(0, _p_str)
 
 # Import our components
 from validator import DatasetValidator
@@ -125,8 +133,7 @@ from trainer.monitoring.callbacks import LiveMonitorCallback
 # Import chat template override (fixes Qwen3 <think> injection conflict)
 from core.chat_templates import apply_chat_template_override
 
-# Import Data Manager for remote eval
-sys.path.insert(0, str(Path(__file__).parent.parent / "data_manager"))
+# Import Data Manager for remote eval (path added in _EXTRA_PATHS above)
 try:
     from remote_evaluator import RemoteEvaluator
     REMOTE_EVAL_AVAILABLE = True
@@ -167,7 +174,6 @@ def get_random_stop_emoji() -> str:
         >>> emoji in STOP_EMOJI_POOL
         True
     """
-    import random
     return random.choice(STOP_EMOJI_POOL)
 
 def get_random_stop_count() -> int:
@@ -182,7 +188,6 @@ def get_random_stop_count() -> int:
         >>> 2 <= count <= 4
         True
     """
-    import random
     return random.randint(STOP_COUNT_MIN, STOP_COUNT_MAX)
 
 def get_stop_instruction(emoji: str, count: int) -> str:
@@ -221,7 +226,7 @@ def get_stop_suffix(emoji: str, count: int) -> str:
     """
     return "\n" + emoji * count
 
-def get_thinking_pattern(example_index):
+def get_thinking_pattern(example_index: int) -> tuple:
     """
     Get RANDOM thinking emoji and count for this example.
 
@@ -230,12 +235,14 @@ def get_thinking_pattern(example_index):
     - Random count between 2-8
 
     Uses example_index as seed for reproducibility.
+    Uses LOCAL RNG to avoid mutating global random state.
     """
-    import random
-    random.seed(example_index)  # Reproducible randomness
+    # Use local RNG to avoid polluting global random state
+    # (global random.seed() can affect shuffling, sampling, etc. elsewhere)
+    rng = random.Random(example_index)
 
-    emoji = random.choice(THINKING_EMOJIS)
-    count = random.randint(2, 8)
+    emoji = rng.choice(THINKING_EMOJIS)
+    count = rng.randint(2, 8)
 
     count_words = ["two", "three", "four", "five", "six", "seven", "eight"]
     count_word = count_words[count - 2]  # count 2 -> index 0
@@ -518,9 +525,10 @@ class UltimateTrainer:
                 content = json.dumps(content, ensure_ascii=False)
             if role == "user":
                 # Add stop instruction to USER messages
-                # Check if ANY stop instruction already present
+                # Check if ANY stop instruction already present (case-insensitive)
+                content_lower = content.lower()
                 has_stop_instruction = any(
-                    emoji in content and "When finished" in content
+                    emoji in content and "when finished" in content_lower
                     for emoji in STOP_EMOJI_POOL
                 )
                 if not has_stop_instruction:
@@ -560,7 +568,6 @@ class UltimateTrainer:
     def enforce_locked_config(self):
         """Hard guard: abort if locked config values are violated."""
         try:
-            import json
             cfg_path = Path("config.json")
             if not cfg_path.exists():
                 print("⚠️  Locked-config check: config.json not found; skipping hard guard.")
@@ -595,14 +602,16 @@ class UltimateTrainer:
                     errors.append(f"model_path missing: {model_path_cfg}")
                 else:
                     # If args.model is a path, ensure it matches model_path to avoid wrong model
-                    if Path(self.args.model).exists():
-                        args_model_path = Path(self.args.model).resolve()
+                    # Guard against args.model being None/empty (would crash Path())
+                    args_model = getattr(self.args, "model", None)
+                    if args_model and Path(args_model).exists():
+                        args_model_path = Path(args_model).resolve()
                         model_path_resolved = Path(model_path_cfg).resolve()
                         # Allow training from current_model_dir as adapter resume
                         if current_model_dir_cfg and args_model_path == Path(current_model_dir_cfg).resolve():
                             pass
                         elif args_model_path != model_path_resolved:
-                            errors.append(f"args.model ({self.args.model}) differs from config model_path ({model_path_cfg})")
+                            errors.append(f"args.model ({args_model}) differs from config model_path ({model_path_cfg})")
 
             if errors:
                 print("\n❌ Locked configuration violation detected. Aborting to protect training.")
@@ -672,23 +681,29 @@ class UltimateTrainer:
         # Build MonitorContext with available components
         # Note: live_monitor=None is OK - inference preview is disabled in callback
         # The callback still handles: progress, throughput, ledger, control signals
-        monitors = MonitorContext(
-            live_monitor=None,  # Inference preview disabled, not needed
-            evolution_tracker=self.evolution_tracker,
-            layer_monitor=None,  # Engine will create if available
-            controller=self.controller,
-            raw_train_examples=[],  # Engine will populate from dataset
-            logits_processor=self.logits_processor,
-            remote_eval_config=self.config_dict.get("remote_eval", {}),
-            current_file=getattr(self.args, "dataset", None),
-            batch_number=getattr(self.args, "batch_number", None),
-            batch_queue_size=getattr(self.args, "batch_queue_size", None),
-            fixed_val_dataset=None,  # Could be set if available
-            micro_eval_inputs=None,  # Could be set if available
-            micro_eval_interval=self.config.monitoring.micro_eval_interval
-                if self.config and self.config.monitoring else 500,
-            status_writer=self.status_writer,
-        ) if MonitorContext else None
+        monitors = None
+        if MonitorContext:
+            # Extract micro_eval_interval with safe fallback
+            micro_eval_interval = 500  # default
+            if self.config and self.config.monitoring:
+                micro_eval_interval = getattr(self.config.monitoring, 'micro_eval_interval', 500)
+
+            monitors = MonitorContext(
+                live_monitor=None,  # Inference preview disabled, not needed
+                evolution_tracker=self.evolution_tracker,
+                layer_monitor=None,  # Engine will create if available
+                controller=self.controller,
+                raw_train_examples=[],  # Engine will populate from dataset
+                logits_processor=self.logits_processor,
+                remote_eval_config=self.config_dict.get("remote_eval", {}),
+                current_file=getattr(self.args, "dataset", None),
+                batch_number=getattr(self.args, "batch_number", None),
+                batch_queue_size=getattr(self.args, "batch_queue_size", None),
+                fixed_val_dataset=None,  # Could be set if available
+                micro_eval_inputs=None,  # Could be set if available
+                micro_eval_interval=micro_eval_interval,
+                status_writer=self.status_writer,
+            )
 
         print("   MonitorContext built (controller, status_writer, remote_eval)")
 

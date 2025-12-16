@@ -140,8 +140,8 @@ Six schools define HOW the Hero learns:
 ## CRITICAL RULES
 
 ### Documentation Policy
-**8 Canonical Docs** - Only write to:
-- `README.md`, `LORE.md`, `QUICKSTART.md`, `ARCHITECTURE.md`
+**9 Canonical Docs** - Only write to:
+- `README.md`, `LORE.md`, `QUICKSTART.md`, `GETTING_STARTED.md`, `ARCHITECTURE.md`
 - `TROUBLESHOOTING.md`, `REMOTE_INFERENCE.md`, `DEVELOPMENT.md`, `CHANGELOG.md`
 
 ### Safety Policies
